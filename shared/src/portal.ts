@@ -4,13 +4,15 @@ import { publicStatus } from "./ticket-status";
 // Allowlist field EKSPLISIT, bukan `Omit<>`: kolom yang bertambah di Prisma nanti tak akan
 // diam-diam ikut terkirim, dan test mengadu kunci hasilnya ke daftar ini.
 
-export const PORTAL_PROJECT_KEYS = ["id", "name"] as const;
+// ADR-0211 · `chatEnabled` = penanda ketersediaan chat untuk akun ini di project ini (gerbang yang
+// sama dengan route chat). Hanya boolean: tak ada setelan chat lain yang ikut terpancar.
+export const PORTAL_PROJECT_KEYS = ["id", "name", "chatEnabled"] as const;
 export const PORTAL_SPEC_KEYS =
   ["id", "title", "priority", "stage", "objective", "createdAt", "startedAt", "doneAt"] as const;
 export const PORTAL_TICKET_KEYS =
   ["id", "number", "category", "title", "status", "createdAt"] as const;
 
-export type PortalProject = { id: string; name: string };
+export type PortalProject = { id: string; name: string; chatEnabled: boolean };
 export type PortalSpec = {
   id: string; title: string; priority: string; stage: string; objective: string;
   createdAt: string; startedAt: string | null; doneAt: string | null;
@@ -23,8 +25,8 @@ export type PortalTicketDetail = PortalTicket & { detail: string };
 const iso = (d: Date | string | null | undefined): string | null =>
   d == null ? null : (typeof d === "string" ? d : d.toISOString());
 
-export function toPortalProject(p: { id: string; name: string }): PortalProject {
-  return { id: p.id, name: p.name };
+export function toPortalProject(p: { id: string; name: string }, chatEnabled: boolean): PortalProject {
+  return { id: p.id, name: p.name, chatEnabled };
 }
 
 export function toPortalSpec(s: {

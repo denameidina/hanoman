@@ -261,8 +261,7 @@ function ConfigField({ entry, draft, onDraft, onSave, onReset }: {
       {entry.hasValue && draft === undefined
         ? <><code className="hn-set-codeinline">{entry.masked}</code>
             <Button size="sm" variant="ghost" leftIcon="pencil" onClick={() => onDraft("")}>Ganti</Button>
-            <Button size="sm" variant="secondary" leftIcon="trash-2" onClick={onReset}
-              className="hn-set-danger-text">Hapus</Button></>
+            <Button size="sm" variant="danger-outline" leftIcon="trash-2" onClick={onReset}>Hapus</Button></>
         : <form onSubmit={submit} className="hn-set-inline hn-set-wrap">
             <Input aria-label={entry.label} type="password"
               placeholder={entry.hasValue ? "biarkan kosong = pertahankan" : (configEntry(entry.key)?.example ?? "tempel token…")}
@@ -283,8 +282,7 @@ function ConfigField({ entry, draft, onDraft, onSave, onReset }: {
       placeholder={configEntry(entry.key)?.example}
       value={draft ?? entry.value ?? ""} onChange={(ev: React.ChangeEvent<HTMLInputElement>) => onDraft(ev.target.value)} className="hn-set-w-input" />
     <Button size="sm" type="submit" leftIcon="save">Simpan</Button>
-    {entry.source === "db" && <Button size="sm" variant="secondary" leftIcon="rotate-ccw" onClick={onReset}
-      className="hn-set-danger-text">Reset</Button>}</form>;
+    {entry.source === "db" && <Button size="sm" variant="danger-outline" leftIcon="rotate-ccw" onClick={onReset}>Reset</Button>}</form>;
 }
 
 // ── Log aktivitas ─────────────────────────────────────────────────────────────
@@ -321,8 +319,8 @@ export function ActivityPanel({ onToast }: { onToast?: ShowToast }) {
       <div className="hn-grid-mobile hn-set-form2 hn-set-spaced">
         <Field label="Project (opsional)"><Input value={projectId} placeholder="mis. hanoman — kosong = semua project"
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjectId(e.target.value)} className="hn-set-full" /></Field>
-        <Button size="sm" variant="secondary" leftIcon="trash-2" disabled={!!blocked}
-          aria-describedby={blocked ? hintId : undefined} onClick={purge} className="hn-set-btn-align hn-set-danger-text">Hapus log</Button>
+        <Button size="sm" variant="danger-outline" leftIcon="trash-2" disabled={!!blocked}
+          aria-describedby={blocked ? hintId : undefined} onClick={purge} className="hn-set-btn-align">Hapus log</Button>
       </div>
       <BlockedHint id={hintId} text={blocked} />
       {rows === null ? <StateBlock kind="loading" compact title="Memuat aktivitas…" />

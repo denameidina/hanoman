@@ -83,7 +83,9 @@ tanpa itu **400**, bukan akun ber-role klien **404**, dan sesi cookie klien **se
 cookie-only: itu bertindak SEBAGAI klien.
 
 ```
-GET /portal/projects[?page=&limit=]         -> { items: [{ id, name }], total, page, pageSize }   # HANYA project yang ditugaskan
+GET /portal/projects[?page=&limit=]         -> { items: [{ id, name, chatEnabled }], total, page, pageSize }   # HANYA project yang ditugaskan
+#   chatEnabled (ADR-0211) = gerbang chat (master switch ∧ akses), SAMA dengan route chat di bawah. Boolean saja:
+#   model, effort, batas, dan kuota TIDAK ikut. Klien memakainya untuk menampilkan tab chat tanpa probe.
 GET /portal/projects/:id/backlog?page=&limit=  -> { items: PortalSpec[], total, page, pageSize }
 GET /portal/projects/:id/backlog/:specId    -> PortalSpec
 GET /portal/projects/:id/tickets?page=&limit=  -> { items: PortalTicket[], total, page, pageSize }
@@ -183,10 +185,15 @@ DELETE /client-accounts/:id    # 204; sesi & baris akses ikut cascade
 
 ## Projects
 ```
-GET  /projects?q=&handledBy=&page=&limit=   # -> { items: ProjectView[], total, page, pageSize } (SPEC-198)
+GET  /projects?q=&handledBy=&sort=&attention=&page=&limit=   # -> { items: ProjectView[], total, page, pageSize } (SPEC-198)
 #   q menyaring name+desc+stack; tanpa page/limit → seluruh item. coverage/docStatus tetap live-scan tiap panggil.
 #   SPEC-880 · ADR-0135 · `handledBy=<deviceId>` menyaring ke project yang penandanya memuat device
 #   itu — "apa saja yang dipegang mesin X" dalam satu klik. Bergabung dengan `q`, bukan menggantikannya.
+#   ADR-0212 · `sort=attention` mengurutkan SELURUH hasil sebelum dipotong: rusak → drift → sisanya, lalu nama
+#   (huruf kecil), lalu id. Urutan total: paginasi lintas halaman konsisten. `attention=1|true` menyaring ke
+#   project dengan docStatus ≠ ok (`0|false`/kosong = tanpa penyaring). Urutan: q → handledBy → attention → sort → paginasi.
+#   Nilai `sort` selain `attention`, dan `attention` selain 0/1/true/false → 400 `{ error }`. Tanpa kedua param = perilaku lama.
+#   MCP: `hanoman_projects_list` menerima `sort` dan `attention` (param aditif, `projects:read`, tanpa tool baru).
 POST /projects            { name, kind, repoDir?, desc, gitRemote?, handledBy? }   # repoDir OPSIONAL (SPEC-217)
 #   SPEC-222 · kind "from-scratch" + repoDir → hanoman `git init` + commit awal (siap scaffold); gagal init → 400
 GET  /projects/:id        # view memuat `repoDir` (default project) + `binding` (override per-mesin | null)
@@ -1481,7 +1488,11 @@ POST   /specs/:id/done                   # BERUBAH: 409 confirm-required juga sa
 ## VPS (SPEC-164 · ADR-0025 · SPEC-211/ADR-0042)
 ```
 GET    /vps                          # [{ id, name, host, port, user, keyPath, lastSeenAt,
-                                     #    health, lastAuditAt, audit, hardened }]
+                                     #    health, lastAuditAt, audit, hardened, scoreTotal }]
+#   scoreTotal (ADR-0211) = skor kepatuhan dari snapshot audit TERSIMPAN terbaru + keputusan N/A/attest
+#   terkini (hitungan yang sama dengan checklist). null = belum pernah diaudit di mesin ini. Listing
+#   TIDAK menjalankan audit atau SSH. Field ini turunan: tak disimpan, tak ikut sync. Siaran grup `vps`
+#   memakai bentuk yang sama.
 POST   /vps  {name,host,user,port?,keyPath?,password?}  # 201 · 400 host/user cacat
                                      # password (SPEC-165) = bootstrap key sekali pakai:
                                      # dipasang ke authorized_keys, diverifikasi key-only,
@@ -1900,8 +1911,8 @@ GET  /api/scheduler/state    -> { config, cap, liveCount, sources:[{id,enabled,e
 #                                  queueCounts:{queued,launched,done,failed,canceled}, sessions:[sesi live ber-item 'launched'],
 #                                  admission:{enabled,liveCount,liveAgentCount,maxConcurrent,loadPerCore,maxLoadPerCore,loadStatus},
 #                                  serverTimeZone }
-# ADR-0204 · `serverTimeZone` = Intl resolvedOptions().timeZone server, zona tempat cron dihitung. Preview cron
-# di UI seharusnya memakai zona ini, bukan zona browser.
+# ADR-0204 · `serverTimeZone` = Intl resolvedOptions().timeZone server, zona tempat cron dihitung.
+# ADR-0212 · Preview cron di UI kini memakai zona ini (`nextRunFor(expr, now, serverTimeZone)`), tanpa batasan zona browser.
 # SPEC-1108: launchGuard={enabled:true,maxLoadPerCore:2.5}, angka finite positif. Baris lama diisi default.
 # Switch baru mematikan kedua check peluncuran; batching governor tetap memakai maxConcurrent.
 # State admission juga dikirim melalui topik schedulerState; metrik Windows null/unsupported.

@@ -47,6 +47,6 @@ export function canApplyRemediation(selected: readonly string[], previewFor: rea
   return selected.length > 0 && previewFor !== null && sameSet(selected, previewFor);
 }
 
-/** Label skor di daftar: skor hanya diketahui setelah audit atau checklist dibuka di sesi ini. */
-export const scoreText = (score: number | undefined): string =>
-  score === undefined ? "Skor —" : `Skor ${score}%`;
+/** Label skor di daftar. `null`/tak ada = belum pernah diaudit (ADR-0211), tampil sebagai strip. */
+export const scoreText = (score: number | null | undefined): string =>
+  score == null ? "Skor —" : `Skor ${score}%`;

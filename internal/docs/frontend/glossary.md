@@ -22,6 +22,7 @@ Dokumen ini adalah kontrak untuk teks yang tampil ke operator. Kode penegaknya: 
 | Nilai enum | label dari `lib/labels.ts` | nilai mentah | Lihat "Enum" di bawah. |
 | Waktu relatif | "baru saja", "5 menit lalu", "2 jam lalu", "kemarin", "3 hari lalu", lalu tanggal ("4 Okt") | "5m lalu", "5 mnt", "2j lalu", "baru saja lalu" | Lihat "Waktu relatif" di bawah. |
 | Mode tampilan terminal | **Fokus** (satu pane + daftar sesi), **Grid** (beberapa pane) | Split, Tabs, Panel | Default Fokus sejak Fase 3E. Pilihan tersimpan per browser. |
+| Dukungan pembaca layar terminal | **Mode pembaca layar** (opsi, default mati) | Screen reader mode, Mode SR, Aksesibilitas penuh | Opsi xterm `screenReaderMode`; tersimpan per browser (`hn.ui.v1.terminal.sr`). Belum diuji dengan VoiceOver/NVDA (Audit UI/UX 2026-10 · keputusan 15). |
 | Buka sesi lain | **Buka…** (menu: Ambil backlog, Riwayat sesi, Terminal biasa) | Impor, Attach | Pemicu bertulisan di toolbar Terminal; di ponsel ikon ber-label "Buka…" (nama aksesibel sama). |
 | Laporan dari klien (tiket) | **Keluhan** (tab "Keluhan saya", tombol "Lapor masalah") | Laporan & keluhan, Help desk, Tiket, Bug | Di layar Klien dan Help Center. Kategori "Ada masalah" untuk `bug`. |
 | Obrolan klien | **Tanya & ide** (tab di Klien) | Obrolan, Chat | Sesi chat milik project, bukan milik satu keluhan. |
@@ -96,7 +97,6 @@ Daftar ini sama dengan allowlist `UTANG Fase 3`. Setiap baris dihapus dari allow
 
 Sisa di luar pemindai (bukan wilayah Fase 2D, tercatat untuk Fase 3):
 
-- `notifications/NotificationBell.tsx`, `notifications/NotificationsArchiveModal.tsx`: waktu relatif sendiri (`5m lalu`, `2j lalu`). Ganti ke `relativeTime`.
 - `portal/labels.ts` sudah menjadi satu-satunya peta kosakata Klien dan Help Center (Fase 3M); status tiket klien dipetakan di `portal/ticket-timeline.ts`.
 - `screens/VpsChecklist.tsx`: peta `MODE_LABEL` (Otomatis/Audit/Info) masih lokal. Pindahkan ke `lib/labels.ts`. Tooltip dan lencana sudah memakai `VPS_SEVERITY_LABEL` dan `VPS_ITEM_STATUS_LABEL` (Fase 3J).
 - `screens/SpecDocsModal.tsx` (`KIND_LABEL`), `screens/settings/Advanced.tsx` (`GROUP_LABEL`, `SOURCE_WORD`, `APPLY_WORD`; pindah dari `SettingsScreen.tsx` di Fase 3C), `screens/RemoteControlPanel.tsx` (`RELAY_LABEL`): peta lokal yang belum dipindah.

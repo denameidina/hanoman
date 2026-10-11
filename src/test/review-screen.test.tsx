@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
+import type { ComponentProps } from "react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { ReviewScreen } from "../src/screens/ReviewScreen";
 import { api } from "../src/api/client";
 import { mockViewport, resetViewport } from "./viewport";
+import { routePath } from "../src/routes";
 
 vi.mock("../src/api/client", () => ({
   api: {
@@ -237,5 +241,160 @@ describe("ReviewScreen · belum ada worktree (409)", () => {
     await screen.findByText("Belum ada perubahan untuk ditinjau");
     expect(screen.queryByRole("link", { name: "Buka di Backlog" })).toBeNull();
     expect(screen.getByRole("link", { name: "Buka di Terminal" })).toBeInTheDocument();
+  });
+});
+
+// Audit UI/UX 2026-10 · Fase 3L′ · bar keputusan dengan prop: Integrasikan (primer), Kembalikan ke
+// Dikerjakan (sekunder), dan ⋯ berisi Hapus worktree serta navigasi. Setiap mutasi lewat useConfirm;
+// galatnya tampil di bar. Layar induk yang menjalankan mutasi, jadi tes memakai callback tiruan.
+describe("ReviewScreen · bar keputusan dengan prop (Fase 3L′)", () => {
+  beforeEach(() => mockViewport(1280));
+
+  const renderReview = (extra: Partial<ComponentProps<typeof ReviewScreen>> = {}) =>
+    render(<ReviewScreen specId="SPEC-171" title="Judul item" onBack={() => {}} {...extra} />);
+  // Bar dicari lewat region-nya, supaya tombol di dalam dialog tidak tercampur.
+  async function decideBar() {
+    await screen.findByText("Judul item");
+    return screen.getByRole("region", { name: "Keputusan" });
+  }
+
+  it("tanpa prop keputusan: hanya tiga tujuan navigasi, tanpa aksi mutasi", async () => {
+    renderReview({ onGoto: vi.fn() });
+    const bar = await decideBar();
+    expect(within(bar).getByRole("button", { name: "Buka di Backlog" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Buka di Terminal" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Buka di IDE" })).toBeInTheDocument();
+    expect(within(bar).queryByRole("button", { name: "Integrasikan" })).toBeNull();
+    expect(within(bar).queryByRole("button", { name: "Kembalikan ke Dikerjakan" })).toBeNull();
+    expect(within(bar).queryByRole("button", { name: "Aksi lain untuk item ini" })).toBeNull();
+  });
+
+  it("dengan prop: aksi sekunder, primer, dan ⋯; tujuan navigasi pindah ke ⋯", async () => {
+    renderReview({ onGoto: vi.fn(), onIntegrate: vi.fn(), onRevert: vi.fn(), onDiscard: vi.fn() });
+    const bar = await decideBar();
+    expect(within(bar).getByRole("button", { name: "Kembalikan ke Dikerjakan" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Integrasikan" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Aksi lain untuk item ini" })).toBeInTheDocument();
+    expect(within(bar).queryByRole("button", { name: "Buka di Terminal" })).toBeNull();
+  });
+
+  it("menu ⋯ memuat navigasi dan memanggil onGoto", async () => {
+    const onGoto = vi.fn();
+    renderReview({ onGoto, onDiscard: vi.fn() });
+    const bar = await decideBar();
+    fireEvent.click(within(bar).getByRole("button", { name: "Aksi lain untuk item ini" }));
+    const menu = await screen.findByRole("dialog");
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Buka di IDE" }));
+    expect(onGoto).toHaveBeenCalledWith({ section: "ide" });
+  });
+
+  it("integrasi: konfirmasi memuat branch, berkas +/−, dan cabang tujuan; konfirmasi memanggil onIntegrate", async () => {
+    const onIntegrate = vi.fn().mockResolvedValue(undefined);
+    renderReview({ onIntegrate, integrateTarget: "main (lokal)" });
+    const bar = await decideBar();
+    fireEvent.click(within(bar).getByRole("button", { name: "Integrasikan" }));
+    const dlg = await screen.findByRole("dialog");
+    expect(within(dlg).getByText("Branch: hanoman/spec-171")).toBeInTheDocument();
+    expect(within(dlg).getByText("1 berkas berubah, +3 −1 baris")).toBeInTheDocument();
+    expect(within(dlg).getByText("Cabang tujuan: main (lokal)")).toBeInTheDocument();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Integrasikan" }));
+    await waitFor(() => expect(onIntegrate).toHaveBeenCalledWith("SPEC-171"));
+  });
+
+  it("integrasi tanpa cabang tujuan eksplisit menyebut cabang asal item", async () => {
+    renderReview({ onIntegrate: vi.fn() });
+    const bar = await decideBar();
+    fireEvent.click(within(bar).getByRole("button", { name: "Integrasikan" }));
+    const dlg = await screen.findByRole("dialog");
+    expect(within(dlg).getByText("Cabang tujuan: cabang asal item (default project)")).toBeInTheDocument();
+  });
+
+  it("integrasi: Batal menutup dialog tanpa memanggil onIntegrate", async () => {
+    const onIntegrate = vi.fn().mockResolvedValue(undefined);
+    renderReview({ onIntegrate });
+    const bar = await decideBar();
+    fireEvent.click(within(bar).getByRole("button", { name: "Integrasikan" }));
+    const dlg = await screen.findByRole("dialog");
+    fireEvent.click(within(dlg).getByRole("button", { name: "Batal" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(onIntegrate).not.toHaveBeenCalled();
+  });
+
+  it("integrasi yang gagal tampil sebagai galat di bar, tidak ditelan", async () => {
+    const onIntegrate = vi.fn().mockRejectedValue(new Error("branch belum ada"));
+    renderReview({ onIntegrate });
+    const bar = await decideBar();
+    fireEvent.click(within(bar).getByRole("button", { name: "Integrasikan" }));
+    const dlg = await screen.findByRole("dialog");
+    fireEvent.click(within(dlg).getByRole("button", { name: "Integrasikan" }));
+    expect(await screen.findByText("Gagal mengintegrasikan item: branch belum ada")).toBeInTheDocument();
+  });
+
+  it("kembalikan: dry-run pending memuat daftar dokumen; konfirmasi memanggil ulang dengan confirmDelete", async () => {
+    const onRevert = vi.fn().mockImplementation((_id: string, confirmDelete?: boolean) => Promise.resolve(
+      confirmDelete ? undefined : { pending: true, stage: "executing", wouldDelete: ["internal/docs/spec.md", "docs/plan.md"] }));
+    renderReview({ onRevert });
+    const bar = await decideBar();
+    fireEvent.click(within(bar).getByRole("button", { name: "Kembalikan ke Dikerjakan" }));
+    const dlg = await screen.findByRole("dialog");
+    expect(within(dlg).getByText("internal/docs/spec.md")).toBeInTheDocument();
+    expect(within(dlg).getByText("2 berkas dokumen fase akan dihapus dari disk. Kode dan commit tidak disentuh.")).toBeInTheDocument();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Hapus dokumen & kembalikan" }));
+    await waitFor(() => expect(onRevert).toHaveBeenLastCalledWith("SPEC-171", true));
+    expect(onRevert).toHaveBeenNthCalledWith(1, "SPEC-171");
+  });
+
+  it("kembalikan tanpa balasan pending langsung selesai tanpa dialog", async () => {
+    const onRevert = vi.fn().mockResolvedValue(undefined);
+    renderReview({ onRevert });
+    const bar = await decideBar();
+    fireEvent.click(within(bar).getByRole("button", { name: "Kembalikan ke Dikerjakan" }));
+    await waitFor(() => expect(onRevert).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("hapus worktree dari ⋯ lewat konfirmasi memanggil onDiscard", async () => {
+    const onDiscard = vi.fn().mockResolvedValue(undefined);
+    renderReview({ onDiscard });
+    const bar = await decideBar();
+    fireEvent.click(within(bar).getByRole("button", { name: "Aksi lain untuk item ini" }));
+    const menu = await screen.findByRole("dialog");
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Hapus worktree" }));
+    const dlg = await screen.findByRole("dialog");
+    expect(within(dlg).getByText("Sesi yang masih berjalan di worktree ini ditutup.")).toBeInTheDocument();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Hapus worktree" }));
+    await waitFor(() => expect(onDiscard).toHaveBeenCalledWith("SPEC-171"));
+  });
+
+  it("hapus worktree yang gagal tampil sebagai galat di bar", async () => {
+    const onDiscard = vi.fn().mockRejectedValue(new Error("worktree terkunci"));
+    renderReview({ onDiscard });
+    const bar = await decideBar();
+    fireEvent.click(within(bar).getByRole("button", { name: "Aksi lain untuk item ini" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("menuitem", { name: "Hapus worktree" }));
+    const dlg = await screen.findByRole("dialog");
+    fireEvent.click(within(dlg).getByRole("button", { name: "Hapus worktree" }));
+    expect(await screen.findByText("Gagal menghapus worktree: worktree terkunci")).toBeInTheDocument();
+  });
+
+  it("bar keputusan adalah anak terakhir layar, di luar panel berkas dan isi", async () => {
+    renderReview({ onIntegrate: vi.fn() });
+    const bar = await decideBar();
+    expect(bar.parentElement?.lastElementChild).toBe(bar);
+    expect(bar.closest(".hn-review-viewer")).toBeNull();
+    expect(bar.closest(".hn-review-pane")).toBeNull();
+  });
+});
+
+describe("ReviewScreen · kontrak CSS bar keputusan", () => {
+  // Bar sticky di dalam area gulir `.hn-shell-main`, yang berakhir di atas lajur pet (DS: pet di alur layout).
+  // Jsdom tidak menghitung layout, jadi yang dikunci adalah deklarasinya.
+  const css = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/review.css"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  it("bar keputusan sticky di bawah dan memiliki z-index", () => {
+    const rule = /\.hn-review-decide\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(rule).toMatch(/position:\s*sticky/);
+    expect(rule).toMatch(/bottom:\s*0/);
+    expect(rule).toMatch(/z-index:\s*\d+/);
   });
 });

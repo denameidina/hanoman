@@ -26,12 +26,12 @@ yang tersentuh diperbarui dalam commit yang sama. Baseline gagal sebelum perubah
 ## Fase 2 — fondasi design system
 - [x] 2A komponen DS: PageHeader, FilterBar, RowList, Stack/Inline, Text, hover CSS, StatusPill dot
 - [x] 2B a11y DS: Field/Input/Select, Radio, Modal inert+h2, shell h1+skip link, Toast antrean + undo, Icon aria-hidden
-- [ ] 2C command palette + shortcut (selesai; "Jawab sesi yang menunggu" ada di palet). Sebagian: tombol "Jawab" di toast dan notifikasi belum ada; "Jawab" hanya di Overview, Dalang, gelembung pet, dan palet.
+- [x] 2C command palette + shortcut (selesai; "Jawab sesi yang menunggu" ada di palet). Tombol "Jawab" di toast dan notifikasi keputusan menyusul di Fase 4 (Z4), sudah ada.
 - [x] 2D map label terpusat + glosarium copy + skeleton/loading
 - [x] 2E pembersihan CSS: kelas `hn-*` mati dan Dalang lama dicabut, `!important` 45 → 30 (sisa dicatat), font tak lagi render-blocking. Layout inline yang tersisa belum dipindah (lihat frontend-implementation § Fase 2E)
 - [x] 2G backend tindak lanjut (ADR-0204): requeue `failed` (butuh `sessions:spawn`), tandai notifikasi terbaca per item (`POST /notifications/:id/read`, tool `hanoman_notification_mark_read`), `serverTimeZone` di scheduler.
 - [ ] Varian `danger` pada `ProgressBar`, `Radio`, `Field`, dan `Callout` (sisa; `Button` dan `OverflowActions` sudah punya).
-- [ ] Hapus layout inline (sisa): `style={{` di `screens/` 1.416 → 1.546 (puncak Fase 2) → 561 sekarang. Belum dipindah ke kelas `hn-*`; lihat frontend-implementation § Fase 2E.
+- [ ] Hapus layout inline (sisa): `style={{` di `screens/` 1.416 → 1.546 (puncak Fase 2) → 561 sekarang. Belum dipindah ke kelas `hn-*`; lihat frontend-implementation § Fase 2E. Fase 4 (Z4): App.tsx 49 → 0, kit 24 → 3, shell 8 → 1, lonceng 17 → 0, arsip 5 → 0, PetAnswer 15 → 0 (sisa dinamis, lihat § Fase 4).
 
 ## Fase 3 — redesign
 - [x] 3A ADR IA baru (17 → 8 menu) + nav hub — ADR-0205; tanpa redirect (path section tak berubah, URL lama tetap hidup)

@@ -6,6 +6,7 @@ import { Button, Icon, IconButton, useConfirm } from "../ds";
 import { paths, type SpecAttachmentView } from "@hanoman/shared";
 import { api } from "../api/client";
 import { failureMessage } from "../lib/report-error";
+import "./styles/dialogs.css";
 
 // Cermin allowlist server (`services/spec-attachment.ts` + `DOCUMENT_TYPES`). Mime DAN ekstensi
 // disebut keduanya: picker macOS menyaring lewat ekstensi, Linux lewat mime.
@@ -24,50 +25,32 @@ export const humanSize = (n: number): string =>
     : n >= 1024 ? `${Math.round(n / 1024)} KB`
     : `${n} B`;
 
-const CARD: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
-  border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)",
-  background: "var(--surface-card)", fontSize: 13,
-};
-
-const THUMB: React.CSSProperties = {
-  width: 44, height: 44, objectFit: "cover", borderRadius: "var(--radius-xs)",
-  border: "1px solid var(--border-hair)", display: "block", flexShrink: 0,
-};
-
-const NAME: React.CSSProperties = { flex: 1, color: "var(--text-strong)", wordBreak: "break-all" };
-const META: React.CSSProperties = { color: "var(--text-subtle)", fontSize: 12, whiteSpace: "nowrap" };
-
+// Gaya kartu, miniatur, nama, dan meta hidup di `styles/dialogs.css` (`hn-att-*`).
 function Dropzone({ children, onFiles }: { children?: React.ReactNode; onFiles: (f: File[]) => void }) {
   const [over, setOver] = React.useState(false);
   const input = React.useRef<HTMLInputElement>(null);
   return (
-    <div data-dropzone
+    <div data-dropzone className="hn-att-drop" data-over={over ? "true" : "false"}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
       onDragLeave={() => setOver(false)}
       onDrop={(e) => {
         e.preventDefault(); setOver(false);
         const list = Array.from(e.dataTransfer?.files ?? []);
         if (list.length) onFiles(list);
-      }}
-      style={{
-        border: `1px dashed ${over ? "var(--accent)" : "var(--border-hair)"}`,
-        borderRadius: "var(--radius-sm)", padding: 12,
-        background: over ? "var(--accent-tint)" : "transparent", transition: "background 120ms",
       }}>
-      <input ref={input} type="file" multiple accept={ATTACHMENT_ACCEPT} style={{ display: "none" }}
+      <input ref={input} type="file" multiple accept={ATTACHMENT_ACCEPT} className="hn-att-input"
         aria-label="Pilih lampiran"
         onChange={(e) => {
           const list = Array.from(e.target.files ?? []);
           e.target.value = "";
           if (list.length) onFiles(list);
         }} />
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div className="hn-att-row">
         <Icon name="paperclip" size={14} />
-        <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+        <span className="hn-att-hint">
           Seret berkas ke sini — gambar, .md, .txt, .log, .json, .csv, .pdf
         </span>
-        <span style={{ flex: 1 }} />
+        <span className="hn-grow" />
         <Button size="sm" variant="secondary" leftIcon="upload"
           onClick={() => input.current?.click()}>Pilih berkas</Button>
       </div>
@@ -81,12 +64,12 @@ export function AttachmentPicker({ files, onChange }: { files: File[]; onChange:
   return (
     <Dropzone onFiles={(list) => onChange([...files, ...list])}>
       {files.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+        <div className="hn-att-list">
           {files.map((f, i) => (
-            <div key={`${f.name}-${i}`} style={CARD}>
+            <div key={`${f.name}-${i}`} className="hn-att-card">
               <Icon name={isImage(f.type) ? "image" : iconFor(f.type)} size={16} />
-              <span style={NAME}>{f.name}</span>
-              <span style={META}>{humanSize(f.size)}</span>
+              <span className="hn-att-name">{f.name}</span>
+              <span className="hn-att-meta">{humanSize(f.size)}</span>
               <IconButton size="sm" icon="x" label={`Buang ${f.name}`}
                 onClick={() => onChange(files.filter((_, j) => j !== i))} />
             </div>
@@ -149,21 +132,21 @@ export function SpecAttachmentsPanel({ specId, onToast }: { specId: string; onTo
   }
 
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Lampiran</div>
+    <div className="hn-att-panel">
+      <div className="hn-eyebrow hn-att-eyebrow">Lampiran</div>
       <Dropzone onFiles={(f) => void upload(f)}>
         {items.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+          <div className="hn-att-list">
             {items.map((a) => (
-              <div key={a.id} style={CARD}>
+              <div key={a.id} className="hn-att-card">
                 {isImage(a.mimeType)
-                  ? <img src={paths.specAttachment(specId, a.id)} alt={a.filename} style={THUMB} />
+                  ? <img src={paths.specAttachment(specId, a.id)} alt={a.filename} className="hn-att-thumb" />
                   : <Icon name={iconFor(a.mimeType)} size={16} />}
-                <span style={NAME}>{a.filename}</span>
-                <span style={META}>{humanSize(a.size)}</span>
+                <span className="hn-att-name">{a.filename}</span>
+                <span className="hn-att-meta">{humanSize(a.size)}</span>
                 <a href={paths.specAttachment(specId, a.id)} download={a.filename}
                   aria-label={`Unduh ${a.filename}`} title={`Unduh ${a.filename}`}
-                  style={{ display: "inline-flex", color: "var(--text-muted)" }}>
+                  className="hn-att-link">
                   <Icon name="download" size={15} />
                 </a>
                 <IconButton size="sm" icon="trash-2" disabled={busy}

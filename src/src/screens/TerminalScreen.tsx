@@ -89,6 +89,10 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // sebagai fitur harian: ia merekam setiap tombol yang ditekan di pane, jadi ia alat investigasi
   // yang dinyalakan saat dibutuhkan lalu dimatikan lagi.
   const [diag, setDiag] = usePersistedState("terminal", "diag", false, isBool);
+  // Audit UI/UX 2026-10 · keputusan 15: mode pembaca layar xterm. OPSIONAL dan default MATI, karena ia
+  // mengekspos teks terminal ke DOM dengan biaya kecepatan. Tab tetap dikirim ke sesi, dan
+  // Ctrl+Shift+Esc tetap melepas fokus (lihat TerminalPane).
+  const [screenReader, setScreenReader] = usePersistedState("terminal", "sr", false, isBool);
   const bumpFont = (delta: number) => setFontSize((n) => clampFontSize(n + delta));
   const [maxed, setMaxed] = React.useState(false);
   // SPEC-232 · id sesi yang sedang dilihat layar-penuh (satu terminal, sebagai modal).
@@ -555,36 +559,49 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // SPEC-800 · kontrol tampilan tinggal di panel, bukan di toolbar: keduanya dipakai sekali lalu
   // dilupakan, dan menaruhnya inline melawan tujuan "pane dapat ruang layar terbesar".
   const displayControls = (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 10 }}>
-      <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>Ukuran teks terminal</span>
+    <div className="hn-terminal-display">
+      <div className="hn-dense-row hn-terminal-display-row">
+        <span className="hn-terminal-display-label">Ukuran teks terminal</span>
         <IconButton size="sm" icon="minus" label="Perkecil teks terminal"
           disabled={fontSize <= FONT_MIN} onClick={() => bumpFont(-1)} />
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, minWidth: 44, textAlign: "center" }}>
+        <span className="hn-terminal-display-value">
           {fontSize}px
         </span>
         <IconButton size="sm" icon="plus" label="Perbesar teks terminal"
           disabled={fontSize >= FONT_MAX} onClick={() => bumpFont(1)} />
       </div>
-      <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+      <div className="hn-dense-row hn-terminal-display-row">
+        <span className="hn-terminal-display-label">
           Papan tombol layar (Esc · panah · Enter)
         </span>
         <Button size="sm" variant="secondary" aria-pressed={keysOpen}
           onClick={() => setKeysOpen((on) => !on)}>{keysOpen ? "Sembunyikan" : "Tampilkan"}</Button>
       </div>
-      <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+      <div className="hn-dense-row hn-terminal-display-row">
+        <span className="hn-terminal-display-label">
           Ketik responsif (huruf tampil sebelum echo server)
         </span>
         <Button size="sm" variant="secondary" aria-pressed={predict}
           aria-label={`${predict ? "Matikan" : "Nyalakan"} ketik responsif`}
           onClick={() => setPredict((on) => !on)}>{predict ? "Matikan" : "Nyalakan"}</Button>
       </div>
+      {/* Mode pembaca layar: opsi xterm `screenReaderMode`, default mati. Hint-nya memuat dua hal yang
+          harus diketahui operator: Tab tetap masuk ke sesi (dan fokus bisa pindah), serta jalan keluar
+          Ctrl+Shift+Esc yang tetap bekerja. Uji nyata dengan VoiceOver/NVDA belum dilakukan. */}
+      <div className="hn-dense-row hn-terminal-display-row">
+        <span id="terminal-sr-label" className="hn-terminal-display-label">Mode pembaca layar</span>
+        <Button size="sm" variant="secondary" aria-pressed={screenReader} aria-describedby="terminal-sr-hint"
+          aria-label={`${screenReader ? "Matikan" : "Nyalakan"} mode pembaca layar`}
+          onClick={() => setScreenReader((on) => !on)}>{screenReader ? "Matikan" : "Nyalakan"}</Button>
+      </div>
+      <p id="terminal-sr-hint" className="hn-terminal-sr-hint">
+        Untuk pembaca layar: teks terminal tersedia di DOM; kecepatan lebih rendah. Tab tetap dikirim ke sesi,
+        dan di mode ini fokus juga bisa pindah ke elemen lain. Ctrl+Shift+Esc tetap melepas fokus dari terminal.
+      </p>
       {/* Reset grid hanya berarti sesuatu di mode grid. Pemilih project pindah ke "Sesi baru". */}
       {!focusMode && (
-        <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span className="hn-grow" id="terminal-reset-grid-hint" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+        <div className="hn-dense-row hn-terminal-display-row">
+          <span id="terminal-reset-grid-hint" className="hn-terminal-display-label">
             Kembalikan grid ke 1 kolom × 1 baris (sesi lain pindah ke "belum di grid")
           </span>
           <Button size="sm" variant="secondary" aria-describedby="terminal-reset-grid-hint"
@@ -596,12 +613,12 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
       )}
       {/* Diagnostik menyimpan pengaturan yang hanya dipakai saat menyelidiki masalah ketik. Tertutup
           supaya kontrol harian tak tercampur dengannya; ia merekam setiap tombol yang ditekan. */}
-      <details style={{ borderTop: "1px solid var(--border-hair)", paddingTop: 8 }}>
-        <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--text-muted)" }}>
+      <details className="hn-terminal-diag">
+        <summary className="hn-terminal-diag-summary">
           Diagnostik{diag ? " · perekaman aktif" : ""}
         </summary>
-        <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-          <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+        <div className="hn-dense-row hn-terminal-display-row hn-terminal-diag-row">
+          <span className="hn-terminal-display-label">
             Rekam jalur ketik — mencatat setiap tombol yang ditekan di pane. Nyalakan hanya saat menyelidiki masalah ketik.
           </span>
           <Button size="sm" variant="secondary" aria-pressed={diag}
@@ -650,17 +667,9 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // ponytail: Escape sengaja TIDAK di-bind untuk keluar. Ia tombol tersibuk di TUI Claude Code;
   // merebutnya demi menutup overlay menukar hal yang dipakai tiap menit dengan hal yang dipakai
   // sekali. Keluar lewat tombol saja. Ada test yang menjaga ini.
-  const rootStyle: React.CSSProperties = {
-    display: "flex", flexDirection: "column", gap: maxed ? 8 : 12,
-    ...(maxed
-      ? { position: "fixed", inset: 0, zIndex: 100, background: "var(--surface-page)",
-          paddingTop: "max(12px, var(--safe-top))", paddingRight: "max(12px, var(--safe-right))",
-          paddingBottom: "max(12px, var(--safe-bottom))", paddingLeft: "max(12px, var(--safe-left))" }
-      : { flex: "1 1 0", minHeight: 640 }),
-  };
-
+  // Layar penuh = kelas `is-maxed` (fixed, menutupi shell); tata letak biasa ada di `.hn-terminal-screen`.
   return (
-    <div data-testid="terminal-root" style={rootStyle}>
+    <div data-testid="terminal-root" className={maxed ? "hn-terminal-screen is-maxed" : "hn-terminal-screen"}>
       {/* Toolbar ≤ 6 kontrol (aturan minimalis, Fase 3E): Sesi baru (primer) · Buka… · Fokus|Grid ·
           Tampilan · Layar penuh. Susunan grid, grup, dan tray hidup di baris grid di bawahnya. */}
       {/* group, bukan toolbar: pola toolbar ARIA menuntut navigasi panah yang tak dipasang di sini. */}
@@ -754,7 +763,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
       )}
 
       {listError && (
-        <Callout tone="err" title="Daftar sesi belum bisa dimuat" style={{ marginBottom: 8 }}>
+        <Callout tone="err" title="Daftar sesi belum bisa dimuat" className="hn-terminal-notice--tight">
           <span>{listError} </span>
           <button type="button" className="hn-terminal-action hn-terminal-action--text"
             onClick={() => setListAttempt((n) => n + 1)}>Coba lagi</button>
@@ -762,17 +771,12 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
       )}
 
       {!focusMode && unplaced.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>Belum di grid:</span>
+        <div className="hn-terminal-unplaced">
+          <span className="hn-terminal-unplaced-label">Belum di grid:</span>
           {unplaced.map((s) => (
-            <span key={s.id} className="hn-terminal-unplaced-chip" style={{
-              display: "inline-flex", alignItems: "center",
-              borderRadius: "var(--radius-sm)", background: "var(--bone-200)",
-              border: "1px solid var(--border-hair)", fontFamily: "var(--font-mono)", fontSize: 11,
-            }}>
+            <span key={s.id} className="hn-terminal-unplaced-chip">
               <button className="hn-terminal-unplaced-action" disabled={!workspaceWritable}
-                onClick={() => placeFirst(s.id)} title="Taruh di sel kosong pertama grup ini"
-                style={{ all: "unset", cursor: "pointer" }}>
+                onClick={() => placeFirst(s.id)} title="Taruh di sel kosong pertama grup ini">
                 {s.specId ?? nameOf(s.projectId)} · {s.id.slice(0, 6)}
               </button>
               <button type="button" className="hn-terminal-action" aria-label={`Tutup sesi ${s.id}`}
@@ -783,7 +787,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
       )}
 
       {!focusMode && singlePane && !showEmpty && (
-        <div className="hn-stack-mobile" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="hn-stack-mobile hn-terminal-tabs-row">
           <Tabs aria-label="Panel terminal" variant="pill" value={String(activeCell)}
             onChange={(next) => setActiveCell(Number(next))}
             tabs={layout.cells.map((id, idx) => ({ value: String(idx),
@@ -799,25 +803,25 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
             hint="Tekan Sesi baru untuk memulai agen di project terpilih, atau Terminal biasa untuk shell." />
         )
       ) : (
-        <div ref={gridRef} data-testid="terminal-grid" style={{
-          flex: 1, minHeight: 0, display: "grid", gap: 8,
-          gridTemplateColumns: singlePane ? "minmax(0, 1fr)"
+        <div ref={gridRef} data-testid="terminal-grid" className="hn-terminal-grid" style={{
+          // Track grid bergantung pada state (jumlah kolom, lebar hasil seret): lewat CSS variable.
+          "--grid-cols": singlePane ? "minmax(0, 1fr)"
             : `18px ${colSizes.map((s) => `minmax(0, ${s}fr)`).join(" ")}`,
-          gridTemplateRows: singlePane ? "minmax(0, 1fr)"
+          "--grid-rows": singlePane ? "minmax(0, 1fr)"
             : `16px ${rowSizes.map((s) => `minmax(0, ${s}fr)`).join(" ")}`,
-        }}>
+        } as React.CSSProperties}>
           {/* Track pane c/r duduk di grid-line c+2/r+2 (line 1 dipakai gutter) — eksplisit, bukan
               auto-placement, supaya divider di bawah bisa berbagi track yang sama tanpa mendorong
               sel lain (auto-placement menganggap track yang diklaim item eksplisit "terpakai"). */}
-          {!singlePane && <div style={{ gridColumn: 1, gridRow: 1 }} />}{/* pojok kiri-atas */}
+          {!singlePane && <div className="hn-terminal-grid-corner" />}{/* pojok kiri-atas */}
           {!singlePane && Array.from({ length: layout.cols }, (_, c) => (
             <GutterX key={`col-${c}`} axis="col" label={`Tutup kolom ${c + 1}`} disabled={!workspaceWritable || layout.cols === 1}
-              style={{ gridColumn: c + 2, gridRow: 1 }}
+              gridColumn={c + 2} gridRow={1}
               onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeColumn(l, c)))} />
           ))}
           {!singlePane && Array.from({ length: layout.rows }, (_, r) => (
             <GutterX key={`row-${r}`} axis="row" label={`Tutup baris ${r + 1}`} disabled={!workspaceWritable || layout.rows === 1}
-              style={{ gridColumn: 1, gridRow: r + 2 }}
+              gridColumn={1} gridRow={r + 2}
               onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, (l) => L.removeRow(l, r)))} />
           ))}
           {!singlePane && Array.from({ length: layout.cols - 1 }, (_, c) => {
@@ -847,11 +851,10 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
               const s = id ? byId(id) : null;
               return (
                 <div key={id ?? `empty-${idx}`} data-terminal-cell-index={idx}
-                  aria-hidden={singlePane && activeCell !== idx ? "true" : "false"} style={{
-                  minHeight: 0, minWidth: 0, display: singlePane && activeCell !== idx ? "none" : "flex", flexDirection: "column",
-                  border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", overflow: "hidden",
-                  ...(singlePane ? {} : { gridColumn: c + 2, gridRow: r + 2 }),
-                }}>
+                  aria-hidden={singlePane && activeCell !== idx ? "true" : "false"}
+                  className={singlePane && activeCell !== idx ? "hn-terminal-cell-slot is-hidden" : "hn-terminal-cell-slot"}
+                  // Posisi sel: `auto` di mode satu panel (auto-placement), koordinat grid di mode grid.
+                  style={{ "--cell-col": singlePane ? "auto" : c + 2, "--cell-row": singlePane ? "auto" : r + 2 } as React.CSSProperties}>
                   {s
                     ? <Cell session={s} nameOf={nameOf} {...handlersFor(s.id)}
                         canArrange={workspaceWritable}
@@ -860,7 +863,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
                         titleOf={titleOf && stableProps.titleOf} onIntegrate={onIntegrate && stableProps.onIntegrate}
                         onIntegrateSession={onIntegrateSession && stableProps.onIntegrateSession}
                         specOf={specOf && stableProps.specOf} backlog={backlog}
-                        fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
+                        fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag} screenReader={screenReader}
                         fullscreen={fullId === s.id}
                         paneHidden={singlePane && activeCell !== idx} />
                     : <EmptyCell disabled={!workspaceWritable} unplaced={unplaced} nameOf={nameOf} onPick={(sid) => place(idx, sid)} />}
@@ -890,7 +893,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
             onExit: handlersFor(id).onExit, onPhases: phasesFor(id), onForget: handlersFor(id).onForget,
           })}
           fontSize={fontSize} showKeys={keysOpen} onToggleKeys={() => setKeysOpen((on) => !on)}
-          predict={predict} diag={diag}
+          predict={predict} diag={diag} screenReader={screenReader}
         />
       )}
 
@@ -920,7 +923,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
       {fullId && byId(fullId) && (
         <FullscreenTerminal session={byId(fullId)!}
           label={cellLabel(byId(fullId)!, nameOf, titleOf)}
-          fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
+          fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag} screenReader={screenReader}
           onClose={() => setFullId(null)} />
       )}
       {mobile && displayOpen && (
@@ -976,14 +979,13 @@ function BacklogPicker({ seed, activeIds, error, onPick, onClose }: {
   return (
     <Modal open title="Ambil backlog" icon="inbox" onClose={onClose} width={760}>
       {notice && (
-        <div role="alert" style={{ marginBottom: 10, padding: "8px 10px", borderRadius: "var(--radius-sm)",
-          background: "var(--clay-100)", color: "var(--clay-600)", fontSize: 12 }}>{notice}</div>
+        <div role="alert" className="hn-terminal-pick-notice">{notice}</div>
       )}
       {/* baris penyaring: search + stage + prioritas (startable tak pernah `done`). */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+      <div className="hn-terminal-pick-filters">
         <Input size="sm" leftIcon="search" placeholder="mis. invoice atau SPEC-412" aria-label="Cari backlog"
           value={q} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-          style={{ flex: "1 1 220px" }} />
+          className="hn-terminal-pick-search" />
         <Select size="sm" aria-label="Filter stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}
           options={[{ value: "all", label: "Semua stage" }].concat(
             B_STAGES.filter((s) => s.key !== "done").map((s) => ({ value: s.key, label: s.label })))} />
@@ -997,35 +999,24 @@ function BacklogPicker({ seed, activeIds, error, onPick, onClose }: {
         <StateBlock kind="empty" icon="inbox" title="Tak ada backlog untuk diambil"
           hint="Semua item sudah selesai/aktif atau tak cocok filter — buat brief baru di halaman Backlog." />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", maxHeight: "62vh", overflowY: "auto" }}>
+        <div className="hn-terminal-pick-list">
           {shown.map((s) => (
-            // SPEC-763 · `all: "unset"` dulu ada di sini dan memakan DUA aturan sekaligus: ia
-            // inline, jadi ia menang atas `button { min-height: var(--touch-target) }` (baris jadi
-            // 39px, di bawah minimum 44px) DAN atas `flex-wrap` milik `.hn-dense-row`. Reset
-            // eksplisit per properti memulihkan keduanya tanpa `!important` baru.
-            // `flex: 0 0 auto` wajib: daftarnya flex-column ber-`maxHeight`, jadi barisnya boleh
-            // menyusut di bawah kontennya — terukur tombol 44px memuat isi 66px, dan judul yang
-            // membungkus MENIMPA baris di bawahnya. Akar yang sama dengan tab yang tumpah.
-            <button key={s.id} onClick={() => onPick(s)} style={{
-              cursor: "pointer", display: "block", width: "100%", flex: "0 0 auto",
-              font: "inherit", color: "inherit", textAlign: "left", background: "transparent",
-              padding: "9px 8px", border: "none", borderBottom: "1px solid var(--border-hair)",
-            }}>
+            // SPEC-763 · reset tombol ada di kelas `.hn-terminal-pick-row` (bukan inline lagi): ia
+            // harus menang atas `button { min-height: var(--touch-target) }` dan atas `flex-wrap`
+            // milik `.hn-dense-row`. `flex: 0 0 auto` wajib: daftarnya flex-column ber-`maxHeight`,
+            // jadi barisnya boleh menyusut di bawah kontennya — terukur tombol 44px memuat isi 66px,
+            // dan judul yang membungkus MENIMPA baris di bawahnya. Akar yang sama dengan tab yang tumpah.
+            <button key={s.id} onClick={() => onPick(s)} className="hn-terminal-pick-row">
               {/* Baris flex-nya hidup di dalam <span>, bukan di <button> itu sendiri: kotak tombol
                   tidak menumbuhkan tingginya untuk baris flex yang membungkus, sehingga judul yang
                   turun ke baris kedua menimpa baris berikutnya (terlihat langsung di 390px). */}
-              <span className="hn-dense-row hn-picker-row" style={{
-                display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
+              <span className="hn-dense-row hn-picker-row hn-terminal-pick-main">
                 <Icon name={s.source === "qa" ? "bug" : s.source === "audit" ? "search" : "lightbulb"} size={14}
                   color={s.source === "qa" ? "var(--clay-500)" : s.source === "audit" ? "var(--wind-600)" : "var(--brass-500)"} />
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)",
-                  flex: "0 0 78px" }}>{s.id}</span>
-                <span className="hn-grow hn-picker-title" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)",
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</span>
+                <span className="hn-terminal-pick-id">{s.id}</span>
+                <span className="hn-picker-title hn-terminal-pick-title">{s.title}</span>
                 <Badge tone={s.priority === "tinggi" ? "err" : "neutral"} size="sm">{s.priority}</Badge>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, flex: "0 1 auto", minWidth: 0,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  color: "var(--text-muted)" }}>{s.projectId}</span>
+                <span className="hn-terminal-pick-project">{s.projectId}</span>
               </span>
             </button>
           ))}
@@ -1048,22 +1039,20 @@ function GroupTabs({ ws, compact = false, writable, onSelect, onAdd, onRename, o
   // Audit UI/UX Terminal · target sentuh kontrol grup: 24px pointer halus, 44px pointer kasar.
   const coarse = useCoarsePointer();
   const box = coarse ? 44 : 24;
-  const controlStyle: React.CSSProperties = { minWidth: box, minHeight: box, display: "inline-grid",
-    placeItems: "center", border: 0, padding: 0, background: "transparent", cursor: "pointer",
-    color: "var(--text-subtle)", fontSize: 12, font: "inherit" };
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap",
-      // Baris digabung → garis bawah tabbar akan memotong baris chrome di tengah.
-      ...(compact ? {} : { borderBottom: "1px solid var(--border-hair)", paddingBottom: 4 }) }}>
+    // Ukuran kontrol (24px / 44px pointer kasar) satu-satunya nilai dinamis: lewat `--group-box`.
+    // Baris digabung → garis bawah tabbar akan memotong baris chrome di tengah (`is-bordered`).
+    <div className={compact ? "hn-terminal-groups" : "hn-terminal-groups is-bordered"}
+      style={{ "--group-box": `${box}px` } as React.CSSProperties}>
       {/* Hanya tab di dalam tablist: ARIA mengharapkan anak tablist berupa tab saja. Kontrol ubah,
           hapus, dan grup baru duduk di luarnya. */}
-      <div role="tablist" aria-label="Grup terminal" style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+      <div role="tablist" aria-label="Grup terminal" className="hn-terminal-groups-tabs">
         {ws.groups.map((g, index) => {
           const isActive = g.id === active.id;
           return (
             <button key={g.id} type="button" role="tab" aria-selected={isActive} tabIndex={isActive ? 0 : -1}
-              className="hn-terminal-group-control" onClick={() => onSelect(g.id)}
+              className="hn-terminal-group-control hn-terminal-group-tab" onClick={() => onSelect(g.id)}
               onKeyDown={(event) => {
                 let next: number | null = null;
                 if (event.key === "ArrowRight") next = (index + 1) % ws.groups.length;
@@ -1075,11 +1064,7 @@ function GroupTabs({ ws, compact = false, writable, onSelect, onAdd, onRename, o
                 onSelect(ws.groups[next]!.id);
                 event.currentTarget.closest('[role="tablist"]')
                   ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
-              }}
-              style={{ minHeight: box, padding: "3px 6px", borderRadius: "var(--radius-sm)", fontSize: 12,
-                font: "inherit", cursor: "pointer", background: isActive ? "var(--bone-200)" : "transparent",
-                border: `1px solid ${isActive ? "var(--border-hair)" : "transparent"}`,
-                color: isActive ? "var(--text-strong)" : "var(--text-muted)" }}>
+              }}>
               {g.name}
             </button>
           );
@@ -1090,19 +1075,18 @@ function GroupTabs({ ws, compact = false, writable, onSelect, onAdd, onRename, o
             onCommit={(name) => { if (name.trim()) onRename(active.id, name.trim()); setEditing(null); }}
             onCancel={() => setEditing(null)} />
         : (
-          <span role="group" aria-label={`Kelola grup ${active.name}`} style={{ display: "inline-flex", alignItems: "center" }}>
-            <button type="button" className="hn-terminal-group-control" aria-label={`Ganti nama grup ${active.name}`}
-              title="Ganti nama" onClick={() => setEditing(active.id)}
-              style={{ ...controlStyle, color: "var(--text-subtle)" }}>✎</button>
-            <button type="button" className="hn-terminal-group-control" aria-label={`Hapus grup ${active.name}`}
+          <span role="group" aria-label={`Kelola grup ${active.name}`} className="hn-terminal-groups-actions">
+            <button type="button" className="hn-terminal-group-control hn-terminal-group-action" aria-label={`Ganti nama grup ${active.name}`}
+              title="Ganti nama" onClick={() => setEditing(active.id)}>✎</button>
+            <button type="button" className="hn-terminal-group-control hn-terminal-group-action hn-terminal-group-remove"
+              aria-label={`Hapus grup ${active.name}`}
               title={only ? "Grup terakhir tak bisa dihapus" : "Hapus grup (sesi tetap hidup)"}
-              disabled={only} onClick={() => onRemove(active.id)}
-              style={{ ...controlStyle, cursor: only ? "not-allowed" : "pointer", opacity: only ? 0.35 : 1 }}>×</button>
+              disabled={only} onClick={() => onRemove(active.id)}>×</button>
           </span>
         ))}
-      <button type="button" className="hn-terminal-group-control" aria-label="Grup baru" title="Grup baru"
-        disabled={!writable} onClick={onAdd}
-        style={{ ...controlStyle, padding: "0 8px", minWidth: box, opacity: writable ? 1 : 0.5 }}>+</button>
+      <button type="button" className="hn-terminal-group-control hn-terminal-group-action hn-terminal-group-add"
+        aria-label="Grup baru" title="Grup baru"
+        disabled={!writable} onClick={onAdd}>+</button>
     </div>
   );
 }
@@ -1112,16 +1096,16 @@ function GroupTabs({ ws, compact = false, writable, onSelect, onAdd, onRename, o
 // `axis` menentukan sumbu mana yang sempit (col-gutter: tinggi 16px, lebar track kolom; row-gutter:
 // lebar 18px, tinggi track baris) — `.hn-terminal-gutter--{axis}` (app.css) hanya memperbesar hit
 // area lewat `::before` pada sumbu yang sempit itu, tanpa mengubah track grid-nya sendiri (SPEC-763).
-// `style` dipakai desktop untuk menitipkan posisi grid-column/row eksplisit (lihat pemanggil).
-function GutterX({ label, disabled, onClick, axis, style }: {
-  label: string; disabled: boolean; onClick: () => void; axis: "col" | "row"; style?: React.CSSProperties;
+// `gridColumn`/`gridRow` adalah posisi grid eksplisit (desktop), dikirim lewat CSS variable.
+function GutterX({ label, disabled, onClick, axis, gridColumn, gridRow }: {
+  label: string; disabled: boolean; onClick: () => void; axis: "col" | "row";
+  gridColumn: number; gridRow: number;
 }) {
   return (
     <button type="button" aria-label={label} title={disabled ? "Grid tak boleh menyusut ke nol" : label}
       disabled={disabled} onClick={onClick}
       className={`hn-terminal-gutter hn-terminal-gutter--${axis}`}
-      style={{ position: "relative", display: "grid", placeItems: "center", fontSize: 11, lineHeight: 1,
-        opacity: disabled ? 0.3 : 1, cursor: disabled ? "not-allowed" : "pointer", ...style }}>×</button>
+      style={{ "--grid-col": gridColumn, "--grid-row": gridRow } as React.CSSProperties}>×</button>
   );
 }
 
@@ -1147,7 +1131,7 @@ function ResizeDivider({ orientation, label, now, min, max, disabled, gridColumn
       className={`hn-terminal-divider hn-terminal-divider--${orientation}`}
       title={disabled ? undefined
         : "Seret untuk ubah ukuran — panah untuk langkah kecil, Shift+panah langkah besar, klik dua kali menyamakan"}
-      style={{ gridColumn, gridRow }}
+      style={{ "--grid-col": gridColumn, "--grid-row": gridRow } as React.CSSProperties}
       onPointerDown={disabled ? undefined : onPointerDown}
       onPointerMove={disabled ? undefined : onPointerMove}
       onPointerUp={disabled ? undefined : onPointerUp}
@@ -1169,20 +1153,14 @@ function RenameInput({ initial, onCommit, onCancel }: {
         if (e.key === "Enter") onCommit(value);
         else if (e.key === "Escape") onCancel();
       }}
-      style={{ width: "min(160px, 60vw)", padding: "3px 6px", fontSize: 12, fontFamily: "var(--font-ui)",
-        border: "1px solid var(--border-strong)", borderRadius: "var(--radius-sm)",
-        background: "var(--surface-card)", color: "var(--text-strong)" }} />
+      className="hn-terminal-rename" />
   );
 }
 
 // Fase yang DILAPORKAN agen, bukan yang disimpulkan server (SPEC-162). Agen yang lupa menulis
 // berkas fasenya meninggalkan strip ini diam — terminalnya sendiri yang jadi kebenaran.
-const PHASE_COLOR: Record<Phase["state"], string> = {
-  done: "var(--brass)",
-  active: "var(--text-strong)",
-  skipped: "var(--text-subtle)",
-  pending: "var(--text-subtle)",
-};
+// Warna, tebal, coret, dan redup nama fase datang dari `data-state` (lihat terminal.css), bukan dari
+// objek inline per fase.
 const CHIP_ICON: Record<ChipTone, string> = {
   done: "✓", running: "●", pending: "○", skipped: "–", failed: "✕", abandoned: "⨯",
 };
@@ -1206,12 +1184,6 @@ export function PhaseStrip({ phases, compact = false, now }: {
   if (!phases?.length) return null;
   const at = now ?? Date.now();
   const openPhase = phases.find((p) => p.name === open && p.agent);
-  const nameStyle = (p: Phase): React.CSSProperties => ({
-    color: PHASE_COLOR[p.state],
-    fontWeight: p.state === "active" ? 600 : 400,
-    textDecoration: p.state === "skipped" ? "line-through" : "none",
-    opacity: p.state === "pending" ? 0.5 : 1,
-  });
   const durationOf = (p: Phase): string => {
     const a = p.agent;
     if (!a) return "";
@@ -1246,17 +1218,11 @@ export function PhaseStrip({ phases, compact = false, now }: {
   // margin bawah kecil; sisanya jadi batas atas tinggi panel, dan kontennya sendiri yang
   // men-scroll (`overflowY: auto`) kalau sel terlalu pendek untuk menampung semuanya.
   return (
-    <div data-testid="phase-strip" style={{
-      flex: "0 0 auto", borderBottom: "1px solid var(--border-hair)",
-    }}>
-      <div data-testid="phase-strip-scroller" style={{
-        display: "flex", alignItems: "center", gap: 8, padding: "3px 8px",
-        fontSize: 10, fontFamily: "var(--font-mono)",
-        overflowX: "auto", whiteSpace: "nowrap",
-      }}>
+    <div data-testid="phase-strip" className="hn-terminal-phase">
+      <div data-testid="phase-strip-scroller" className="hn-terminal-phase-scroller">
         {phases.map((p) => {
           if (!p.agent) {
-            return <span key={p.name} data-state={p.state} title={p.state} style={nameStyle(p)}>{p.name}</span>;
+            return <span key={p.name} data-state={p.state} title={p.state} className="hn-terminal-phase-name">{p.name}</span>;
           }
           const a = p.agent;
           const tone = chipTone(p);
@@ -1267,13 +1233,9 @@ export function PhaseStrip({ phases, compact = false, now }: {
               ref={open === p.name ? popover.triggerRef : undefined} aria-haspopup="dialog"
               aria-controls={open === p.name ? popover.panelId : undefined}
               aria-label={chipAccessibleName(p, duration)} onClick={() => setOpen(open === p.name ? null : p.name)}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 4, flex: "0 0 auto", padding: "1px 6px",
-                border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "transparent",
-                font: "inherit", color: "var(--text-body)", cursor: "pointer",
-              }}>
+              className="hn-terminal-phase-chip">
               <span aria-hidden>{CHIP_ICON[tone]}</span>
-              <span data-state={p.state} title={p.state} style={nameStyle(p)}>{p.name}</span>
+              <span data-state={p.state} title={p.state} className="hn-terminal-phase-name">{p.name}</span>
               {p.state === "skipped" && <span>dilewati</span>}
               {full && a.model && <span>· {modelLabel(a.model)}</span>}
               {full && a.effort && <span>· {a.effort}</span>}
@@ -1281,7 +1243,7 @@ export function PhaseStrip({ phases, compact = false, now }: {
               {a.attempts > 1 && <span>↻{a.attempts}</span>}
               {a.evidence === "missing" && (
                 <span role="img" aria-label="bukti subagent tak diterima" title="bukti subagent tak diterima"
-                  style={{ color: "var(--status-warn)" }}>⚠</span>
+                  className="hn-terminal-phase-warn">⚠</span>
               )}
             </button>
           );
@@ -1289,14 +1251,7 @@ export function PhaseStrip({ phases, compact = false, now }: {
       </div>
       {openPhase?.agent && (
         <div ref={popover.panelRef} id={popover.panelId} role="dialog" aria-label={`Detail fase ${openPhase.name}`}
-          tabIndex={-1} onKeyDown={popover.onKeyDown} style={{
-          position: "absolute", marginLeft: 8, zIndex: 5, minWidth: 220,
-          maxWidth: "min(420px, calc(100% - 16px))", maxHeight: "calc(100% - 48px)", overflowY: "auto",
-          boxSizing: "border-box",
-          padding: "8px 10px", background: "var(--surface-card)", border: "1px solid var(--border-hair)",
-          borderRadius: "var(--radius-sm)", whiteSpace: "normal", lineHeight: 1.5,
-          fontSize: 10, fontFamily: "var(--font-mono)",
-        }}>
+          tabIndex={-1} onKeyDown={popover.onKeyDown} className="hn-terminal-phase-panel">
           <div><b>{openPhase.agent.name}</b></div>
           {/* Guard: `model` opsional — dibangun dari bagian yang ADA saja supaya tak menyisakan
               "· " di depan saat model kosong. */}
@@ -1305,7 +1260,7 @@ export function PhaseStrip({ phases, compact = false, now }: {
           <div>durasi {durationOf(openPhase) || "—"} · percobaan {openPhase.agent.attempts}</div>
           <div>token in {openPhase.agent.inputTokens ?? "—"} · out {openPhase.agent.outputTokens ?? "—"} · cache {openPhase.agent.cachedTokens ?? "—"}</div>
           {openPhase.agent.resultExcerpt && (
-            <pre style={{ margin: "6px 0 0", whiteSpace: "pre-wrap", maxHeight: 160, overflow: "auto" }}>{openPhase.agent.resultExcerpt}</pre>
+            <pre className="hn-terminal-phase-excerpt">{openPhase.agent.resultExcerpt}</pre>
           )}
         </div>
       )}
@@ -1315,7 +1270,7 @@ export function PhaseStrip({ phases, compact = false, now }: {
 
 const Cell = React.memo(CellImpl);
 
-function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen, onDialog, paneHidden }: {
+function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, screenReader, fullscreen, onFullscreen, onDialog, paneHidden }: {
   session: TerminalSession; nameOf: (pid: string) => string;
   onClose: () => void; onForget: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
   // Dialog dokumen/integrasi dipegang layar (satu tempat untuk sel, rail, dan pane fokus).
@@ -1328,7 +1283,7 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
   specOf?: (specId: string) => SpecSlim | undefined;
   // Hanya kunci render ulang: `titleOf`/`specOf` stabil, jadi perubahan backlog harus lewat prop ini.
   backlog?: SpecSlim[];
-  fontSize: number; showKeys: boolean; predict: boolean; diag: boolean;
+  fontSize: number; showKeys: boolean; predict: boolean; diag: boolean; screenReader: boolean;
   fullscreen: boolean; onFullscreen: () => void; paneHidden?: boolean;
 }) {
   const [phases, setPhases] = React.useState<Phase[] | null>(null);
@@ -1385,25 +1340,23 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
   });
   return (
     <>
-      <div className="hn-terminal-cell-header" style={{
-        display: "flex", alignItems: "center", gap: 8, padding: "4px 8px", flex: "0 0 auto",
-        background: failed ? "var(--status-err-tint)"
-          : session.exited || finished ? "var(--status-ok-tint)"
-            : attention ? "var(--status-warn-tint)" : "var(--bone-200)",
-        borderBottom: "1px solid var(--border-hair)",
-        fontFamily: "var(--font-mono)", fontSize: 11, color: session.exited ? "var(--text-muted)" : "var(--text-body)",
-      }}>
+      {/* Latar kepala ditentukan oleh `data-cell-tone` (prioritas: gagal > selesai > perhatian > netral). */}
+      <div className={session.exited ? "hn-terminal-cell-header is-exited" : "hn-terminal-cell-header"}
+        data-cell-tone={failed ? "failed" : session.exited || finished ? "done" : attention ? "attention" : "idle"}>
         {stateIllustration && (
-          <ProductStateIllustration id={stateIllustration} decorative
-            style={{ width: 34, flex: "0 0 auto", borderRadius: "var(--radius-sm)" }} />
+          // Lebar 34px ada di pembungkus (kelas), bukan di <img>: Illustration sudah memberi
+          // `width: 100%` inline pada gambar, dan inline itu menang atas kelas.
+          <span className="hn-terminal-cell-illus">
+            <ProductStateIllustration id={stateIllustration} decorative />
+          </span>
         )}
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span className="hn-terminal-cell-title">
           {label} · {session.id.slice(0, 6)}
         </span>
         {/* ADR-0164 · model & effort orchestrator; model tiap fase ada di chip PhaseStrip. */}
         {session.orchestrated && session.model && (
           <span data-testid="orchestrator-chip" title="Model & effort orchestrator"
-            style={{ flex: "0 0 auto", fontSize: 10, color: "var(--text-muted)" }}>
+            className="hn-terminal-orch">
             orch {modelLabel(session.model)}{session.effort ? ` · ${session.effort}` : ""}
           </span>
         )}
@@ -1420,7 +1373,7 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
         {awaiting && !deciding && !finished && <StatusPill status="awaiting" size="sm" />}
         {/* Aksi sel: satu menu ⋯ untuk aksi sekunder, lalu "Tutup" yang berdiri sendiri. Tutup
             menghentikan agen, jadi ia selalu lewat konfirmasi (`onClose` = requestKill). */}
-        <span className="hn-terminal-actions" style={{ display: "inline-flex", alignItems: "center", gap: 2, flex: "0 0 auto" }}>
+        <span className="hn-terminal-actions">
           <OverflowActions label={`Aksi sesi ${session.id}`} items={menuItems} />
           <button type="button" className="hn-terminal-action" aria-label={`Tutup sesi ${session.id}`}
             title="Tutup sesi (dikonfirmasi dulu)" onClick={onClose}>
@@ -1433,20 +1386,20 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
           ADR-0164 review 2 · `position: relative` di sini (bukan di wrapper `phase-strip`) jadi
           containing block panel detail fase: tinggi = strip + pane, selalu definit dan selalu
           di dalam sel (yang `overflow: hidden`), jadi panel tak bisa lagi meluber ke luar sel. */}
-      <div ref={bodyRef} style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, position: "relative" }}>
+      <div ref={bodyRef} className="hn-terminal-cell-body">
         {session.exited && <SessionEndedBanner />}
         <PhaseStrip phases={phases} compact={bodyWidth < 480} />
         {/* key = identitas sesi: pindah antar sel memindah subtree, bukan me-remount WebSocket.
             SPEC-232 · saat sel ini sedang layar-penuh, pane-nya dilepas (placeholder) supaya
             hanya modal yang meng-attach tmux — jaga invariant satu sesi = satu attach. */}
-        <div style={{ flex: 1, minHeight: 0 }}>
+        <div className="hn-terminal-cell-pane">
           {fullscreen
-            ? <div style={{ height: "100%", display: "grid", placeItems: "center", padding: 12,
-                color: "var(--text-subtle)", fontSize: 12, textAlign: "center" }}>
+            ? <div className="hn-terminal-cell-fullscreen">
                 Terbuka di layar penuh
               </div>
             : <TerminalPane key={session.id} sessionId={session.id} onExit={onExit} onPhases={onPhases}
-                fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} hidden={paneHidden}
+                fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} screenReader={screenReader}
+                hidden={paneHidden}
                 onForget={onForget} label={cellLabel(session, nameOf, titleOf)} />}
         </div>
       </div>
@@ -1593,11 +1546,11 @@ type FocusViewProps = {
   fullId: string | null;
   focusPhases: { sessionId: string; phases: Phase[] } | null;
   paneHandlers: (id: string) => { onExit: (code: number) => void; onPhases: (p: Phase[], done: boolean) => void; onForget: () => void };
-  fontSize: number; showKeys: boolean; onToggleKeys: () => void; predict: boolean; diag: boolean;
+  fontSize: number; showKeys: boolean; onToggleKeys: () => void; predict: boolean; diag: boolean; screenReader: boolean;
 };
 
 function FocusView({ sessionCount, focused, railItems, mobile, listError, menuFor, onFocus, drawerOpen, onDrawer,
-  fullId, focusPhases, paneHandlers, fontSize, showKeys, onToggleKeys, predict, diag }: FocusViewProps) {
+  fullId, focusPhases, paneHandlers, fontSize, showKeys, onToggleKeys, predict, diag, screenReader }: FocusViewProps) {
   const current = focused ? railItems.find((item) => item.session.id === focused.id) : undefined;
   return (
     <div className="hn-terminal-focus" data-testid="terminal-focus">
@@ -1630,7 +1583,7 @@ function FocusView({ sessionCount, focused, railItems, mobile, listError, menuFo
                 <div className="hn-terminal-focus-placeholder">Terbuka di layar penuh</div>
               ) : (
                 <TerminalPane key={focused.id} sessionId={focused.id} {...paneHandlers(focused.id)}
-                  fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag}
+                  fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} screenReader={screenReader}
                   composer compact={mobile} onToggleKeys={onToggleKeys} label={current.label} />
               )}
             </div>
@@ -1655,13 +1608,9 @@ function FocusView({ sessionCount, focused, railItems, mobile, listError, menuFo
 // keadaan "berakhir" disampaikan lewat banner sendiri; pill "Selesai"/"Gagal" di header tetap ada.
 function SessionEndedBanner() {
   return (
-    <div role="status" data-testid="terminal-ended" style={{
-      display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto", padding: "4px 8px",
-      background: "var(--bone-200)", borderBottom: "1px solid var(--border-hair)",
-      fontSize: 11, color: "var(--text-strong)",
-    }}>
-      <strong style={{ fontWeight: 600 }}>Berakhir</strong>
-      <span style={{ color: "var(--text-body)" }}>
+    <div role="status" data-testid="terminal-ended" className="hn-terminal-ended">
+      <strong className="hn-terminal-ended-title">Berakhir</strong>
+      <span className="hn-terminal-ended-body">
         Agen sudah berhenti. Output tetap bisa dibaca; tutup sel bila tak diperlukan lagi.
       </span>
     </div>
@@ -1672,16 +1621,16 @@ function SessionEndedBanner() {
 // menampilkan placeholder (lihat Cell) supaya tmux tetap satu attach. closeOnEscape=false:
 // Escape tombol tersibuk TUI Claude Code — keluar via × / backdrop saja (sejalan maximize-grid,
 // SPEC-163). Menutup modal memasang ulang pane di sel (reconnect murah; scrollback dari tmux).
-function FullscreenTerminal({ session, label, fontSize, showKeys, predict, diag, onClose }: {
+function FullscreenTerminal({ session, label, fontSize, showKeys, predict, diag, screenReader, onClose }: {
   session: TerminalSession; label: string; fontSize: number; showKeys: boolean; predict: boolean; diag: boolean;
-  onClose: () => void;
+  screenReader: boolean; onClose: () => void;
 }) {
   return (
     <Modal open icon="terminal" title={label} onClose={onClose} closeOnEscape={false} width={1600}>
-      <div style={{ height: "min(72vh, calc(100dvh - 180px))", minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <div className="hn-terminal-fullscreen-body">
         {session.exited && <SessionEndedBanner />}
         <TerminalPane key={session.id} sessionId={session.id} onExit={() => {}}
-          fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} />
+          fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} screenReader={screenReader} />
       </div>
     </Modal>
   );
@@ -1691,7 +1640,7 @@ function EmptyCell({ unplaced, nameOf, onPick, disabled }: {
   unplaced: TerminalSession[]; nameOf: (pid: string) => string; onPick: (id: string) => void; disabled: boolean;
 }) {
   return (
-    <div style={{ flex: 1, display: "grid", placeItems: "center", padding: 12 }}>
+    <div className="hn-terminal-empty-cell">
       <Select size="sm" value="" aria-label="Pilih sesi untuk sel" disabled={disabled || !unplaced.length}
         onChange={(e) => e.target.value && onPick(e.target.value)}
         options={[{ value: "", label: unplaced.length ? "Pilih sesi…" : "tidak ada sesi bebas" }]

@@ -143,7 +143,7 @@ describe("TerminalScreen · mode Fokus (Fase 3E)", () => {
     // Batal: sesi tetap ada dan tak ada panggilan DELETE.
     fireEvent.click(screen.getByLabelText("Aksi sesi run222 di daftar"));
     const menu = await screen.findByRole("dialog", { name: "Aksi sesi run222 di daftar" });
-    fireEvent.click(within(menu).getByRole("button", { name: "Tutup sesi" }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Tutup sesi" }));
     fireEvent.click(await screen.findByRole("button", { name: "Batal" }));
     expect(deleteTerminal).not.toHaveBeenCalled();
     expect(railOrder()).toContain("run222");
@@ -151,7 +151,7 @@ describe("TerminalScreen · mode Fokus (Fase 3E)", () => {
     // Tutup: dikonfirmasi, lalu DELETE dan baris hilang dari rail.
     fireEvent.click(screen.getByLabelText("Aksi sesi run222 di daftar"));
     const again = await screen.findByRole("dialog", { name: "Aksi sesi run222 di daftar" });
-    fireEvent.click(within(again).getByRole("button", { name: "Tutup sesi" }));
+    fireEvent.click(within(again).getByRole("menuitem", { name: "Tutup sesi" }));
     fireEvent.click(await screen.findByRole("button", { name: "Tutup sesi" }));
     await waitFor(() => expect(deleteTerminal).toHaveBeenCalledWith("run222"));
     await waitFor(() => expect(railOrder()).not.toContain("run222"));
@@ -242,9 +242,9 @@ describe("TerminalScreen · ponsel: toolbar satu baris dan papan tombol khusus (
     fireEvent.click(screen.getByRole("button", { name: "Menu terminal" }));
     const menu = await screen.findByRole("dialog", { name: "Terminal" });
     for (const name of ["Pakai mode Grid", "Layar penuh", "Tampilan terminal"]) {
-      expect(within(menu).getByRole("button", { name })).toBeInTheDocument();
+      expect(within(menu).getByRole("menuitem", { name })).toBeInTheDocument();
     }
-    fireEvent.click(within(menu).getByRole("button", { name: "Pakai mode Grid" }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Pakai mode Grid" }));
     expect(localStorage.getItem(VIEW_KEY)).toBe(JSON.stringify("grid"));
     await screen.findByTestId("terminal-grid");
     expect(screen.queryByTestId("terminal-focus")).toBeNull();
@@ -256,7 +256,7 @@ describe("TerminalScreen · ponsel: toolbar satu baris dan papan tombol khusus (
     await screen.findByRole("button", { name: /^Sesi · 4$/ });
     fireEvent.click(screen.getByRole("button", { name: "Menu terminal" }));
     const menu = await screen.findByRole("dialog", { name: "Terminal" });
-    fireEvent.click(within(menu).getByRole("button", { name: "Tampilan terminal" }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Tampilan terminal" }));
     const sheet = await screen.findByRole("dialog", { name: "Tampilan terminal" });
     expect(within(sheet).getByText("Ukuran teks terminal")).toBeInTheDocument();
     expect(within(sheet).getByText("Papan tombol layar (Esc · panah · Enter)")).toBeInTheDocument();

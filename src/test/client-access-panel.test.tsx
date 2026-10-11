@@ -67,7 +67,7 @@ describe("ClientAccessPanel (SPEC-617)", () => {
     render(<ClientAccessPanel />);
     await screen.findByText("klien@x.co");
     fireEvent.click(screen.getByRole("button", { name: "Aksi lain untuk klien@x.co" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Hapus akun" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Hapus akun" }));
     expect(api.deleteClientAccount).not.toHaveBeenCalled();
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/tak bisa dibatalkan/i)).toBeInTheDocument();

@@ -11,6 +11,7 @@ import { remediate } from "../services/vps-remediate";
 import { sshExec, consoleArgv } from "../services/vps-ssh";
 import { runAudit, scriptPath } from "../services/vps-audit";
 import { buildChecklist } from "../vps/checklist";
+import { listVpsWithScore } from "../services/vps-list";
 import { bootstrapKey } from "../services/vps-bootstrap";
 import { createAgentSession, createOperatorSession } from "../services/session-launch-gate";
 import { sessionModel } from "../services/settings";
@@ -28,7 +29,8 @@ function keyMissing(v: { keyPath: string | null }): boolean {
 }
 
 export default async function (app: FastifyInstance) {
-  app.get("/vps", async () => prisma.vps.findMany({ orderBy: { createdAt: "asc" } }));
+  // ADR-0211 · `scoreTotal` per baris dari audit TERSIMPAN — listing tak pernah menjalankan audit.
+  app.get("/vps", async () => listVpsWithScore());
 
   // `password` transien (SPEC-165): dipakai memasang key hanoman, lalu hilang bersama
   // request ini. Bootstrap dijalankan SEBELUM baris lahir — gagal berarti tak ada sampah.

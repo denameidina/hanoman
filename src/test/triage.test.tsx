@@ -30,7 +30,7 @@ const renderTriage = (onToast = vi.fn()) => render(<TriageScreen projects={proje
 // Aksi sekunder (Edit, Hapus, salin/lepas tautan) ada di menu ⋯ "Aksi lainnya" pada detail tiket.
 async function pickMenu(item: RegExp) {
   fireEvent.click(await screen.findByRole("button", { name: "Aksi lainnya" }));
-  fireEvent.click(screen.getByRole("button", { name: item }));
+  fireEvent.click(screen.getByRole("menuitem", { name: item }));
 }
 
 beforeEach(() => {

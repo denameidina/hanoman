@@ -3,6 +3,11 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { buildFileTree, TreeRow } from "../src/screens/file-tree";
 import { IdeScreen } from "../src/screens/IdeScreen";
 import { api } from "../src/api/client";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+// jsdom tak memuat CSS: latar terpilih dibaca dari berkas stylesheet-nya.
+const ideCss = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/ide.css"), "utf8");
 
 // ADR-0121 · folder sebagai TUJUAN operasi berkas.
 describe("TreeRow · folder sebagai target", () => {
@@ -14,7 +19,8 @@ describe("TreeRow · folder sebagai target", () => {
     fireEvent.click(screen.getByText("src/"));
     expect(onSelectDir).toHaveBeenCalledWith("src");
     rerender(<TreeRow node={nodes[0]!} selected="" onSelect={() => {}} dirSelected="src" onSelectDir={onSelectDir} />);
-    expect(screen.getByText("src/").closest("button")).toHaveStyle({ background: "var(--brass-100)" });
+    expect(screen.getByText("src/").closest("button")).toHaveClass("hn-ide-sel");
+    expect(ideCss).toMatch(/\.hn-ide-sel\s*\{\s*background:\s*var\(--brass-100\)/);
   });
 
   it("tanpa onSelectDir perilaku lama utuh: klik hanya buka-tutup", () => {
@@ -74,7 +80,7 @@ describe("Berkas · buat & unggah", () => {
     mountIde();
     await openBerkas();
     fireEvent.click(screen.getByRole("button", { name: "Aksi lain berkas" }));
-    fireEvent.click(await screen.findByRole("button", { name: /folder baru/i }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /folder baru/i }));
     fireEvent.change(screen.getByLabelText("Nama folder"), { target: { value: "kosong" } });
     fireEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
     await waitFor(() => expect(create).toHaveBeenCalledWith("p1", "kosong", "dir"));

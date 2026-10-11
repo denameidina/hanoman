@@ -10,6 +10,7 @@
 import React from "react";
 import { MCP_TOOLS, MCP_TOOL_SCHEMA_VERSION } from "@hanoman/shared";
 import { Button, Card } from "../ds";
+import "./styles/integrations.css";
 
 type Client = "claude-code" | "claude-desktop" | "codex" | "cursor";
 
@@ -56,14 +57,6 @@ claude mcp add hanoman --env HANOMAN_HOST=${host} --env HANOMAN_AGENT_TOKEN=hnm_
   return json;
 }
 
-const PRE_STYLE: React.CSSProperties = {
-  margin: 0, padding: 12, fontSize: 12, lineHeight: 1.5, overflowX: "auto",
-  background: "var(--bone-100)", border: "1px solid var(--ink-200)",
-  borderRadius: "var(--radius-sm)", whiteSpace: "pre",
-};
-const MUTED: React.CSSProperties = { fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.55, marginBottom: 10 };
-const CELL: React.CSSProperties = { padding: "6px 10px 6px 0", borderBottom: "1px solid var(--border-hair)", verticalAlign: "top", fontSize: 12.5 };
-
 export function McpPanel(): React.ReactElement {
   const [client, setClient] = React.useState<Client>("claude-code");
   const [level, setLevel] = React.useState<SnippetLevel>("default");
@@ -83,20 +76,20 @@ export function McpPanel(): React.ReactElement {
   return (
     <>
       <Card eyebrow="mcp" title="MCP server">
-        <div style={MUTED}>
+        <div className="hn-mcp-muted">
           Agen AI mana pun yang berbicara MCP bisa memakai hanoman lewat <code>hanoman mcp</code> —
           tanpa pembungkus khusus per-klien. Ia memakai <b>agent token yang sama</b> dengan REST dan
           capability yang sama; buat tokennya di kartu di atas, lalu tempel di konfigurasi klien.{" "}
           <b>Skema tool versi {MCP_TOOL_SCHEMA_VERSION}.</b>
         </div>
-        <div style={MUTED}>
+        <div className="hn-mcp-muted">
           Prasyarat: <code>npm i -g hanoman</code> di mesin tempat klien AI-nya jalan. Host di bawah
           diisi otomatis dengan instance ini — <b>agent token diterbitkan per-instance</b>, jadi token
           dari instance lain akan selalu ditolak 401 di sini.
         </div>
         {/* ADR-0155 · kalimat lama di sini berkata permukaan berbahaya "tidak tersedia lewat MCP".
             Itu sudah tidak benar, dan kalimat yang berbohong lebih buruk daripada tak ada. */}
-        <div style={MUTED}>
+        <div className="hn-mcp-muted">
           Tool berbahaya — membuka sesi agen di worktree, perintah VPS, merge/rebase, penghapusan
           backlog, perubahan stage — <b>hanya muncul</b> pada tingkat <code>--danger</code>. Tingkat
           itu <b>bukan kontrol keamanan</b>: ia menentukan tool mana yang terlihat, sementara yang
@@ -104,7 +97,7 @@ export function McpPanel(): React.ReactElement {
           di atas. Sebuah tool bisa terlihat dan tetap menjawab 403.
         </div>
 
-        <div role="group" aria-label="Klien MCP" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+        <div role="group" aria-label="Klien MCP" className="hn-mcp-clients">
           {CLIENTS.map((c) => (
             <Button key={c.id} size="sm" variant={c.id === client ? "primary" : "ghost"} onClick={() => setClient(c.id)}>
               {c.label}
@@ -122,36 +115,36 @@ export function McpPanel(): React.ReactElement {
           </Button>
         </div>
 
-        <div style={{ ...MUTED, marginBottom: 8 }}>{active.hint}</div>
-        <pre data-testid="mcp-snippet" style={PRE_STYLE}>{snippet}</pre>
-        <div style={{ marginTop: 10 }}>
+        <div className="hn-mcp-muted hn-mcp-hint">{active.hint}</div>
+        <pre data-testid="mcp-snippet" className="hn-mcp-pre">{snippet}</pre>
+        <div className="hn-mcp-copy">
           <Button size="sm" leftIcon="copy" onClick={copy}>{copied ? "Tersalin" : "Salin"}</Button>
         </div>
       </Card>
 
       <Card eyebrow="tool" title="Tool yang tersedia">
-        <div style={MUTED}>
+        <div className="hn-mcp-muted">
           Centang capability di bawah pada token yang dipakai. Mode baca-saja menyembunyikan seluruh
           tool bertanda <i>tulis</i>.
         </div>
-        <div className="hn-local-overflow" style={{ overflowX: "auto" }}>
-          <table data-testid="mcp-tools" style={{ borderCollapse: "collapse", width: "100%" }}>
+        <div className="hn-local-overflow">
+          <table data-testid="mcp-tools" className="hn-mcp-table">
             <thead>
               <tr>
-                <th style={{ ...CELL, textAlign: "left", fontSize: 11.5, color: "var(--text-subtle)" }}>Tool</th>
-                <th style={{ ...CELL, textAlign: "left", fontSize: 11.5, color: "var(--text-subtle)" }}>Mode</th>
-                <th style={{ ...CELL, textAlign: "left", fontSize: 11.5, color: "var(--text-subtle)" }}>Capability</th>
+                <th className="hn-mcp-th">Tool</th>
+                <th className="hn-mcp-th">Mode</th>
+                <th className="hn-mcp-th">Capability</th>
               </tr>
             </thead>
             <tbody>
               {MCP_TOOLS.map((t) => (
                 <tr key={t.name}>
-                  <td style={CELL}>
+                  <td className="hn-mcp-td">
                     <code>{t.name}</code>
-                    <div style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{t.title}</div>
+                    <div className="hn-mcp-sub">{t.title}</div>
                   </td>
-                  <td style={CELL}>{t.mode === "read" ? "baca" : "tulis"}</td>
-                  <td style={CELL}>{t.capability ? <code>{t.capability}</code> : <span style={{ color: "var(--text-subtle)" }}>—</span>}</td>
+                  <td className="hn-mcp-td">{t.mode === "read" ? "baca" : "tulis"}</td>
+                  <td className="hn-mcp-td">{t.capability ? <code>{t.capability}</code> : <span className="hn-mcp-dash">—</span>}</td>
                 </tr>
               ))}
             </tbody>

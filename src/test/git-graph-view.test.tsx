@@ -27,7 +27,8 @@ describe("GitGraph", () => {
     expect(document.querySelector('[data-panel="detail"]')).toHaveAttribute("aria-hidden", "false");
     fireEvent.click(screen.getByRole("tab", { name: "Graph" }));
     const trigger = screen.getByRole("button", { name: "Aksi commit aaaa111" });
-    expect(screen.getByRole("button", { name: "Buka commit aaaa111" }).parentElement?.parentElement).toHaveStyle({ height: "44px" });
+    // Tinggi baris dinamis (30px desktop, 44px sentuh) ada di CSS variable daftar; baris mewarisinya.
+    expect(screen.getByRole("list", { name: "Riwayat commit" }).style.getPropertyValue("--row-h")).toBe("44px");
     fireEvent.click(trigger);
     const first = await screen.findByRole("menuitem", { name: /Checkout aaaa111/i });
     expect(first).toHaveFocus();

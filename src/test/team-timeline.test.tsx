@@ -1,8 +1,19 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import type { MemberView, TaskView } from "@hanoman/shared";
 import { TeamTimeline } from "../src/screens/team-timeline";
 import { barGeometry, taskSpan, timelineWindow, todayOffset, zoomCell } from "../src/screens/team-rules";
+
+// jsdom tak memuat stylesheet: aturan yang kini hidup di `team.css` (min-width, overflow, warna nada)
+// dibaca langsung dari berkasnya. Komentar dibuang agar pencarian selector tak cocok ke teks komentar.
+const TEAM_CSS = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/team.css"), "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "");
+const decl = (selector: string): string => {
+  const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`${esc}\\s*\\{([^}]*)\\}`).exec(TEAM_CSS)?.[1] ?? "";
+};
 
 // Cermin `LABEL_W` di `team-timeline.tsx` — lebar kolom label tak diekspor karena ia keputusan
 // tata letak, bukan kontrak; yang diuji di sini adalah OFFSET-nya, bukan angkanya.
@@ -37,8 +48,8 @@ describe("TeamTimeline · kanvas", () => {
     const win = timelineWindow([taskSpan(t)!], "day", TODAY);
     const g = barGeometry(t, win)!;
     const bar = screen.getByTestId("timeline-bar-t1");
-    expect(bar.style.left).toBe(`${g.left}%`);
-    expect(bar.style.width).toBe(`${g.width}%`);
+    expect(bar.style.getPropertyValue("--tl-left")).toBe(`${g.left}%`);
+    expect(bar.style.getPropertyValue("--tl-width")).toBe(`${g.width}%`);
   });
 
   it("jumlah sel header sama dengan jumlah tick jendela, dan berubah saat zoom berubah", () => {
@@ -67,7 +78,7 @@ describe("TeamTimeline · kanvas", () => {
     view([t]);
     const win = timelineWindow([taskSpan(t)!], "day", TODAY);
     const expected = LABEL_W + (todayOffset(win, TODAY)! / 100) * win.ticks.length * zoomCell("day");
-    expect(screen.getByTestId("timeline-today").style.left).toBe(`${expected}px`);
+    expect(screen.getByTestId("timeline-today").style.getPropertyValue("--tl-today-x")).toBe(`${expected}px`);
   });
 
   it("garis hari ini tak dirender saat hari ini di luar jendela", () => {
@@ -76,14 +87,12 @@ describe("TeamTimeline · kanvas", () => {
     expect(screen.queryByTestId("timeline-today")).toBeNull();
   });
 
-  it("kanvas tak bisa melar mengikuti isinya — minWidth 0 hidup di gaya inline, bukan cuma CSS", () => {
+  it("kanvas tak bisa melar mengikuti isinya — min-width 0 dan max-width 100% ada di .hn-tl-scroll", () => {
     view([task({ startDate: iso("2026-09-12") })]);
-    // jsdom tak memuat stylesheet: properti yang hanya hidup di `.hn-timeline-scroll` dijaga nol
-    // test, dan justru `min-width: 0` inilah kelas bug SPEC-879.
-    const scroller = screen.getByTestId("team-timeline");
-    // React menulis `0` tanpa satuan untuk nilai numerik nol.
-    expect(scroller.style.minWidth).toBe("0");
-    expect(scroller.style.maxWidth).toBe("100%");
+    // `min-width: 0` inilah kelas bug SPEC-879. Ia kini di kelas, jadi dibaca dari team.css.
+    expect(screen.getByTestId("team-timeline").className).toContain("hn-tl-scroll");
+    expect(decl(".hn-tl-scroll")).toMatch(/min-width:\s*0(;|\s|$)/);
+    expect(decl(".hn-tl-scroll")).toMatch(/max-width:\s*100%/);
   });
 
   /* SPEC-879 · gulir mendatar hidup DI DALAM kanvas; badan halaman tak boleh ikut. Dan anak blok
@@ -93,9 +102,9 @@ describe("TeamTimeline · kanvas", () => {
     view([task({ startDate: iso("2026-09-12") })]);
     const scroller = screen.getByTestId("team-timeline");
     expect(scroller.className).toContain("hn-timeline-scroll");
-    expect(scroller.style.overflowX).toBe("auto");
+    expect(decl(".hn-tl-scroll")).toMatch(/overflow-x:\s*auto/);
     const inner = screen.getByTestId("timeline-canvas");
-    expect(parseInt(inner.style.minWidth, 10)).toBeGreaterThan(0);
+    expect(parseInt(inner.style.getPropertyValue("--tl-canvas-w"), 10)).toBeGreaterThan(0);
   });
 });
 
@@ -156,10 +165,15 @@ describe("TeamTimeline · kejujuran batang", () => {
       task({ id: "jalan", status: "doing", startDate: iso("2026-09-12") }),
       task({ id: "salah", startDate: iso("2026-09-14"), dueDate: iso("2026-09-10") }),
     ]);
-    const bg = (id: string) => screen.getByTestId(`timeline-bar-${id}`).style.background;
-    expect(bg("beres")).toBe("var(--bone-300)");
-    expect(bg("jalan")).toBe("var(--brass-300)");
-    expect(bg("salah")).toBe("var(--status-err-tint)");
+    const tone = (id: string) => screen.getByTestId(`timeline-bar-${id}`).getAttribute("data-tone");
+    expect(tone("beres")).toBe("muted");
+    expect(tone("jalan")).toBe("brass");
+    expect(tone("salah")).toBe("err");
+    // Warna tiap nada hidup di team.css; ketiganya harus berbeda, dan tak ada yang tanpa aturan.
+    const bg = (t: string) => decl(`.hn-tl-bar[data-tone="${t}"], .hn-tl-swatch[data-tone="${t}"]`);
+    expect(bg("muted")).toContain("var(--bone-300)");
+    expect(bg("brass")).toContain("var(--brass-300)");
+    expect(bg("err")).toContain("var(--status-err-tint)");
   });
 
   it("nama pemilik baris ikut dirender, kartu tanpa assignee tetap punya kalimat", () => {

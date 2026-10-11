@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { McpPanel } from "../src/screens/McpPanel";
@@ -66,5 +68,11 @@ describe("McpPanel", () => {
     expect(screen.getByText(/skema tool versi 2/i)).toBeTruthy();   // naik ke 2 sejak ADR-0182 (tes ini basi di main)
     expect(screen.getByText(/hanya muncul/i)).toBeTruthy();
     expect(screen.queryByText(/tidak tersedia lewat MCP/i)).toBeNull();
+  });
+
+  // Anggaran gaya inline (Z3): layout lewat kelas `hn-mcp-*` di integrations.css.
+  it("layout lewat kelas: gaya inline tinggal ≤ 2", () => {
+    const src = readFileSync(resolve(import.meta.dirname, "../src/screens/McpPanel.tsx"), "utf8");
+    expect((src.match(/style=\{\{/g) ?? []).length).toBeLessThanOrEqual(2);
   });
 });

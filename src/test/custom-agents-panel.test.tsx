@@ -495,7 +495,7 @@ describe("audit UI/UX · hapus, galat muat, field lanjutan, validasi", () => {
   const bawaan = { ...own, id: "global:scout", name: "scout", builtin: true };
   const openDelete = async (name: string) => {
     fireEvent.click(screen.getByRole("button", { name: `Aksi untuk agen ${name}` }));
-    fireEvent.click(await screen.findByRole("button", { name: /Hapus agen…/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Hapus agen…/ }));
   };
 
   it("Hapus meminta konfirmasi bernama agen dan baru menghapus setelah disetujui", async () => {
@@ -535,7 +535,7 @@ describe("audit UI/UX · hapus, galat muat, field lanjutan, validasi", () => {
     render(<CustomAgentsPanel projectId={null} />);
     await screen.findByText("scout");
     fireEvent.click(screen.getByRole("button", { name: "Aksi untuk agen scout" }));
-    const btn = await screen.findByRole("button", { name: /Hapus agen…/ }) as HTMLButtonElement;
+    const btn = await screen.findByRole("menuitem", { name: /Hapus agen…/ }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
     expect(screen.getByText("Agen bawaan tak bisa dihapus")).toBeTruthy();
   });

@@ -128,7 +128,9 @@ describe("SPEC-879 · region baris Git Graph adalah scroller lokal yang HIDUP", 
       // Anak blok selalu selebar induknya; tanpa `min-width` scroller ini tak pernah punya konten
       // lebih lebar untuk digulir — terukur 362 = 362 di 390px, `canScroll: false`.
       const inner = rows.firstElementChild as HTMLElement;
-      expect(Number.parseInt(inner.style.minWidth, 10)).toBeGreaterThanOrEqual(460);
+      // Lebar minimum daftar ada di CSS variable (dinamis per jumlah lane); kelasnya memakainya.
+      expect(Number.parseInt(inner.style.getPropertyValue("--graph-min-w"), 10)).toBeGreaterThanOrEqual(460);
+      expect(ideCss).toMatch(/\.hn-git-rows\s*\{[^}]*min-width:\s*var\(--graph-min-w/s);
       // Kartunya sendiri TAK boleh lagi berada di dalam scroller mendatar.
       expect(rows.closest(".hn-local-overflow")).toBe(rows);
     });
@@ -197,7 +199,7 @@ describe("SPEC-879 · kontrol IDE memakai primitive design system", () => {
     expect(dest).toHaveClass("hn-ide-dest");
     expect(ideCss).toMatch(/\.hn-ide-dest\s*\{[^}]*flex:\s*1 1 auto/s);
     const spacers = [...dest.parentElement!.children].filter((c) =>
-      c !== dest && !c.textContent?.trim() && (c as HTMLElement).style.flex === "1");
+      c !== dest && !c.textContent?.trim() && ((c as HTMLElement).style.flex === "1" || c.classList.contains("hn-grow")));
     expect(spacers).toHaveLength(0);
   });
 

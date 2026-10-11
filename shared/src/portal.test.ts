@@ -69,9 +69,14 @@ describe("proyeksi portal (SPEC-617)", () => {
     expect(out.detail).toBe("langkah repro");
   });
 
-  it("project hanya id & nama", () => {
-    const out = toPortalProject(PROJECT_ROW);
+  // ADR-0211 · project hanya id, nama, dan penanda chat — allowlist, bukan Omit<>.
+  it("project hanya id, nama, dan chatEnabled", () => {
+    const out = toPortalProject(PROJECT_ROW, true);
     expect(Object.keys(out).sort()).toEqual([...PORTAL_PROJECT_KEYS].sort());
-    expect(out).toEqual({ id: "p1", name: "P1" });
+    expect(out).toEqual({ id: "p1", name: "P1", chatEnabled: true });
+  });
+
+  it("chatEnabled mengikuti argumen apa adanya (false tetap false, bukan hilang)", () => {
+    expect(toPortalProject(PROJECT_ROW, false)).toEqual({ id: "p1", name: "P1", chatEnabled: false });
   });
 });

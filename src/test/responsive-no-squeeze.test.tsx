@@ -83,28 +83,32 @@ describe("SPEC-763 · baris padat memberi teks lebar minimum di mobile", () => {
    - judul ber-`flex-basis: 0` kalah dari `projectId` yang basis-nya selebar isinya → judul tersisa
      "Ba…" (konten terpotong 667px) padahal ia satu-satunya pembeda antar-baris. */
 describe("SPEC-763 · baris pemilih tak diperas di bawah kontennya", () => {
+  // Sejak inline → kelas (Audit UI/UX 2026-10 · Fase 2E, Z1), `flex: 0 0 auto` dan `display: block` hidup
+  // di kelas baris (terminal.css), bukan di objek inline. Invariant-nya tetap diperiksa, hanya lewat kelas.
+  const terminalCss = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/terminal.css"), "utf8");
   const rows = [
-    ["TerminalScreen.tsx", "onPick(s)"],
-    ["SessionHistoryModal.tsx", "setSelected(r)"],
+    ["TerminalScreen.tsx", "onPick(s)", "hn-terminal-pick-row"],
+    ["SessionHistoryModal.tsx", "setSelected(r)", "hn-terminal-hist-row"],
   ] as const;
 
-  it.each(rows)("%s: baris tak memakai `all: unset` dan tak boleh menyusut", (file, anchor) => {
+  it.each(rows)("%s: baris tak memakai `all: unset` dan tak boleh menyusut", (file, anchor, rowClass) => {
     const source = readFileSync(resolve(import.meta.dirname, `../src/screens/${file}`), "utf8");
     const at = source.indexOf(anchor);
     expect(at).toBeGreaterThan(-1);
     const row = source.slice(at, at + 420);
     expect(row).not.toContain('all: "unset"');
-    expect(row).toContain('flex: "0 0 auto"');
+    expect(row).toContain(`className="${rowClass}"`);
+    expect(terminalCss).toMatch(new RegExp(`\\.${rowClass}\\s*\\{[^}]*flex:\\s*0 0 auto`));
   });
 
-  it.each(rows)("%s: pembungkus flex ada DI DALAM tombol, bukan pada tombolnya", (file, anchor) => {
+  it.each(rows)("%s: pembungkus flex ada DI DALAM tombol, bukan pada tombolnya", (file, anchor, rowClass) => {
     const source = readFileSync(resolve(import.meta.dirname, `../src/screens/${file}`), "utf8");
     const at = source.indexOf(anchor);
     const row = source.slice(at, at + 900);
     // Kotak <button> tak menumbuhkan tingginya untuk baris flex yang membungkus: tombolnya
     // `block`, dan yang `flex` adalah <span> di dalamnya.
-    expect(row).toContain('display: "block"');
-    expect(row).toMatch(/<span className="hn-dense-row hn-picker-row"/);
+    expect(terminalCss).toMatch(new RegExp(`\\.${rowClass}\\s*\\{[^}]*display:\\s*block`));
+    expect(row).toMatch(/<span className="hn-dense-row hn-picker-row/);
   });
 
   it("memberi judul barisnya sendiri di mobile lewat aturan yang menang atas nowrap inline", () => {

@@ -1,26 +1,40 @@
 /* ReviewScreen (SPEC-171) — review file worktree backlog item ala VSCode:
-   daftar berkas (changed + tree) dan viewer Diff|Source. Read-only.
+   daftar berkas (changed + tree) dan viewer Diff|Source. Viewer itu read-only.
 
-   Audit UI/UX 2026-10 · Fase 3 (3L) · "Tinjau lalu Putuskan": kepala ringkas (jumlah berkas, +/−),
-   lalu bar keputusan sticky di bawah. Layar ini tak memutuskan apa pun sendiri: merge dan konflik
-   tetap dikerjakan di Backlog (integrate) atau Terminal (sesi konflik). Tiga tombol di bar hanya
-   berpindah layar: lewat `onGoto` bila layar induk memberikannya, selain itu tautan biasa. */
+   Audit UI/UX 2026-10 · Fase 3 (3L′) · "Tinjau lalu Putuskan": kepala ringkas (jumlah berkas, +/−),
+   lalu bar keputusan sticky di bawah. Tanpa prop keputusan, bar hanya berisi tiga tujuan navigasi
+   (Backlog, Terminal, IDE). Dengan prop keputusan (`onIntegrate`, `onRevert`, `onDiscard`), bar memuat
+   aksi nyata: satu primer, satu sekunder, dan ⋯ untuk aksi destruktif serta navigasi. Setiap mutasi
+   lewat konfirmasi `useConfirm`; layar ini tak memanggil API mutasi sendiri — layar induk yang
+   menjalankannya dan melempar galat agar ditampilkan di sini. */
 import React from "react";
-import { Button, Badge, Icon, Inline, StateBlock, DocPreviewModal, isMarkdownPath, ResponsivePanels } from "../ds";
-import { api, type SpecReview, type ReviewFile } from "../api/client";
+import { Button, Badge, Callout, Icon, Inline, OverflowActions, StateBlock, DocPreviewModal, isMarkdownPath,
+  ResponsivePanels, useConfirm, type OverflowItem } from "../ds";
+import { api, type SpecReview, type ReviewFile, type RevertPending } from "../api/client";
 import { buildFileTree, TreeRow, TreeRoot, ChangedSection } from "./file-tree";
 import { DiffView } from "./diff-view";
 import { routePath, type Route } from "../routes";
+import { failureMessage } from "../lib/report-error";
 import "./styles/review.css";
 
 export type ReviewKind = "spec" | "session";
 
 // SPEC-171/230 · review worktree. kind="spec" (backlog item) atau "session" (sesi project-level
 // PRD, tanpa Spec) memilih endpoint yang dipakai — bentuk data & UI identik.
-export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto }:
+export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onIntegrate, integrateTarget, onRevert, onDiscard }:
   { specId: string; title: string; onBack: () => void; kind?: ReviewKind;
     /** Pindah ke layar lain (Backlog, Terminal, IDE). Tanpa ini setiap tombol jadi tautan ke `routePath`. */
-    onGoto?: (to: Route) => void }) {
+    onGoto?: (to: Route) => void;
+    /** Integrasikan: merge branch item ke cabang tujuannya. Layar induk memilih tujuan dan menjalankan
+     *  mutasi; galat dilempar agar ditampilkan di bar. Hanya bermakna untuk item `done` (server 409 selain itu). */
+    onIntegrate?: (specId: string) => Promise<void>;
+    /** Cabang tujuan integrasi, hanya untuk teks dialog konfirmasi (mis. "main (lokal)"). */
+    integrateTarget?: string;
+    /** Kembalikan status ke Dikerjakan. Panggilan tanpa `confirmDelete` adalah dry-run: balasan `pending`
+     *  memuat daftar dokumen yang akan dihapus; layar meminta konfirmasi lalu memanggil lagi dengan `true`. */
+    onRevert?: (specId: string, confirmDelete?: boolean) => Promise<RevertPending | void>;
+    /** Hapus worktree item: direktorinya dipindah ke tempat sampah repo, branch dan commit tetap. Galat dilempar. */
+    onDiscard?: (specId: string) => Promise<void>; }) {
   const fetchReview = kind === "session" ? api.sessionReview : api.specReview;
   const fetchFile = kind === "session" ? api.sessionReviewFile : api.specReviewFile;
   const [review, setReview] = React.useState<SpecReview | null>(null);
@@ -38,6 +52,8 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto }:
   // preview-nya sebuah AKSI, bukan tab ketiga (Diff|Source tetap apa adanya).
   const [preview, setPreview] = React.useState(false);
   const [panel, setPanel] = React.useState<"files" | "viewer">("files");
+  const { confirm, dialog } = useConfirm();
+  const [actionErr, setActionErr] = React.useState("");
 
   React.useEffect(() => {
     let alive = true;
@@ -79,11 +95,17 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto }:
   const selectFile = (path: string) => { setSelected(path); setPanel("viewer"); };
 
   const backLabel = kind === "session" ? "Kembali ke terminal" : "Kembali ke backlog";
-  const hint = kind === "session"
-    ? "Merge dan konflik dikerjakan di Terminal."
-    : "Merge dan konflik dikerjakan di Backlog. Buka Terminal untuk melanjutkan sesinya.";
+  const hasDecision = !!(onIntegrate || onRevert || onDiscard);
+  const branch = `hanoman/${specId.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`;
+  const hint = hasDecision
+    ? onIntegrate
+      ? "Integrasi menggabungkan branch item ke cabang tujuan. Konflik dibereskan sesi agen di Terminal."
+      : "Tinjau perubahan, lalu putuskan."
+    : kind === "session"
+      ? "Merge dan konflik dikerjakan di Terminal."
+      : "Merge dan konflik dikerjakan di Backlog. Buka Terminal untuk melanjutkan sesinya.";
 
-  // Tiga tujuan keputusan. Di sesi PRD, merge dan konflik hanya ada di Terminal.
+  // Tiga tujuan navigasi. Di sesi PRD, merge dan konflik hanya ada di Terminal.
   const goTerminal: Route = { section: "terminal" };
   const goIde: Route = { section: "ide" };
   const goBacklog: Route = { section: "backlog", specId };
@@ -92,6 +114,72 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto }:
   const goButton = (to: Route, label: string, icon: string, variant: "primary" | "secondary") => onGoto
     ? <Button size="sm" variant={variant} leftIcon={icon} onClick={() => go(to)}>{label}</Button>
     : <Button size="sm" variant={variant} leftIcon={icon} as="a" href={routePath(to)}>{label}</Button>;
+
+  // Aksi keputusan. Galat mutasi tampil di bar (`actionErr`), bukan ditelan. Dialog konfirmasi menahan
+  // batal/konfirmasi selama `run` berjalan, sehingga submit ganda tak mungkin.
+  async function askIntegrate() {
+    const integrate = onIntegrate;
+    if (!integrate) return;
+    setActionErr("");
+    try {
+      await confirm({
+        title: `Integrasikan ${specId}?`, eyebrow: specId, icon: "git-merge", confirmLabel: "Integrasikan",
+        message: "Branch item di-merge ke cabang tujuan. Bila ada konflik, sesi agen membereskannya di Terminal. Rebase tetap di Backlog.",
+        impact: [
+          `Branch: ${branch}`,
+          `${changed.length} berkas berubah, +${totalAdd} −${totalDel} baris`,
+          `Cabang tujuan: ${integrateTarget ?? "cabang asal item (default project)"}`,
+        ],
+        run: () => integrate(specId),
+      });
+    } catch (e) { setActionErr(failureMessage("mengintegrasikan item", e)); }
+  }
+  async function askRevert() {
+    const revert = onRevert;
+    if (!revert) return;
+    setActionErr("");
+    try {
+      const preview = await revert(specId);
+      // Tanpa `pending` server sudah mengubah status langsung; tak ada yang perlu dikonfirmasi lagi.
+      if (!preview || !("pending" in preview)) return;
+      const files = preview.wouldDelete;
+      await confirm({
+        title: `Kembalikan ${specId} ke Dikerjakan?`, eyebrow: `${specId} → Dikerjakan`, icon: "rotate-ccw",
+        tone: files.length ? "danger" : "default",
+        confirmLabel: files.length ? "Hapus dokumen & kembalikan" : "Kembalikan",
+        message: files.length
+          ? `${files.length} berkas dokumen fase akan dihapus dari disk. Kode dan commit tidak disentuh.`
+          : "Tak ada dokumen fase yang dihapus. Kode dan commit tidak disentuh.",
+        impact: files,
+        run: () => revert(specId, true),
+      });
+    } catch (e) { setActionErr(failureMessage("mengembalikan status", e)); }
+  }
+  async function askDiscard() {
+    const discard = onDiscard;
+    if (!discard) return;
+    setActionErr("");
+    try {
+      await confirm({
+        title: `Hapus worktree ${specId}?`, eyebrow: specId, icon: "trash-2", tone: "danger", confirmLabel: "Hapus worktree",
+        message: "Direktori worktree dipindah ke tempat sampah repo, lalu dibersihkan. Branch dan commit item tetap ada.",
+        impact: ["Sesi yang masih berjalan di worktree ini ditutup.", "Perubahan yang belum di-commit di worktree ini ikut dibersihkan."],
+        run: async () => { await discard(specId); setTries((n) => n + 1); },
+      });
+    } catch (e) { setActionErr(failureMessage("menghapus worktree", e)); }
+  }
+  // Menu ⋯: aksi destruktif plus navigasi. Navigasi hanya ada bila layar induk memberi `onGoto`,
+  // karena item menu tak bisa menjadi tautan.
+  const moreItems: OverflowItem[] = [
+    ...(onDiscard ? [{ key: "discard", label: "Hapus worktree", icon: "trash-2", tone: "danger" as const,
+      onSelect: () => void askDiscard() }] : []),
+    ...(onGoto && kind === "spec" ? [{ key: "backlog", label: "Buka di Backlog", icon: "list-checks",
+      onSelect: () => go(goBacklog) }] : []),
+    ...(onGoto ? [
+      { key: "terminal", label: "Buka di Terminal", icon: "terminal", onSelect: () => go(goTerminal) },
+      { key: "ide", label: "Buka di IDE", icon: "code", onSelect: () => go(goIde) },
+    ] : []),
+  ];
 
   if (state === "loading") return <StateBlock kind="loading" title="Memuat review…" hint={specId} />;
   if (state === "error") return <StateBlock kind="error" title="Gagal memuat review" hint={specId} action={() => setTries((n) => n + 1)} />;
@@ -181,13 +269,25 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto }:
     />
 
     <div className="hn-review-decide" role="region" aria-label="Keputusan">
+      {actionErr && <Callout tone="err" className="hn-review-decide-err">{actionErr}</Callout>}
       <p className="hn-review-decide-hint">{hint}</p>
-      <div className="hn-review-decide-actions">
-        {kind === "spec" && goButton(goBacklog, "Buka di Backlog", "list-checks", "primary")}
-        {goButton(goTerminal, "Buka di Terminal", "terminal", kind === "session" ? "primary" : "secondary")}
-        {goButton(goIde, "Buka di IDE", "code", "secondary")}
-      </div>
+      {hasDecision ? (
+        <div className="hn-review-decide-actions">
+          {onRevert && <Button size="sm" variant="secondary" leftIcon="rotate-ccw" onClick={() => void askRevert()}>Kembalikan ke Dikerjakan</Button>}
+          {onIntegrate && <Button size="sm" variant="primary" leftIcon="git-merge" onClick={() => void askIntegrate()}>Integrasikan</Button>}
+          {moreItems.length > 0 && <div className="hn-review-more">
+            <OverflowActions label="Aksi lain untuk item ini" items={moreItems} />
+          </div>}
+        </div>
+      ) : (
+        <div className="hn-review-decide-actions">
+          {kind === "spec" && goButton(goBacklog, "Buka di Backlog", "list-checks", "primary")}
+          {goButton(goTerminal, "Buka di Terminal", "terminal", kind === "session" ? "primary" : "secondary")}
+          {goButton(goIde, "Buka di IDE", "code", "secondary")}
+        </div>
+      )}
     </div>
+    {dialog}
     {preview && canPreview && (
       <DocPreviewModal path={selected} text={file!.content ?? ""} eyebrow={specId}
         download={(f) => downloadUrl(specId, selected, f)} onClose={() => setPreview(false)} />

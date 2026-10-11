@@ -102,20 +102,20 @@ describe("PhaseStrip · panel dibatasi tinggi badan sel, bukan wrapper strip (AD
   it("wrapper phase-strip tak lagi jadi containing block: tanpa position, tanpa overflow", () => {
     render(<PhaseStrip phases={[{ name: "Spec", state: "done", agent: agent() }]} />);
     const strip = screen.getByTestId("phase-strip");
-    expect(strip.style.position).toBe("");
-    expect(strip.style.overflowX).toBe("");
-    expect(strip.style.overflowY).toBe("");
-    expect(screen.getByTestId("phase-strip-scroller")).toHaveStyle({ overflowX: "auto" });
+    // Aturan (position, overflow) hidup di terminal.css; jsdom tak memuat stylesheet, jadi yang
+    // diikat di sini adalah kelasnya dan tak adanya style inline. Deklarasinya dikunci terminal-css-contract.
+    expect(strip).toHaveClass("hn-terminal-phase");
+    expect(strip).not.toHaveAttribute("style");
+    expect(screen.getByTestId("phase-strip-scroller")).toHaveClass("hn-terminal-phase-scroller");
+    expect(screen.getByTestId("phase-strip-scroller")).not.toHaveAttribute("style");
   });
 
   it("panel: absolute tanpa top (posisi statis), overflow-y & maxHeight sendiri", () => {
     render(<PhaseStrip phases={[{ name: "Spec", state: "done", agent: agent() }]} />);
     fireEvent.click(screen.getByRole("button", { name: /^Fase Spec:/ }));
     const dialog = screen.getByRole("dialog", { name: "Detail fase Spec" });
-    expect(dialog.style.position).toBe("absolute");
-    expect(dialog.style.top).toBe("");
-    expect(dialog.style.overflowY).toBe("auto");
-    expect(dialog.style.maxHeight).toContain("100%");
+    expect(dialog).toHaveClass("hn-terminal-phase-panel");
+    expect(dialog).not.toHaveAttribute("style");
   });
 });
 

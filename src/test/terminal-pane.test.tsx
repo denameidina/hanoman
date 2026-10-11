@@ -999,6 +999,34 @@ describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", (
       .toBe(false);
   });
 
+  // Keputusan 15 (Audit UI/UX 2026-10): mode pembaca layar xterm itu opsional dan default mati.
+  // Opsinya berpindah di tempat (AccessibilityManager dinyalakan atau dibuang), tanpa socket baru.
+  it("mode pembaca layar mati secara default dan berpindah di tempat tanpa socket baru", async () => {
+    const { rerender } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    expect(xt.options?.screenReaderMode).toBe(false);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+
+    rerender(<TerminalPane sessionId="sesi-1" onExit={() => { }} screenReader />);
+    expect(xt.options?.screenReaderMode).toBe(true);
+    expect(sockets).toHaveLength(1);
+
+    rerender(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    expect(xt.options?.screenReaderMode).toBe(false);
+    expect(sockets).toHaveLength(1);
+  });
+
+  // Dengan mode aktif, Tab tetap diproses xterm (dan dikirim ke pty), sedangkan Ctrl+Shift+Esc tetap
+  // melepas fokus dan tak pernah sampai ke pty. Jalan keluar itu tak boleh hilang di mode ini.
+  it("mode pembaca layar aktif: Ctrl+Shift+Esc tetap melepas fokus, Tab tetap diproses terminal", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} screenReader />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    expect(xt.options?.screenReaderMode).toBe(true);
+    expect(xt.keyHandler?.(new KeyboardEvent("keydown", { key: "Escape", ctrlKey: true, shiftKey: true })))
+      .toBe(false);
+    expect(xt.keyHandler?.(new KeyboardEvent("keydown", { key: "Tab" }))).toBe(true);
+  });
+
   it("tombol keluar fokus terlihat saat terminal berfokus dan memindahkan fokus ke akar pane", async () => {
     const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));

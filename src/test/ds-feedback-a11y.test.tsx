@@ -137,8 +137,8 @@ describe("OverflowActions · danger dan label", () => {
       { key: "hapus", label: "Hapus", tone: "danger", onSelect: () => {} },
     ]} />);
     fireEvent.click(screen.getByRole("button", { name: "Aksi sesi A" }));
-    expect(screen.getByRole("button", { name: "Hapus" })).toHaveClass("hn-overflow-item-danger");
-    expect(screen.getByRole("button", { name: "Lihat" })).not.toHaveClass("hn-overflow-item-danger");
+    expect(screen.getByRole("menuitem", { name: "Hapus" })).toHaveClass("hn-overflow-item-danger");
+    expect(screen.getByRole("menuitem", { name: "Lihat" })).not.toHaveClass("hn-overflow-item-danger");
   });
 
   it("label memberi nama pemicu dan dialog; title mengganti judul dialog saja", () => {
@@ -146,12 +146,13 @@ describe("OverflowActions · danger dan label", () => {
       { key: "a", label: "Tandai selesai", onSelect: () => {} },
     ]} />);
     const trigger = screen.getByRole("button", { name: "Aksi untuk SPEC-7" });
-    expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+    expect(trigger).toHaveAttribute("aria-haspopup", "menu");
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(trigger);
     expect(trigger).toHaveAttribute("aria-expanded", "true");
     const dialog = screen.getByRole("dialog", { name: "Aksi SPEC-7" });
-    expect(within(dialog).getByRole("button", { name: "Tandai selesai" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("menu", { name: "Aksi SPEC-7" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("menuitem", { name: "Tandai selesai" })).toBeInTheDocument();
   });
 
   it("tanpa title, dialog memakai label sebagai namanya", () => {

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { MemberView } from "@hanoman/shared";
@@ -86,5 +88,58 @@ describe("MembersPanel", () => {
     expect(api.deleteMember).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /hapus anggota/i }));
     await waitFor(() => expect(api.deleteMember).toHaveBeenCalledWith("dena@x.id"));
+  });
+
+  /* Muat ulang senyap (temuan Fase 1 yang tertunda): setelah mutasi, daftar yang sudah tampil tetap di
+     layar dan tak pernah kembali ke "Memuat…". Galatnya tampil sebagai alert di atas data lama. */
+  it("muat ulang setelah mutasi tak mengosongkan daftar dan tak menampilkan 'Memuat…'", async () => {
+    vi.mocked(api.listMembers).mockClear();
+    open();
+    await screen.findByText("Dena");
+    let finishReload!: (v: ReturnType<typeof page>) => void;
+    vi.mocked(api.listMembers).mockImplementationOnce(() => new Promise((res) => { finishReload = res; }));
+    fireEvent.click(screen.getByRole("button", { name: "Nonaktifkan Dena" }));
+    await waitFor(() => expect(api.listMembers).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("Dena")).toBeInTheDocument();
+    expect(screen.queryByText("Memuat…")).toBeNull();
+    finishReload(page([member({ active: false })]));
+    expect(await screen.findByText("nonaktif")).toBeInTheDocument();
+  });
+
+  it("galat muat ulang tampil sebagai alert di atas data lama, tanpa menggantinya", async () => {
+    open();
+    await screen.findByText("Dena");
+    vi.mocked(api.listMembers).mockRejectedValueOnce(new Error("jaringan putus"));
+    fireEvent.click(screen.getByRole("button", { name: "Nonaktifkan Dena" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Gagal memuat ulang anggota");
+    expect(alert).toHaveTextContent(/data lama/i);
+    expect(screen.getByText("Dena")).toBeInTheDocument();
+    expect(screen.queryByText("Gagal memuat anggota.")).toBeNull();
+  });
+
+  it("Coba lagi di alert memuat daftar terbaru dan menutup alertnya", async () => {
+    open();
+    await screen.findByText("Dena");
+    vi.mocked(api.listMembers).mockRejectedValueOnce(new Error("jaringan putus"));
+    fireEvent.click(screen.getByRole("button", { name: "Nonaktifkan Dena" }));
+    await screen.findByRole("alert");
+    vi.mocked(api.listMembers).mockResolvedValueOnce(page([member({ name: "Dena Baru" })]));
+    fireEvent.click(screen.getByRole("button", { name: /coba lagi/i }));
+    expect(await screen.findByText("Dena Baru")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("muat pertama yang gagal memakai keadaan galat penuh, bukan alert di atas data", async () => {
+    vi.mocked(api.listMembers).mockRejectedValueOnce(new Error("jaringan putus"));
+    open();
+    expect(await screen.findByText("Gagal memuat anggota.")).toBeInTheDocument();
+    expect(screen.queryByText("Gagal memuat ulang anggota")).toBeNull();
+  });
+
+  // Anggaran gaya inline (Z3): layout lewat kelas `hn-mem-*` di panels.css, bukan `style={{ … }}`.
+  it("layout lewat kelas: gaya inline tinggal ≤ 3", () => {
+    const src = readFileSync(resolve(import.meta.dirname, "../src/screens/MembersPanel.tsx"), "utf8");
+    expect((src.match(/style=\{\{/g) ?? []).length).toBeLessThanOrEqual(3);
   });
 });

@@ -131,3 +131,43 @@
 @media (max-width: 767px) {
   .vps-form-pair { grid-template-columns: 1fr; }
 }
+
+/* ── Panel provisioning (SPEC-883) · kelas `vps-prov-*`. Warna status lewat `data-status` (ok, partial,
+   absent), bukan inline. Nilainya sama dengan `STATUS_COLOR` di VpsProvision.tsx; status lain jatuh ke
+   `--text-subtle` (dot) atau tanpa warna (segmen meter), seperti sebelumnya. */
+.vps-prov { display: grid; gap: 12px; }
+.vps-prov-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.vps-prov-badges { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.vps-prov-summary { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+.vps-prov-hint { font-size: 11px; color: var(--text-subtle); }
+.vps-prov-chip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11px; line-height: 18px;
+  color: var(--text-body); background: var(--surface-sunken); border: 1px solid var(--border-hair);
+  border-radius: 999px; padding: 0 8px; white-space: nowrap;
+}
+.vps-prov-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-subtle); flex: 0 0 auto; }
+.vps-prov-dot[data-status="ok"] { background: var(--leaf-600); }
+.vps-prov-dot[data-status="partial"] { background: var(--amber-600); }
+.vps-prov-meter { display: flex; gap: 2px; align-items: center; }
+.vps-prov-seg { width: 12px; height: 4px; border-radius: 2px; }
+.vps-prov-seg[data-status="ok"] { background: var(--leaf-600); }
+.vps-prov-seg[data-status="partial"] { background: var(--amber-600); }
+.vps-prov-seg[data-status="absent"] { background: var(--border-strong); }
+.vps-prov-count { font-size: 11px; color: var(--text-subtle); white-space: nowrap; }
+.vps-prov-count-ok { color: var(--text-strong); font-weight: 600; }
+.vps-prov-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.vps-prov-legend { font-size: 12px; font-weight: 600; color: var(--text-strong); margin-bottom: 6px; padding: 0; }
+.vps-prov-profiles { display: grid; gap: 8px; }
+.vps-prov-profile-hint { font-size: 11px; color: var(--text-muted); margin-left: 24px; line-height: 1.5; }
+.vps-prov-items { display: grid; gap: 6px; }
+.vps-prov-item { display: flex; gap: 6px; align-items: center; }
+.vps-prov-tag { font-size: 10px; color: var(--text-subtle); }
+.vps-prov-reason { font-size: 12px; color: var(--text-muted); }
+.vps-prov-steps {
+  font-size: 11px; font-family: var(--font-mono); max-height: 220px; overflow: auto;
+  background: var(--surface-sunken); padding: 8px; border-radius: 4px;
+}
+.vps-prov-setup { display: grid; gap: 4px; border: 1px solid var(--border-strong); border-radius: 4px; padding: 8px; }
+.vps-prov-setup-title { font-size: 12px; }
+.vps-prov-setup-link { font-size: 12px; word-break: break-all; }
+.vps-prov-pending { display: flex; gap: 8px; align-items: center; font-size: 12px; }

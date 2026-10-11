@@ -192,7 +192,12 @@ export type SpecListParams = {
   dateField?: "created" | "started"; from?: string; to?: string;
 };
 // SPEC-880 · `handledBy` = deviceId; menjawab "apa saja yang dipegang mesin X" dalam satu klik.
-export type ProjectListParams = { q?: string; handledBy?: string; page?: number; limit?: number };
+// ADR-0212 · `sort=attention` mengurutkan seluruh hasil di server; `attention` (boolean) menyaring ke
+// project yang dokumennya drift/rusak. Keduanya opsional; tanpa keduanya balasannya seperti semula.
+export type ProjectListParams = {
+  q?: string; handledBy?: string; page?: number; limit?: number;
+  sort?: "attention"; attention?: boolean;
+};
 // SPEC-1217 · §S4.8 · GET /api/logs — rentang wajib, kursor opaque, TANPA `total` (ADR-0107 exc. #4).
 export type LogSearchQueryInput = {
   from: string; to: string; deviceId?: string; projectId?: string; specId?: string;

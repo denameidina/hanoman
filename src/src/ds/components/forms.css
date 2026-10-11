@@ -14,3 +14,26 @@
 @media (pointer: coarse), (max-width: 767px) {
   .hn-choice-control { min-width: var(--touch-target); min-height: var(--touch-target); }
 }
+
+/* Button varian danger (forms.tsx, Audit 2026-10). Warnanya lewat kelas: hover butuh pseudo-class.
+   `hn-btn-danger` solid untuk aksi merusak utama; `hn-btn-danger-outline` teks + border merah untuk aksi
+   sekunder. Keduanya mendapat cincin fokus yang sama dengan fokus DS (`--border-focus`). Tombol nonaktif
+   tak berubah saat hover. Semua varian Button (termasuk non-danger) kini tanpa `outline` inline: cincin
+   fokusnya datang dari `:focus-visible` global di app.css. */
+.hn-btn-danger {
+  background: var(--clay-600); color: #fff; border: 1px solid var(--clay-600);
+}
+.hn-btn-danger:not(:disabled):not([aria-disabled="true"]):hover { filter: brightness(0.95); }
+
+.hn-btn-danger-outline {
+  background: var(--surface-card); color: var(--clay-600); border: 1px solid var(--clay-500);
+  box-shadow: var(--shadow-xs);
+}
+.hn-btn-danger-outline:not(:disabled):not([aria-disabled="true"]):hover {
+  background: var(--status-err-tint); border-color: var(--clay-600);
+}
+
+.hn-btn-danger:focus-visible,
+.hn-btn-danger-outline:focus-visible {
+  outline: 2px solid var(--border-focus); outline-offset: 2px;
+}

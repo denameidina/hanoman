@@ -78,7 +78,7 @@ describe("TeamScreen · toolbar", () => {
     await screen.findByTestId("team-board");
     expect(screen.queryByRole("button", { name: /^anggota$/i })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Lainnya" }));
-    expect(screen.getByRole("button", { name: "Anggota tim" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Anggota tim" })).toBeInTheDocument();
   });
 
   /* Satu langganan & satu fetch PER KOLOM: `order` bermakna DI DALAM kolom, jadi potongan 200
@@ -129,7 +129,7 @@ describe("TeamScreen · mutasi", () => {
     view();
     await screen.findByTestId("team-card-t1");
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
-    fireEvent.click(screen.getByRole("button", { name: "Pindah ke Selesai" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Pindah ke Selesai" }));
     await waitFor(() => expect(api.patchTask).toHaveBeenCalledWith("t1", { status: "done", order: 0 }));
     expect(screen.getByTestId("team-col-done")).toHaveTextContent("Desain");
   });
@@ -139,7 +139,7 @@ describe("TeamScreen · mutasi", () => {
     const { onToast } = view();
     await screen.findByTestId("team-card-t1");
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
-    fireEvent.click(screen.getByRole("button", { name: "Pindah ke Selesai" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Pindah ke Selesai" }));
     await waitFor(() => expect(onToast).toHaveBeenCalled());
     expect(screen.getByTestId("team-col-backlog")).toHaveTextContent("Desain");
   });
@@ -164,7 +164,7 @@ describe("TeamScreen · modal", () => {
     view();
     await screen.findByTestId("team-board");
     fireEvent.click(screen.getByRole("button", { name: "Lainnya" }));
-    fireEvent.click(screen.getByRole("button", { name: "Anggota tim" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Anggota tim" }));
     expect(await screen.findByLabelText("Email anggota baru")).toBeInTheDocument();
   });
 });
@@ -478,7 +478,7 @@ describe("TeamScreen · urung", () => {
     view();
     await screen.findByTestId("team-card-t1");
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
-    fireEvent.click(screen.getByRole("button", { name: "Pindah ke Selesai" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Pindah ke Selesai" }));
     await waitFor(() => expect(api.patchTask).toHaveBeenCalledWith("t1", { status: "done", order: 0 }));
     fireEvent.click(await screen.findByRole("button", { name: "Urungkan" }));
     await waitFor(() => expect(api.patchTask).toHaveBeenLastCalledWith("t1", { status: "backlog" }));

@@ -3,6 +3,7 @@ import React from "react";
 import { Icon } from "../icon";
 import { Modal } from "../kit";
 import { IconButton } from "./forms";
+import "./ui.css";
 const _extends = Object.assign;
 
 type Tab = string | { value: string; label?: React.ReactNode; icon?: string; count?: number };
@@ -130,15 +131,20 @@ export function Tabs({ tabs = [], value, defaultValue, onChange, variant = "unde
 export type OverflowItem = {
   key: string; label: string; icon?: string;
   onSelect: () => void; disabled?: boolean; title?: string;
-  /** `danger` untuk aksi merusak (hapus, reset). Tetap berupa tombol biasa; hanya warnanya yang berubah. */
+  /** `danger` untuk aksi merusak (hapus, reset). Tetap menu item biasa; hanya warnanya yang berubah. */
   tone?: "default" | "danger";
 };
 
-// SPEC-800 · ember untuk aksi yang tidak muat. Panelnya `Modal` DS — bukan popover terposisi —
-// karena Modal sudah membawa focus trap, Escape, restorasi fokus, dan bentuk bottom-sheet mobile
-// (app.css `.hn-modal-overlay { align-items: flex-end }`) tanpa satu pun hitungan tepi viewport.
-// Audit 2026-10 · panel tetap `dialog` (bukan `role=menu`): pemakai dan test-nya mencari item sebagai
-// `button` di dalam dialog; mengganti role memutus ~11 berkas test sekaligus. Lihat design-system.md.
+// Kontrol yang bisa dituju Tab; selektornya sama dengan jebakan fokus `Modal` (kit.tsx).
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// SPEC-800 · ember untuk aksi yang tidak muat. Panelnya tetap `Modal` DS (focus trap, Escape, restorasi
+// fokus, bentuk bottom-sheet di ponsel), dan DI DALAM panel itu item tersusun sebagai menu ARIA:
+// `role="menu"` berisi `role="menuitem"`, roving tabindex (satu item tabbable), ↑/↓ berputar, Home/End,
+// huruf pertama melompat ke item berawalan huruf itu. Tab dari menu menutup panel dan fokus kembali ke
+// pemicu. Shift+Tab juga menutup, kecuali ada kontrol di `children`: fokus lalu kembali ke sana.
+// `children` (unduhan, slider, dsb.) dirender DI LUAR `role="menu"`, karena ARIA tak mengizinkan input
+// di dalam menu. Pemicu memakai `aria-haspopup="menu"` bila ada item, `"dialog"` bila hanya children.
 export function OverflowActions({ label, title, items, icon = "more-horizontal", size = "sm", children }: {
   /** Nama aksesibel pemicu (wajib; juga nama dialog bila `title` tak diisi). */
   label: string;
@@ -148,27 +154,93 @@ export function OverflowActions({ label, title, items, icon = "more-horizontal",
   size?: "sm" | "md" | "lg"; children?: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
+  // Indeks item yang tabbable (roving tabindex).
+  const [active, setActive] = React.useState(0);
+  const itemRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
+  const extraRef = React.useRef<HTMLDivElement>(null);
+  const triggerId = React.useId();
+  // Fokus dikembalikan ke pemicu hanya bila menutup lewat keyboard (Esc, ×, Tab). Pilihan item tidak:
+  // aksinya sering membuka dialog lain, dan pemicu di belakangnya sudah inert.
+  const restoreFocus = React.useRef(false);
+  const wasOpen = React.useRef(false);
+
+  React.useEffect(() => {
+    if (wasOpen.current && !open && restoreFocus.current) {
+      restoreFocus.current = false;
+      document.getElementById(triggerId)?.focus();
+    }
+    wasOpen.current = open;
+  }, [open, triggerId]);
+
+  // Hook harus dipanggil sebelum return dini di bawah.
   if (!items.length && !children) return null;
+
+  const enabled = items.flatMap((item, i) => (item.disabled ? [] : [i]));
+  const firstEnabled = Math.max(0, items.findIndex((item) => !item.disabled));
+  const openPanel = () => { setActive(firstEnabled); setOpen(true); };
+  const closeByKey = () => { restoreFocus.current = true; setOpen(false); };
+  const focusItem = (i: number) => { setActive(i); itemRefs.current[i]?.focus(); };
+
+  const onMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const current = itemRefs.current.findIndex((el) => el === event.target);
+    if (event.key === "Tab") {
+      // Stop propagation: jebakan Tab milik Modal (listener window) tak boleh ikut mengulang fokus.
+      if (event.shiftKey && extraRef.current?.querySelector(FOCUSABLE)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeByKey();
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const n = enabled.length;
+      if (!n) return;
+      const pos = enabled.indexOf(current);
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      const next = pos < 0 ? enabled[step > 0 ? 0 : n - 1] : enabled[(pos + step + n) % n];
+      if (next !== undefined) focusItem(next);
+      return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      const target = event.key === "Home" ? enabled[0] : enabled[enabled.length - 1];
+      if (target !== undefined) focusItem(target);
+      return;
+    }
+    // Typeahead: satu huruf, mulai dari item sesudah yang aktif lalu berputar.
+    if (event.key.length === 1 && event.key !== " " && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      const ch = event.key.toLowerCase();
+      const order = [...enabled.filter((i) => i > current), ...enabled.filter((i) => i <= current)];
+      const hit = order.find((i) => (items[i]?.label ?? "").trim().toLowerCase().startsWith(ch));
+      if (hit !== undefined) focusItem(hit);
+    }
+  };
+
   return (
     <>
-      <IconButton size={size} icon={icon} label={label} aria-haspopup="dialog"
-        aria-expanded={open} onClick={() => setOpen(true)} />
+      <IconButton id={triggerId} size={size} icon={icon} label={label}
+        aria-haspopup={items.length ? "menu" : "dialog"} aria-expanded={open} onClick={openPanel} />
       {open && (
-        <Modal open title={title ?? label} icon={icon} width={420} onClose={() => setOpen(false)}>
-          {children}
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {items.map((item) => {
-              const danger = item.tone === "danger";
-              return (
-                <button key={item.key} type="button" disabled={item.disabled} title={item.title}
-                  onClick={() => { setOpen(false); item.onSelect(); }}
-                  className={`hn-overflow-item${danger ? " hn-overflow-item-danger" : ""}`}>
-                  {item.icon && <Icon name={item.icon} size={15} />}
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
+        <Modal open title={title ?? label} icon={icon} width={420} onClose={closeByKey}>
+          {children != null && <div ref={extraRef}>{children}</div>}
+          {items.length > 0 && (
+            <div role="menu" aria-label={title ?? label} className="hn-overflow-menu" onKeyDown={onMenuKeyDown}>
+              {items.map((item, i) => {
+                const danger = item.tone === "danger";
+                return (
+                  <button key={item.key} ref={(el) => { itemRefs.current[i] = el; }} type="button"
+                    role="menuitem" tabIndex={i === active ? 0 : -1} disabled={item.disabled} title={item.title}
+                    data-initial-focus={i === active ? "" : undefined}
+                    onFocus={() => setActive(i)}
+                    onClick={() => { setOpen(false); item.onSelect(); }}
+                    className={`hn-overflow-item${danger ? " hn-overflow-item-danger" : ""}`}>
+                    {item.icon && <Icon name={item.icon} size={15} />}
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </Modal>
       )}
     </>

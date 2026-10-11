@@ -7,6 +7,8 @@
    jsdom tak melayout, jadi yang diuji adalah RANTAI-nya: harus ada leluhur yang benar-benar
    scroller, dan tiap mata rantai di antaranya harus meneruskan batas tinggi (kolom flex yang
    boleh menyusut). Idiom ini menyalin `scroll-chain.test.tsx` (SPEC-393). */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -110,6 +112,12 @@ describe("portal klien bisa digulir (SPEC-626)", () => {
     fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     fireEvent.click(await screen.findByText("Pekerjaan 1"));
     await waitFor(() => expect(screen.getByTestId("modal-body")).toBeInTheDocument());
-    expect(scrolls(screen.getByTestId("modal-body"))).toBe(true);
+    // Sejak Audit UI/UX 2026-10 (Z4) body modal memakai kelas `hn-modal-body` (app-shell.css), bukan
+    // style inline: jsdom tak memuat CSS, jadi kontrak scroll dibaca dari kelas + berkas CSS-nya.
+    const body = screen.getByTestId("modal-body");
+    expect(body).toHaveClass("hn-modal-body");
+    const css = readFileSync(resolve(__dirname, "../src/styles/app-shell.css"), "utf8");
+    const rule = css.match(/\.hn-modal-body\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toMatch(/overflow:\s*auto/);
   });
 });

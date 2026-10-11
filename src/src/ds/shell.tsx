@@ -1,6 +1,7 @@
 /* Ported from .prototype/app/Shell.jsx — sidebar + topbar chrome.
    ESM + typed; window globals removed. No visual change. */
 import React from "react";
+import "../styles/app-shell.css";
 import { Icon } from "./icon";
 import { Input } from "./components/forms";
 import { Mark } from "./marks";
@@ -63,19 +64,12 @@ export const NAV_KEYS: string[] = HN_NAV.map((n) => n.key);
 
 function HnWordmark() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{
-          display: "inline-flex", alignItems: "center", justifyContent: "center",
-          width: 26, height: 26, borderRadius: "var(--radius-sm)",
-          background: "var(--accent)", color: "var(--ink-900)",
-        }}>
+    <div className="hn-wordmark-stack">
+      <div className="hn-wordmark-row">
+        <span className="hn-wordmark-mark">
           <Mark id="buntut" size={17} color="#fff" />
         </span>
-        <span style={{
-          fontFamily: "var(--font-mono)", fontSize: 16, fontWeight: 500,
-          letterSpacing: "-0.01em", color: "var(--text-strong)",
-        }}>
+        <span className="hn-wordmark-text">
           hanoman
         </span>
       </div>
@@ -354,7 +348,7 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             {/* Di ponsel crumb disembunyikan CSS (app.css `.hn-shell-crumb`): judulnya sudah nama layar (h1) dan
                 barisnya dijajar tab hub di atas konten. Crumb hub sudah dikosongkan di atas (`crumbHub`). */}
             {(crumbHub || breadcrumb || scopeName) && (
-              <div className="hn-shell-crumb" style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", marginBottom: 1 }}>
+              <div className="hn-shell-crumb">
                 {crumbHub && <span data-testid="hub-crumb">{crumbHub}</span>}
                 {crumbHub && (breadcrumb || scopeName) ? " · " : ""}
                 {/* Deskripsi layar dibungkus sendiri: teksnya tetap bisa dicari utuh (getByText) walau
@@ -364,10 +358,7 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
               </div>
             )}
             {/* h1: judul layar adalah heading utama halaman. `margin: 0` menimpa base.css. */}
-            <h1 className="hn-shell-title" style={{
-              margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600,
-              letterSpacing: "-0.02em", color: "var(--text-strong)", lineHeight: 1.1,
-            }}>
+            <h1 className="hn-shell-title">
               {title}
             </h1>
           </div>
@@ -410,7 +401,7 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             `border-box` wajib: tanpa itu padding menambah tinggi di atas 100% dan menciptakan
             scrollbar kedua. */}
         <main ref={mainRef} id="main-content" tabIndex={-1} data-testid="shell-main" className="hn-shell-main">
-          <div className="hn-shell-content" style={{ maxWidth: wide ? "none" : "var(--content-max)" }}>
+          <div className={wide ? "hn-shell-content hn-shell-content--wide" : "hn-shell-content hn-shell-content--capped"}>
             {children}
           </div>
         </main>

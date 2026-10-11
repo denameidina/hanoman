@@ -37,7 +37,10 @@ export function buildFileTree(paths: string[], dirs: string[] = []): FileNode[] 
   return root.kids;
 }
 
-export const ST_COLOR: Record<string, string> = { A: "var(--leaf-600)", M: "var(--brass-700)", D: "var(--clay-500)" };
+// Warna status (A/M/D) ada di ide.css lewat `data-status`. Kelas & CSS variable untuk baris pohon:
+// `--depth` (kedalaman) dihitung CSS, bukan inline per properti.
+const cls = (...names: (string | false | null | undefined)[]) => names.filter(Boolean).join(" ");
+const cssVars = (vars: Record<string, string | number>) => vars as React.CSSProperties;
 
 // Roving tabindex: `tabPath` = baris yang terakhir difokus (tab stop), `firstPath` = cadangan
 // bila belum ada yang difokus. Dibagi lewat konteks supaya TreeRow rekursif tak perlu prop baru.
@@ -125,7 +128,7 @@ export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen
   const [loading, setLoading] = React.useState(false);
   const nav = React.useContext(TreeNavCtx);
   const tabbable = !nav || (nav.tabPath ? nav.tabPath === node.path : nav.firstPath === node.path);
-  const dim = ignored?.has(node.path) ? 0.62 : 1;
+  const ignoredEntry = ignored?.has(node.path) ?? false;
   // Tombol ⋯ hanya untuk pointer: ia `aria-hidden` dan di luar tab order. Jalur keyboard-nya tombol
   // Menu/Shift+F10 pada baris itu sendiri, sehingga aksinya tetap terjangkau tanpa tombol bersarang.
   const more = (onOpen: (anchor: HTMLElement, pos: { x: number; y: number }) => void) => (
@@ -146,21 +149,15 @@ export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen
         data-path={node.path} onClick={() => onSelect(node.path)}
         onContextMenu={menu ? (e) => { e.preventDefault(); openMenu(e.currentTarget, { x: e.clientX, y: e.clientY }); } : undefined}
         onKeyDown={menu ? (e) => menuFromKeyboard(e, (a) => openMenu(a)) : undefined}
-        className={menu ? "hn-ide-tree-entry" : undefined}
-        style={{
-        display: "flex", alignItems: "center", gap: 8, width: "100%",
-        padding: "5px 8px", paddingLeft: 22 + depth * 12, border: "none", cursor: "pointer",
-        textAlign: "left", background: on ? "var(--brass-100)" : "transparent", opacity: dim,
-      }}>
+        className={cls("hn-ide-tree-leaf", on && "hn-ide-sel", ignoredEntry && "hn-ide-tree-ignored", menu && "hn-ide-tree-entry")}
+        style={cssVars({ "--depth": depth })}>
         {cf
-          ? <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: ST_COLOR[cf.status] }}>{cf.status}</span>
+          ? <span className="hn-ide-status" data-status={cf.status}>{cf.status}</span>
           : <Icon name="file-text" size={13} color={on ? "var(--brass-700)" : "var(--text-subtle)"} />}
-        <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-mono)", fontSize: 12,
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          color: on ? "var(--brass-700)" : "var(--text-body)", fontWeight: on ? 600 : 400 }}>{node.name}</span>
-        {cf && !cf.binary && <span style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>
-          <span style={{ color: "var(--leaf-600)" }}>+{cf.add}</span>{" "}
-          <span style={{ color: "var(--clay-500)" }}>−{cf.del}</span>
+        <span className="hn-ide-tree-name">{node.name}</span>
+        {cf && !cf.binary && <span className="hn-ide-stat">
+          <span className="hn-ide-add">+{cf.add}</span>{" "}
+          <span className="hn-ide-del">−{cf.del}</span>
         </span>}
       </button>
     );
@@ -195,18 +192,12 @@ export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen
       data-path={node.path} onClick={() => void toggle()}
       onContextMenu={menu ? (e) => { e.preventDefault(); openMenu(e.currentTarget, { x: e.clientX, y: e.clientY }); } : undefined}
       onKeyDown={menu ? (e) => menuFromKeyboard(e, (a) => openMenu(a)) : undefined}
-      className={menu ? "hn-ide-tree-entry" : undefined}
-      style={{
-        display: "flex", alignItems: "center", gap: 8, width: "100%",
-        padding: "5px 6px", paddingLeft: 6 + depth * 12, border: "none",
-        background: dirOn ? "var(--brass-100)" : "transparent", cursor: "pointer", textAlign: "left",
-        opacity: dim,
-      }}>
+      className={cls("hn-ide-tree-dir", dirOn && "hn-ide-sel", ignoredEntry && "hn-ide-tree-ignored", menu && "hn-ide-tree-entry")}
+      style={cssVars({ "--depth": depth })}>
       <Icon name={open ? "chevron-down" : "chevron-right"} size={14} color="var(--text-subtle)" />
       <Icon name="folder" size={15} color={dirOn ? "var(--brass-700)" : "var(--brass-500)"} />
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5,
-        color: dirOn ? "var(--brass-700)" : "var(--text-strong)", fontWeight: dirOn ? 700 : 500 }}>{node.name}/</span>
-      {loading && <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>memuat…</span>}
+      <span className="hn-ide-tree-dirname">{node.name}/</span>
+      {loading && <span className="hn-ide-tree-loading">memuat…</span>}
     </button>
   );
   return (
@@ -225,7 +216,7 @@ export function TreeRow({ node, selected, onSelect, depth = 0, meta, defaultOpen
               ignored={ignored} onExpand={onExpand} menu={menu} />
           ))}
           {!loading && node.kids.length === 0 && (
-            <div role="none" style={{ padding: "4px 8px", paddingLeft: 28 + depth * 12, fontSize: 11.5, color: "var(--text-subtle)" }}>kosong</div>
+            <div role="none" className="hn-ide-tree-empty" style={cssVars({ "--depth": depth })}>kosong</div>
           )}
         </div>
       )}
@@ -238,18 +229,12 @@ export function ChangedRow({ cf, selected, onSelect }:
   { cf: ChangedFile; selected: string; onSelect: (p: string) => void }) {
   const on = cf.path === selected;
   return (
-    <button onClick={() => onSelect(cf.path)} style={{
-      display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "5px 10px",
-      border: "none", cursor: "pointer", textAlign: "left",
-      background: on ? "var(--brass-100)" : "transparent",
-    }}>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700, color: ST_COLOR[cf.status] }}>{cf.status}</span>
-      <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-mono)", fontSize: 12,
-        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        color: on ? "var(--brass-700)" : "var(--text-body)" }}>{cf.path}</span>
-      {!cf.binary && <span style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>
-        <span style={{ color: "var(--leaf-600)" }}>+{cf.add}</span>{" "}
-        <span style={{ color: "var(--clay-500)" }}>−{cf.del}</span>
+    <button onClick={() => onSelect(cf.path)} className={cls("hn-ide-changed-row", on && "hn-ide-sel")}>
+      <span className="hn-ide-status" data-status={cf.status}>{cf.status}</span>
+      <span className="hn-ide-changed-path">{cf.path}</span>
+      {!cf.binary && <span className="hn-ide-stat">
+        <span className="hn-ide-add">+{cf.add}</span>{" "}
+        <span className="hn-ide-del">−{cf.del}</span>
       </span>}
     </button>
   );
@@ -265,19 +250,18 @@ export function ChangedSection({ label, changed, selected, onSelect, view, onVie
     () => Object.fromEntries(changed.map((c) => [c.path, c])) as Record<string, ChangedFile>, [changed]);
   return (
     <>
-      <div className="hn-eyebrow" style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px" }}>
-        <span style={{ flex: 1 }}>{label} · {changed.length}</span>
+      <div className="hn-eyebrow hn-ide-changed-head">
+        <span className="hn-grow">{label} · {changed.length}</span>
         {changed.length > 0 && (["list", "tree"] as const).map((v) => (
           <button key={v} aria-label={`${v === "list" ? "List" : "Tree"} ${label}`} aria-pressed={view === v} onClick={() => onView(v)}
-            style={{ display: "flex", padding: 3, border: "none", cursor: "pointer", borderRadius: 4,
-              background: view === v ? "var(--brass-100)" : "transparent" }}>
+            className="hn-ide-view-btn">
             <Icon name={v === "list" ? "list" : "folder-tree"} size={14}
               color={view === v ? "var(--brass-700)" : "var(--text-subtle)"} />
           </button>
         ))}
       </div>
       {changed.length === 0
-        ? <div style={{ padding: "4px 10px", fontSize: 12, color: "var(--text-subtle)" }}>{emptyText}</div>
+        ? <div className="hn-ide-empty-pad">{emptyText}</div>
         : view === "tree"
         ? <TreeRoot label={`Pohon ${label}`} nodes={tree}>
             {tree.map((n) => <TreeRow key={n.path} node={n} selected={selected} onSelect={onSelect} meta={meta} defaultOpen />)}

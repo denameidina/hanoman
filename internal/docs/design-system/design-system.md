@@ -1,6 +1,6 @@
 # Design system — hanoman
 
-Estetika **editorial instrument-panel**: bone paper hangat, ink text, satu aksen **brass** (gold-leaf wayang). Font IBM Plex (Serif display, Sans UI, Mono data/label). Hairline 1px, radius kontrol 5px / kartu 12px. Semantik earthy (leaf/amber/clay). Satu permukaan gelap: terminal log.
+Estetika **editorial instrument-panel**: bone paper hangat, ink text, satu aksen **brass** (gold-leaf wayang). Font IBM Plex (Serif display, Sans UI, Mono data/label). Hairline 1px, radius kontrol 5px / kartu 12px. Semantik earthy (leaf/amber/clay). Dua permukaan gelap: terminal log dan panel Dalang ([ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md)), keduanya memakai token `--term-*`.
 
 Detail token & komponen ada di paket design system terpisah (Hanoman Design System). Frontend wajib memakai token & komponennya — jangan menciptakan warna/tipografi baru.
 
@@ -44,7 +44,7 @@ Primitive bersama:
   menggulir saat ruangnya kurang. Basis `auto` membuat pecah-baris ditentukan lebar isi, dan dengan
   itu bentuk kepala berubah hanya karena label tab aktif ditebalkan atau nama project bertambah
   panjang (SPEC-879).
-- **Pet Hanoman duduk di alur layout, tak pernah melayang.** Pet dibuat sekali di `App` dan disalurkan lewat
+- **Pet Hanoman duduk di alur layout, tak pernah melayang** ([ADR-0206](../adr/0206-pet-footer-sidebar-default-per-tier.md), menggantikan sebagian [ADR-0144](../adr/0144-pet-diseret-sumbu-y-jalur-melebar.md)). Pet dibuat sekali di `App` dan disalurkan lewat
   `PetDockContext`; `Shell` menaruhnya di slot-nya. Desktop (≥1200): **footer sidebar** (`.hn-shell-dock`, di
   bawah daftar hub, `margin-top: auto`). Tablet dan ponsel: **lajur di bawah `<main>`** (`.hn-shell-lane`),
   sehingga area gulir berakhir di atasnya dan tak ada kontrol yang tertutup. Di lajur itu pet selalu duduk
@@ -63,8 +63,8 @@ Primitive bersama:
   Sembunyikan) yang membaca dan menulis preferensi yang sama lewat `usePetEnabled()`. Preferensi ini per browser
   dan tak pernah disimpan ke server.
 - **Tak ada sinyal penting yang hanya ada di pet.** Keputusan sesi tetap sampai lewat notifikasi `decision`
-  (toast dan bell dengan "Buka terminal"), layar Terminal (`awaiting`), dan "Jawab sesi yang menunggu" di palet.
-  Dalang (layar penuh tanpa Shell) tak punya slot, sehingga pet tak tampil di sana.
+  (toast dan bell dengan aksi "Jawab"), layar Terminal (`awaiting`), dan "Jawab sesi yang menunggu" di palet.
+  Dalang (layar penuh tanpa Shell, [ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md)) tak punya slot, sehingga pet tak tampil di sana.
 - `--pet-h` hanya dipublikasikan (tinggi sel) untuk satu hal: bar `position: fixed` di ponsel (aksi QA) yang
   ikut naik di atas lajur. `.hn-shell-main` tak lagi memesan ruang pet. Dokumen (`html`/`body`) tak pernah
   menggulir: satu-satunya scroller adalah `.hn-shell-main` atau scroller 100dvh milik permukaan mandiri.
@@ -143,7 +143,8 @@ Aturan:
 4. **Landmark shell.** `Shell` merender tautan "Lewati ke konten" sebagai elemen pertama yang muncul
    saat difokus, dan judul layar sebagai `<h1>` dengan `margin: 0`.
 5. **Keluar fokus terminal.** Pane terminal meneruskan semua tombol ke pty. `Ctrl+Shift+Esc` melepas
-   fokus dari terminal (handler di `TerminalPane.tsx`, teks hint di sebelahnya).
+   fokus **keyboard** dari terminal (handler di `TerminalPane.tsx`, teks hint di sebelahnya). Ini bukan mode
+   tampilan Fokus | Grid ([ADR-0209](../adr/0209-terminal-rail-sesi-fokus-default.md)).
 6. **Target sentuh pilihan.** Checkbox dan radio DS (`.hn-choice-target` / `.hn-choice-control`,
    `ds/components/forms.tsx`) mendapat area 24×24 di desktop dan 44×44 pada `(pointer: coarse), (max-width: 767px)`
    (`app.css`). Checkbox/radio `input` mentah (Triase, PRD, VPS, Agent access, setup) digambar sendiri 16 px
@@ -192,9 +193,20 @@ fill (`--amber-600`, `--brass-600`, `--wind-600`, `--clay-600` sebagai titik/bat
 | `--wind-600` di atas `--wind-100` | 4,47 | **gagal sebagai teks** (selisih 0,03) |
 
 **Menu aksi (`OverflowActions`).** Pemicu wajib `label` (nama aksesibelnya); `title?` mengganti judul dialog
-(default `label`). Item `tone: "danger"` memakai `--clay-600` (6,45:1 di kartu). Panel tetap **dialog**
-(sheet Modal), bukan `role="menu"`: pemakai dan test mencari item sebagai `button` di dalam dialog, dan
-mengganti role memutus ~11 berkas test sekaligus. Menu ARIA penuh adalah tindak lanjut terpisah.
+(default `label`). Item `tone: "danger"` memakai `--clay-600` (6,45:1 di kartu). Panel tetap `Modal` (dialog
+ber-focus-trap, bentuk sheet di ponsel), dan **di dalamnya item tersusun sebagai menu ARIA**:
+
+- Pemicu: `aria-haspopup="menu"` + `aria-expanded` (`"dialog"` bila hanya `children`, tanpa item).
+- Daftar: `role="menu"` ber-`aria-label` dari `title` (atau `label`); tiap item `role="menuitem"` (`<button>`).
+- Roving tabindex: hanya satu item `tabIndex=0`; fokus awal di item itu (`data-initial-focus`).
+- ↑/↓ berputar dan melewati item `disabled`; Home/End ke ujung; satu huruf memindahkan ke item berawalan huruf itu.
+- Esc (dari `Modal`) dan Tab dari item menutup panel; fokus kembali ke pemicu. Shift+Tab menutup kecuali
+  ada `children`, lalu fokus masuk ke kontrol itu. Memilih item menutup panel tanpa mengembalikan fokus
+  (aksinya sering membuka dialog lain).
+- `children` (unduhan, slider, dsb.) dirender **di luar** `role="menu"`: ARIA tak mengizinkan input di dalam menu.
+
+Test: `overflow-actions.test.tsx` (kontrak menu) dan `ds-feedback-a11y.test.tsx`. Pemakai yang mencari item
+memakai `getByRole("menuitem", { name })`. Berkas pemakainya tersebar di `test/` dan `src/screens/`.
 
 **CSS yang dipindah ke kelas.** `[style*=…]` sudah tak ada di `app.css`; anak ber-flex inline yang
 dulu dikenali selektor itu kini membawa `hn-grow` (`flex: 1 1 0%`, identik dengan inline `flex: 1`).
@@ -252,7 +264,7 @@ Keputusan di [ADR-0205](../adr/0205-navigasi-8-hub-bergrup.md).
 | Angka antrean | Hub menjumlahkan antrean tab-tabnya. Tiap tab menampilkan angkanya sendiri. Nol tak dirender |
 | Crumb | `Hub › Tab` di atas judul, hanya untuk hub bertab banyak. Deskripsi layar tetap di belakangnya |
 | Layar turunan | Detail project tampil di bawah Projects, dan review di bawah Backlog. Keduanya tak pernah jadi tab |
-| Di luar sidebar | Dalang: palet "Buka panggung", `g d`, dan bantuan `?` |
+| Di luar sidebar | Dalang ([ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md)): palet "Buka panggung", `g d`, dan bantuan `?` |
 
 Aturan:
 
@@ -277,7 +289,7 @@ Fokus digambar sekali oleh pembungkus (border + ring): outline bawaan `input:foc
 kelas `hn-input-core` / `hn-textarea-core` di `app.css`, karena gaya inline tak bisa mengalahkan `!important`.
 
 **Checkbox · Radio · RadioGroup.** Area sentuh checkbox dan radio 24×24 (kotak yang tampak tetap 18px);
-di layar sentuh tetap 44×44 lewat `.hn-choice-target`. Pilihan tunggal sebagai grup memakai `RadioGroup`:
+di layar sentuh tetap 44×44 lewat `.hn-choice-target`. Pilihan tunggal sebagai grup memakai `RadioGroup` (contoh: selektor tingkat akses Perangkat Lihat · Kerja · Tulis, [ADR-0210](../adr/0210-perangkat-tingkat-akses-lihat-kerja-tulis.md)):
 
 ```tsx
 <RadioGroup aria-label="Mode" value={mode} onChange={(v) => setMode(v)}>
@@ -314,8 +326,24 @@ showToast("Entri dibuang", "ok", undefined, { action: { label: "Urungkan", onAct
 - `show(message, tone?, icon?, opts?)`; `opts = { action?: { label, onAction }, duration? }`.
 - Maksimal `TOAST_VISIBLE` (3) terlihat sekaligus; sisanya menunggu slot kosong. Timer tiap toast mulai saat ia terlihat.
 - Durasi 2,6 dtk; 7 dtk bila ada aksi; `duration` menimpa keduanya. Kursor atau fokus di dalam toast menjeda timer.
+- Toast keputusan (`notifications/`) membawa aksi **Jawab** (7 dtk): membuka Terminal terfokus ke sesinya dan menandai notifikasinya terbaca. Tak tampil bila sesi itu sudah ditonton di Terminal.
 - Wadah `role="status"` (polite) selalu ada di DOM, walau kosong. Toast `tone="err"` membawa `role="alert"` assertive.
   Konsekuensi untuk tes: `getByRole("alert")` kini juga menangkap toast galat; pilih alert berdasarkan teks.
+
+**Button · varian danger (Audit UI/UX 2026-10).** Dua varian merah resmi, warnanya di `forms.css`
+(`.hn-btn-danger*`), bukan inline:
+
+- `variant="danger"`: solid (fill `--clay-600`, teks putih). Untuk aksi merusak utama, mis. konfirmasi hapus.
+- `variant="danger-outline"`: teks `--clay-600`, border `--clay-500`, hover memakai tint galat (`--status-err-tint`).
+  Untuk aksi merusak sekunder: `Hapus`, `Reset`, `Hapus log` di pengaturan.
+
+Kedua varian mendapat cincin fokus DS (`--border-focus`) lewat `:focus-visible`, sama seperti semua varian
+Button dan IconButton: tak ada lagi `outline: none` inline di sana (Audit 2026-10 · Z11). Cincin global
+`button:focus-visible` (app.css) digambar 2 px di luar border, jadi ia bertumpu di latar halaman atau kartu
+(≥ 4,1:1: 4,55 di page, 4,83 di kartu, 4,14 di panel), bukan di isian tombol. Klik mouse tak memicu
+`:focus-visible`, jadi tombol tak bercincin sesudah diklik. Jangan menulis `style={{ color: "var(--clay-600)" }}`
+atau `className` merah di atas `variant="secondary"`: kelas itu kalah oleh warna inline dan tak pernah merah.
+Aksi merusak sekunder memakai `variant="danger-outline"`.
 
 **Icon.** `Icon` tanpa `aria-label`, `aria-labelledby`, atau `title` mendapat `aria-hidden="true"` (dekoratif).
 Dengan nama, ia `role="img"` dan tak disembunyikan. Caller tetap bisa menimpa lewat `aria-hidden` eksplisit.
@@ -373,7 +401,7 @@ API komponen:
 
 Penempatan mengikuti kegunaan, bukan kewajiban memajang semuanya. Enam product-state dipakai pada
 onboarding, backlog sungguh kosong, sesi aktif, menunggu keputusan, sukses, dan error yang bisa
-dipulihkan. **Pet Hanoman** — maskot persisten di tepi bawah dashboard yang pose-nya turunan status sesi &
+dipulihkan. **Pet Hanoman** — maskot persisten di footer sidebar (desktop) atau lajur di bawah konten (tablet dan ponsel, default mati; [ADR-0206](../adr/0206-pet-footer-sidebar-default-per-tier.md)) yang pose-nya turunan status sesi &
 backlog, bukan hiasan — memakai band ilustrasi tersendiri: **pet** 80–128 px, ±2,5 head unit,
 digambar sebagai atlas sprite PET-001 (`internal/assets/pet/`, ADR-0140) dan bukan lagi family
 `sticker` (`STK-001…008`, yang tetap di katalog untuk pemakaian lain). Tabel

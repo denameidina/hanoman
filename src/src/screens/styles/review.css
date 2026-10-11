@@ -69,7 +69,9 @@
   border: 1px solid var(--border-hair); border-radius: var(--radius-lg); box-shadow: var(--shadow-md);
 }
 .hn-review-decide-hint { margin: 0; flex: 1 1 260px; font-size: var(--text-sm); color: var(--text-muted); line-height: 1.5; }
+.hn-review-decide-err { flex: 1 1 100%; margin: 0; }
 .hn-review-decide-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.hn-review-more { display: inline-flex; }
 
 @media (min-width: 768px) {
   .hn-review-list { max-height: min(640px, 60dvh); overflow: auto; }
@@ -85,6 +87,7 @@
   .hn-review-decide { padding-bottom: calc(10px + var(--safe-bottom)); }
   .hn-review-decide-actions { width: 100%; }
   .hn-review-decide-actions > * { flex: 1 1 auto; justify-content: center; }
+  .hn-review-decide-actions > .hn-review-more { flex: 0 0 auto; }
   .hn-review-viewbar { align-items: stretch; }
   .hn-review-path { flex-basis: 100%; }
 }

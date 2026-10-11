@@ -8,6 +8,11 @@ import { usePopoverFocus } from "../ds/popover";
 import { relativeTime } from "../lib/time-format";
 import { LIMIT_SEVERITY_LABEL } from "../lib/labels";
 import { useCoarsePointer } from "../ds/responsive";
+import "./styles/limits.css";
+
+/* Nilai yang berubah per render (warna severity, lebar meter) lewat CSS custom property. `CSSProperties`
+   tak memuat kunci `--*`; assertion ini sama dengan `ds/responsive.tsx`. */
+const cssVars = (vars: Record<string, string>) => vars as React.CSSProperties;
 
 // Tanggal+jam absolut reset (waktu lokal browser, id-ID). Weekly reset berhari-hari ke depan —
 // countdown saja tak cukup; tampilkan momen persisnya. SPEC-205.
@@ -29,15 +34,13 @@ const severityWord = (s: string) => SEVERITY_WORD[s] ?? "tidak diketahui";
 
 // Meter satu window. Memakai token severity DS; `role="progressbar"` memegang nama dan teks nilainya
 // sendiri (DS ProgressBar meneruskan atribut ke pembungkus, bukan ke elemen progressbar-nya).
+// Warna isi meter diwarisi dari `--lim-fg` pembungkus window (lihat LimitWindows).
 function WindowMeter({ label, pct, severity }: { label: string; pct: number; severity: Severity }) {
-  const tok = severityToken(severity);
   const shown = Math.round(pct);
   return (
     <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={shown}
-      aria-valuetext={`${shown}% terpakai, ${severityWord(severity)}`}
-      style={{ height: 5, background: "var(--bone-300)", borderRadius: "var(--radius-pill)", overflow: "hidden" }}>
-      <div style={{ width: `${Math.max(0, Math.min(100, pct))}%`, height: "100%", background: tok.fg,
-        borderRadius: "var(--radius-pill)" }} />
+      aria-valuetext={`${shown}% terpakai, ${severityWord(severity)}`} className="hn-lim-meter">
+      <div className="hn-lim-meter-fill" style={cssVars({ "--lim-fill": `${Math.max(0, Math.min(100, pct))}%` })} />
     </div>
   );
 }
@@ -48,35 +51,35 @@ function WindowMeter({ label, pct, severity }: { label: string; pct: number; sev
 export function LimitWindows({ dto, emptyHint }: { dto: LimitsDTO; emptyHint?: string }) {
   if (!dto.windows.length)
     return (
-      <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", padding: "4px 0" }}>
+      <div className="hn-lim-empty">
         {dto.status === "unavailable"
           ? emptyHint ?? "Limit belum terbaca — Claude belum dipakai atau belum login di host ini."
           : "Belum ada data limit."}
       </div>
     );
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="hn-lim-windows">
       {dto.windows.map((w) => {
         const tok = severityToken(w.severity);
         return (
-          <div key={w.key} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-              <span style={{ fontSize: "var(--text-sm)", color: "var(--text-body)" }}>
+          <div key={w.key} className="hn-lim-window" style={cssVars({ "--lim-fg": tok.fg })}>
+            <div className="hn-lim-head">
+              <span className="hn-lim-label">
                 {w.label}{w.isActive ? " · aktif" : ""}
               </span>
-              <span style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)", color: tok.fg }}>{w.usedPct}%</span>
-                <span style={{ fontSize: "var(--text-xs)", color: tok.fg }}>{severityWord(w.severity)}</span>
+              <span className="hn-lim-value">
+                <span className="hn-lim-pct">{w.usedPct}%</span>
+                <span className="hn-lim-word">{severityWord(w.severity)}</span>
               </span>
             </div>
             <WindowMeter label={w.label} pct={w.usedPct} severity={w.severity} />
             {w.resetsAt && (
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>{resetLabel(w.resetsAt, w.key.startsWith("weekly"))}</span>
+              <span className="hn-lim-reset">{resetLabel(w.resetsAt, w.key.startsWith("weekly"))}</span>
             )}
           </div>
         );
       })}
-      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)", marginTop: 2 }}>
+      <div className="hn-lim-foot">
         {dto.status === "stale"
           ? `Data lama · terakhir diperbarui ${relativeTime(dto.fetchedAt)}`
           : `Diperbarui ${relativeTime(dto.fetchedAt)}`}
@@ -108,7 +111,7 @@ function LimitPill({ title, dto, square = false, emptyHint, eyebrow, footnote }:
     ? "—"
     : `${worst.usedPct}% · ${severityWord(worst.severity)}${stale ? " · lama" : ""}`;
   return (
-    <div style={{ position: "relative" }}>
+    <div className="hn-lim-pill-wrap">
       <button
         ref={popover.triggerRef}
         type="button"
@@ -118,29 +121,19 @@ function LimitPill({ title, dto, square = false, emptyHint, eyebrow, footnote }:
         aria-controls={popover.panelId}
         aria-label={`${title}, ${state}`}
         title={title}
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px",
-          minHeight: coarse ? 44 : undefined,
-          borderRadius: "var(--radius-pill, 999px)", border: "1px solid var(--border-hair)",
-          background: tok.bg, color: tok.fg, cursor: "pointer",
-          fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)",
-        }}
+        className={coarse ? "hn-lim-pill hn-lim-pill-touch" : "hn-lim-pill"}
+        style={cssVars({ "--lim-bg": tok.bg, "--lim-fg": tok.fg })}
       >
         {/* Bentuk membedakan agen sekilas: titik untuk Claude, kotak untuk Codex. */}
-        <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: square ? 2 : 999, background: tok.fg }} />
+        <span aria-hidden="true" className={square ? "hn-lim-dot hn-lim-dot-square" : "hn-lim-dot"} />
         {visible}
       </button>
       {open && (
         <div ref={popover.panelRef} id={popover.panelId} role="dialog" aria-label={title} tabIndex={-1}
-          onKeyDown={popover.onKeyDown} className="hn-viewport-popover" style={{
-          position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 40, width: 280,
-          background: "var(--surface-card)", border: "1px solid var(--border-hair)",
-          borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-lg)",
-          padding: 14,
-        }}>
-          <div className="hn-eyebrow" style={{ marginBottom: 8 }}>{eyebrow ?? title}</div>
+          onKeyDown={popover.onKeyDown} className="hn-viewport-popover hn-lim-popover">
+          <div className="hn-eyebrow hn-lim-eyebrow">{eyebrow ?? title}</div>
           <LimitWindows dto={dto} emptyHint={emptyHint} />
-          {footnote && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)", marginTop: 6, lineHeight: 1.45 }}>{footnote}</div>}
+          {footnote && <div className="hn-lim-footnote">{footnote}</div>}
         </div>
       )}
     </div>

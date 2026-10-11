@@ -1,0 +1,177 @@
+/* ============================================================
+   Kelas shell, primitif DS (Toast, Modal, Field, Pager), App, dan Pet answer.
+   Audit UI/UX 2026-10 · Fase 4 (migrasi inline → kelas). Visual-ekuivalen: setiap nilai di sini
+   adalah nilai inline yang sebelumnya dirender di TSX. Kontrak: frontend-implementation.md.
+
+   Urutan kaskade: berkas ini diimpor dari ds/kit.tsx, yang dievaluasi setelah app.css (main.tsx).
+   Aturan yang bertabrakan dengan app.css memakai selektor yang lebih spesifik, supaya tak bergantung
+   pada urutan impor (lihat `.hn-modal-panel > .hn-modal-footer`).
+   ============================================================ */
+
+/* ---------- Utilitas kecil (dipakai banyak layar) ---------- */
+.hn-w-full { width: 100%; }
+.hn-grow-min { flex: 1 1 0%; min-width: 0; }
+.hn-row-8 { display: flex; gap: 8px; }
+.hn-mb-12 { margin-bottom: 12px; }
+
+/* ---------- App · sheet "Mulai sesi" & "Brief" ---------- */
+.hn-sheet-block { margin-bottom: 16px; }
+.hn-sheet-lead { font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5; }
+.hn-sheet-alert {
+  font-size: 12.5px; line-height: 1.55; margin-bottom: 12px; padding: 9px 11px; border-radius: 8px;
+  background: var(--warn-bg, #fdf6e3); color: var(--text-strong);
+}
+.hn-sheet-notice {
+  font-size: 12.5px; margin-bottom: 12px; padding: 9px 11px; border-radius: 8px;
+  background: var(--warn-bg, #fdf6e3);
+}
+.hn-sheet-note {
+  font-size: 12px; line-height: 1.5; margin-bottom: 12px; padding: 8px 10px; border-radius: 8px;
+  background: var(--warn-bg, #fdf6e3); color: var(--text-muted);
+}
+.hn-goal-row { display: flex; align-items: center; gap: 10px; }
+.hn-goal-row--on { margin-bottom: 10px; }
+.hn-sheet-meta { font-size: 12.5px; color: var(--text-muted); }
+.hn-sheet-foot { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+.hn-sheet-status {
+  font-size: 12px; line-height: 1.5; margin-top: 8px; padding: 8px 10px; overflow-wrap: anywhere;
+  border-radius: 8px; background: var(--warn-bg, #fdf6e3); color: var(--text-muted);
+}
+.hn-sheet-hint { font-size: 12px; color: var(--text-subtle); margin-top: 8px; line-height: 1.5; }
+.hn-sheet-empty { font-size: 12.5px; color: var(--text-subtle); }
+.hn-dep-list {
+  max-height: 132px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid var(--border-hair); border-radius: var(--radius-sm); padding: 8px;
+}
+.hn-grid-split { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
+.hn-grid-even { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ---------- Toast (ds/kit.tsx) ---------- */
+.hn-toast-host {
+  position: fixed; left: 50%; bottom: calc(28px + var(--safe-bottom)); transform: translateX(-50%); z-index: 200;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  width: max-content; max-width: min(460px, calc(100vw - var(--safe-left) - var(--safe-right) - 28px));
+  pointer-events: none;
+}
+.hn-toast {
+  pointer-events: auto; box-sizing: border-box; display: flex; align-items: center; gap: 10px;
+  padding: 11px 16px; background: var(--surface-inverse); color: var(--term-fg);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-xl);
+  font-family: var(--font-sans); font-size: 13.5px; max-width: 100%;
+  animation: hn-fade-in 180ms var(--ease-out, ease-out);
+}
+.hn-toast--action { padding: 9px 10px 9px 16px; }
+.hn-toast-msg { min-width: 0; flex: 1 1 auto; }
+.hn-toast-action {
+  border: none; background: transparent; cursor: pointer; color: var(--brass-300);
+  font: var(--weight-medium) 13px/1 var(--font-ui); padding: 6px 8px; border-radius: var(--radius-sm);
+  flex: 0 0 auto;
+}
+
+/* ---------- Modal (ds/kit.tsx) ----------
+   Lebar panel tetap inline (prop `width`). Mobile di app.css memakai !important untuk lebar,
+   tinggi, dan padding, jadi kelas ini tak mengubah perilaku di sana. */
+.hn-modal-scrim {
+  position: fixed; inset: 0; z-index: 150; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--ink-900) 42%, transparent);
+  animation: hn-fade-in 160ms ease-out;
+}
+.hn-modal-sheet {
+  display: flex; flex-direction: column; max-width: 100%;
+  max-height: calc(100dvh - 48px - var(--safe-top) - var(--safe-bottom));
+  background: var(--surface-card); border-radius: var(--radius-lg);
+  border: 1px solid var(--border-hair); box-shadow: var(--shadow-xl); overflow: hidden;
+  animation: hn-modal-in 200ms var(--ease-out, ease-out);
+}
+.hn-modal-panel--fill {
+  height: min(88vh, calc(100dvh - 48px - var(--safe-top) - var(--safe-bottom)));
+}
+.hn-modal-header {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 18px 20px 14px; border-bottom: 1px solid var(--border-hair);
+}
+.hn-modal-icon {
+  width: 32px; height: 32px; border-radius: var(--radius-sm); flex: 0 0 auto;
+  background: var(--brass-100); color: var(--brass-700);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.hn-modal-eyebrow { margin-bottom: 3px; }
+.hn-modal-title {
+  margin: 0; font-family: var(--font-display); font-size: 19px; font-weight: 600;
+  letter-spacing: -0.02em; color: var(--text-strong); line-height: 1.15;
+}
+.hn-modal-close {
+  border: none; background: transparent; cursor: pointer; color: var(--text-muted); opacity: 1;
+  width: 44px; height: 44px; align-items: center; justify-content: center; padding: 0;
+  border-radius: var(--radius-sm); display: inline-flex; flex: 0 0 auto;
+}
+.hn-modal-close:disabled { cursor: not-allowed; opacity: 0.4; }
+.hn-modal-body { padding: 18px 20px; overflow: auto; }
+.hn-modal-body--fill { flex: 1 1 auto; min-height: 0; }
+/* Selektor dua tingkat: app.css mengatur padding-bottom footer dengan safe-area; footer Modal selalu
+   14px di bawah, seperti sebelumnya. Tanpa spesifisitas lebih, urutan impor yang menentukan. */
+.hn-modal-panel > .hn-modal-footer {
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  padding: 14px 20px; border-top: 1px solid var(--border-hair); background: var(--bone-100);
+}
+
+/* ---------- Field (ds/kit.tsx) ---------- */
+.hn-field { display: block; margin-bottom: 14px; }
+.hn-field-label {
+  display: block; font-family: var(--font-ui); font-size: 12.5px; font-weight: 600;
+  color: var(--text-strong); margin-bottom: 6px;
+}
+.hn-field-hint { font-size: 11.5px; color: var(--text-subtle); margin-top: 5px; }
+.hn-field-error { font-size: 12px; color: var(--status-err); margin-top: 5px; line-height: 1.4; }
+
+/* ---------- Pager (ds/kit.tsx); tombol halaman tetap inline (keadaan hover/aktif dinamis) ---------- */
+.hn-pager {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 14px; border-top: 1px solid var(--border-hair); background: var(--bone-100); flex-wrap: wrap;
+}
+.hn-pager-count { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted); }
+.hn-pager-btns { display: flex; align-items: center; gap: 5px; }
+.hn-pager-gap { font-family: var(--font-mono); font-size: 12px; color: var(--text-subtle); padding: 0 2px; }
+
+/* ---------- Shell (ds/shell.tsx) ---------- */
+.hn-wordmark-stack { display: flex; flex-direction: column; gap: 10px; }
+.hn-wordmark-row { display: flex; align-items: center; gap: 8px; }
+.hn-wordmark-mark {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  border-radius: var(--radius-sm); background: var(--accent); color: var(--ink-900);
+}
+.hn-wordmark-text {
+  font-family: var(--font-mono); font-size: 16px; font-weight: 500;
+  letter-spacing: -0.01em; color: var(--text-strong);
+}
+.hn-shell-crumb { font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle); margin-bottom: 1px; }
+.hn-shell-title {
+  margin: 0; font-family: var(--font-display); font-size: 19px; font-weight: 600;
+  letter-spacing: -0.02em; color: var(--text-strong); line-height: 1.1;
+}
+.hn-shell-content--capped { max-width: var(--content-max); }
+.hn-shell-content--wide { max-width: none; }
+
+/* ---------- Pet answer (screens/PetAnswer.tsx) ---------- */
+.hn-pet-box {
+  margin-top: 8px; padding: 8px 10px; background: var(--bone-100);
+  border: 1px solid var(--border-hair); border-radius: var(--radius-sm);
+}
+.hn-pet-note { font-family: var(--font-ui); font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+.hn-pet-sent { font-family: var(--font-ui); font-size: 12.5px; color: var(--text-strong); }
+.hn-pet-head { margin-bottom: 6px; }
+.hn-pet-eyebrow-top { margin-top: 2px; }
+.hn-pet-eyebrow-bottom { margin-bottom: 4px; }
+.hn-pet-question {
+  font-family: var(--font-ui); font-size: 12.5px; font-weight: 600; color: var(--text-strong);
+  line-height: 1.4; margin-top: 4px;
+}
+.hn-pet-title {
+  font-family: var(--font-ui); font-size: 12.5px; font-weight: 600; color: var(--text-strong);
+  line-height: 1.4; margin-bottom: 6px;
+}
+.hn-pet-mt-6 { margin-top: 6px; }
+.hn-pet-mt-8 { margin-top: 8px; }
+.hn-pet-stack { display: flex; flex-direction: column; gap: 6px; }
+.hn-pet-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.hn-pet-free { display: flex; gap: 6px; margin-top: 8px; }

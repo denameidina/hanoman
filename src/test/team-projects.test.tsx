@@ -66,8 +66,8 @@ describe("TeamProjectTimeline · baris per project", () => {
     view(tasks);
     const g = spanGeometry(projectSpan(tasks)!, win(tasks))!;
     const env = screen.getByTestId("timeline-bar-span:p1");
-    expect(env.style.left).toBe(`${g.left}%`);
-    expect(env.style.width).toBe(`${g.width}%`);
+    expect(env.style.getPropertyValue("--tl-left")).toBe(`${g.left}%`);
+    expect(env.style.getPropertyValue("--tl-width")).toBe(`${g.width}%`);
   });
 
   it("amplop dilukis SEBELUM segmen, dan ada satu segmen per task bertanggal", () => {

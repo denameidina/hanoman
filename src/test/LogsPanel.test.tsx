@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { LogsPanel } from "../src/screens/LogsPanel";
@@ -32,5 +34,11 @@ describe("LogsPanel", () => {
     await waitFor(() => expect(screen.getByText("a")).toBeInTheDocument());
     screen.getByRole("button", { name: /muat lagi/i }).click();
     await waitFor(() => expect(spy).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: "abc" })));
+  });
+
+  // Anggaran gaya inline (Z3): layout lewat kelas `hn-logs-*` di panels.css.
+  it("layout lewat kelas: gaya inline tinggal ≤ 3", () => {
+    const src = readFileSync(resolve(import.meta.dirname, "../src/screens/LogsPanel.tsx"), "utf8");
+    expect((src.match(/style=\{\{/g) ?? []).length).toBeLessThanOrEqual(3);
   });
 });

@@ -9,7 +9,7 @@ import { mockViewport, resetViewport } from "./viewport";
 async function cellAction(sessionId: string, name: string) {
   fireEvent.click(screen.getByLabelText(`Aksi sesi ${sessionId}`));
   const menu = await screen.findByRole("dialog", { name: `Aksi sesi ${sessionId}` });
-  fireEvent.click(within(menu).getByRole("button", { name }));
+  fireEvent.click(within(menu).getByRole("menuitem", { name }));
 }
 
 // Audit UI/UX 2026-10 · Fase 3E: "Ambil backlog", "Riwayat sesi", dan "Terminal biasa" pindah ke
@@ -31,11 +31,11 @@ const ph = vi.hoisted(() => ({
   next: { phases: [] as { name: string; state: string }[], complete: false },
 }));
 vi.mock("../src/screens/TerminalPane", () => ({
-  TerminalPane: ({ sessionId, onExit, onPhases }: {
-    sessionId: string; onExit?: (c: number) => void;
+  TerminalPane: ({ sessionId, onExit, onPhases, screenReader }: {
+    sessionId: string; onExit?: (c: number) => void; screenReader?: boolean;
     onPhases?: (p: { name: string; state: string }[], complete: boolean) => void;
   }) => (
-    <div data-testid="pane">
+    <div data-testid="pane" data-sr={String(Boolean(screenReader))}>
       {sessionId}
       <button aria-label={`exit ${sessionId}`} onClick={() => onExit?.(143)} />
       <button aria-label={`phases ${sessionId}`}
@@ -232,7 +232,7 @@ describe("TerminalScreen (grid)", () => {
     expect(putTerminalWorkspace).toHaveBeenCalledTimes(1);
     expect(putTerminalWorkspace.mock.calls[0]![0]).toEqual(seeded);
     fireEvent.click(screen.getByRole("button", { name: "Atur grid" }));
-    expect(screen.getByRole("button", { name: "Hapus kolom aktif" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Hapus kolom aktif" })).toBeInTheDocument();
   });
   it("desktop → tablet → mobile mempertahankan grup dan koordinat sessionId kanonik", async () => {
     const viewport = mockViewport(1440);
@@ -578,7 +578,8 @@ describe("TerminalScreen (grid)", () => {
     expect(await screen.findByText("Selesai")).toBeInTheDocument();
     // ADR-0164 review 2 · containing block panel detail fase = wrapper badan sel (bukan wrapper
     // strip), supaya panel dibatasi tinggi sel yang `overflow: hidden`, bukan meluber ke pane.
-    expect(screen.getByTestId("phase-strip").parentElement).toHaveStyle({ position: "relative" });
+    // Pembungkus badan sel itu `position: relative` lewat kelas (terminal.css, dikunci terminal-css-contract).
+    expect(screen.getByTestId("phase-strip").parentElement).toHaveClass("hn-terminal-cell-body");
   });
 
   // Badan pane TIDAK diredupkan: prosesnya masih hidup dan operator masih bisa mengetik di sana.
@@ -1051,11 +1052,12 @@ describe("TerminalScreen (layar penuh)", () => {
 
     const masuk = await screen.findByRole("button", { name: "Layar penuh" });
     expect(masuk).toHaveAttribute("aria-pressed", "false");
-    expect(root()).not.toHaveStyle({ position: "fixed" });
+    expect(root()).not.toHaveClass("is-maxed");
 
     fireEvent.click(masuk);
 
-    expect(root()).toHaveStyle({ position: "fixed", zIndex: "100" });
+    // fixed & z-index hidup di terminal.css (`.hn-terminal-screen.is-maxed`), dikunci terminal-css-contract.
+    expect(root()).toHaveClass("is-maxed");
     expect(screen.getByRole("button", { name: "Keluar layar penuh" }))
       .toHaveAttribute("aria-pressed", "true");
   });
@@ -1067,9 +1069,8 @@ describe("TerminalScreen (layar penuh)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Keluar layar penuh" }));
 
-    expect(root()).not.toHaveStyle({ position: "fixed" });
-    expect(root()).not.toHaveStyle({ height: "calc(100dvh - 180px)" });
-    expect(root()).toHaveStyle({ flex: "1 1 0", minHeight: "640px" });
+    expect(root()).not.toHaveClass("is-maxed");
+    expect(root()).toHaveClass("hn-terminal-screen");   // flex 1 1 0 & min-height 640px ada di CSS
     expect(screen.getByRole("button", { name: "Layar penuh" })).toBeInTheDocument();
   });
 
@@ -1089,7 +1090,7 @@ describe("TerminalScreen (layar penuh)", () => {
     // dan benar-benar terhubung, bukan sekadar ter-render
     fireEvent.click(screen.getByRole("button", { name: "+ Kolom" }));
     expect(await screen.findByLabelText("Tutup kolom 2")).toBeInTheDocument();
-    expect(root()).toHaveStyle({ position: "fixed" });   // tetap maximize
+    expect(root()).toHaveClass("is-maxed");   // tetap maximize
   });
 
   it("Escape TIDAK keluar dari layar penuh — Escape milik terminal", async () => {
@@ -1100,7 +1101,7 @@ describe("TerminalScreen (layar penuh)", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     fireEvent.keyDown(root(), { key: "Escape" });
 
-    expect(root()).toHaveStyle({ position: "fixed" });
+    expect(root()).toHaveClass("is-maxed");
     expect(screen.getByRole("button", { name: "Keluar layar penuh" })).toBeInTheDocument();
   });
 });
@@ -1178,7 +1179,7 @@ describe("TerminalScreen · integrate (SPEC-175)", () => {
     // hanya sesi ber-spec yang menawarkan Rebase / Merge di menu aksinya
     fireEvent.click(screen.getByLabelText("Aksi sesi spec1sess"));
     const withSpec = await screen.findByRole("dialog", { name: "Aksi sesi spec1sess" });
-    expect(within(withSpec).getByRole("button", { name: "Rebase / Merge branch" })).toBeInTheDocument();
+    expect(within(withSpec).getByRole("menuitem", { name: "Rebase / Merge branch" })).toBeInTheDocument();
     fireEvent.click(within(withSpec).getByLabelText("Tutup"));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Aksi sesi spec1sess" })).toBeNull());
     fireEvent.click(screen.getByLabelText("Aksi sesi plain0000"));
@@ -1237,10 +1238,10 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
     expect(screen.getByRole("button", { name: "Tutup sesi aaaa1111" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Aksi sesi aaaa1111" }));
     const menu = await screen.findByRole("dialog", { name: "Aksi sesi aaaa1111" });
-    expect(within(menu).getByRole("button", { name: "Lihat dokumen" })).toBeInTheDocument();
-    expect(within(menu).getByRole("button", { name: "Review perubahan" })).toBeInTheDocument();
-    expect(within(menu).getByRole("button", { name: "Lepas dari grid" })).toBeInTheDocument();
-    expect(within(menu).getByRole("button", { name: "Layar penuh" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Lihat dokumen" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Review perubahan" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Lepas dari grid" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Layar penuh" })).toBeInTheDocument();
   });
 
   it("aksi sekunder juga di menu pada sel lebar; tak ada yang inline selain Tutup", async () => {
@@ -1269,7 +1270,7 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
     expect(screen.queryByRole("button", { name: "+ Kolom" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Atur grid" }));
     for (const name of ["+ Kolom", "+ Baris"]) {
-      expect(screen.getByRole("button", { name })).toBeInTheDocument();
+      expect(screen.getByRole("menuitem", { name })).toBeInTheDocument();
     }
   });
 
@@ -1277,7 +1278,7 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
   const openDisplayOnPhone = async () => {
     fireEvent.click(screen.getByRole("button", { name: "Menu terminal" }));
     const menu = await screen.findByRole("dialog", { name: "Terminal" });
-    fireEvent.click(within(menu).getByRole("button", { name: "Tampilan terminal" }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Tampilan terminal" }));
     return screen.findByRole("dialog", { name: "Tampilan terminal" });
   };
 
@@ -1355,7 +1356,8 @@ describe("TerminalScreen · audit UI/UX (Terminal)", () => {
     expect(within(tablist).queryByRole("button", { name: "Hapus grup Utama" })).toBeNull();
     expect(within(tablist).queryByRole("button", { name: "Ganti nama grup Utama" })).toBeNull();
     const hapus = screen.getByRole("button", { name: "Hapus grup Utama" });
-    expect(hapus).toHaveStyle({ minHeight: "24px" });
+    // Ukuran kontrol grup (24px pointer halus) adalah nilai dinamis: lewat CSS variable di kontainernya.
+    expect(hapus.closest<HTMLElement>(".hn-terminal-groups")?.style.getPropertyValue("--group-box")).toBe("24px");
   });
 
   it("rekam jalur ketik ada di bagian Diagnostik yang tertutup, bukan di panel harian", async () => {
@@ -1368,5 +1370,33 @@ describe("TerminalScreen · audit UI/UX (Terminal)", () => {
     expect(diagnostik).not.toBeNull();
     expect(diagnostik!.open).toBe(false);
     expect(within(diagnostik!).getByRole("button", { name: "Nyalakan rekam jalur ketik" })).toBeInTheDocument();
+  });
+
+  // Keputusan 15 (Audit UI/UX 2026-10): mode pembaca layar xterm itu opsional. Default MATI; toggle
+  // di popover Tampilan menyimpannya ke ui-state dan menyampaikannya ke pane. Hint-nya wajib
+  // menjelaskan Tab dan Ctrl+Shift+Esc, karena keduanya tetap bekerja seperti biasa di mode ini.
+  it("mode pembaca layar: default mati, toggle tersimpan ke ui-state dan sampai ke pane", async () => {
+    localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 1, cells: ["aaaa1111"] }));
+    listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByTestId("pane");
+    expect(screen.getByTestId("pane")).toHaveAttribute("data-sr", "false");
+    // usePersistedState menulis nilai awalnya saat mount: default mati tampak sebagai "false" di storage.
+    expect(localStorage.getItem("hn.ui.v1.terminal.sr")).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Tampilan terminal" }));
+    const dialog = await screen.findByRole("dialog", { name: "Tampilan terminal" });
+    expect(within(dialog).getByText("Mode pembaca layar")).toBeInTheDocument();
+    const hint = dialog.querySelector("#terminal-sr-hint")?.textContent ?? "";
+    expect(hint).toContain("Untuk pembaca layar: teks terminal tersedia di DOM; kecepatan lebih rendah.");
+    expect(hint).toContain("Tab tetap dikirim ke sesi");
+    expect(hint).toContain("Ctrl+Shift+Esc");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Nyalakan mode pembaca layar" }));
+
+    expect(localStorage.getItem("hn.ui.v1.terminal.sr")).toBe("true");
+    expect(screen.getByTestId("pane")).toHaveAttribute("data-sr", "true");
+    expect(within(dialog).getByRole("button", { name: "Matikan mode pembaca layar" }))
+      .toHaveAttribute("aria-pressed", "true");
   });
 });

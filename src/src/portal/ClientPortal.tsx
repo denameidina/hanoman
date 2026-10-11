@@ -74,10 +74,6 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
   const [listGagal, setListGagal] = React.useState<string | null>(null);
   const [bukaGagal, setBukaGagal] = React.useState<string | null>(null);
   const [composing, setComposing] = React.useState(false);
-  // SPEC-854 · ADR-0129 · chat portal opt-in. Kehadirannya disimpulkan dari route-nya sendiri,
-  // bukan dari knob yang disalin ke klien: Settings adalah permukaan operator dan tak pernah
-  // dibaca akun klien (ADR-0110).
-  const [chatAda, setChatAda] = React.useState(false);
 
   React.useEffect(() => {
     setProjects(null); setFailed(false);
@@ -102,13 +98,6 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
   }, []);
 
   React.useEffect(() => { if (active) loadLists(active, bPage, tPage); }, [active, bPage, tPage, reload, loadLists]);
-  React.useEffect(() => {
-    if (!active) return;
-    setChatAda(false);
-    portalApi.listChatSessions(active, { page: 1, limit: 1 })
-      .then(() => setChatAda(true))
-      .catch(() => setChatAda(false));
-  }, [active]);
   // Ganti project atau tab = kembali ke halaman 1 (idiom TriageScreen SPEC-523): halaman 5 dari
   // konteks lama menjawab daftar konteks baru yang cuma punya 2 halaman → kosong tanpa sebab.
   React.useEffect(() => { setBPage(1); setTPage(1); }, [active, tab]);
@@ -130,7 +119,15 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
     finally { onLoggedOut(); }
   };
 
-  const activeName = projects?.find((p) => p.id === active)?.name ?? "";
+  const activeProject = projects?.find((p) => p.id === active);
+  const activeName = activeProject?.name ?? "";
+  // SPEC-854 · ADR-0129 · ADR-0211 · chat portal opt-in. Penandanya datang bersama daftar project
+  // dari server (`chatEnabled`, gerbang yang sama dengan route chat), jadi tak ada request probe ke
+  // /chat/sessions hanya untuk menebak apakah tab ini boleh ada. Settings tetap tak dibaca klien.
+  const chatAda = activeProject?.chatEnabled === true;
+  // Tab "tanya" yang tertinggal dari project lain (chat-nya mati di project ini) jatuh ke Keluhan,
+  // bukan ke ChatPanel yang akan menembak route 404.
+  const tabAktif: Tab = tab === "tanya" && !chatAda ? "keluhan" : tab;
 
   return (
     // SPEC-626 · `#root` (app.css) mengunci viewport — benar untuk Shell operator
@@ -180,19 +177,18 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
               </div>
 
               <div className="hn-portal-tabs-row">
-                <Tabs className="hn-portal-tabs" value={tab} onChange={(v) => setTab(v as Tab)} tabs={[
+                <Tabs className="hn-portal-tabs" value={tabAktif} onChange={(v) => setTab(v as Tab)} tabs={[
                   { value: "keluhan", label: "Keluhan saya", count: tickets.total },
                   { value: "progres", label: "Progres pekerjaan", count: backlog.total },
-                  // SPEC-854 · ADR-0129 · tab hanya lahir kalau chat menyala di Settings; selama
-                  // mati, route-nya 404 dan `chatAda` tetap false (tak ada tab yang menipu).
+                  // SPEC-854 · ADR-0129 · tab hanya lahir kalau chat menyala (`chatEnabled`, ADR-0211).
                   ...(chatAda ? [{ value: "tanya", label: "Tanya & ide" }] : []),
                 ]} />
               </div>
 
-              {tab === "tanya" ? <ChatPanel projectId={active!} /> : listGagal ? (
+              {tabAktif === "tanya" ? <ChatPanel projectId={active!} /> : listGagal ? (
                 <StateBlock kind="error" title="Daftar belum bisa dimuat" hint={listGagal}
                   action={() => setReload((n) => n + 1)} actionLabel="Coba lagi" />
-              ) : tab === "progres" ? (
+              ) : tabAktif === "progres" ? (
                 backlog.total === 0
                   ? <StateBlock kind="empty" icon="list-checks" title="Belum ada pekerjaan tercatat"
                       hint="Begitu tim mulai mengerjakan sesuatu di project ini, daftarnya muncul di sini." />

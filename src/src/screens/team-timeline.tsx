@@ -1,6 +1,6 @@
 import React from "react";
 import type { MemberView, TaskView } from "@hanoman/shared";
-import { Icon, FIXED_ROW_STYLE } from "../ds";
+import { Icon } from "../ds";
 import {
   barGeometry, projectGroups, taskDates, taskSpan, timelineRows, timelineWindow, todayOffset,
   zoomCell,
@@ -15,9 +15,8 @@ import {
    jendela. Mode Lintas project (item E) memakainya apa adanya dengan baris per PROJECT, dan itulah
    sebabnya `bars` jamak meski mode task selalu mengirim satu. */
 
+// Tinggi baris (34 px), inset batang (6 px), dan indent anak (16 px) hidup di `team.css` (`hn-tl-*`).
 const LABEL_W = 232;
-const ROW_H = 34;
-const BAR_INSET = 6;
 
 export type TimelineBarSpec = {
   key: string;
@@ -34,35 +33,31 @@ export type TimelineRowSpec = {
   bars: TimelineBarSpec[];
 };
 
-const TONE: Record<TimelineBarSpec["tone"], { bg: string; border: string }> = {
-  brass: { bg: "var(--brass-300)", border: "var(--brass-500)" },
-  err: { bg: "var(--status-err-tint)", border: "var(--status-err)" },
-  muted: { bg: "var(--bone-300)", border: "var(--border-strong)" },
+/* Warna batang dan swatch lahir dari nada di CSS (`.hn-tl-bar[data-tone]` di team.css). Di sini hanya
+   warna ikon yang dibutuhkan TSX, dan ia harus sama dengan `border-color` nada itu. */
+const TONE_BORDER: Record<TimelineBarSpec["tone"], string> = {
+  brass: "var(--brass-500)",
+  err: "var(--status-err)",
+  muted: "var(--border-strong)",
   // SPEC-949 · amplop rentang project. Harus lebih resesif dari `muted`, yang sudah dipakai task
   // berstatus `done`: amplop yang sewarna dengan task selesai membuat dua hal berbeda tampak sama.
-  envelope: { bg: "var(--bone-200)", border: "var(--border-hair)" },
+  envelope: "var(--border-hair)",
 };
 
-const LABEL_CELL: React.CSSProperties = {
-  position: "sticky", left: 0, zIndex: 1, flex: `0 0 ${LABEL_W}px`, width: LABEL_W,
-  boxSizing: "border-box", padding: "5px 10px", minWidth: 0,
-  background: "var(--surface-card)", borderRight: "1px solid var(--border-hair)",
-};
-
-const ELLIPSIS: React.CSSProperties = {
-  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-};
+/* Nilai yang berubah per render lewat CSS custom property. `CSSProperties` tak memuat kunci `--*`;
+   assertion ini sama dengan `ds/responsive.tsx`. */
+const cssVars = (vars: Record<string, string>) => vars as React.CSSProperties;
 
 function Bar({ spec }: { spec: TimelineBarSpec }) {
   const g = spec.geometry;
-  const tone = TONE[spec.tone];
+  const border = TONE_BORDER[spec.tone];
   const interactive = !!spec.onClick;
   // Audit 2026-10: batang tanpa aksi (amplop project) bukan tombol — ia gambar, bukan kontrol.
   // Hanya batang yang membuka tugas yang berupa <button>, sehingga klik batang punya satu arti.
   const props = {
     "data-testid": `timeline-bar-${spec.key}`,
-    // SPEC-949 · nada dipancarkan sebagai atribut karena warnanya lahir dari `TONE` di sini, bukan
-    // dari geometri: amplop yang jatuh ke nada task selesai (`muted`) lolos dari SETIAP assertion
+    // SPEC-949 · nada dipancarkan sebagai atribut karena warnanya lahir dari nada di CSS, bukan dari
+    // geometri: amplop yang jatuh ke nada task selesai (`muted`) lolos dari SETIAP assertion
     // berbasis `data-invalid`, terukur.
     "data-tone": spec.tone,
     "data-invalid": g.invalid ? "true" : "false",
@@ -70,35 +65,18 @@ function Bar({ spec }: { spec: TimelineBarSpec }) {
     "data-clipped-end": g.clippedEnd ? "true" : "false",
     title: spec.title, "aria-label": spec.title,
     onClick: spec.onClick,
-    style: {
-      position: "absolute" as const, top: BAR_INSET, height: ROW_H - BAR_INSET * 2,
-      left: `${g.left}%`, width: `${g.width}%`,
-      // Minimum PIKSEL, bukan persen: memaksanya ke persen membuat batang satu hari di zoom
-      // bulan tampak lebih panjang dari waktunya.
-      minWidth: 3,
-      // `minHeight` WAJIB dinyatakan untuk tombol: di `pointer: coarse` dan di bawah 768 px,
-      // `app.css` menaikkan setiap `button` ke `min-height: var(--touch-target)` (44 px). Batang
-      // 44 px di baris 34 px meluber menimpa baris berikutnya, dan jsdom tak memuat stylesheet.
-      // Inline menang atas selector mana pun.
-      minHeight: ROW_H - BAR_INSET * 2,
-      display: "flex", alignItems: "center", padding: 0, overflow: "hidden",
-      background: tone.bg, border: `1px solid ${tone.border}`,
-      // Sudut SIKU di sisi yang terpotong — batang terpotong yang tak mengaku terpotong
-      // berbohong tentang tenggat.
-      borderTopLeftRadius: g.clippedStart ? 0 : "var(--radius-sm)",
-      borderBottomLeftRadius: g.clippedStart ? 0 : "var(--radius-sm)",
-      borderTopRightRadius: g.clippedEnd ? 0 : "var(--radius-sm)",
-      borderBottomRightRadius: g.clippedEnd ? 0 : "var(--radius-sm)",
-      cursor: interactive ? "pointer" : "default",
-    },
+    className: "hn-tl-bar",
+    // Satu-satunya nilai per batang adalah posisi dan lebar. Minimum 3 px (bukan persen) dan tinggi
+    // tombol 22 px ada di `.hn-tl-bar`; sudut siku di sisi terpotong ada di `data-clipped-*`.
+    style: cssVars({ "--tl-left": `${g.left}%`, "--tl-width": `${g.width}%` }),
   };
   const body = (
     <>
       {/* Tenggat mendahului mulai: warna saja tak cukup (WCAG 1.4.1) — ikon + legenda menyebutnya. */}
-      {g.invalid && <Icon name="triangle-alert" size={11} color={tone.border} />}
-      {g.clippedStart && <Icon name="chevron-left" size={11} color={tone.border} />}
-      <span style={{ flex: 1 }} />
-      {g.clippedEnd && <Icon name="chevron-right" size={11} color={tone.border} />}
+      {g.invalid && <Icon name="triangle-alert" size={11} color={border} />}
+      {g.clippedStart && <Icon name="chevron-left" size={11} color={border} />}
+      <span className="hn-grow" />
+      {g.clippedEnd && <Icon name="chevron-right" size={11} color={border} />}
     </>
   );
   return interactive
@@ -109,25 +87,19 @@ function Bar({ spec }: { spec: TimelineBarSpec }) {
 /* Legenda warna + ikon. Dipakai kedua mode; "Rentang project" hanya di mode lintas project. */
 function TimelineLegend({ envelope = false }: { envelope?: boolean }) {
   const swatch = (tone: TimelineBarSpec["tone"]) => (
-    <span aria-hidden="true" style={{
-      display: "inline-block", width: 14, height: 9, borderRadius: 2,
-      background: TONE[tone].bg, border: `1px solid ${TONE[tone].border}`,
-    }} />
+    <span aria-hidden="true" className="hn-tl-swatch" data-tone={tone} />
   );
   return (
-    <ul aria-label="Legenda linimasa" style={{
-      display: "flex", flexWrap: "wrap", gap: "4px 14px", listStyle: "none", margin: "0 0 8px", padding: 0,
-      fontSize: "var(--text-xs)", color: "var(--text-muted)",
-    }}>
-      <li style={{ display: "flex", alignItems: "center", gap: 6 }}>{swatch("brass")}Rencana</li>
-      <li style={{ display: "flex", alignItems: "center", gap: 6 }}>{swatch("muted")}Selesai</li>
-      <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <ul aria-label="Legenda linimasa" className="hn-tl-legend">
+      <li className="hn-tl-legend-item">{swatch("brass")}Rencana</li>
+      <li className="hn-tl-legend-item">{swatch("muted")}Selesai</li>
+      <li className="hn-tl-legend-item">
         {swatch("err")}
         <Icon name="triangle-alert" size={11} color="var(--status-err)" />
         Tenggat mendahului mulai
       </li>
       {envelope && (
-        <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <li className="hn-tl-legend-item">
           {swatch("envelope")}Rentang project (buka lewat namanya)
         </li>
       )}
@@ -147,81 +119,57 @@ export function TimelineCanvas({ window: win, rows, today, emptyHint, testId, la
   const cell = zoomCell(win.zoom);
   const trackW = win.ticks.length * cell;
   const marker = todayOffset(win, today);
-  /* Gridline sebagai GRADIEN, bukan satu div per sel per baris: 40 baris x 120 tick = 4 800 node
-     kosong yang tak pernah dibaca siapa pun. Ia tetap sejajar dengan header karena kanvasnya
-     sama-sama `N x cell` px. */
-  const track: React.CSSProperties = {
-    position: "relative", width: trackW, height: ROW_H, flex: `0 0 ${trackW}px`,
-    backgroundImage:
-      `repeating-linear-gradient(to right, var(--border-hair) 0 1px, transparent 1px ${cell}px)`,
-  };
   return (
-    /* `minWidth: 0` DI SINI, bukan hanya di `.hn-timeline-scroll`: ia satu-satunya yang menahan
-       flex item ini melar mengikuti isinya alih-alih menggulir (kelas SPEC-879), dan jsdom tak
-       memuat stylesheet — properti yang hanya hidup di CSS dijaga nol test. Yang tertinggal di
-       kelasnya hanya yang memang tak bisa diuji di jsdom (`overscroll-behavior`, `-webkit-*`). */
-    <div data-testid={testId ?? "team-timeline"} className="hn-timeline-scroll"
-      style={{
-        flex: "1 1 auto", minHeight: 0, minWidth: 0, maxWidth: "100%",
-        overflowX: "auto", overflowY: "auto",
-      }}>
+    /* Gulir mendatar dan `min-width: 0` ada di `.hn-tl-scroll` (team.css): ia yang menahan flex item
+       ini melar mengikuti isinya alih-alih menggulir (kelas SPEC-879). Diuji lewat berkas CSS, karena
+       jsdom tak memuat stylesheet. */
+    <div data-testid={testId ?? "team-timeline"} className="hn-timeline-scroll hn-tl-scroll">
       {/* Lebar EKSPLISIT: anak blok di dalam container `overflow: auto` menyusut mengikuti
-          containernya, dan scroller-nya lalu tak punya apa pun untuk digulir (SPEC-879). */}
-      <div data-testid="timeline-canvas"
-        style={{ position: "relative", minWidth: LABEL_W + trackW, width: LABEL_W + trackW }}>
-        <div style={{
-          display: "flex", position: "sticky", top: 0, zIndex: 2,
-          background: "var(--bone-100)", borderBottom: "1px solid var(--border-hair)",
-        }}>
+          containernya, dan scroller-nya lalu tak punya apa pun untuk digulir (SPEC-879).
+          Dimensi kanvas (lebar kolom label, tick, trek) dinyatakan sekali di sini sebagai CSS var
+          dan diwarisi header, baris, dan garis hari ini. Gridline trek memakai gradien, bukan satu
+          div per sel per baris: 40 baris x 120 tick = 4 800 node kosong yang tak pernah dibaca. */}
+      <div data-testid="timeline-canvas" className="hn-tl"
+        style={cssVars({
+          "--tl-label-w": `${LABEL_W}px`,
+          "--tl-cell": `${cell}px`,
+          "--tl-ticks": String(win.ticks.length),
+          "--tl-track-w": `${trackW}px`,
+          "--tl-canvas-w": `${LABEL_W + trackW}px`,
+        })}>
+        <div className="hn-tl-head">
           {/* Kolom label tetap `sticky left` bahkan di header: nama tugas yang tergulir keluar
               membuat batang di sebelah kanan kehilangan pemiliknya. */}
-          <div style={{ ...LABEL_CELL, zIndex: 3, background: "var(--bone-100)" }}>
+          <div className="hn-tl-label">
             <span className="hn-eyebrow">{labelHead ?? "Tugas"}</span>
           </div>
-          <div style={{
-            display: "grid", gridTemplateColumns: `repeat(${win.ticks.length}, ${cell}px)`,
-            width: trackW, flex: `0 0 ${trackW}px`,
-          }}>
+          <div className="hn-tl-ticks">
             {win.ticks.map((t) => (
-              <div key={t.start} data-testid="timeline-tick" style={{
-                borderLeft: `1px solid ${t.major ? "var(--border-strong)" : "var(--border-hair)"}`,
-                padding: "5px 4px", fontFamily: "var(--font-mono)", fontSize: 10,
-                ...ELLIPSIS,
-                color: t.major ? "var(--text-body)" : "var(--text-subtle)",
-              }}>{t.label}</div>
+              <div key={t.start} data-testid="timeline-tick" data-major={t.major ? "true" : "false"}
+                className="hn-tl-tick">{t.label}</div>
             ))}
           </div>
         </div>
 
         {rows.length === 0 ? (
-          <div data-testid="timeline-empty" style={{
-            position: "sticky", left: 0, width: LABEL_W, padding: "18px 10px",
-            fontSize: "var(--text-xs)", color: "var(--text-muted)",
-          }}>{emptyHint ?? "Tak ada yang bisa dihamparkan di jendela ini."}</div>
+          <div data-testid="timeline-empty" className="hn-tl-empty">
+            {emptyHint ?? "Tak ada yang bisa dihamparkan di jendela ini."}
+          </div>
         ) : rows.map((r) => (
-          <div key={r.key} data-testid={`timeline-row-${r.key}`}
-            style={{ display: "flex", borderBottom: "1px solid var(--border-hair)" }}>
-            <div style={LABEL_CELL}>
-              <div style={{
-                ...ELLIPSIS, fontSize: 12, fontWeight: "var(--weight-medium)",
-                color: "var(--text-strong)",
-              }}>{r.label}</div>
-              {r.meta && <div style={{ ...ELLIPSIS, fontSize: 10, color: "var(--text-subtle)" }}>
-                {r.meta}
-              </div>}
+          <div key={r.key} data-testid={`timeline-row-${r.key}`} className="hn-tl-row">
+            <div className="hn-tl-label">
+              <div className="hn-tl-label-text">{r.label}</div>
+              {r.meta && <div className="hn-tl-label-meta">{r.meta}</div>}
             </div>
-            <div style={track}>
+            <div className="hn-tl-track">
               {r.bars.map((b) => <Bar key={b.key} spec={b} />)}
             </div>
           </div>
         ))}
 
         {marker !== null && (
-          <div data-testid="timeline-today" aria-hidden="true" style={{
-            position: "absolute", top: 0, bottom: 0, width: 2, pointerEvents: "none",
-            left: LABEL_W + (marker / 100) * trackW,
-            background: "var(--brass-500)", opacity: 0.5,
-          }} />
+          <div data-testid="timeline-today" aria-hidden="true" className="hn-tl-today"
+            style={cssVars({ "--tl-today-x": `${LABEL_W + (marker / 100) * trackW}px` })} />
         )}
       </div>
     </div>
@@ -236,23 +184,15 @@ function Aside({ testId, icon, title, hint, tasks, onOpen }: {
 }) {
   if (tasks.length === 0) return null;
   return (
-    <div data-testid={testId} style={{
-      ...FIXED_ROW_STYLE, marginTop: 10, padding: 10,
-      background: "var(--bone-100)", border: "1px solid var(--border-hair)",
-      borderRadius: "var(--radius-lg)",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+    <div data-testid={testId} className="hn-tl-aside">
+      <div className="hn-tl-aside-head">
         <Icon name={icon} size={13} color="var(--text-subtle)" />
         <span className="hn-eyebrow">{title} · {tasks.length}</span>
-        {hint && <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{hint}</span>}
+        {hint && <span className="hn-tl-aside-hint">{hint}</span>}
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      <div className="hn-tl-aside-list">
         {tasks.map((t) => (
-          <button key={t.id} type="button" onClick={() => onOpen(t)} style={{
-            padding: "3px 10px", background: "var(--surface-card)",
-            border: "1px solid var(--border-hair)", borderRadius: "var(--radius-pill)",
-            fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--text-body)", cursor: "pointer",
-          }}>{t.title}</button>
+          <button key={t.id} type="button" onClick={() => onOpen(t)} className="hn-tl-chip">{t.title}</button>
         ))}
       </div>
     </div>
@@ -303,9 +243,7 @@ export function TeamTimeline({ tasks, members, zoom, today, hidden, onOpen }: {
       <TimelineCanvas window={win} rows={rowSpecs} today={today}
         emptyHint="Belum ada tugas bertanggal — isi mulai atau tenggat di kartunya." />
       {hidden > 0 && (
-        <div data-testid="timeline-truncated" style={{
-          ...FIXED_ROW_STYLE, marginTop: 8, fontSize: "var(--text-xs)", color: "var(--status-warn)",
-        }}>
+        <div data-testid="timeline-truncated" className="hn-tl-note">
           {hidden} tugas tak termuat karena plafon 200 per kolom — persempit penyaring
         </div>
       )}
@@ -325,7 +263,6 @@ export function TeamTimeline({ tasks, members, zoom, today, hidden, onOpen }: {
    jamak yang sudah disiapkan `TimelineCanvas`. */
 
 const NONE_KEY = "__none__";
-const CHILD_INDENT = 16;
 
 const taskTone = (t: TaskView, g: BarGeometry): TimelineBarSpec["tone"] =>
   g.invalid ? "err" : t.status === "done" ? "muted" : "brass";
@@ -343,22 +280,13 @@ function ExpandLabel({ testId, open, name, count, onClick }: {
     /* `data-testid` sendiri, bukan `getByRole("button", { name })`: amplop project juga sebuah
        `button` dan `aria-label`-nya memuat nama project yang sama, jadi query berbasis nama cocok
        DUA elemen dan test gagal karena ambiguitas, bukan karena kode. */
+    // `min-height: 0` ada di `.hn-tl button.hn-tl-expand` (team.css): `app.css` menaikkan setiap
+    // `button` ke 44 px di layar sentuh, dan tombol 44 px di baris 34 px meluber ke baris berikutnya.
     <button type="button" onClick={onClick} data-testid={testId} aria-expanded={open}
-      style={{
-        display: "flex", alignItems: "center", gap: 5, width: "100%", padding: 0,
-        background: "none", border: "none", cursor: "pointer", textAlign: "left",
-        // WAJIB inline: `app.css` menaikkan setiap `button` ke `min-height: var(--touch-target)`
-        // (44 px) di `pointer: coarse` dan di bawah 768 px. Tombol 44 px di baris 34 px meluber
-        // menimpa baris berikutnya, dan jsdom tak memuat stylesheet — nol test akan merah.
-        minHeight: 0,
-        fontFamily: "var(--font-ui)", fontSize: 12, fontWeight: "var(--weight-medium)",
-        color: "var(--text-strong)",
-      }}>
+      className="hn-tl-expand">
       <Icon name={open ? "chevron-down" : "chevron-right"} size={12} color="var(--text-subtle)" />
-      <span style={{ ...ELLIPSIS, flex: 1 }}>{name}</span>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--text-subtle)" }}>
-        {count}
-      </span>
+      <span className="hn-tl-expand-name">{name}</span>
+      <span className="hn-tl-expand-count">{count}</span>
     </button>
   );
 }
@@ -446,9 +374,7 @@ export function TeamProjectTimeline({
         const dates = taskDates(t);
         out.push({
           key: `t:${t.id}`,
-          label: <span style={{ ...ELLIPSIS, display: "block", paddingLeft: CHILD_INDENT }}>
-            {t.title}
-          </span>,
+          label: <span className="hn-tl-child">{t.title}</span>,
           meta: dates ? `${assignee} · ${dates}` : assignee,
           bars: geometry
             ? [{
@@ -469,9 +395,7 @@ export function TeamProjectTimeline({
         testId="team-projects" labelHead="Project"
         emptyHint="Belum ada project bertanggal — isi mulai atau tenggat di kartunya." />
       {hidden > 0 && (
-        <div data-testid="projects-truncated" style={{
-          ...FIXED_ROW_STYLE, marginTop: 8, fontSize: "var(--text-xs)", color: "var(--status-warn)",
-        }}>
+        <div data-testid="projects-truncated" className="hn-tl-note">
           {hidden} tugas tak termuat karena plafon 200 per kolom — amplop project bisa
           lebih pendek dari rentang sebenarnya; persempit kolom, anggota, atau pencarian
         </div>

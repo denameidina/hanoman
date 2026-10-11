@@ -56,12 +56,16 @@ function variantStyle(variant: string): React.CSSProperties {
     case "secondary": return { background: "var(--surface-card)", color: "var(--text-strong)",
       border: "1px solid var(--border-strong)", boxShadow: "var(--shadow-xs)" };
     case "ghost": return { background: "transparent", color: "var(--text-body)", border: "1px solid transparent" };
-    case "danger": return { background: "var(--clay-600)", color: "#fff", border: "1px solid var(--clay-600)" };
+    // Dua varian danger memakai warna dari forms.css (`.hn-btn-danger*`): hover dan fokus butuh pseudo-class.
+    case "danger": case "danger-outline": return {};
     case "primary": default: return { background: "var(--accent)", color: "var(--accent-on)",
       border: "1px solid var(--accent)", boxShadow: "var(--shadow-xs)" };
   }
 }
-type ButtonProps = { children?: React.ReactNode; variant?: "primary" | "secondary" | "ghost" | "danger";
+// Audit 2026-10 · varian danger resmi. `danger` = solid, untuk aksi merusak utama (konfirmasi hapus).
+// `danger-outline` = teks + border merah, untuk aksi merusak sekunder (dulu `variant="secondary"` dengan
+// `className="hn-set-danger-text"`, yang kalah oleh `color` inline dan tak pernah merah).
+type ButtonProps = { children?: React.ReactNode; variant?: "primary" | "secondary" | "ghost" | "danger" | "danger-outline";
   size?: Size; leftIcon?: string; rightIcon?: string; loading?: boolean; disabled?: boolean; fullWidth?: boolean;
   type?: "button" | "submit" | "reset";
   // SPEC-361 · `as="a"` dipakai tombol unduh: unduhan butuh anchor sungguhan (atribut `download`)
@@ -76,7 +80,9 @@ export function Button({ children, variant = "primary", size = "md", leftIcon, r
   const [active, setActive] = React.useState(false);
   const isDisabled = disabled || loading;
   const base = variantStyle(variant);
-  const hoverOverlay: React.CSSProperties = variant === "ghost" ? { background: "var(--bone-200)" }
+  const isDanger = variant === "danger" || variant === "danger-outline";
+  // Hover danger ada di forms.css; inline-nya kosong.
+  const hoverOverlay: React.CSSProperties = isDanger ? {} : variant === "ghost" ? { background: "var(--bone-200)" }
     : variant === "secondary" ? { background: "var(--bone-100)", borderColor: "var(--ink-300)" }
     : { filter: "brightness(0.95)" };
   const isAnchor = asTag === "a";
@@ -90,13 +96,17 @@ export function Button({ children, variant = "primary", size = "md", leftIcon, r
     ...tagProps,
     onMouseEnter: () => setHover(true),
     onMouseLeave: () => { setHover(false); setActive(false); },
-    onMouseDown: () => setActive(true), onMouseUp: () => setActive(false), className: `hn-touch-target ${className}`.trim(),
+    onMouseDown: () => setActive(true), onMouseUp: () => setActive(false),
+    className: ["hn-touch-target", isDanger ? `hn-btn-${variant}` : "", className].filter(Boolean).join(" "),
     style: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: s.gap, height: s.h,
       textDecoration: "none",
       padding: `0 ${s.px}px`, width: fullWidth ? "100%" : "auto", font: `var(--weight-medium) ${s.fs}/1 var(--font-ui)`,
       letterSpacing: "0.005em", borderRadius: "var(--radius-sm)", cursor: isDisabled ? "not-allowed" : "pointer",
       opacity: isDisabled ? 0.5 : 1, transition: "var(--transition-fast)",
-      transform: active && !isDisabled ? "translateY(0.5px)" : "none", outline: "none", whiteSpace: "nowrap",
+      transform: active && !isDisabled ? "translateY(0.5px)" : "none",
+      // Tanpa `outline` inline: cincin fokus datang dari `:focus-visible` global (app.css) untuk semua
+      // varian. Klik mouse tak memicu `:focus-visible`, jadi tombol tak bercincin sesudah diklik.
+      whiteSpace: "nowrap",
       ...base, ...(hover && !isDisabled ? hoverOverlay : null), ...style },
   }, rest),
     loading && React.createElement(Icon, { name: "loader-2", size: s.icon, style: { animation: "hn-spin 0.7s linear infinite" } }),
@@ -124,7 +134,7 @@ export function IconButton({ icon, label, variant = "ghost", size = "md", disabl
     onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false), className: `hn-touch-target ${className}`.trim(),
     style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: s.box, height: s.box,
       borderRadius: "var(--radius-sm)", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1,
-      transition: "var(--transition-fast)", outline: "none", ...base, ...(hover && !disabled ? hoverOverlay : null), ...style },
+      transition: "var(--transition-fast)", ...base, ...(hover && !disabled ? hoverOverlay : null), ...style },
   }, rest), React.createElement(Icon, { name: icon, size: s.icon }));
 }
 

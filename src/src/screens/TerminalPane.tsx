@@ -53,7 +53,7 @@ type LinkState =
 export const TerminalPane = React.memo(TerminalPaneImpl);
 
 function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
-  predict = true, diag = false, mode = "local", hidden = false, onForget, label, composer = false,
+  predict = true, diag = false, screenReader = false, mode = "local", hidden = false, onForget, label, composer = false,
   compact = false, onToggleKeys }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
@@ -68,6 +68,10 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   // Perekam diagnostik jalur input. Opt-in, mati secara default: ia merekam SETIAP tombol yang
   // ditekan di pane ini, jadi ia hanya boleh menyala saat operator memang sedang menyelidiki.
   diag?: boolean;
+  // Audit UI/UX 2026-10 · keputusan 15: mode pembaca layar xterm (`screenReaderMode`). Opt-in, mati
+  // secara default. Ia menaruh teks terminal di DOM untuk NVDA/VoiceOver dengan biaya kecepatan.
+  // Tombol keluar fokus (Ctrl+Shift+Esc) tetap ditangani di `attachCustomKeyEventHandler` di bawah.
+  screenReader?: boolean;
   // SPEC-1218 · ADR-0165 §11 · "remote" = mirroring pane di klien lain lewat relay: server memegang
   // geometri (frame `geometry` menggantikan `resize` yang kita kirim), dan tanpa `sessions:write`
   // pane jadi baca-saja — tak ada `onData`/composer/keys yang bisa mengetik ke pty orang lain.
@@ -101,6 +105,8 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   predictRef.current = predict;
   const diagRef = React.useRef(diag);
   diagRef.current = diag;
+  const screenReaderRef = React.useRef(screenReader);
+  screenReaderRef.current = screenReader;
   const hiddenRef = React.useRef(hidden);
   hiddenRef.current = hidden;
   // Long-press seleksi teks hanya untuk pointer kasar — laptop hybrid dengan touchscreen + mouse
@@ -163,6 +169,8 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     const term = new Terminal({
       fontFamily: token("--font-mono", "monospace"),
       fontSize: clampFontSize(fontSizeRef.current), cursorBlink: false,
+      // Keputusan 15 · opsi awal; perubahan saat sesi hidup diterapkan di effect di bawah.
+      screenReaderMode: screenReaderRef.current,
       // SPEC-511 · tmux lahir dengan `mouse on` (SPEC-209) supaya wheel browser menggulir riwayat
       // pane; harganya, tmux menyalakan mouse-reporting di terminal klien (terukur: `?1000h`
       // `?1002h` `?1006h`) — dan xterm memanggil `SelectionService.disable()` begitu ada protokol
@@ -824,6 +832,15 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     current.fit.fit();
     current.sendSize(true);
   }, [fontSize, mode]);
+
+  // Mode pembaca layar (keputusan 15) berpindah di tempat: opsi runtime xterm 6 menyalakan atau
+  // membuang AccessibilityManager tanpa me-remount socket, jadi sesi tak kehilangan attach-nya.
+  React.useEffect(() => {
+    const current = view.current;
+    if (!current) return;
+    if (current.term.options.screenReaderMode === screenReader) return;
+    current.term.options.screenReaderMode = screenReader;
+  }, [screenReader, mode]);
 
   // SPEC-882 · kolom ketik & bar tombol memakan tinggi host, jadi `cols`/`rows` PTY ikut berubah
   // saat sakelarnya digeser. ResizeObserver menangkapnya di browser, tapi frame `resize` wajib

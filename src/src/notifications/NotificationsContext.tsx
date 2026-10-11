@@ -47,7 +47,11 @@ type Ctx = { items: Notification[]; unread: number; total: number; markAllRead: 
 export const NotificationsContext = React.createContext<Ctx>({ items: [], unread: 0, total: 0, markAllRead: () => { }, markRead: () => { }, clear: () => { } });
 export const useNotifications = () => React.useContext(NotificationsContext);
 
-export function NotificationsProvider({ showToast, onOpen, children }: { showToast: ShowToast; onOpen?: (n: Notification) => void; children: React.ReactNode }) {
+export function NotificationsProvider({ showToast, onOpen, isViewing, children }: {
+  showToast: ShowToast; onOpen?: (n: Notification) => void;
+  /** Sesi keputusan yang sedang ditonton operator (Terminal, sesi itu terfokus): tak perlu toast. */
+  isViewing?: (n: Notification) => boolean; children: React.ReactNode;
+}) {
   const [items, setItems] = React.useState<Notification[]>([]);
   const [unread, setUnread] = React.useState(0);
   // SPEC-523 · jumlah SELURUH notifikasi. Bell menampilkan 50 teratas; tanpa angka ini 50 itu
@@ -61,6 +65,13 @@ export function NotificationsProvider({ showToast, onOpen, children }: { showToa
   // dan efek poll tak teardown/rebuild tiap 3s (badai request selama sesi aktif).
   const onOpenRef = React.useRef(onOpen);
   onOpenRef.current = onOpen;
+  // Ref seperti onOpenRef: `handle` tetap stabil, sementara isi App (layar, fokus sesi) selalu terbaru.
+  const isViewingRef = React.useRef(isViewing);
+  isViewingRef.current = isViewing;
+  // Id notifikasi yang sudah men-toast. Satu notifikasi = satu toast, walau frame WS-nya berulang.
+  const toasted = React.useRef<Set<string>>(new Set());
+  // Diisi di bawah, setelah markRead didefinisikan. Dipakai aksi "Jawab" pada toast (dipanggil kemudian).
+  const markReadRef = React.useRef<(id: string) => void>(() => { });
 
   // Settings nyaris tak pernah berubah: fetch sekali saat mount, bukan tiap tick (SPEC-197).
   const loadPrefs = React.useCallback(async () => {
@@ -79,9 +90,23 @@ export function NotificationsProvider({ showToast, onOpen, children }: { showToa
     const top = maxAt(data.items);
     if (top > baseline.current) baseline.current = top;
     const latest = fresh[0]; // items terbaru dulu (server orderBy desc)
-    if (latest) {
+    if (latest && !toasted.current.has(latest.id)) {
+      toasted.current.add(latest.id);
+      if (toasted.current.size > 200) toasted.current.delete(toasted.current.values().next().value as string);
       const t = toastFor(latest, prefs.current);
-      if (t.enabled) { showToast(t.msg, t.tone, t.icon); playNotifySound(t.sound); notifyOS(t.msg, latest, onOpenRef.current); }
+      if (t.enabled) {
+        // Keputusan: toast membawa aksi "Jawab" (buka Terminal terfokus ke sesi itu, sekaligus tandai
+        // terbaca). Bila operator sudah menonton sesi itu di Terminal, toast-nya dilewati; bunyi dan
+        // notifikasi OS tetap berjalan seperti biasa.
+        const decision = latest.type === "decision";
+        const viewing = decision && isViewingRef.current?.(latest) === true;
+        const opts = decision && onOpenRef.current ? {
+          action: { label: "Jawab", onAction: () => { markReadRef.current(latest.id); onOpenRef.current?.(latest); } },
+          duration: 7000,
+        } : undefined;
+        if (!viewing) showToast(t.msg, t.tone, t.icon, opts);
+        playNotifySound(t.sound); notifyOS(t.msg, latest, onOpenRef.current);
+      }
     }
   }, [showToast]);
 
@@ -132,6 +157,7 @@ export function NotificationsProvider({ showToast, onOpen, children }: { showToa
       showToast(failureMessage("menandai notifikasi dibaca", e), "err", "x-circle");
     });
   }, [showToast]);
+  markReadRef.current = markRead;
   const clear = React.useCallback(() => {
     const before = shown.current;
     setItems([]); setUnread(0); setTotal(0);

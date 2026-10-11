@@ -91,8 +91,6 @@ export function VpsScreen({ onToast, onGotoTerminal }:
   const [status, setStatus] = React.useState<"loading" | "ready" | "error">("loading");
   const [loadErr, setLoadErr] = React.useState("");
   const [busy, setBusy] = React.useState<string | null>(null); // "<aksi>:<id>"
-  // Skor kepatuhan hanya diketahui setelah audit atau checklist dibuka di sesi ini (daftar tak memuatnya).
-  const [scores, setScores] = React.useState<Record<string, number>>({});
   // null = tertutup · "new" = daftar · VpsView = edit
   const [modal, setModal] = React.useState<null | "new" | VpsView>(null);
   // VPS yang detailnya sedang dibuka di modal (null = tertutup). SPEC-740 · ADR-0115 · yang disimpan
@@ -122,12 +120,11 @@ export function VpsScreen({ onToast, onGotoTerminal }:
     catch (e) { onToast(failureMessage(failAction, e), "err", "x-circle"); }
     finally { setBusy(null); }
   }
-  // Audit menyimpan skornya: daftar menampilkannya tanpa membuka checklist.
+  // Audit menyimpan skornya (ADR-0211): daftar memuatnya ulang dari server, tanpa state skor terpisah.
   const audit = async (v: VpsView) => {
     setBusy(`audit:${v.id}`);
     try {
-      const r = await api.auditVps(v.id);
-      setScores((s) => ({ ...s, [v.id]: r.scoreTotal }));
+      await api.auditVps(v.id);
       load(); onToast(`${v.name} · audit selesai`, "ok", "server");
     } catch (e) { onToast(failureMessage("menjalankan audit", e), "err", "x-circle"); }
     finally { setBusy(null); }
@@ -263,7 +260,7 @@ export function VpsScreen({ onToast, onGotoTerminal }:
                 <span className="vps-row-addr">{v.user}@{v.host}{v.port !== 22 ? `:${v.port}` : ""}</span>
               </button>
               <VpsStepper steps={vpsSteps(v)} name={v.name} />
-              <span className="vps-row-score">{scoreText(scores[v.id])}</span>
+              <span className="vps-row-score">{scoreText(v.scoreTotal)}</span>
             </div>
           </DenseRow>
         ))}
@@ -275,7 +272,8 @@ export function VpsScreen({ onToast, onGotoTerminal }:
           summary={summaryNode(detailVps)}
           provisioning={<VpsProvisionPanel vps={detailVps} onToast={onToast} onGotoTerminal={onGotoTerminal} />}
           access={accessNode(detailVps)}
-          onScore={(total) => setScores((s) => ({ ...s, [detailVps.id]: total }))}
+          /* Checklist baru dimuat (mis. sesudah N/A/attest): muat ulang daftar supaya skor di baris ikut. */
+          onScore={() => load()}
           onClose={() => { setDetailVps(null); load(); }} onToast={onToast} />
       )}
       <VpsModal open={modal === "new"} title="Daftarkan VPS" submitLabel="Daftarkan"

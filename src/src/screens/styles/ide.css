@@ -30,7 +30,7 @@
 .hn-ide-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--space-2); }
 
 /* Pemisah panel berkas (keyboard + pointer). Hanya ada saat split; di mobile tak dirender. */
-.hn-ide-files-pane { position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.hn-ide-files-pane { position: relative; display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; min-width: 0; }
 .hn-ide-split {
   position: absolute; top: 0; bottom: 0; right: -12px; width: 12px; z-index: 2;
   display: flex; align-items: center; justify-content: center; cursor: col-resize; touch-action: none;
@@ -150,7 +150,7 @@
 }
 
 /* ---------------------------------------------------------------- Kerangka tab & dialog */
-.hn-ide-screen { min-width: 0; }
+.hn-ide-screen { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .hn-ide-scroll-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .hn-ide-section-gap { border-top: 1px solid var(--border-hair); margin: var(--space-1) 0; }
 .hn-ide-drop { outline: 2px dashed var(--brass-500); outline-offset: -4px; }
@@ -219,3 +219,236 @@
 @media (pointer: coarse), (max-width: 767px) {
   .hn-ide-seg button { min-height: 44px; min-width: 44px; }
 }
+
+/* ---------------------------------------------------------------- Migrasi inline (Z2)
+   Nilai statis dari inline style GitGraph, file-tree, IdeReadPanel, dan IdeScreen dipindah ke sini.
+   Nilai yang berubah per baris atau per daftar tetap lewat CSS variable yang di-set di elemen itu:
+   --depth (kedalaman pohon), --row-h (tinggi baris commit), --graph-min-w (lebar minimum daftar
+   commit), --git-cols (kolom grid layout Git Graph), dan --lane (warna lane per elemen SVG).
+   Urutan aturan penting: state (`.is-sel`, `.hn-git-diff-tab--on`) ditulis SETELAH dasarnya dan
+   `:hover`, supaya menang dengan spesifisitas sama, seperti inline style sebelumnya. */
+
+/* Palet lane Git Graph: nilai hex yang sama dengan sebelumnya, kini bernama. Palet dari config
+   (`gitGraph.colours`) menimpa lewat --lane per elemen SVG, jadi bagian ini hanya nilai bawaan. */
+.hn-git-graph-layout {
+  display: grid; grid-template-columns: var(--git-cols, minmax(0, 1fr)); gap: 16px; align-items: start; min-width: 0;
+  --graph-lane-0: #a9791c; --graph-lane-1: #3b7a57; --graph-lane-2: #8a5a44;
+  --graph-lane-3: #4a6fa5; --graph-lane-4: #7d5ba6; --graph-lane-5: #b0503a;
+}
+.hn-git-panel { min-width: 0; }
+.hn-git-find {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px; border-bottom: 1px solid var(--border-hair);
+}
+.hn-git-find-input {
+  flex: 1 1 0%; border: none; background: transparent;
+  font-size: 12.5px; font-family: var(--font-ui); color: var(--text-body);
+}
+.hn-git-find-count { font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle); }
+.hn-git-find-hint { margin-left: auto; font-size: 11px; color: var(--text-subtle); }
+.hn-git-branch-select {
+  font-size: 12px; padding: 3px 6px; border: 1px solid var(--border-hair); border-radius: var(--radius-sm);
+  background: var(--surface-card); color: var(--text-body);
+}
+.hn-git-stash-row {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 6px 12px; border-bottom: 1px solid var(--border-hair);
+}
+.hn-git-stash-label { margin-right: 4px; }
+.hn-git-stash-chip {
+  font-family: var(--font-mono); font-size: 10.5px; padding: 2px 8px; border-radius: 999px; border: none;
+  cursor: pointer; background: var(--bone-200); color: var(--text-muted); flex: 0 0 auto;
+}
+.hn-git-rows { min-width: var(--graph-min-w, 0px); }
+
+/* Baris commit: tinggi dari --row-h (diwarisi dari daftar). State terpilih/ditemukan ditulis setelah
+   :hover agar menang atas latar hover, seperti inline background sebelumnya. */
+.hn-ide-graph-row {
+  display: flex; align-items: center; gap: 10px; height: var(--row-h, 30px); padding: 0 12px;
+  cursor: pointer; border-bottom: 1px solid var(--border-hair);
+}
+.hn-ide-graph-row.is-sel { background: var(--brass-100); }
+.hn-ide-graph-row.is-active { background: var(--brass-300); }
+.hn-ide-graph-row.is-hit { background: var(--bone-100); }
+
+/* Lane SVG. Garis & simpul memakai --lane; simpul merge berongga (pembeda non-warna, selain warna). */
+.hn-graph-lane { flex: 0 0 auto; }
+.hn-graph-edge { fill: none; stroke: var(--lane); stroke-width: 1.5px; }
+.hn-graph-node { fill: var(--lane); stroke: var(--surface-card); stroke-width: 1.5px; }
+.hn-graph-node[data-merge="true"] { fill: var(--surface-card); stroke: var(--lane); }
+.hn-graph-node--open { fill: none; stroke: var(--graph-lane-0); }
+
+.hn-git-main { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 0%; }
+.hn-git-ref {
+  font-family: var(--font-mono); font-size: 10.5px; padding: 1px 6px; cursor: pointer; border: none;
+  border-radius: 999px; background: var(--brass-100); color: var(--brass-700); flex: 0 0 auto;
+}
+.hn-git-ref--head { background: var(--brass-700); color: var(--bone-000); }
+.hn-git-tag {
+  font-family: var(--font-mono); font-size: 10.5px; padding: 1px 6px 1px 4px; border: none; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 3px; background: var(--leaf-100); color: var(--leaf-600);
+  flex: 0 0 auto;
+}
+.hn-git-merge {
+  flex: 0 0 auto; font-family: var(--font-mono); font-size: 10px; padding: 0 5px; border-radius: 999px;
+  border: 1px solid var(--border-strong); color: var(--text-muted);
+}
+.hn-git-subject {
+  min-width: 160px; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left;
+  font-size: 12.5px; color: var(--text-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-git-subject--muted { color: var(--text-muted); }
+.hn-git-author {
+  flex: 0 0 auto; width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle);
+}
+.hn-git-date {
+  flex: 0 0 auto; width: 40px; text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle);
+}
+.hn-git-wt {
+  flex: 0 0 auto; width: 88px; text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle);
+}
+.hn-git-wt-gap { flex: 0 0 auto; width: 40px; }
+.hn-git-uncommitted {
+  flex: 1 1 0%; border: 0; padding: 0; background: transparent; text-align: left; cursor: pointer;
+  font-size: 12.5px; font-style: italic; color: var(--text-muted);
+}
+.hn-git-uncommitted--static { cursor: default; }
+
+.hn-git-more {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 9px 12px; border-top: 1px solid var(--border-hair);
+}
+.hn-git-more-count { font-size: 11.5px; color: var(--text-subtle); }
+.hn-git-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.hn-git-cluster { display: flex; align-items: center; gap: 6px; }
+.hn-git-detail-title { font-size: 13px; color: var(--text-strong); font-weight: 600; margin-bottom: 4px; }
+.hn-git-detail-meta {
+  display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-subtle); margin-bottom: 6px;
+}
+.hn-git-avatar { border-radius: 999px; }
+.hn-git-detail-body {
+  font-family: var(--font-mono); font-size: 11.5px; white-space: pre-wrap; color: var(--text-muted); margin-bottom: 10px;
+}
+.hn-git-changed-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.hn-git-count { margin-bottom: 6px; }
+.hn-git-empty { font-size: 12px; color: var(--text-subtle); }
+.hn-git-view-btn { display: flex; padding: 3px; border: none; cursor: pointer; border-radius: 4px; background: transparent; }
+.hn-git-view-btn[aria-pressed="true"] { background: var(--brass-100); }
+.hn-git-file { display: flex; align-items: center; gap: 6px; padding: 3px 6px; }
+.hn-git-file-path {
+  flex: 1 1 0%; min-width: 0; text-align: left; border: none; background: transparent; cursor: pointer;
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--text-body);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Pil "Compare dari …" dan tombol tutupnya. Putih (#fff) dipertahankan, seperti tombol danger DS. */
+.hn-git-compare-pill {
+  position: fixed; bottom: max(16px, var(--safe-bottom)); left: 50%; transform: translateX(-50%); z-index: 140;
+  background: var(--brass-500); color: #fff; padding: 6px 14px; border-radius: 999px; font-size: 12.5px;
+  box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 10px;
+}
+.hn-git-compare-close { border: none; background: transparent; color: #fff; cursor: pointer; font-weight: 700; }
+
+/* Modal diff satu berkas di Git Graph. */
+.hn-git-diff-body { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.hn-git-diff-bar {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 12px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--border-hair);
+}
+.hn-git-diff-tabs { display: flex; gap: 2px; background: var(--bone-100); border-radius: var(--radius-pill); padding: 2px; }
+.hn-git-diff-tab {
+  padding: 4px 12px; border: none; cursor: pointer; border-radius: var(--radius-pill); font-size: 12px;
+  text-transform: capitalize; background: transparent; color: var(--text-muted); font-weight: 400;
+}
+.hn-git-diff-tab--on { background: var(--surface-card); color: var(--text-strong); font-weight: 600; }
+.hn-git-diff-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px 0; }
+.hn-git-md { padding: 0 16px; }
+.hn-git-source {
+  margin: 0; padding: 0 16px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; color: var(--text-body);
+}
+
+/* IdeScreen: lebar input bernama dan panel berkas. */
+.hn-ide-input-full { width: 100%; }
+.hn-ide-input-100 { width: 100px; }
+.hn-ide-screen--fill { flex: 1 1 0; min-height: 0; }
+.hn-ide-tree-scroll { padding: 8px; flex: 1 1 auto; min-height: 0; overflow: auto; outline-offset: -4px; }
+
+/* Pohon berkas (file-tree): indentasi per kedalaman lewat --depth. */
+.hn-ide-tree-leaf {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 5px 8px; padding-left: calc(22px + var(--depth, 0) * 12px);
+  border: none; cursor: pointer; text-align: left; background: transparent;
+}
+.hn-ide-tree-dir {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 5px 6px; padding-left: calc(6px + var(--depth, 0) * 12px);
+  border: none; background: transparent; cursor: pointer; text-align: left;
+}
+.hn-ide-tree-ignored { opacity: 0.62; }
+.hn-ide-tree-name {
+  flex: 1 1 0%; min-width: 0; font-family: var(--font-mono); font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-body); font-weight: 400;
+}
+.hn-ide-sel .hn-ide-tree-name { color: var(--brass-700); font-weight: 600; }
+.hn-ide-tree-dirname { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-strong); font-weight: 500; }
+.hn-ide-sel .hn-ide-tree-dirname { color: var(--brass-700); font-weight: 700; }
+.hn-ide-tree-empty {
+  padding: 4px 8px; padding-left: calc(28px + var(--depth, 0) * 12px); font-size: 11.5px; color: var(--text-subtle);
+}
+.hn-ide-tree-loading { font-size: 11px; color: var(--text-subtle); }
+.hn-ide-status { font-family: var(--font-mono); font-size: 12px; font-weight: 700; }
+.hn-ide-status[data-status="A"] { color: var(--leaf-600); }
+.hn-ide-status[data-status="M"] { color: var(--brass-700); }
+.hn-ide-status[data-status="D"] { color: var(--clay-500); }
+.hn-ide-stat { font-family: var(--font-mono); font-size: 11px; }
+.hn-ide-add { color: var(--leaf-600); }
+.hn-ide-del { color: var(--clay-500); }
+.hn-ide-changed-row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 5px 10px; border: none; cursor: pointer; text-align: left; background: transparent;
+}
+/* Ditulis SETELAH dasar baris (leaf, dir, changed-row) agar menang dengan spesifisitas sama. */
+.hn-ide-sel { background: var(--brass-100); }
+.hn-ide-changed-path {
+  flex: 1 1 0%; min-width: 0; font-family: var(--font-mono); font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-body);
+}
+.hn-ide-sel .hn-ide-changed-path { color: var(--brass-700); }
+.hn-ide-changed-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px; }
+.hn-ide-view-btn { display: flex; padding: 3px; border: none; cursor: pointer; border-radius: 4px; background: transparent; }
+.hn-ide-view-btn[aria-pressed="true"] { background: var(--brass-100); }
+.hn-ide-empty-pad { padding: 4px 10px; font-size: 12px; color: var(--text-subtle); }
+
+/* IdeReadPanel (baca-saja, dipakai lewat RemoteInstanceView). */
+.hn-ide-read-root { display: flex; flex-direction: column; gap: 16px; flex: 1 1 0; min-height: 0; }
+.hn-ide-read-head { flex: 0 0 auto; padding: 10px 14px; border-bottom: 1px solid var(--border-hair); }
+.hn-ide-read-tree { padding: 8px; flex: 1 1 auto; min-height: 0; overflow: auto; }
+.hn-ide-read-divider { border-top: 1px solid var(--border-hair); margin: 6px 0; }
+.hn-ide-read-section { padding: 6px 8px; margin-top: 8px; border-top: 1px solid var(--border-hair); }
+.hn-ide-read-viewer-head {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; border-bottom: 1px solid var(--border-hair);
+}
+.hn-ide-read-path { font-family: var(--font-mono); font-size: 13px; color: var(--text-strong); }
+.hn-ide-read-diff { padding: 10px 0; }
+.hn-ide-read-md { padding: 16px 20px; }
+.hn-ide-read-pre {
+  margin: 0; padding: 16px 18px; overflow: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.7;
+}
+.hn-ide-read-from { padding: 6px 14px; font-size: 11.5px; color: var(--text-subtle); }
+.hn-ide-read-compare { padding: 8px 14px; border-bottom: 1px solid var(--border-hair); }
+.hn-ide-read-empty { font-size: 12px; color: var(--text-subtle); }
+.hn-ide-read-cpath { font-family: var(--font-mono); font-size: 11.5px; padding: 2px 0; }
+.hn-ide-read-alert {
+  padding: 8px 14px; font-size: 12px; color: var(--status-err); border-bottom: 1px solid var(--border-hair);
+}
+.hn-ide-read-list { padding: 8px; overflow: auto; }
+.hn-ide-read-commit {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%;
+  padding: 6px 10px; border: none; cursor: pointer; text-align: left; background: transparent;
+}
+.hn-ide-read-commit--from { background: var(--brass-100); }
+.hn-ide-read-subject { font-family: var(--font-mono); font-size: 12.5px; }
+.hn-ide-read-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle); }

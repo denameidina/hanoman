@@ -4,6 +4,7 @@ import { convertPayload, flowForSource, payloadShapeFor, shapeOfPayload } from "
 import { SOURCE_OPTS, SHAPE_FIELDS, PRIO_OPTS, SEV_OPTS, sourceMeta } from "./source-meta";
 import type { SourceResetPending } from "../api/client";
 import type { Spec } from "./types";
+import "./styles/dialogs.css";
 
 // SPEC-546 · ADR-0109 · dialog "Ubah type". Prefill form-nya memakai `convertPayload` — fungsi
 // MURNI yang sama yang dipakai server saat `payload` tak dikirim, jadi apa yang dilihat operator
@@ -63,14 +64,11 @@ export function ChangeSourceDialog({ spec, onClose, onSubmit }: {
     <Modal open title="Item ini akan dikembalikan ke Brainstorming" icon="rotate-ccw"
       eyebrow={`${spec.id} · ${sourceMeta(spec.source).label} → ${sourceMeta(target).label}`}
       onClose={busy ? undefined : onClose}>
-      <div style={{ fontSize: 13.5, color: "var(--text-strong)", lineHeight: 1.55, marginBottom: 12 }}>
+      <div className="hn-dia-lead hn-dia-lead-sm">
         Alur kerja {sourceMeta(target).label} berbeda dari yang sudah dikerjakan, jadi item ini
         mulai lagi dari awal. Kode yang sudah ter-commit di branch lain tak disentuh.
       </div>
-      <ul data-testid="source-reset-impact" style={{
-        fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)",
-        marginBottom: 16, paddingLeft: 18, lineHeight: 1.6,
-      }}>
+      <ul data-testid="source-reset-impact" className="hn-dia-impact">
         {pending.wouldDelete.map((f) => <li key={f}>{f}</li>)}
         {pending.worktree && <li>{pending.worktree}</li>}
         {pending.branch && <li>{pending.branch}</li>}
@@ -78,7 +76,7 @@ export function ChangeSourceDialog({ spec, onClose, onSubmit }: {
           <li>tak ada berkas yang perlu dibuang — hanya tahapnya yang mundur</li>
         )}
       </ul>
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+      <div className="hn-dia-foot">
         <Button size="sm" variant="secondary" disabled={busy} onClick={onClose}>Batal</Button>
         <Button size="sm" variant="danger" leftIcon="rotate-ccw" loading={busy}
           onClick={() => submit(true)}>Reset &amp; ubah type</Button>
@@ -91,36 +89,30 @@ export function ChangeSourceDialog({ spec, onClose, onSubmit }: {
       eyebrow={`${spec.id} · ${sourceMeta(spec.source).label}`} onClose={onClose}>
       <Field label="Type tujuan">
         <Select aria-label="Type tujuan" value={target} onChange={(e) => setTarget(e.target.value)}
-          options={options} style={{ width: "100%" }} />
+          options={options} className="hn-dia-full" />
       </Field>
       {!options.length && (
-        <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 12 }}>
+        <div className="hn-dia-note">
           Tak ada type lain yang bisa dituju. Dialog tetap terbuka dan mengatakannya — menolak
           dengan diam adalah bug yang melahirkan ADR-0149.
         </div>
       )}
       {sameFlowStarted ? (
-        <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 12 }}>
+        <div className="hn-dia-note">
           Item ini sudah pernah dikerjakan sesi, dan type tujuannya memakai alur kerja yang sama —
           yang berpindah hanya <strong>labelnya</strong>. Isi, worktree, dan berkas fase tak disentuh.
         </div>
       ) : (
         <>
           {resetNeeded && (
-            <div data-testid="source-reset-warning" style={{
-              fontSize: 12.5, color: "var(--text-strong)", lineHeight: 1.5, marginBottom: 12,
-              border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", padding: 10,
-            }}>
+            <div data-testid="source-reset-warning" className="hn-dia-box">
               <Badge tone="warn" size="sm">alur kerja berbeda</Badge>{" "}
               Item ini akan kembali ke tahap <strong>Brainstorming</strong>; dokumen fase, worktree,
               dan branch sesi lamanya dihapus. Daftar persisnya ditampilkan sebelum kamu menyetujui.
             </div>
           )}
           {conv.dropped.length > 0 && (
-            <div data-testid="source-dropped" style={{
-              fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 12,
-              border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", padding: 10,
-            }}>
+            <div data-testid="source-dropped" className="hn-dia-box hn-dia-box-muted">
               <Badge tone="warn" size="sm">tak punya padanan</Badge>{" "}
               {conv.dropped.map(labelOf).join(", ")} tidak ada di bentuk{" "}
               {sourceMeta(target).label}. Teks lamanya tetap tersimpan di{" "}
@@ -130,21 +122,21 @@ export function ChangeSourceDialog({ spec, onClose, onSubmit }: {
           {shape !== "qa" && (
             <Field label="Prioritas">
               <Select aria-label="Prioritas" value={form.priority ?? "sedang"}
-                onChange={setField("priority")} options={PRIO_OPTS} style={{ width: "100%" }} />
+                onChange={setField("priority")} options={PRIO_OPTS} className="hn-dia-full" />
             </Field>
           )}
           {fields.map(([k, label, ph]) => (
             <Field key={k} label={label}>
               {k === "severity"
                 ? <Select aria-label={label} value={form[k] ?? "minor"} onChange={setField(k)}
-                    options={SEV_OPTS} style={{ width: "100%" }} />
+                    options={SEV_OPTS} className="hn-dia-full" />
                 : <HnTextarea aria-label={label} value={form[k] ?? ""} onChange={setField(k)}
                     rows={2} placeholder={ph} />}
             </Field>
           ))}
         </>
       )}
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+      <div className="hn-dia-foot hn-dia-foot-tight">
         <Button size="sm" variant="secondary" onClick={onClose}>Batal</Button>
         <Button size="sm" variant="primary" leftIcon="shuffle" loading={busy}
           disabled={!options.length} onClick={() => submit()}>Ubah type</Button>

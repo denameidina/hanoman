@@ -76,7 +76,7 @@ describe("Review perubahan (SPEC-171) di menu ⋯", () => {
       onOpenReview={onOpenReview} projectFilter="all" onProjectFilter={() => {}} />);
     // Aksi sekunder tak lagi sejajar di kartu: buka menu dulu, lalu pilih Review perubahan.
     fireEvent.click(screen.getByRole("button", { name: "Aksi lain SPEC-1" }));
-    fireEvent.click(screen.getByRole("button", { name: "Review perubahan" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Review perubahan" }));
     expect(onOpenReview).toHaveBeenCalledOnce();
     expect(onOpenReview.mock.calls[0]![0].id).toBe("SPEC-1");
   });

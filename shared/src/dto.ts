@@ -584,6 +584,9 @@ export type VpsView = {
   components?: VpsComponents | null;
   componentsCheckedAt?: string | null;
   provisionProfile?: string | null;
+  // ADR-0211 · skor kepatuhan dari audit TERSIMPAN (listing `GET /vps` dan siaran `vps`; tak pernah
+  // menjalankan audit). Opsional: respons lain (POST/PATCH) tak memuatnya. null = belum pernah diaudit.
+  scoreTotal?: number | null;
 };
 
 // SPEC-220 · checklist kepatuhan (katalog 232 item + status per VPS). Server menghidrasi penuh

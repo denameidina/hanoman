@@ -5,24 +5,18 @@ import {
   WEBHOOK_MAX_ATTEMPTS, WEBHOOK_MAX_BYTES, WEBHOOK_QUEUE_CAP, WEBHOOK_SPEC_VERSION,
   WEBHOOK_TOLERANCE_SEC, sampleEnvelope,
 } from "@hanoman/shared";
+import "./styles/integrations.css";
 
 // SPEC-481 · ADR-0100 · dokumentasi webhook DI DALAM aplikasi, dibangun dari katalog yang sama
 // dengan pengirimnya. Tak ada daftar jenis peristiwa yang ditulis tangan di berkas ini — brief
 // mensyaratkan dokumentasi yang tak bisa basi saat peristiwa baru ditambahkan.
 
-const prose: React.CSSProperties = { fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 };
-const code: React.CSSProperties = {
-  fontFamily: "var(--font-mono)", fontSize: 12, whiteSpace: "pre", overflowX: "auto",
-  background: "var(--bone-200)", border: "1px solid var(--border-hair)",
-  borderRadius: "var(--radius-sm)", padding: 12, margin: 0,
-};
-
 function Copyable({ text, label = "Salin" }: { text: string; label?: string }) {
   const [done, setDone] = React.useState(false);
   return (
-    <div style={{ position: "relative" }}>
-      <pre style={code}>{text}</pre>
-      <div style={{ marginTop: 6 }}>
+    <div className="hn-wh-copy">
+      <pre className="hn-wh-code">{text}</pre>
+      <div className="hn-wh-mt6">
         <Button size="sm" variant="ghost" onClick={() => {
           void navigator.clipboard?.writeText(text);
           setDone(true);
@@ -106,11 +100,11 @@ function FoldCard({ eyebrow, title, children }: { eyebrow: string; title: string
   return (
     <Card>
       <details>
-        <summary style={{ cursor: "pointer", padding: 20, fontFamily: "var(--font-ui)" }}>
+        <summary className="hn-wh-fold-summary">
           <span className="hn-eyebrow">{eyebrow}</span>
-          <span style={{ display: "block", marginTop: 2, fontSize: 15, fontWeight: 600, color: "var(--text-strong)" }}>{title}</span>
+          <span className="hn-wh-fold-title">{title}</span>
         </summary>
-        <div style={{ padding: "0 20px 20px", display: "flex", flexDirection: "column", gap: 12 }}>{children}</div>
+        <div className="hn-wh-fold-body">{children}</div>
       </details>
     </Card>
   );
@@ -130,46 +124,46 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
       <Card eyebrow="dokumentasi" title="Dokumentasi webhook">
         {/* Tombol kembali hanya ada bila dokumentasi berdiri sendiri; di Pengaturan ia dilipat (details). */}
         {onBack && (
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <div className="hn-wh-back">
             <Button size="sm" variant="ghost" onClick={onBack}>
               <Icon name="arrow-left" size={14} /> Kembali ke daftar endpoint
             </Button>
           </div>
         )}
-        <div style={prose}>
+        <div className="hn-wh-prose">
           Setiap kali sesuatu berubah di hanoman, kami mengirim satu <b>HTTP POST</b> ke URL yang
           Anda daftarkan. Kanal ini <b>satu arah</b> — hanoman tak pernah membaca apa pun dari
           penerima selain kode status HTTP-nya. Badan permintaan selalu berbentuk amplop seragam
           ber-versi <code>{WEBHOOK_SPEC_VERSION}</code>, jadi penerima yang ditulis hari ini tetap
           bekerja saat jenis peristiwa baru ditambahkan.
         </div>
-        <div style={{ ...prose, marginTop: 10 }}>
+        <div className="hn-wh-prose hn-wh-mt10">
           Setiap bagian di bawah bisa dibuka sendiri dan semuanya tertutup dulu, supaya halaman ini tak memanjang.
         </div>
       </Card>
 
       <FoldCard eyebrow="katalog" title="Jenis peristiwa dan kapan terpicu">
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="hn-wh-col-16">
           {byEntity.map((g) => (
             <div key={g.label}>
-              <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 8 }}>{g.label}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className="hn-wh-group">{g.label}</div>
+              <div className="hn-wh-col-10">
                 {g.events.map((e) => (
-                  <div key={e.type} style={{ paddingLeft: 10, borderLeft: "2px solid var(--border-hair)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <code style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: 600 }}>{e.type}</code>
+                  <div key={e.type} className="hn-wh-event">
+                    <div className="hn-wh-event-head">
+                      <code className="hn-wh-type">{e.type}</code>
                       <Badge tone="brass" size="sm">{e.entityLabel}</Badge>
-                      <span style={{ fontSize: 12.5 }}>{e.label}</span>
+                      <span className="hn-wh-event-label">{e.label}</span>
                     </div>
-                    <div style={{ ...prose, marginTop: 4 }}>{e.when}</div>
+                    <div className="hn-wh-prose hn-wh-mt4">{e.when}</div>
                   </div>
                 ))}
               </div>
             </div>
           ))}
         </div>
-        <Callout tone="info" title="Satu perubahan = satu peristiwa" style={{ marginTop: 14 }}>
-          <div style={prose}>
+        <Callout tone="info" title="Satu perubahan = satu peristiwa" className="hn-wh-mt14">
+          <div className="hn-wh-prose">
             Peristiwa turunan <b>menggantikan</b>, bukan menambah: perubahan stage backlog dikirim
             sebagai <code>spec.stage_changed</code> dan <b>tidak</b> juga sebagai
             {" "}<code>spec.updated</code>. Berlangganan <code>spec.*</code> tetap menerima keduanya.
@@ -180,13 +174,13 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
       </FoldCard>
 
       <FoldCard eyebrow="amplop" title="Anatomi amplop">
-        <div className="hn-local-overflow" style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+        <div className="hn-local-overflow">
+          <table className="hn-wh-table hn-wh-table--full">
             <tbody>
               {ENVELOPE_FIELDS.map(([k, v]) => (
-                <tr key={k} style={{ borderTop: "1px solid var(--border-hair)" }}>
-                  <td style={{ padding: "6px 8px", fontFamily: "var(--font-mono)", whiteSpace: "nowrap", verticalAlign: "top" }}>{k}</td>
-                  <td style={{ padding: "6px 8px", color: "var(--text-muted)" }}>{v}</td>
+                <tr key={k} className="hn-wh-tr">
+                  <td className="hn-wh-cell hn-wh-cell--mono hn-wh-cell--nowrap hn-wh-cell--top">{k}</td>
+                  <td className="hn-wh-cell hn-wh-cell--muted">{v}</td>
                 </tr>
               ))}
             </tbody>
@@ -195,15 +189,15 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
       </FoldCard>
 
       <FoldCard eyebrow="contoh" title="Contoh payload per jenis">
-        <div style={{ ...prose, marginBottom: 10 }}>
+        <div className="hn-wh-prose hn-wh-mb10">
           Contoh di bawah dibangun dari katalog yang sama dengan pengirimnya — bukan salinan yang
-          bisa basi. Salin salah satunya sebagai fixture test penerima Anda.
+          bisa jadi data lama. Salin salah satunya sebagai fixture test penerima Anda.
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="hn-wh-col-16">
           {WEBHOOK_EVENTS.map((e) => (
             <div key={e.type}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <code style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: 600 }}>{e.type}</code>
+              <div className="hn-wh-type-head">
+                <code className="hn-wh-type">{e.type}</code>
               </div>
               <Copyable text={JSON.stringify(sampleEnvelope(e.type), null, 2)}
                 label={`Salin contoh ${e.type}`} />
@@ -213,15 +207,15 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
       </FoldCard>
 
       <FoldCard eyebrow="keamanan" title="Header dan verifikasi tanda tangan">
-        <div style={prose}>
+        <div className="hn-wh-prose">
           Setiap permintaan membawa header berikut:
         </div>
-        <ul style={{ ...prose, paddingLeft: 20 }}>
+        <ul className="hn-wh-prose hn-wh-list">
           {Object.values(WEBHOOK_HEADERS).map((h) => (
-            <li key={h}><code style={{ fontFamily: "var(--font-mono)" }}>{h}</code></li>
+            <li key={h}><code className="hn-wh-mono">{h}</code></li>
           ))}
         </ul>
-        <div style={prose}>
+        <div className="hn-wh-prose">
           Tanda tangannya <code>v1=</code> diikuti HMAC-SHA256 heksadesimal atas string
           {" "}<code>{"<timestamp>.<raw body>"}</code> memakai secret endpoint. <b>Verifikasi atas
           byte mentah</b>, bukan hasil <code>JSON.parse</code> lalu <code>stringify</code> —
@@ -229,29 +223,29 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
           dengan perbandingan waktu-tetap, dan tolak permintaan yang timestamp-nya menyimpang lebih
           dari <b>{WEBHOOK_TOLERANCE_SEC} detik</b> supaya kiriman lama tak bisa diputar ulang.
         </div>
-        <div style={{ marginTop: 12 }}><Copyable text={NODE_SNIPPET} label="Salin contoh Node.js" /></div>
-        <div style={{ marginTop: 12 }}><Copyable text={PY_SNIPPET} label="Salin contoh Python" /></div>
+        <div className="hn-wh-mt12"><Copyable text={NODE_SNIPPET} label="Salin contoh Node.js" /></div>
+        <div className="hn-wh-mt12"><Copyable text={PY_SNIPPET} label="Salin contoh Python" /></div>
       </FoldCard>
 
-      <FoldCard eyebrow="pengiriman" title="Retry, pengiriman ganda, dan idempotensi">
-        <div style={prose}>
+      <FoldCard eyebrow="pengiriman" title="Kirim ulang, pengiriman ganda, dan idempotensi">
+        <div className="hn-wh-prose">
           Pengiriman berjalan lewat antrean, jadi penerima yang lambat tak pernah memperlambat
           hanoman. Pengiriman gagal diulang sampai <b>{WEBHOOK_MAX_ATTEMPTS} percobaan</b> dengan
           jeda berikut:
         </div>
-        <div className="hn-local-overflow" style={{ overflowX: "auto", marginTop: 8 }}>
-          <table style={{ borderCollapse: "collapse", fontSize: 12.5 }}>
+        <div className="hn-local-overflow hn-wh-mt8">
+          <table className="hn-wh-table">
             <tbody>
               <tr>
-                <td style={{ padding: "4px 10px", color: "var(--text-muted)" }}>Percobaan</td>
+                <td className="hn-wh-cell--tight hn-wh-cell--muted">Percobaan</td>
                 {WEBHOOK_BACKOFF_SEC.map((_, i) => (
-                  <td key={i} style={{ padding: "4px 10px", fontFamily: "var(--font-mono)" }}>{i + 1}</td>
+                  <td key={i} className="hn-wh-cell--tight hn-wh-cell--mono">{i + 1}</td>
                 ))}
               </tr>
-              <tr style={{ borderTop: "1px solid var(--border-hair)" }}>
-                <td style={{ padding: "4px 10px", color: "var(--text-muted)" }}>Jeda sebelumnya</td>
+              <tr className="hn-wh-tr">
+                <td className="hn-wh-cell--tight hn-wh-cell--muted">Jeda sebelumnya</td>
                 {WEBHOOK_BACKOFF_SEC.map((s, i) => (
-                  <td key={i} style={{ padding: "4px 10px", fontFamily: "var(--font-mono)" }}>
+                  <td key={i} className="hn-wh-cell--tight hn-wh-cell--mono">
                     {s === 0 ? "—" : s < 60 ? `${s} dtk` : s < 3600 ? `${s / 60} mnt` : `${s / 3600} jam`}
                   </td>
                 ))}
@@ -259,17 +253,17 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
             </tbody>
           </table>
         </div>
-        <Callout tone="warn" title="Penerima WAJIB idempoten" style={{ marginTop: 12 }}>
-          <div style={prose}>
-            Kontraknya <b>at-least-once</b>: satu peristiwa bisa tiba lebih dari sekali — retry
+        <Callout tone="warn" title="Penerima WAJIB idempoten" className="hn-wh-mt12">
+          <div className="hn-wh-prose">
+            Kontraknya <b>at-least-once</b>: satu peristiwa bisa tiba lebih dari sekali — kirim ulang
             setelah jaringan putus di tengah, atau setelah hanoman di-restart saat pengiriman sedang
-            berjalan. Retry mengirim <b>byte yang persis sama</b>, jadi <code>id</code> peristiwanya
+            berjalan. Kirim ulang mengirim <b>byte yang persis sama</b>, jadi <code>id</code> peristiwanya
             tetap. Simpan <code>id</code> yang sudah Anda proses dan abaikan kembarannya. Urutan
             kedatangan juga tak dijamin — jangan menyimpulkan urutan dari urutan tiba; pakai
             {" "}<code>createdAt</code>.
           </div>
         </Callout>
-        <div style={{ ...prose, marginTop: 10 }}>
+        <div className="hn-wh-prose hn-wh-mt10">
           Balas <b>2xx</b> secepat mungkin lalu kerjakan yang berat di latar; hanoman menutup
           koneksi setelah 10 detik dan menghitungnya sebagai gagal. Balasan <b>410 Gone</b>
           {" "}menonaktifkan endpoint seketika — pakai itu bila penerima memang pensiun.
@@ -279,7 +273,7 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
       </FoldCard>
 
       <FoldCard eyebrow="batas" title="Batas ukuran, laju, dan antrean">
-        <div style={prose}>
+        <div className="hn-wh-prose">
           Amplop dibatasi <b>{Math.round(WEBHOOK_MAX_BYTES / 1024)} KiB</b>. Yang melewatinya
           dipangkas bertahap — field teks panjang dipotong lebih dulu, lalu <code>data.before</code>
           {" "}dibuang seluruhnya — dan hasilnya ditandai <code>truncated: true</code> dengan daftar
@@ -292,15 +286,15 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
       </FoldCard>
 
       <FoldCard eyebrow="keamanan" title="Yang kami jaga, dan yang tetap jadi tanggung jawab Anda">
-        <div style={prose}>
+        <div className="hn-wh-prose">
           Secret setiap endpoint disimpan terenkripsi dan <b>tak pernah</b> dikembalikan utuh oleh
           API — ia ditampilkan sekali saat dibuat atau dirotasi. Payload hanya memuat field yang
           didaftarkan katalog, jadi token, kredensial, dan isi rahasia tak pernah ikut. URL tujuan
           wajib <code>http</code>/<code>https</code> tanpa kredensial di dalamnya, dan alamat
           internal/loopback ditolak kecuali Anda mengizinkannya secara eksplisit per endpoint.
         </div>
-        <Callout tone="warn" title="Batas yang jujur" style={{ marginTop: 10 }}>
-          <div style={prose}>
+        <Callout tone="warn" title="Batas yang jujur" className="hn-wh-mt10">
+          <div className="hn-wh-prose">
             Pemeriksaan alamat dijalankan ulang pada <b>setiap</b> percobaan kirim, tapi selalu ada
             jeda antara memeriksa DNS dan menyambung — DNS rebinding karena itu dipersempit,
             <b> tidak ditutup</b>. Jangan mendaftarkan penerima di jaringan yang tak Anda percayai,
@@ -310,18 +304,18 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
       </FoldCard>
 
       <FoldCard eyebrow="panduan" title="Membuat penerima webhook pertama Anda">
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="hn-wh-col-12">
           <div>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>Langkah 1 — jalankan penerima</div>
-            <div style={prose}>
+            <div className="hn-wh-step">Langkah 1 — jalankan penerima</div>
+            <div className="hn-wh-prose">
               Salin potongan Node.js atau Python di atas ke berkas baru, isi
               {" "}<code>HANOMAN_WEBHOOK_SECRET</code> dengan nilai apa pun untuk sementara, lalu
               jalankan. Cukup satu route yang membalas 2xx.
             </div>
           </div>
           <div>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>Langkah 2 — buat URL-nya bisa dijangkau</div>
-            <div style={prose}>
+            <div className="hn-wh-step">Langkah 2 — buat URL-nya bisa dijangkau</div>
+            <div className="hn-wh-prose">
               Kalau penerima berjalan di mesin yang sama dengan hanoman, pakai
               {" "}<code>http://127.0.0.1:&lt;port&gt;</code> dan nyalakan
               {" "}<b>Izinkan alamat internal</b> pada endpoint. Kalau di tempat lain, pastikan
@@ -329,8 +323,8 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
             </div>
           </div>
           <div>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>Langkah 3 — daftarkan endpoint</div>
-            <div style={prose}>
+            <div className="hn-wh-step">Langkah 3 — daftarkan endpoint</div>
+            <div className="hn-wh-prose">
               Kembali ke daftar endpoint → <b>Tambah endpoint</b>. Isi nama dan URL, pilih peristiwa
               (mulailah dengan <b>Semua peristiwa</b>), simpan. <b>Salin secret yang muncul</b> —
               ia tak ditampilkan lagi — lalu pasang sebagai <code>HANOMAN_WEBHOOK_SECRET</code> di
@@ -338,8 +332,8 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
             </div>
           </div>
           <div>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>Langkah 4 — tekan Test, lalu buktikan</div>
-            <div style={prose}>
+            <div className="hn-wh-step">Langkah 4 — tekan Test, lalu buktikan</div>
+            <div className="hn-wh-prose">
               Tombol <b>Test</b> mengirim satu <code>webhook.ping</code>. Yang benar: penerima
               memverifikasi tanda tangan dan hanoman menampilkan <code>HTTP 200</code>. Bila gagal,
               pesannya ditampilkan apa adanya. Sesudah itu ubah sesuatu di backlog dan buka

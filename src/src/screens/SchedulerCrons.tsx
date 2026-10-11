@@ -6,10 +6,9 @@
    Jalankan sekarang · Riwayat · Hapus lewat konfirmasi). Form memakai dua tab: Dasar (nama, jadwal, prompt)
    dan Lanjutan (runtime, model, effort). Pilihan lanjutan baru terlihat setelah tab-nya dibuka.
 
-   Zona waktu (ADR-0204): semua INSTAN dari server (jalan berikutnya, terakhir, riwayat) ditampilkan dalam
-   zona server `timeZone`. Preview "jalan berikutnya" di FORM dihitung lokal lewat `nextRunFor`, dan fungsi itu
-   tak menerima zona. Karena itu preview hanya tampil bila zona browser sama dengan zona server; selain itu
-   hanya label zona yang tampil, dan kalimat di form menjelaskan batasnya. */
+   Zona waktu (ADR-0204, ADR-0212): semua INSTAN dari server (jalan berikutnya, terakhir, riwayat) dan
+   preview "jalan berikutnya" di FORM dihitung dalam zona server `timeZone`. Preview memakai
+   `nextRunFor(expr, now, zone)`, jadi tampil akurat walau zona browser berbeda. */
 import React from "react";
 import {
   Badge, Button, Select, Input, Switch, Modal, Field, HnTextarea, Pager, serverPage, LocalOverflow, OverflowActions,
@@ -132,9 +131,9 @@ export type SchedulerCronsProps = {
 
 export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }: SchedulerCronsProps) {
   const { confirm, dialog } = useConfirm();
-  const browserZone = browserTimeZone();
-  const zone = timeZone ?? browserZone;
-  const sameZone = timeZone === undefined || timeZone === browserZone;
+  // Zona server dipakai untuk SEMUA jam (instan dan preview). Browser hanya cadangan bila server belum
+  // melaporkan zonanya (state lama tanpa `serverTimeZone`).
+  const zone = timeZone ?? browserTimeZone();
   const at: At = (iso) => fmtAt(iso, zone);
   // SPEC-740 · ADR-0115 · project yang dipilih & seksi riwayat yang ter-expand bertahan.
   const [projectId, setProjectId] = usePersistedState("scheduler", "cronProject", projects[0]?.id ?? "", isStr);
@@ -163,8 +162,8 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
 
   const expr = exprOf(draft);
   const validExpr = parseCron(expr) !== null;
-  // Preview hanya bila zona browser = zona server; fungsi `nextRunFor` tak punya parameter zona.
-  const preview = sameZone && validExpr ? nextRunFor(expr, new Date()) : null;
+  // ADR-0212: preview dihitung dalam zona server, bukan zona browser.
+  const preview = validExpr ? nextRunFor(expr, new Date(), zone) : null;
 
   const save = async () => {
     if (!validExpr) { onToast("Ekspresi cron tidak sah", "err", "x-circle"); return; }
@@ -244,11 +243,9 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
 
   const previewText = !validExpr
     ? "Jadwal tidak sah, jadi tidak ada jalan berikutnya."
-    : !sameZone
-      ? `Preview belum bisa dihitung untuk zona server ${zone} dari browser ini (zona browser: ${browserZone}). Jam jalan berikutnya tampil di daftar cron.`
-      : preview
-        ? `Perkiraan jalan berikutnya: ${at(preview.toISOString())}`
-        : "Jadwal tidak sah, jadi tidak ada jalan berikutnya.";
+    : preview
+      ? `Perkiraan jalan berikutnya: ${at(preview.toISOString())}`
+      : `Preview belum bisa dihitung untuk zona ${zone}. Jam jalan berikutnya tampil di daftar cron.`;
 
   return (
     <div className="hn-sched-panel">
@@ -387,7 +384,7 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
               </Field>
             )}
 
-            <p data-testid="cron-next-preview" className={`hn-sched-note${validExpr && sameZone ? "" : " hn-sched-preview-warn"}`}>
+            <p data-testid="cron-next-preview" className={`hn-sched-note${preview ? "" : " hn-sched-preview-warn"}`}>
               {previewText}
             </p>
             <p className="hn-sched-note">Jadwal berlaku menurut zona waktu server <b>{zone}</b>.</p>

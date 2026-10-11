@@ -260,9 +260,6 @@
   color: var(--text-subtle);
   margin-right: var(--space-2);
 }
-.hn-set-danger-text {
-  color: var(--clay-600);
-}
 .hn-set-result {
   display: grid;
   gap: var(--space-2);

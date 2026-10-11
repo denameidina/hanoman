@@ -439,3 +439,686 @@
     transition: none;
   }
 }
+
+/* ── Inline → kelas (Audit UI/UX 2026-10 · Fase 2E, Z1) ─────────────────────────────────────────
+   Semua nilai statis TerminalScreen, SessionHistoryModal, dan NewTerminalModal pindah ke sini.
+   Yang tetap inline hanya nilai dinamis, lewat CSS variable: --grid-cols/--grid-rows (track grid),
+   --cell-col/--cell-row (sel), --grid-col/--grid-row (gutter dan divider), dan --group-box (ukuran
+   kontrol grup, 24px atau 44px pada pointer kasar). Selector tombol diawali konteks induknya
+   (`.hn-terminal-groups button.x`) supaya menang atas aturan `button` generik di app.css
+   (`button:not(…)`, `.hn-shell button`), yang dulu dikalahkan inline. */
+
+/* Popover "Tampilan terminal". `.hn-dense-row` di ponsel memakai align-items !important (app.css),
+   jadi baris ini tak perlu melawannya. */
+.hn-terminal-display {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.hn-terminal-display-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hn-terminal-display-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.hn-terminal-display-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  min-width: 44px;
+  text-align: center;
+}
+
+.hn-terminal-sr-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.hn-terminal-diag {
+  border-top: 1px solid var(--border-hair);
+  padding-top: 8px;
+}
+
+.hn-terminal-diag-summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.hn-terminal-diag-row {
+  margin-top: 8px;
+}
+
+/* Notifikasi di dalam layar terminal: jarak bawah 12px (default) atau 8px (daftar sesi). */
+.hn-terminal-notice {
+  margin-bottom: 12px;
+}
+
+.hn-terminal-notice--tight {
+  margin-bottom: 8px;
+}
+
+/* Sesi yang belum di grid. */
+.hn-terminal-unplaced {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hn-terminal-unplaced-label {
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.hn-terminal-unplaced-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--bone-200);
+  border: 1px solid var(--border-hair);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* Tombol nama di dalam chip: reset penuh, seperti inline `all: unset` dulu. Selector dua tingkat
+   supaya menang atas `button:focus-visible` (app.css) yang juga dulu dikalahkan inline. */
+.hn-terminal-unplaced-chip > .hn-terminal-unplaced-action {
+  all: unset;
+  cursor: pointer;
+}
+
+/* Baris tab mode tunggal (ketika ada satu panel di layar kecil). */
+.hn-terminal-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Grid multi-pane. Track dikirim lewat --grid-cols/--grid-rows dari state. */
+.hn-terminal-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: var(--grid-cols);
+  grid-template-rows: var(--grid-rows);
+}
+
+.hn-terminal-grid-corner {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+/* Sel grid: posisi lewat --cell-col/--cell-row (auto di mode fokus/ponsel). */
+.hn-terminal-cell-slot {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  grid-column: var(--cell-col);
+  grid-row: var(--cell-row);
+}
+
+.hn-terminal-cell-slot.is-hidden {
+  display: none;
+}
+
+/* Gutter tutup kolom/baris. Selector `button.` menang atas `.hn-terminal-gutter { font: inherit }`
+   di app.css, dan `font-size` di sini mengikuti perilaku inline lama (11px, line-height 1). */
+button.hn-terminal-gutter {
+  position: relative;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 1;
+  cursor: pointer;
+  grid-column: var(--grid-col);
+  grid-row: var(--grid-row);
+}
+
+button.hn-terminal-gutter:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Divider antar-track: posisi lewat --grid-col/--grid-row. */
+.hn-terminal-divider {
+  grid-column: var(--grid-col);
+  grid-row: var(--grid-row);
+}
+
+/* Grup terminal (tab): baris kontrol dan tabnya. `--group-box` datang dari container. */
+.hn-terminal-groups {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.hn-terminal-groups.is-bordered {
+  border-bottom: 1px solid var(--border-hair);
+  padding-bottom: 4px;
+}
+
+.hn-terminal-groups-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.hn-terminal-groups-actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* `font: inherit` datang SETELAH font-size 12px di objek inline lama, jadi yang berlaku adalah
+   inherit: sengaja tak ada font-size di sini. */
+.hn-terminal-groups button.hn-terminal-group-tab {
+  min-height: var(--group-box);
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.hn-terminal-groups button.hn-terminal-group-tab[aria-selected="true"] {
+  background: var(--bone-200);
+  border-color: var(--border-hair);
+  color: var(--text-strong);
+}
+
+.hn-terminal-groups button.hn-terminal-group-action {
+  min-width: var(--group-box);
+  min-height: var(--group-box);
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-subtle);
+  font: inherit;
+  cursor: pointer;
+}
+
+.hn-terminal-groups button.hn-terminal-group-add {
+  padding: 0 8px;
+}
+
+.hn-terminal-groups button.hn-terminal-group-remove:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.hn-terminal-groups button.hn-terminal-group-add:disabled {
+  opacity: 0.5;
+}
+
+/* Input nama grup saat diganti nama. */
+.hn-terminal-rename {
+  width: min(160px, 60vw);
+  padding: 3px 6px;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  color: var(--text-strong);
+}
+
+/* Lebar penuh untuk pemilih di form Sesi baru. */
+.hn-terminal-field-full {
+  width: 100%;
+}
+
+/* Form Sesi baru: pengantar dan catatan kompatibilitas Codex. */
+.hn-terminal-intro {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.hn-terminal-codex-note {
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--status-warn-tint);
+  color: var(--text-muted);
+}
+
+/* Strip fase. Warna nama fase lewat data-state (aturan lama dipetakan 1:1 di bawah). */
+.hn-terminal-phase {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--border-hair);
+}
+
+.hn-terminal-phase-scroller {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.hn-terminal-phase-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  color: var(--text-body);
+  cursor: pointer;
+}
+
+.hn-terminal-phase-name {
+  font-weight: 400;
+  text-decoration: none;
+  opacity: 1;
+}
+
+.hn-terminal-phase-name[data-state="done"] { color: var(--brass); }
+.hn-terminal-phase-name[data-state="active"] { color: var(--text-strong); font-weight: 600; }
+.hn-terminal-phase-name[data-state="skipped"] { color: var(--text-subtle); text-decoration: line-through; }
+.hn-terminal-phase-name[data-state="pending"] { color: var(--text-subtle); opacity: 0.5; }
+
+.hn-terminal-phase-warn {
+  color: var(--status-warn);
+}
+
+/* Panel detail fase. Tanpa `top`: ia jatuh ke posisi statisnya di bawah baris chip. */
+.hn-terminal-phase-panel {
+  position: absolute;
+  margin-left: 8px;
+  z-index: 5;
+  min-width: 220px;
+  max-width: min(420px, calc(100% - 16px));
+  max-height: calc(100% - 48px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+  white-space: normal;
+  line-height: 1.5;
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.hn-terminal-phase-excerpt {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  max-height: 160px;
+  overflow: auto;
+}
+
+/* Kepala sel. Latar mengikuti prioritas status (gagal > selesai > perlu perhatian > netral). */
+.hn-terminal-cell-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  flex: 0 0 auto;
+  background: var(--bone-200);
+  border-bottom: 1px solid var(--border-hair);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-body);
+}
+
+.hn-terminal-cell-header.is-exited {
+  color: var(--text-muted);
+}
+
+.hn-terminal-cell-header[data-cell-tone="failed"] { background: var(--status-err-tint); }
+.hn-terminal-cell-header[data-cell-tone="done"] { background: var(--status-ok-tint); }
+.hn-terminal-cell-header[data-cell-tone="attention"] { background: var(--status-warn-tint); }
+
+/* Pembungkus ilustrasi status: lebar 34px ada di sini, bukan di <img> (yang punya width:100%
+   inline dari komponen Illustration dan akan menang atas kelas). */
+.hn-terminal-cell-illus {
+  display: block;
+  width: 34px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.hn-terminal-cell-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hn-terminal-orch {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.hn-terminal-cell-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.hn-terminal-cell-pane {
+  flex: 1;
+  min-height: 0;
+}
+
+.hn-terminal-cell-fullscreen {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  color: var(--text-subtle);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Banner sesi berakhir. */
+.hn-terminal-ended {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  background: var(--bone-200);
+  border-bottom: 1px solid var(--border-hair);
+  font-size: 11px;
+  color: var(--text-strong);
+}
+
+.hn-terminal-ended-title {
+  font-weight: 600;
+}
+
+.hn-terminal-ended-body {
+  color: var(--text-body);
+}
+
+.hn-terminal-fullscreen-body {
+  height: min(72vh, calc(100dvh - 180px));
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.hn-terminal-empty-cell {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+}
+
+/* Akar layar terminal. Mode maximize (layar penuh) menimpa tata letak biasa lewat `.is-maxed`. */
+.hn-terminal-screen {
+  flex: 1 1 0;
+  min-height: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hn-terminal-screen.is-maxed {
+  flex: 0 1 auto;
+  min-height: auto;
+  gap: 8px;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--surface-page);
+  padding-top: max(12px, var(--safe-top));
+  padding-right: max(12px, var(--safe-right));
+  padding-bottom: max(12px, var(--safe-bottom));
+  padding-left: max(12px, var(--safe-left));
+}
+
+/* Modal "Ambil backlog". */
+.hn-terminal-pick-notice {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--clay-100);
+  color: var(--clay-600);
+  font-size: 12px;
+}
+
+.hn-terminal-pick-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+/* Kotak cari (Input DS): lebar lentur sendiri, membungkus ke barisnya bila sempit. */
+.hn-terminal-pick-search {
+  flex: 1 1 220px;
+}
+
+.hn-terminal-pick-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+/* Baris klik = button. `flex: 0 0 auto` wajib: daftarnya flex-column ber-maxHeight. */
+.hn-terminal-pick-row {
+  display: block;
+  width: 100%;
+  flex: 0 0 auto;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  padding: 9px 8px;
+  border: none;
+  border-bottom: 1px solid var(--border-hair);
+  cursor: pointer;
+}
+
+.hn-terminal-pick-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.hn-terminal-pick-id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-subtle);
+  flex: 0 0 78px;
+}
+
+.hn-terminal-pick-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hn-terminal-pick-project {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+/* Modal "Riwayat sesi" (SessionHistoryModal). */
+.hn-terminal-hist-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.hn-terminal-hist-search {
+  flex: 1 1 200px;
+}
+
+.hn-terminal-hist-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.hn-terminal-hist-row {
+  display: block;
+  width: 100%;
+  flex: 0 0 auto;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  padding: 9px 8px;
+  border: none;
+  border-bottom: 1px solid var(--border-hair);
+  cursor: pointer;
+}
+
+.hn-terminal-hist-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.hn-terminal-hist-when {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-subtle);
+  flex: 0 0 132px;
+}
+
+.hn-terminal-hist-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hn-terminal-hist-duration {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  flex: 0 0 72px;
+}
+
+.hn-terminal-hist-loading {
+  padding: 10px 8px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-subtle);
+}
+
+.hn-terminal-hist-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.hn-terminal-hist-spacer {
+  flex: 1;
+}
+
+.hn-terminal-hist-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.hn-terminal-hist-key {
+  color: var(--text-subtle);
+}
+
+.hn-terminal-hist-val {
+  font-family: var(--font-mono);
+  color: var(--text-body);
+  word-break: break-all;
+}
+
+.hn-terminal-hist-note {
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+.hn-terminal-hist-copy {
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+}
+
+.hn-terminal-hist-copy.is-err {
+  color: var(--clay-600);
+}
+
+.hn-terminal-hist-error {
+  font-size: 12px;
+  color: var(--clay-600);
+}
+
+.hn-terminal-hist-pre {
+  max-height: 52vh;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  background: var(--bone-200);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-body);
+}

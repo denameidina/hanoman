@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { UpdateStatus } from "@hanoman/shared";
@@ -137,5 +139,13 @@ describe("Mulai ulang hanoman (manual)", () => {
     await open();
     expect(await screen.findByText(/belum kembali/i)).toBeTruthy();
     expect(reloadSpy).not.toHaveBeenCalled();
+  });
+});
+
+// Anggaran gaya inline (Z3): layout lewat kelas `hn-upd-*` di panels.css.
+describe("UpdateIndicator · layout", () => {
+  it("gaya inline tinggal ≤ 4", () => {
+    const src = readFileSync(resolve(import.meta.dirname, "../src/screens/UpdateIndicator.tsx"), "utf8");
+    expect((src.match(/style=\{\{/g) ?? []).length).toBeLessThanOrEqual(4);
   });
 });

@@ -85,3 +85,105 @@
   .hn-tm-switches { align-items: stretch; }
   .hn-tm-card-foot { align-items: center; }
 }
+
+/* ── Linimasa (SPEC-948/949) · kelas `hn-tl-*`. Nilai yang berubah per render hidup sebagai CSS var
+   yang diset sekali di akar kanvas (`.hn-tl`) dan diwarisi turunannya: --tl-label-w (kolom label),
+   --tl-cell (lebar satu tick), --tl-ticks (jumlah tick), --tl-track-w (lebar trek), --tl-canvas-w
+   (lebar kanvas utuh). Per batang: --tl-left, --tl-width. Garis hari ini: --tl-today-x.
+   Aturan TOMBOL memakai konteks `.hn-tl` karena `.hn-shell button` dan `button:not(...)` di app.css
+   (spesifisitas 0,1,1) memberi min-height/min-width 44 px di layar sentuh. `.hn-tl button.hn-tl-*`
+   (0,2,1) mengalahkannya, sama seperti inline dulu. Konstanta TSX: ROW_H 34, BAR_INSET 6. */
+.hn-tl-scroll { flex: 1 1 auto; min-height: 0; min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: auto; }
+.hn-tl { position: relative; width: var(--tl-canvas-w); min-width: var(--tl-canvas-w); }
+.hn-tl-head {
+  display: flex; position: sticky; top: 0; z-index: 2;
+  background: var(--bone-100); border-bottom: 1px solid var(--border-hair);
+}
+.hn-tl-label {
+  position: sticky; left: 0; z-index: 1; flex: 0 0 var(--tl-label-w); width: var(--tl-label-w);
+  box-sizing: border-box; padding: 5px 10px; min-width: 0;
+  background: var(--surface-card); border-right: 1px solid var(--border-hair);
+}
+/* Kolom label di header tetap sticky, dan warnanya bone (bukan card) agar tak tembus saat digulir. */
+.hn-tl-head .hn-tl-label { z-index: 3; background: var(--bone-100); }
+.hn-tl-ticks {
+  display: grid; grid-template-columns: repeat(var(--tl-ticks), var(--tl-cell));
+  width: var(--tl-track-w); flex: 0 0 var(--tl-track-w);
+}
+.hn-tl-tick {
+  border-left: 1px solid var(--border-hair); padding: 5px 4px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-subtle);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-tl-tick[data-major="true"] { border-left-color: var(--border-strong); color: var(--text-body); }
+.hn-tl-row { display: flex; border-bottom: 1px solid var(--border-hair); }
+.hn-tl-label-text {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; font-weight: var(--weight-medium); color: var(--text-strong);
+}
+.hn-tl-label-meta {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10px; color: var(--text-subtle);
+}
+.hn-tl-track {
+  position: relative; width: var(--tl-track-w); height: 34px; flex: 0 0 var(--tl-track-w);
+  background-image: repeating-linear-gradient(to right, var(--border-hair) 0 1px, transparent 1px var(--tl-cell));
+}
+/* Batang: posisi dan lebar dari CSS var per batang. Nada lewat atribut `data-tone`. */
+.hn-tl-bar {
+  position: absolute; top: 6px; left: var(--tl-left); width: var(--tl-width);
+  height: 22px; min-width: 3px; min-height: 22px; display: flex; align-items: center; padding: 0; overflow: hidden;
+  cursor: default; border: 1px solid var(--border-hair); border-radius: var(--radius-sm);
+}
+.hn-tl button.hn-tl-bar { min-width: 3px; min-height: 22px; cursor: pointer; }
+.hn-tl-bar[data-clipped-start="true"] { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.hn-tl-bar[data-clipped-end="true"] { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.hn-tl-bar[data-tone="brass"], .hn-tl-swatch[data-tone="brass"] { background: var(--brass-300); border-color: var(--brass-500); }
+.hn-tl-bar[data-tone="err"], .hn-tl-swatch[data-tone="err"] { background: var(--status-err-tint); border-color: var(--status-err); }
+.hn-tl-bar[data-tone="muted"], .hn-tl-swatch[data-tone="muted"] { background: var(--bone-300); border-color: var(--border-strong); }
+.hn-tl-bar[data-tone="envelope"], .hn-tl-swatch[data-tone="envelope"] { background: var(--bone-200); border-color: var(--border-hair); }
+.hn-tl-today {
+  position: absolute; top: 0; bottom: 0; left: var(--tl-today-x); width: 2px; pointer-events: none;
+  background: var(--brass-500); opacity: 0.5;
+}
+.hn-tl-empty {
+  position: sticky; left: 0; width: var(--tl-label-w); padding: 18px 10px;
+  font-size: var(--text-xs); color: var(--text-muted);
+}
+/* Legenda. Swatch menerima warnanya dari nada yang sama dengan batang. */
+.hn-tl-legend {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 0 0 8px; padding: 0;
+  font-size: var(--text-xs); color: var(--text-muted);
+}
+.hn-tl-legend-item { display: flex; align-items: center; gap: 6px; }
+.hn-tl-swatch {
+  display: inline-block; width: 14px; height: 9px; border-radius: 2px; border: 1px solid transparent;
+}
+/* Baris project (mode lintas project): tombol pembuka tak boleh setinggi tombol sentuh (44 px) di baris 34 px. */
+.hn-tl button.hn-tl-expand { min-height: 0; }
+.hn-tl-expand {
+  display: flex; align-items: center; gap: 5px; width: 100%; padding: 0;
+  background: none; border: none; cursor: pointer; text-align: left;
+  font-family: var(--font-ui); font-size: 12px; font-weight: var(--weight-medium); color: var(--text-strong);
+}
+.hn-tl-expand-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hn-tl-expand-count { font-family: var(--font-mono); font-size: 10px; color: var(--text-subtle); }
+.hn-tl-child {
+  display: block; padding-left: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Daftar di bawah kanvas: "Belum dijadwalkan" dan "Di luar jendela", serta catatan plafon. */
+.hn-tl-aside {
+  flex: 0 0 auto; margin-top: 10px; padding: 10px;
+  background: var(--bone-100); border: 1px solid var(--border-hair); border-radius: var(--radius-lg);
+}
+.hn-tl-aside-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+.hn-tl-aside-hint { font-size: var(--text-xs); color: var(--text-muted); }
+.hn-tl-aside-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.hn-tl-chip {
+  padding: 3px 10px; background: var(--surface-card); border: 1px solid var(--border-hair);
+  border-radius: var(--radius-pill); font-family: var(--font-ui); font-size: 12px;
+  color: var(--text-body); cursor: pointer;
+}
+.hn-tl-note {
+  flex: 0 0 auto; margin-top: 8px; font-size: var(--text-xs); color: var(--status-warn);
+}

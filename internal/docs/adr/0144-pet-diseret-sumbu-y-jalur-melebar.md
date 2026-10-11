@@ -1,5 +1,10 @@
 # ADR-0144 — Pet yang diseret: sumbu Y di jalur pet, tiga mode fisika di mesin murni, dan jalur yang melebar hanya selagi terangkat
 
+> **Sebagian digantikan oleh [ADR-0206](0206-pet-footer-sidebar-default-per-tier.md)** (2026-10-11). Keputusan 4
+> (jalur `position: fixed` yang melebar ke `--safe-top` selagi `held`/`falling`) dan angka plafon 661 px / 725 px di
+> Konsekuensi tidak berlaku lagi. Jalur kini alur layout: footer sidebar di desktop, lajur di bawah konten di
+> tablet dan ponsel. Keputusan 1–3 dan 5–7 tetap berlaku.
+
 Tanggal: 2026-08-23 · Status: diterima · Sumber: spec `docs/superpowers/specs/2026-08-23-spec-905-pet-diseret-design.md`
 Mengamandemen ADR-0140 keputusan 5 (mesin berkeliaran) dan butir DOM-nya (kepemilikan `transform`);
 menegakkan ADR-0039 (tanpa channel realtime baru), ADR-0024, ADR-0037, dan grammar SPEC-648

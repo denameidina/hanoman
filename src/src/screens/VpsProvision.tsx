@@ -13,8 +13,6 @@ import type {
 import { COMPONENT_STATUS_LABEL, labelOf } from "../lib/labels";
 
 const STATUS_LABEL = COMPONENT_STATUS_LABEL;
-const STATUS_COLOR: Record<string, string> = {
-  ok: "var(--leaf-600)", partial: "var(--amber-600)", absent: "var(--text-subtle)" };
 
 // `partial not-logged-in` SELALU berbunyi "belum login": itu satu-satunya kalimat yang jujur
 // tentang biner yang ada tapi belum siap (SPEC-487, marker ≠ bukti).
@@ -36,14 +34,12 @@ const PROFILE_HINT: Record<ProvisionProfile, string> = {
 const STATUS_SHORT: Record<string, string> = {
   ok: "terpasang", partial: "belum siap", absent: "belum ada" };
 
+// Warna dot status lahir dari `data-status` di CSS (`.vps-prov-dot`), sama dengan `STATUS_COLOR`.
 function Chip({ status, children, title }:
   { status: string; children: React.ReactNode; title?: string }) {
-  const color = STATUS_COLOR[status] ?? "var(--text-subtle)";
   return (
-    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 5,
-      fontSize: 11, lineHeight: "18px", color: "var(--text-body)", background: "var(--surface-sunken)",
-      border: "1px solid var(--border-hair)", borderRadius: 999, padding: "0 8px", whiteSpace: "nowrap" }}>
-      <span aria-hidden style={{ width: 6, height: 6, borderRadius: "50%", background: color, flex: "0 0 auto" }} />
+    <span title={title} className="vps-prov-chip">
+      <span aria-hidden className="vps-prov-dot" data-status={status} />
       {children}
     </span>
   );
@@ -54,14 +50,14 @@ export function ComponentBadges({ components, checkedAt }:
   { components: VpsComponents | null; checkedAt: string | null }) {
   // Nol data ≠ nol komponen. Deretan strip akan terbaca sebagai "sudah dicek, semuanya kosong".
   if (!components || !checkedAt) {
-    return <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>Komponen belum diperiksa</span>;
+    return <span className="vps-prov-hint">Komponen belum diperiksa</span>;
   }
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+    <div className="vps-prov-badges">
       {Object.entries(components).map(([id, entry]) => (
         <Chip key={id} status={entry.status}>{badgeText(id, entry)}</Chip>
       ))}
-      <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>
+      <span className="vps-prov-hint">
         diperiksa {new Date(checkedAt).toLocaleString("id-ID")}
       </span>
     </div>
@@ -78,7 +74,7 @@ export function ComponentSummary({ components, checkedAt }:
   { components: VpsComponents | null; checkedAt: string | null }) {
   if (!components || !checkedAt) {
     return (
-      <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>
+      <span className="vps-prov-hint">
         Komponen belum diperiksa — buka detail untuk memeriksa
       </span>
     );
@@ -87,17 +83,16 @@ export function ComponentSummary({ components, checkedAt }:
   const problems = entries.filter(([, e]) => e.status !== "ok");
   const okCount = entries.length - problems.length;
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", minWidth: 0 }}>
+    <div className="vps-prov-summary">
       {/* Meter: satu segmen per komponen, warnanya status. Bentuk keseluruhan terbaca sebelum
           satu kata pun dibaca. */}
-      <span aria-hidden style={{ display: "flex", gap: 2, alignItems: "center" }}>
+      <span aria-hidden className="vps-prov-meter">
         {entries.map(([id, e]) => (
-          <span key={id} style={{ width: 12, height: 4, borderRadius: 2,
-            background: e.status === "absent" ? "var(--border-strong)" : STATUS_COLOR[e.status] }} />
+          <span key={id} className="vps-prov-seg" data-status={e.status} />
         ))}
       </span>
-      <span style={{ fontSize: 11, color: "var(--text-subtle)", whiteSpace: "nowrap" }}>
-        <strong style={{ color: "var(--text-strong)", fontWeight: 600 }}>{okCount}/{entries.length}</strong> terpasang
+      <span className="vps-prov-count">
+        <strong className="vps-prov-count-ok">{okCount}/{entries.length}</strong> terpasang
       </span>
       {problems.map(([id, e]) => (
         <Chip key={id} status={e.status} title={badgeText(id, e)}>
@@ -105,7 +100,7 @@ export function ComponentSummary({ components, checkedAt }:
             ? "belum login" : STATUS_SHORT[e.status] ?? e.status}
         </Chip>
       ))}
-      <span style={{ fontSize: 11, color: "var(--text-subtle)", whiteSpace: "nowrap" }}>
+      <span className="vps-prov-count">
         diperiksa {shortTime(checkedAt)}
       </span>
     </div>
@@ -224,34 +219,34 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
     : [];
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+    <div className="vps-prov">
+      <div className="vps-prov-row">
         <ComponentBadges components={current} checkedAt={checkedAt} />
         <Button size="sm" variant="ghost" onClick={doProbe} disabled={busy !== null}>Periksa</Button>
       </div>
 
-      <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-        <legend style={{ fontSize: 12, fontWeight: 600, color: "var(--text-strong)", marginBottom: 6, padding: 0 }}>Profil</legend>
-        <div style={{ display: "grid", gap: 8 }}>
+      <fieldset className="vps-prov-fieldset">
+        <legend className="vps-prov-legend">Profil</legend>
+        <div className="vps-prov-profiles">
           {(["lab", "production"] as ProvisionProfile[]).map((p) => (
             <div key={p}>
               <Radio aria-label={p} label={p} checked={profile === p} onChange={() => setProfile(p)} />
-              <div style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 24, lineHeight: 1.5 }}>{PROFILE_HINT[p]}</div>
+              <div className="vps-prov-profile-hint">{PROFILE_HINT[p]}</div>
             </div>
           ))}
         </div>
       </fieldset>
 
-      <div style={{ display: "grid", gap: 6 }}>
+      <div className="vps-prov-items">
         {visible.map((c) => {
           // Prasyarat yang ikut tercentang dikunci DENGAN alasan terlihat: checkbox yang mati
           // tanpa penjelasan terbaca seperti bug, bukan seperti keputusan.
           const auto = required.has(c.id) && !picked.has(c.id);
           return (
-            <div key={c.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div key={c.id} className="vps-prov-item">
               <Checkbox aria-label={c.label} label={c.label} checked={required.has(c.id)}
                 disabled={auto} onChange={() => toggle(c.id)} />
-              {auto && <span style={{ fontSize: 10, color: "var(--text-subtle)" }}>prasyarat</span>}
+              {auto && <span className="vps-prov-tag">prasyarat</span>}
             </div>
           );
         })}
@@ -264,27 +259,26 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
         </Field>
       )}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="vps-prov-row">
         <Button variant="ghost" onClick={doPreview} disabled={!canRun || busy !== null}>Pratinjau</Button>
         <Button onClick={doApply} disabled={!canRun || busy !== null}>Pasang</Button>
-        {!canRun && blockReason && <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{blockReason}</span>}
+        {!canRun && blockReason && <span className="vps-prov-reason">{blockReason}</span>}
       </div>
 
       {/* Hasil langkah diumumkan ke pembaca layar dan bisa difokus untuk digulir lewat keyboard. */}
       <div aria-live="polite">
         {steps && (
-          <pre tabIndex={0} aria-label="Hasil langkah provisioning" style={{ fontSize: 11, fontFamily: "var(--font-mono)", maxHeight: 220, overflow: "auto",
-            background: "var(--surface-sunken)", padding: 8, borderRadius: 4 }}>
+          <pre tabIndex={0} aria-label="Hasil langkah provisioning" className="vps-prov-steps">
             {steps.map((s) => `${s.item.padEnd(14)} ${s.status.padEnd(6)} ${s.detail}`).join("\n")}
           </pre>
         )}
       </div>
 
       {setup && (
-        <div style={{ display: "grid", gap: 4, border: "1px solid var(--border-strong)", borderRadius: 4, padding: 8 }}>
-          <strong style={{ fontSize: 12 }}>Buat admin pertama</strong>
-          <a href={setup.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, wordBreak: "break-all" }}>{setup.url}</a>
-          <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>
+        <div className="vps-prov-setup">
+          <strong className="vps-prov-setup-title">Buat admin pertama</strong>
+          <a href={setup.url} target="_blank" rel="noreferrer" className="vps-prov-setup-link">{setup.url}</a>
+          <span className="vps-prov-hint">
             berlaku sampai {new Date(setup.expiresAt).toLocaleTimeString("id-ID")}
           </span>
           <div>
@@ -294,7 +288,7 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
       )}
 
       {pending.length > 0 && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}>
+        <div className="vps-prov-pending">
           <Icon name="alert-triangle" />
           <span>{pending.map(([id]) => id).join(", ")} terpasang tapi belum login.</span>
           <Button size="sm" variant="ghost" onClick={openConsole}>Login lewat Console</Button>

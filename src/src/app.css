@@ -1100,8 +1100,7 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 }
 .hn-filter-chip:focus-visible,
 .hn-filter-trigger:focus-visible,
-.hn-row-main:focus-visible,
-.hn-overflow-item:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.hn-row-main:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 /* RowList / DenseRow · satu pola untuk baris klik (button/a) dan non-klik (div). */
 .hn-row-list { list-style: none; margin: 0; padding: 0; min-width: 0; }
@@ -1154,20 +1153,7 @@ button.hn-row-main { cursor: pointer; }
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
 }
 
-/* OverflowActions · item dialog. Warna dan hover lewat kelas agar `:hover` tetap berlaku. */
-.hn-overflow-item {
-  display: flex; align-items: center; gap: var(--space-3); width: 100%;
-  min-height: var(--touch-target); padding: 8px 10px; text-align: left;
-  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-body);
-  font: var(--weight-medium) var(--text-md)/1.3 var(--font-ui); cursor: pointer;
-}
-.hn-overflow-item:hover:not(:disabled),
-.hn-overflow-item:focus-visible { background: var(--surface-sunken); color: var(--text-strong); }
-.hn-overflow-item:focus-visible { outline-offset: -2px; }
-.hn-overflow-item:disabled { color: var(--text-subtle); opacity: 0.5; cursor: not-allowed; }
-.hn-overflow-item-danger { color: var(--clay-600); }
-.hn-overflow-item-danger:hover:not(:disabled),
-.hn-overflow-item-danger:focus-visible { background: var(--status-err-tint); color: var(--clay-600); }
+/* OverflowActions · item menu (`.hn-overflow-item*`) didefinisikan sekali di ds/components/ui.css. */
 
 /* Tabs · panel tab. Yang tak aktif memakai atribut `hidden` dari DOM. */
 .hn-tabpanel { min-width: 0; }

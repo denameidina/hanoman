@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { attach, detach, __tick, __reset, presenceKey } from "../src/services/events";
 import { prisma } from "../src/db";
-import { resetDb, makeProject, makeSpec } from "./factory";
+import { resetDb, makeProject, makeSpec, makeVps } from "./factory";
 import { sessionPhasesBySpecAsync } from "../src/services/live-phases";
 import { modelCatalogService } from "../src/services/model-catalog";
 import { killAll } from "../src/services/pty";
@@ -86,6 +86,18 @@ describe("events hub", () => {
     await prisma.notification.create({ data: { specId: "SPEC-2", title: "y", projectId: "p1" } });
     await __tick(); await __tick(); await __tick();
     expect(c.frames.length).toBe(n);
+  });
+});
+
+// ADR-0211 · siaran grup `vps` memakai fungsi listing yang sama dengan `GET /vps`: setiap baris
+// membawa `scoreTotal` (null = belum pernah diaudit), bukan baris mentah tanpa skor.
+describe("siaran grup vps membawa skor (ADR-0211)", () => {
+  it("baris yang belum diaudit tampil dengan scoreTotal null, bukan tanpa field", async () => {
+    await makeVps({ name: "ev1", host: "198.51.100.201" });
+    const c = fakeClient();
+    await attach(c);
+    const vf = c.frames.find((f) => f.t === "vps") as { vps: { name: string; scoreTotal?: unknown }[] } | undefined;
+    expect(vf?.vps.find((r) => r.name === "ev1")).toMatchObject({ scoreTotal: null });
   });
 });
 

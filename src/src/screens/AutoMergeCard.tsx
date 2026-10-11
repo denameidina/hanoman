@@ -3,6 +3,7 @@ import { Card, Badge, Button, Select, Checkbox } from "../ds";
 import { AUTO_MERGE_OFF, autoMergeSummary, type AutoMerge } from "@hanoman/shared";
 import { api } from "../api/client";
 import type { ProjectVM } from "./types";
+import "./styles/auto-merge.css";
 
 // SPEC-486 · ADR-0103 · permukaan kebijakan auto-merge per project. Duduk di Settings project
 // (layar yang sama dengan Help Center & Custom agent), bukan di Settings global: kebijakan ini
@@ -57,45 +58,45 @@ export function AutoMergeCard({ p, onToast, onProjectChanged }: {
   return (
     <Card eyebrow="integrasi" title="Auto-merge saat sesi selesai"
       actions={<Button size="sm" leftIcon="check" disabled={busy || !repoDir} onClick={save}>Simpan</Button>}>
-      <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="hn-am-intro">
         Saat sebuah backlog item mencapai <b>Selesai</b>, hanoman menggabungkan branch kerjanya
         (<code>hanoman/&lt;spec&gt;</code>) ke branch tujuan. Merge saja — tak pernah rebase, tak pernah
         force-push. Konflik tidak menghapus apa pun: branch kerja tetap utuh dan kamu dapat notifikasi
         berisi alasannya. Item bisa menimpa setelan ini satu per satu dari Backlog.
       </div>
       {!repoDir && (
-        <div style={{ fontSize: 12.5, color: "var(--status-warn, var(--text-muted))", marginBottom: 12 }}>
+        <div className="hn-am-warn">
           Project ini belum di-bind ke checkout lokal — atur <b>repoDir</b> dulu (Edit project) sebelum
           menyalakan auto-merge.
         </div>
       )}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+      <div className="hn-am-row">
         <Badge tone={stored && stored.mode !== "off" ? "ok" : "neutral"} size="sm">
           {autoMergeSummary(stored ?? AUTO_MERGE_OFF)}
         </Badge>
       </div>
-      <div style={{ display: "grid", gap: 10 }}>
+      <div className="hn-am-grid">
         <div>
-          <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Mode</div>
+          <div className="hn-eyebrow hn-am-label">Mode</div>
           <Select size="sm" aria-label="Mode auto-merge" value={form.mode} disabled={!repoDir}
             onChange={(e) => set("mode")(e.target.value as AutoMerge["mode"])} options={MODE_OPTS} />
         </div>
         {form.mode !== "off" && (
           <div>
-            <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Tujuan</div>
+            <div className="hn-eyebrow hn-am-label">Tujuan</div>
             <Select size="sm" aria-label="Tujuan" value={form.dest} disabled={!repoDir}
               onChange={(e) => set("dest")(e.target.value as AutoMerge["dest"])} options={DEST_OPTS} />
           </div>
         )}
         {form.mode === "default-branch" && (
-          <div style={{ fontSize: 12.5, color: "var(--text-subtle)" }}>
+          <div className="hn-am-note">
             Default branch repo saat ini: <b>{branches.def ?? "— tak terbaca"}</b>. Diresolve ulang tiap
             kali auto-merge berjalan, jadi mengganti default branch repo berlaku di run berikutnya.
           </div>
         )}
         {form.mode === "branch" && (
           <div>
-            <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Branch tujuan</div>
+            <div className="hn-eyebrow hn-am-label">Branch tujuan</div>
             <Select size="sm" aria-label="Branch tujuan" value={form.branch ?? ""} disabled={!repoDir || !pick.length}
               onChange={(e) => set("branch")(e.target.value || null)}
               options={[{ value: "", label: "Pilih branch…" }, ...pick.map((b) => ({ value: b, label: b }))]} />

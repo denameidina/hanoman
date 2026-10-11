@@ -6,6 +6,7 @@ import { useModelCatalog } from "./api/model-catalog";
 import { coerceClaudeEffort, zLaunchRejection, type LaunchRejection } from "@hanoman/shared";
 import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
 import { parseRoute, routePath } from "./routes";
+import { STAGE_LABEL } from "./lib/labels";
 import { LazyBoundary } from "./ds/LazyBoundary";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
@@ -295,15 +296,12 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
         {launchRejection && !isBlocked && !isRemoteTarget && <Button leftIcon="lock" variant="danger" disabled={busy}
           onClick={() => void start(true)}>Mulai tetap</Button>}
       </>}>
-      <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="hn-sheet-lead">
         Agen, model &amp; effort <b>orchestrator</b> sesi ini. Default dari setelan global; ubah bila perlu. Bila
         orkestrasi flow ini aktif, tiap fase dikerjakan subagent dengan model &amp; effort di bawah (Settings ›
         Orkestrasi). Override di bawah hanya berlaku untuk sesi ini dan tidak mengubah Settings.
       </div>
-      {launchRejection && <div role="alert" style={{
-        fontSize: 12.5, lineHeight: 1.55, marginBottom: 12, padding: "9px 11px",
-        borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-strong)",
-      }}>
+      {launchRejection && <div role="alert" className="hn-sheet-alert">
         <b>{launchRejection.error}</b>
         <div>{launchRejection.admission.liveCount} sesi hidup · {launchRejection.admission.liveAgentCount} agen terstruktur · cap {launchRejection.admission.maxConcurrent}</div>
         <div>Load per core: {launchRejection.admission.loadStatus === "available" && launchRejection.admission.loadPerCore !== null
@@ -315,10 +313,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
           operator harus melihat dulu apa yang ia lewati. Worktree sesi lahir `--detach` dari
           basisnya, jadi pekerjaan dependency yang belum ter-merge memang TAK ADA di dalamnya. */}
       {isBlocked && (
-        <div data-testid="dep-blocked-note" style={{
-          fontSize: 12.5, lineHeight: 1.55, marginBottom: 12, padding: "9px 11px",
-          borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-strong)",
-        }}>
+        <div data-testid="dep-blocked-note" className="hn-sheet-alert">
           Backlog ini menunggu{" "}
           <b>{blockers.map((b) => `${b.id} (${b.reason === "missing" ? "tak ditemukan"
             : b.reason === "unmerged" ? "belum ter-merge" : "belum selesai"})`).join(", ")}</b>.
@@ -328,18 +323,18 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       )}
       {/* SPEC-1216 · ADR-0165 §11 · target Start: "hub ini" atau device handledBy/online lainnya. */}
       <Field label="Target" hint="Mesin yang menjalankan sesi ini. Tak terpilih tetap tampil beserta alasannya.">
-        <Select aria-label="target" value={targetId} style={{ width: "100%" }}
+        <Select aria-label="target" value={targetId} className="hn-w-full"
           options={targets.map((t) => ({ value: t.deviceId, label: t.eligible ? t.name : `${t.name} — ${reasonLabel(t.reason)}`, disabled: !t.eligible }))}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setTargetId(e.target.value); setRemoteError(null); }} />
       </Field>
       {remoteError?.error === "remote-session" && remoteError.remoteSession && (
-        <div role="alert" style={{ fontSize: 12.5, marginBottom: 12, padding: "9px 11px", borderRadius: 8, background: "var(--warn-bg, #fdf6e3)" }}>
+        <div role="alert" className="hn-sheet-notice">
           Sesi ini sudah berjalan di <b>{remoteError.remoteSession.name}</b>.
           {/* aksi "Sambung ke sesi" milik navigasi TerminalScreen — turunan C; di sini cukup pesan + tutup */}
         </div>
       )}
       {remoteError?.error === "confirm-required" && (
-        <div role="alert" style={{ fontSize: 12.5, marginBottom: 12, padding: "9px 11px", borderRadius: 8, background: "var(--warn-bg, #fdf6e3)" }}>
+        <div role="alert" className="hn-sheet-notice">
           <div>Device terakhir yang mengerjakan ini sudah offline.</div>
           <Button variant="danger" disabled={busy} onClick={() => void start(false, true)}>Tetap mulai</Button>
         </div>
@@ -347,27 +342,24 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       {/* SPEC-338 · ADR-0074 · mesin sesi. Perilaku sesi identik (worktree, fase, stage, review);
           yang berbeda hanya CLI yang dijalankan — dan karenanya katalog model/effort-nya. */}
       <Field label="Agen" hint="Mesin yang menjalankan sesi ini. Perilaku sesi sama; hanya CLI-nya berbeda.">
-        <Select aria-label="Agen" value={agent} style={{ width: "100%" }}
+        <Select aria-label="Agen" value={agent} className="hn-w-full"
           options={[{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex CLI" }]}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickAgent(e.target.value as Agent)} />
       </Field>
       <Field label="Model">
-        <Select aria-label="Model" value={model} style={{ width: "100%" }}
+        <Select aria-label="Model" value={model} className="hn-w-full"
           options={runtimeModelOptions(agent, model)}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickModel(e.target.value)} />
       </Field>
       <Field label="Effort">
-        <Select aria-label="Effort" value={effort} style={{ width: "100%" }}
+        <Select aria-label="Effort" value={effort} className="hn-w-full"
           options={efforts.map((v) => ({ value: v, label: v }))}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEffort(e.target.value)} />
       </Field>
       {/* SPEC-339 · catatan LUNAK: CLI terlalu tua untuk model terpilih. Tidak memblokir Mulai —
           aturannya sama persis dengan kartu Settings karena keduanya memanggil codexClientTooOld. */}
       {agent === "codex" && codexClientTooOld(model, codexVer) && (
-        <div data-testid="codex-version-note" style={{
-          fontSize: 12, lineHeight: 1.5, marginBottom: 12, padding: "8px 10px",
-          borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-muted)",
-        }}>
+        <div data-testid="codex-version-note" className="hn-sheet-note">
           Codex CLI terpasang <b>{codexVer}</b>, sedangkan <b>{model}</b> butuh <b>{codexModel(model)?.minClient}</b>.
           Sesi tetap boleh dijalankan, tapi modelnya belum tentu dikenali CLI ini.
         </div>
@@ -386,10 +378,10 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
         hint={goalLocked
           ? "Backlog goal selalu berjalan dalam mode goal — sesi menolak berhenti sampai goal item ini terbukti tercapai. Kosongkan kondisi untuk memakai goal item apa adanya."
           : "Sesi menolak berhenti sampai kondisinya terbukti. Kosongkan kondisi untuk memakai bawaan hanoman: semua fase tercatat, plan tak menyisakan task, push sukses."}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: goalOn ? 10 : 0 }}>
+        <div className={goalOn ? "hn-goal-row hn-goal-row--on" : "hn-goal-row"}>
           <Switch aria-label="Mode goal" checked={goalOn} disabled={goalLocked}
             onChange={(v: boolean) => { if (!goalLocked) setGoalOn(v); }} />
-          <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+          <span className="hn-sheet-meta">
             {goalLocked ? "aktif · terkunci" : goalOn ? "aktif" : "nonaktif"}
           </span>
         </div>
@@ -403,7 +395,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
           RAM & CPU tetap tersisa untuk sesi lain di mesin yang sama. */}
       <Field label="Scope verifikasi"
         hint="Hanya yang berubah = test/typecheck/lint hanya menyentuh berkas yang disentuh sesi ini. Suite penuh tetap dijalankan manusia sebelum merge.">
-        <Select aria-label="Scope verifikasi" value={verifyScope} style={{ width: "100%" }}
+        <Select aria-label="Scope verifikasi" value={verifyScope} className="hn-w-full"
           options={[
             { value: "changed", label: "Hanya yang berubah — hemat RAM & CPU" },
             { value: "full", label: "Seluruh project" },
@@ -415,11 +407,10 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
           tanpa satu pun perubahan di berkas ini. */}
       <Field label="Metode"
         hint="Metodologi kerja sesi ini: skill per fase + direktori plan/spec. Fase-fasenya sendiri tak berubah. Item yang sudah pernah dijalankan memakai metode tercatatnya saat dilanjutkan.">
-        <Select aria-label="Metode" value={method} style={{ width: "100%" }}
+        <Select aria-label="Metode" value={method} className="hn-w-full"
           options={METHOD_IDS.map((id) => ({ value: id, label: METHODS[id]!.label }))}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMethod(e.target.value)} />
-        <div data-testid="method-requires"
-          style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+        <div data-testid="method-requires" className="hn-sheet-foot">
           Butuh terpasang: {METHODS[method]?.requires.join(" · ") ?? "—"}
         </div>
         {/* SPEC-739 · ADR-0114 · sampai spec ini `requires` cuma teks: hanoman menjanjikan
@@ -427,10 +418,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
             hidup (ADR-0037, cermin catatan versi codex SPEC-339) — tapi wajib menyebut AGEN:
             skill yang hilang tak mematikan sesi, ia menghapus gerbang yang disebut prompt. */}
         {methodStat && !methodStat.ready && (
-          <div data-testid="method-status-note" style={{
-            fontSize: 12, lineHeight: 1.5, marginTop: 8, padding: "8px 10px", overflowWrap: "anywhere",
-            borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-muted)",
-          }}>
+          <div data-testid="method-status-note" className="hn-sheet-status">
             <b>{methodStat.label}</b> belum siap untuk <b>{agent === "codex" ? "Codex CLI" : "Claude Code"}</b> di
             mesin ini
             {methodStat.missingPackages.length > 0 && <> · paket kurang: <code>{methodStat.missingPackages.join(" · ")}</code></>}
@@ -513,7 +501,7 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
             : isGoal ? "Buat goal → sesi goal" : "Buat brief → brainstorm"}
         </Button>
       </>}>
-      <div style={{ marginBottom: 16 }}>
+      <div className="hn-sheet-block">
         <Tabs variant="pill" value={f.kind} onChange={(v) => setF((s) => ({ ...s, kind: v }))} tabs={[
           { value: "brief", label: "Feature brief", icon: "lightbulb" },
           { value: "qa", label: "QA finding", icon: "bug" },
@@ -523,7 +511,7 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
           // SPEC-825 · ADR-0123 · task remeh: satu fase, bahkan tanpa fase pembuktian terpisah.
           { value: "no_effort", label: "Tanpa effort", icon: "zap" },
         ]} />
-        <div style={{ fontSize: 12, color: "var(--text-subtle)", marginTop: 8, lineHeight: 1.5 }}>
+        <div className="hn-sheet-hint">
           {isNoEffort ? "Sesi satu fase (Kerjakan): langsung mengerjakan lalu berhenti — tanpa brainstorm, spec, plan, maupun fase pembuktian terpisah. Untuk ganti copy, bump konstanta, perbaiki typo docs, tambah satu baris allowlist."
             : isGoal ? "Sesi goal langsung mengejar goal-nya — tanpa brainstorm, spec, atau plan (fase: Goal → Verifikasi). Sesi lahir dengan mode goal aktif dan menolak berhenti sampai buktinya ada di transkrip."
             : isQa ? "Finding masuk lewat alur audit → spec → plan → execute. hanoman menelusuri akar masalah dulu."
@@ -532,12 +520,11 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
         </div>
       </div>
       <Field label="Project">
-        <Select value={f.project} onChange={set("project")} style={{ width: "100%" }}
+        <Select value={f.project} onChange={set("project")} className="hn-w-full"
           options={projects.map((p) => ({ value: p.id, label: p.name }))} />
       </Field>
       <Field label="Branch" hint="branch yang disalin ke worktree (salinan kerja terpisah untuk sesi ini) saat sesi dimulai">
-        <Select value={f.branchFrom} onChange={set("branchFrom")} disabled={!branches.length}
-          style={{ width: "100%" }} options={branchOptions(branches, remoteOnly)} />
+        <Select value={f.branchFrom} onChange={set("branchFrom")} disabled={!branches.length} className="hn-w-full" options={branchOptions(branches, remoteOnly)} />
       </Field>
       {/* SPEC-447 · ADR-0093 · sesi item ini tak akan lahir sebelum semua yang dicentang selesai
           DAN commit-nya ada di branch basis. Otomasi memblokirnya keras; Start manual masih bisa
@@ -545,14 +532,11 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
       <Field label="Bergantung pada"
         hint="Backlog yang harus selesai & ter-merge lebih dulu. Kosongkan bila item ini berdiri sendiri.">
         {depCandidates.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: "var(--text-subtle)" }}>
+          <div className="hn-sheet-empty">
             Belum ada backlog lain di project ini.
           </div>
         ) : (
-          <div style={{
-            maxHeight: 132, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6,
-            border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", padding: 8,
-          }}>
+          <div className="hn-dep-list">
             {depCandidates.map((s) => (
               <Checkbox key={s.id} aria-label={`Bergantung pada ${s.id}`}
                 checked={f.dependsOn.includes(s.id)} onChange={() => toggleDep(s.id)}
@@ -565,8 +549,7 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
         <Input aria-label="Judul" value={f.title} onChange={set("title")}
           placeholder={isQa ? "mis. Funnel double-count sesi lintas tengah malam"
             : isNoEffort ? "mis. Label tombol Simpan di form backlog"
-            : isGoal ? "mis. Latensi daftar backlog" : "mis. Jadwal invoice berulang"}
-          style={{ width: "100%" }} />
+            : isGoal ? "mis. Latensi daftar backlog" : "mis. Jadwal invoice berulang"} className="hn-w-full" />
       </Field>
       {/* SPEC-407 · ADR-0089 · bentuk payload goal: goal + bukti berhenti + batasan. Sengaja
           BUKAN konteks/outcome — server mengikat source ↔ bentuk payload di boundary. */}
@@ -580,34 +563,34 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
             <HnTextarea aria-label="Selesai bila" value={f.done} onChange={set("done")} rows={2}
               placeholder="mis. output benchmark menunjukkan < 200 ms" />
           </Field>
-          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+          <div className="hn-grid-mobile hn-grid-split">
             <Field label="Batasan" hint="opsional">
               <Input aria-label="Batasan" value={f.constraints} onChange={set("constraints")}
-                placeholder="mis. tanpa cache eksternal" style={{ width: "100%" }} />
+                placeholder="mis. tanpa cache eksternal" className="hn-w-full" />
             </Field>
             <Field label="Prioritas">
-              <Select aria-label="Prioritas" value={f.priority} onChange={set("priority")} style={{ width: "100%" }} options={PRIORITY} />
+              <Select aria-label="Prioritas" value={f.priority} onChange={set("priority")} className="hn-w-full" options={PRIORITY} />
             </Field>
           </div>
         </>
       ) : isQa ? (
         <>
           <Field label="Severity">
-            <Select value={f.severity} onChange={set("severity")} style={{ width: "100%" }} options={SEVERITY} />
+            <Select value={f.severity} onChange={set("severity")} className="hn-w-full" options={SEVERITY} />
           </Field>
           <Field label="Langkah reproduksi">
             <HnTextarea value={f.steps} onChange={set("steps")} rows={3} mono placeholder={"1. Buka …\n2. Lakukan …\n3. Amati …"} />
           </Field>
-          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="hn-grid-mobile hn-grid-even">
             <Field label="Diharapkan"><HnTextarea value={f.expected} onChange={set("expected")} rows={2} placeholder="mis. total funnel sama dengan jumlah baris laporan harian" /></Field>
             <Field label="Aktual"><HnTextarea value={f.actual} onChange={set("actual")} rows={2} placeholder="mis. total funnel dua kali lipat untuk sesi yang melewati tengah malam" /></Field>
           </div>
           <Field label="Environment" hint="build / kanal tempat finding muncul">
-            <Input value={f.env} onChange={set("env")} placeholder="prod · web · v0.9.2" style={{ width: "100%" }} />
+            <Input value={f.env} onChange={set("env")} placeholder="prod · web · v0.9.2" className="hn-w-full" />
           </Field>
           <Field label="Batasan" hint="opsional — batasan pengerjaan yang sudah kamu ketahui">
             <Input aria-label="Batasan" value={f.constraints} onChange={set("constraints")}
-              placeholder="mis. jangan ubah kontrak API" style={{ width: "100%" }} />
+              placeholder="mis. jangan ubah kontrak API" className="hn-w-full" />
           </Field>
         </>
       ) : (
@@ -621,12 +604,12 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
             <HnTextarea value={f.outcome} onChange={set("outcome")} rows={2}
               placeholder={isAudit ? "Jawaban/kepastian yang dicari…" : "mis. satu badge di Overview menunjukkan jumlah sesi yang menunggu"} />
           </Field>
-          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+          <div className="hn-grid-mobile hn-grid-split">
             <Field label="Batasan" hint="opsional">
-              <Input value={f.constraints} onChange={set("constraints")} placeholder="mis. reuse queue yang ada" style={{ width: "100%" }} />
+              <Input value={f.constraints} onChange={set("constraints")} placeholder="mis. reuse queue yang ada" className="hn-w-full" />
             </Field>
             <Field label="Prioritas">
-              <Select value={f.priority} onChange={set("priority")} style={{ width: "100%" }} options={PRIORITY} />
+              <Select value={f.priority} onChange={set("priority")} className="hn-w-full" options={PRIORITY} />
             </Field>
           </div>
         </>
@@ -670,12 +653,12 @@ function NewProjectModal({ open, onClose, onCreate }:
         <Button size="sm" leftIcon={scratch ? "messages-square" : clone ? "git-branch" : "radar"}
           onClick={submit} disabled={!canSubmit || busy}>{submitLabel}</Button>
       </>}>
-      <div style={{ marginBottom: 16 }}>
+      <div className="hn-sheet-block">
         <Tabs variant="pill" value={f.kind} onChange={(v) => setF((s) => ({ ...s, kind: v }))} tabs={[
           { value: "from-scratch", label: "Dari nol", icon: "sparkles" },
           { value: "existing", label: "Kode yang sudah ada", icon: "folder-git-2" },
         ]} />
-        <div style={{ fontSize: 12, color: "var(--text-subtle)", marginTop: 8, lineHeight: 1.5 }}>
+        <div className="hn-sheet-hint">
           {scratch ? "hanoman menggali ide sampai tujuan MVP disepakati (brainstorm), lalu membuat kerangka dokumen acuan (Source of Truth)."
             : "hanoman membaca kode yang sudah ada, lalu menyusun dokumen acuan (Source of Truth) dari kode itu."}
         </div>
@@ -683,11 +666,11 @@ function NewProjectModal({ open, onClose, onCreate }:
       {scratch ? (
         <>
           <Field label="Nama project" hint="lowercase, tanpa spasi">
-            <Input value={f.name} onChange={set("name")} placeholder="mis. kirana" style={{ width: "100%" }} />
+            <Input value={f.name} onChange={set("name")} placeholder="mis. kirana" className="hn-w-full" />
           </Field>
           <Field label="Direktori" hint="folder tempat repo baru dibuat (mesin ini)">
-            <div style={{ display: "flex", gap: 8 }}>
-              <Input value={f.dir} onChange={set("dir")} leftIcon="folder" mono placeholder="/path/ke/project-baru" style={{ flex: 1 }} />
+            <div className="hn-row-8">
+              <Input value={f.dir} onChange={set("dir")} leftIcon="folder" mono placeholder="/path/ke/project-baru" className="hn-grow" />
               <Button size="sm" variant="secondary" leftIcon="folder-open" onClick={() => setPicker(true)}>Pilih folder</Button>
             </div>
           </Field>
@@ -700,7 +683,7 @@ function NewProjectModal({ open, onClose, onCreate }:
       ) : (
         <>
           {/* SPEC-218 · dua cara menambah existing: folder lokal, atau clone dari URL git. */}
-          <div style={{ marginBottom: 12 }}>
+          <div className="hn-mb-12">
             <Tabs variant="pill" value={f.mode} onChange={(v) => setF((s) => ({ ...s, mode: v as "local" | "clone" }))} tabs={[
               { value: "local", label: "Dari folder lokal", icon: "folder" },
               { value: "clone", label: "Salin dari URL git", icon: "git-branch" },
@@ -709,20 +692,20 @@ function NewProjectModal({ open, onClose, onCreate }:
           {clone ? (
             <Field label="URL repository" hint="GitHub/GitLab · https atau ssh">
               <Input value={f.gitRemote} onChange={set("gitRemote")} leftIcon="git-branch" mono
-                placeholder="https://github.com/org/repo.git" style={{ width: "100%" }} />
+                placeholder="https://github.com/org/repo.git" className="hn-w-full" />
             </Field>
           ) : null}
           <Field label={clone ? "Folder tujuan salinan" : "Direktori"}
             hint={clone ? "folder lokal tempat repo disalin (git clone) di mesin ini" : "opsional · folder checkout lokal (bisa diedit belakangan per-mesin)"}>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Input value={f.dir} onChange={set("dir")} leftIcon="folder" mono placeholder="/path/ke/repo" style={{ flex: 1 }} />
+            <div className="hn-row-8">
+              <Input value={f.dir} onChange={set("dir")} leftIcon="folder" mono placeholder="/path/ke/repo" className="hn-grow" />
               <Button size="sm" variant="secondary" leftIcon="folder-open" onClick={() => setPicker(true)}>Pilih folder</Button>
             </div>
           </Field>
           <FolderPicker open={picker} onClose={() => setPicker(false)}
             start={f.dir} onPick={(p) => setF((s) => ({ ...s, dir: p }))} />
           <Field label="Deskripsi" hint="opsional">
-            <Input value={f.desc} onChange={set("desc")} placeholder="mis. POS ritel + inventori" style={{ width: "100%" }} />
+            <Input value={f.desc} onChange={set("desc")} placeholder="mis. POS ritel + inventori" className="hn-w-full" />
           </Field>
         </>
       )}
@@ -774,21 +757,21 @@ export function EditProjectModal({ open, project, onClose, onSave }:
       {/* SPEC-255 · ADR-0064 · `id` kini renameable lewat operasi khusus (cascade + rambat sync). */}
       <Field label="ID project" hint="slug unik · huruf-kecil/angka/hubung · ganti = pengaruh Help Center & sync ke server">
         <Input value={f.id} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, id: e.target.value }))}
-          leftIcon="hash" mono placeholder="mis. erp-tumbuh-ai" style={{ width: "100%" }} />
+          leftIcon="hash" mono placeholder="mis. erp-tumbuh-ai" className="hn-w-full" />
       </Field>
       <Field label="Nama project" hint="label tampilan — boleh berbeda dari id">
         <Input value={f.name} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, name: e.target.value }))}
-          placeholder="mis. ERP Tumbuh AI" style={{ width: "100%" }} />
+          placeholder="mis. ERP Tumbuh AI" className="hn-w-full" />
       </Field>
       <Field label="Deskripsi">
         <Input value={f.desc} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, desc: e.target.value }))}
-          placeholder="mis. ERP manufaktur + inventori" style={{ width: "100%" }} />
+          placeholder="mis. ERP manufaktur + inventori" className="hn-w-full" />
       </Field>
       {/* SPEC-858 · picker folder yang sama dengan modal Project baru; ketik manual tetap jalan. */}
       <Field label="Path (mesin ini)" hint="opsional · disimpan lokal, tak disync · kosongkan = pakai default">
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="hn-row-8">
           <Input value={f.dir} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, dir: e.target.value }))}
-            leftIcon="folder" mono placeholder="/path/ke/repo (mesin ini)" style={{ flex: 1, minWidth: 0 }} />
+            leftIcon="folder" mono placeholder="/path/ke/repo (mesin ini)" className="hn-grow-min" />
           <Button size="sm" variant="secondary" leftIcon="folder-open" onClick={() => setPicker(true)}>Pilih folder</Button>
         </div>
       </Field>
@@ -797,7 +780,7 @@ export function EditProjectModal({ open, project, onClose, onSave }:
       {/* SPEC-218 · remote resmi (disync) — device lain bisa clone project ini. */}
       <Field label="Git remote" hint="opsional · remote resmi agar device lain bisa clone project ini · disync antar-device">
         <Input value={f.gitRemote} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, gitRemote: e.target.value }))}
-          leftIcon="git-branch" mono placeholder="https://github.com/org/repo.git" style={{ width: "100%" }} />
+          leftIcon="git-branch" mono placeholder="https://github.com/org/repo.git" className="hn-w-full" />
       </Field>
       {/* SPEC-880 · ADR-0135 · "ditangani oleh" — pernyataan DISYNC, beda dari "Path (mesin ini)"
           di atas. Nilai tersimpan yang device-nya tak ada di katalog mesin ini (dicabut, atau
@@ -1090,6 +1073,11 @@ function AppInner() {
   const lastPageRef = React.useRef<string | null>(null);
   React.useEffect(() => { if (section !== "dalang") lastPageRef.current = section; }, [section]);
 
+  // Keputusan sesi yang sedang ditonton (Terminal, sesi itu terfokus) tak perlu toast: keputusannya
+  // sudah di layar dan tetap terlihat di rail sesi. `focusSession` = sesi yang dibuka dari notifikasi,
+  // palet, atau pet; pilihan manual di rail Terminal tak dilaporkan ke sini (layar itu memegang fokusnya).
+  const isViewingSession = React.useCallback((nt: Notification) =>
+    section === "terminal" && !!nt.sessionId && focusSession === nt.sessionId, [section, focusSession]);
   // SPEC-184 · klik aksi notifikasi. `sessions` = daftar ter-poll (cek liveness untuk notif done).
   const openNotification = React.useCallback((nt: Notification) => {
     const t = notifTarget(nt, sessions);
@@ -1463,9 +1451,25 @@ function AppInner() {
       const res = await api.patchSpec(spec.id, { stage: target, confirmDelete });
       if ("pending" in res) return res;
       setBacklog((b) => b.map((s) => (s.id === res.id ? res : s)));
-      showToast(spec.id + " dikembalikan ke " + target, "warn", "rotate-ccw");
+      showToast(spec.id + " dikembalikan ke " + (STAGE_LABEL[target as keyof typeof STAGE_LABEL] ?? target), "warn", "rotate-ccw");
       return res;
     } catch { showToast("Gagal mengembalikan stage " + spec.id, "err", "x-circle"); return undefined; }
+  }
+
+  // Audit UI/UX 3L′ · aksi keputusan di layar Review memakai jalur yang SUDAH ada (integrateSpec,
+  // deleteWorktrees) — tanpa endpoint baru. Galat dilempar agar ditampilkan di bar keputusan.
+  async function integrateReviewSpec(spec: SpecSlim) {
+    const { defaultBranch } = await api.listBranches(spec.projectId);
+    const base = spec.branchFrom ?? defaultBranch;
+    if (!base) { showToast(spec.id + " · cabang tujuan belum diketahui", "err", "x-circle"); return; }
+    await integrateSpec(spec, "merge", "local:" + base);
+  }
+  async function discardReviewWorktree(spec: SpecSlim) {
+    const name = spec.id.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+    const { results } = await api.deleteWorktrees(spec.projectId, { names: [name] });
+    const r = results[0];
+    if (!r?.ok) throw new Error(r?.error ?? "worktree tidak ditemukan");
+    showToast(spec.id + " · worktree dihapus", "ok", "trash-2");
   }
 
   // SPEC-804 · ADR-0120 · tandai item selesai manual. 409 `confirm-required` bukan kegagalan:
@@ -1783,6 +1787,7 @@ function AppInner() {
   } else if (section === "review") {
     // SPEC-171/230 · layar review file worktree — backlog item (spec) ATAU sesi PRD (session).
     const back = reviewTarget?.kind === "session" ? "terminal" : "backlog";
+    const reviewSpec = reviewTarget?.kind === "spec" ? backlog.find((s) => s.id === reviewTarget.id) : undefined;
     screen = (
       <Shell active="backlog" title="Review" wide onNavigate={setSection}
         breadcrumb={reviewTarget ? (reviewTarget.kind === "session" ? "terminal · " : "backlog · ") + reviewTarget.id : "review"}
@@ -1790,7 +1795,16 @@ function AppInner() {
         {hubTabs}
         {gate(reviewTarget
           ? <ReviewScreen specId={reviewTarget.id} kind={reviewTarget.kind} title={reviewTarget.title} onBack={() => setSection(back)}
-              onGoto={(to) => navigate(routePath(to))} />
+              onGoto={(to) => navigate(routePath(to))}
+              {...(reviewSpec?.stage === "done" ? {
+                onIntegrate: () => integrateReviewSpec(reviewSpec),
+                integrateTarget: reviewSpec.branchFrom ?? undefined,
+                onRevert: async (_id: string, confirmDelete?: boolean) => {
+                  const res = await revertStage(reviewSpec, "executing", confirmDelete);
+                  return res && "pending" in res ? res : undefined;
+                },
+              } : {})}
+              {...(reviewSpec && reviewSpec.stage !== "done" ? { onDiscard: () => discardReviewWorktree(reviewSpec) } : {})} />
           : <StateBlock kind="empty" icon="git-compare" title="Pilih item untuk di-review"
               hint="Buka Review dari Backlog atau dari sel sesi di Terminal." action={() => setSection("backlog")} actionLabel="Ke Backlog" />)}
       </Shell>
@@ -1829,7 +1843,7 @@ function AppInner() {
 
   return (
     <AuthProvider user={me} onLoggedOut={onLoggedOut}>
-      <NotificationsProvider showToast={showToast} onOpen={openNotification}>
+      <NotificationsProvider showToast={showToast} onOpen={openNotification} isViewing={isViewingSession}>
         {/* SPEC-884 · ADR-0139 · instance publik yang perlindungannya turun jadi satu password
             tidak boleh terlihat sama dengan yang dikeraskan. Di luar ClientPortal: klien tak
             punya kuasa mengubahnya, jadi baginya ini cuma kecemasan tanpa tombol. */}

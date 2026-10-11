@@ -66,7 +66,7 @@ describe("IdeScreen · toolbar: Checkout di menu ⋯", () => {
     // pilih ref "dev" agar Checkout aktif
     fireEvent.change(screen.getByDisplayValue("· working tree ·"), { target: { value: "dev" } });
     fireEvent.click(screen.getByRole("button", { name: "Aksi lain IDE" }));
-    fireEvent.click(await screen.findByRole("button", { name: /checkout dev/i }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /checkout dev/i }));
     await waitFor(() => expect(api.ideGit).toHaveBeenCalledWith("p1", { op: "checkout", ref: "dev" }));
   });
   it("checkout 409 memunculkan dialog Paksa", async () => {
@@ -75,7 +75,7 @@ describe("IdeScreen · toolbar: Checkout di menu ⋯", () => {
     await screen.findByRole("tablist", { name: "Bagian IDE" });
     fireEvent.change(screen.getByDisplayValue("· working tree ·"), { target: { value: "dev" } });
     fireEvent.click(screen.getByRole("button", { name: "Aksi lain IDE" }));
-    fireEvent.click(await screen.findByRole("button", { name: /checkout dev/i }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /checkout dev/i }));
     expect(await screen.findByRole("button", { name: /paksa/i })).toBeInTheDocument();
   });
 });

@@ -9,20 +9,14 @@ import { useNotifications } from "./NotificationsContext";
 // mengimpor NotificationBell, dan itu menutup siklus impor.
 import { Modal, Pager, serverPage } from "../ds/kit";
 import { Icon } from "../ds/icon";
+import { relativeTime } from "../lib/time-format";
+import "./notifications.css";
 
 const PAGE = 20;
 
-function timeAgo(iso: string): string {
-  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
-  if (s < 60) return "baru saja";
-  const m = Math.round(s / 60); if (m < 60) return `${m}m lalu`;
-  const h = Math.round(m / 60); if (h < 24) return `${h}j lalu`;
-  return `${Math.round(h / 24)}h lalu`;
-}
-
 export function NotificationsArchiveModal({ onClose, onOpen }:
   { onClose: () => void; onOpen?: (n: Notification) => void }) {
-  // ADR-0204 · "Buka" di arsip juga menandai item itu terbaca (lihat NotificationsContext.markRead).
+  // ADR-0204 · "Buka"/"Jawab" di arsip juga menandai item itu terbaca (lihat NotificationsContext.markRead).
   const { markRead } = useNotifications();
   const [items, setItems] = React.useState<Notification[]>([]);
   const [total, setTotal] = React.useState(0);
@@ -40,36 +34,30 @@ export function NotificationsArchiveModal({ onClose, onOpen }:
   }, [page]);
 
   const sp = serverPage(total, page, PAGE);
-  const blank = { padding: "18px 10px", textAlign: "center" as const, color: "var(--text-subtle)", fontSize: 13 };
 
   return (
     <Modal open title="Semua notifikasi" icon="bell" onClose={onClose} width={720}>
-      <div style={{ display: "flex", flexDirection: "column", maxHeight: "60vh", overflowY: "auto" }}>
-        {loading && items.length === 0 ? <div style={blank}>memuat…</div>
-          : items.length === 0 ? <div style={blank}>Belum ada notifikasi</div>
-            : items.map((n) => (
-              <div key={n.id} style={{
-                display: "flex", alignItems: "center", gap: 10, padding: "9px 8px",
-                borderBottom: "1px solid var(--border-hair)",
-              }}>
+      <div className="hn-notif-archive-list">
+        {loading && items.length === 0 ? <div className="hn-notif-empty">memuat…</div>
+          : items.length === 0 ? <div className="hn-notif-empty">Belum ada notifikasi</div>
+            : items.map((n) => {
+              const decision = n.type === "decision";
+              return (
+              <div key={n.id} className="hn-notif-archive-row">
                 <Icon name="bell" size={14} color="var(--text-subtle)" />
-                <span style={{
-                  flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)",
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                }}>
+                <span className="hn-notif-archive-title">
                   {n.specId ? `${n.specId} · ${n.title}` : n.title}
                 </span>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>
-                  {timeAgo(n.createdAt)}
-                </span>
+                <span className="hn-notif-archive-time">{relativeTime(n.createdAt) || "—"}</span>
                 {onOpen && (
-                  <button onClick={() => { markRead(n.id); onOpen(n); onClose(); }} style={{
-                    border: "none", background: "transparent", cursor: "pointer",
-                    color: "var(--text-muted)", fontSize: 12, fontFamily: "var(--font-ui)",
-                  }}>Buka</button>
+                  <button onClick={() => { markRead(n.id); onOpen(n); onClose(); }}
+                    className={decision ? "hn-notif-open hn-notif-open--primary" : "hn-notif-open"}>
+                    {decision ? "Jawab" : "Buka"}
+                  </button>
                 )}
               </div>
-            ))}
+              );
+            })}
       </div>
       <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to}
         onPage={setPage} unit="notifikasi" />

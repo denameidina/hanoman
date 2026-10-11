@@ -4,6 +4,7 @@ import { zCreateProject, zUpdateProject, zRenameProject } from "@hanoman/shared"
 import { prisma } from "../db";
 import { renameProject } from "../services/rename-project";
 import { toProjectView, loadDeviceIndex } from "../services/project-view";
+import { boolParam, needsAttention, sortByAttention } from "../services/project-list";
 import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
 import { listRepoBranches, listRepoRemoteBranches, defaultBranch } from "../services/branches";
@@ -18,9 +19,15 @@ import { realGit } from "@hanoman/runner";
 export default async function (app: FastifyInstance) {
   // SPEC-198 · envelope + filter q + paginasi via API. project-view dihitung penuh
   // (coverage/docStatus live per project), lalu filter q (name+desc+stack) + potong di memori.
-  app.get("/projects", async (req) => {
-    const { q, handledBy, page, limit } = req.query as
-      { q?: string; handledBy?: string; page?: string; limit?: string };
+  // ADR-0212 · `sort=attention` mengurutkan SELURUH hasil (rusak → drift → sisanya, lalu nama) sebelum
+  // dipotong; `attention=1` menyaring ke yang perlu perhatian saja. Keduanya opsional: tanpa param,
+  // balasan sama seperti sebelumnya.
+  app.get("/projects", async (req, reply) => {
+    const { q, handledBy, page, limit, sort, attention } = req.query as
+      { q?: string; handledBy?: string; page?: string; limit?: string; sort?: string; attention?: string };
+    const attentionOnly = boolParam(attention);
+    if (attentionOnly === null) return reply.code(400).send({ error: "attention: pakai 1 atau 0" });
+    if (sort && sort !== "attention") return reply.code(400).send({ error: `sort "${sort}" tidak dikenal (pakai attention)` });
     // SPEC-197 · satu listSessions untuk seluruh request (bukan re-scan tmux per project),
     // dan oper baris `p` yang sudah ada (bukan findUniqueOrThrow lagi = N+1).
     const ps = await prisma.project.findMany({ orderBy: { createdAt: "desc" } });
@@ -38,7 +45,9 @@ export default async function (app: FastifyInstance) {
     const scoped = device
       ? filtered.filter((v) => v.handledBy.some((h) => h.deviceId === device))
       : filtered;
-    return paginate(scoped, page, limit);
+    const attentive = attentionOnly ? scoped.filter(needsAttention) : scoped;
+    const ordered = sort === "attention" ? sortByAttention(attentive) : attentive;
+    return paginate(ordered, page, limit);
   });
   app.get("/projects/:id", async (req, reply) => {
     const { id } = req.params as { id: string };

@@ -13,8 +13,9 @@ async function openBerkas() {
   const list = await screen.findByRole("tablist", { name: "Bagian IDE" });
   fireEvent.click(within(list).getByRole("tab", { name: "Berkas" }));
 }
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { paths } from "@hanoman/shared";
+import { injectProjectCss } from "./project-css";
 
 vi.mock("../src/api/client", () => ({
   api: {
@@ -37,11 +38,19 @@ vi.mock("../src/api/client", () => ({
 }));
 
 import { Modal } from "../src/ds";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { SpecDocsModal } from "../src/screens/SpecDocsModal";
+
+// Gaya pane SpecDocsModal kini kelas (`hn-sdm-scroll`) di dialogs.css. jsdom tak menerapkan kaskade
+// berkas CSS, jadi aturannya dibaca langsung dari berkasnya; komentar dibuang lebih dulu.
+const DIALOGS_CSS = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/dialogs.css"), "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "");
 import { DocsWorkspace } from "../src/screens/DocsWorkspace";
 import { IdeScreen } from "../src/screens/IdeScreen";
 import { mockViewport, resetViewport } from "./viewport";
 
+beforeAll(() => injectProjectCss());
 beforeEach(() => vi.clearAllMocks());
 
 const pane = () => screen.getByTestId("doc-preview-scroll");
@@ -65,18 +74,24 @@ describe("Modal fillHeight (SPEC-363)", () => {
   it("memberi panel tinggi pasti agar isinya bisa mengisi, dan badannya menyerap sisa", () => {
     const { container } = render(<Modal open fillHeight title="X">isi</Modal>);
     const panel = container.querySelector("[data-testid='modal-panel']") as HTMLElement;
-    expect(panel.style.height).toContain("100dvh");
+    // Sejak Audit UI/UX 2026-10 (Z4) tinggi/flex dipindah dari style inline ke kelas (app-shell.css);
+    // jsdom tak memuat CSS, jadi kontraknya diuji lewat kelas + isi berkas CSS.
+    expect(panel).toHaveClass("hn-modal-panel--fill");
     const body = container.querySelector("[data-testid='modal-body']") as HTMLElement;
-    expect(body.style.flex).toBe("1 1 auto");
-    expect(body.style.minHeight).toBe("0");
+    expect(body).toHaveClass("hn-modal-body--fill");
+    const css = readFileSync(resolve(__dirname, "../src/styles/app-shell.css"), "utf8");
+    expect(css.match(/\.hn-modal-panel--fill\s*\{([^}]*)\}/)?.[1] ?? "").toMatch(/100dvh/);
+    const bodyRule = css.match(/\.hn-modal-body--fill\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(bodyRule).toMatch(/flex:\s*1 1 auto/);
+    expect(bodyRule).toMatch(/min-height:\s*0/);
   });
 
   it("tanpa fillHeight, modal tetap setinggi isinya (20-an modal lain tak berubah)", () => {
     const { container } = render(<Modal open title="X">isi</Modal>);
     const panel = container.querySelector("[data-testid='modal-panel']") as HTMLElement;
-    expect(panel.style.height).toBe("");
+    expect(panel).not.toHaveClass("hn-modal-panel--fill");
     const body = container.querySelector("[data-testid='modal-body']") as HTMLElement;
-    expect(body.style.flex).toBe("");
+    expect(body).not.toHaveClass("hn-modal-body--fill");
   });
 });
 
@@ -94,8 +109,10 @@ describe("pane pratinjau menyerap tinggi yang tersedia (SPEC-363)", () => {
   it("SpecDocsModal (Backlog & Terminal) — tanpa 62vh", async () => {
     render(<SpecDocsModal specId="SPEC-363" onClose={() => {}} />);
     await waitFor(() => expect(pane()).toBeInTheDocument());
-    expect(pane().style.flex).toBe("1 1 auto");
-    expect(pane().style.overflow).toBe("auto");
+    expect(pane().className).toContain("hn-sdm-scroll");
+    const rule = /\.hn-sdm-scroll\s*\{([^}]*)\}/.exec(DIALOGS_CSS)?.[1] ?? "";
+    expect(rule).toMatch(/flex:\s*1 1 auto/);
+    expect(rule).toMatch(/overflow:\s*auto/);
     expect(fixedHeightInsideFrame(pane())).toEqual([]);
   });
 
@@ -112,8 +129,9 @@ describe("pane pratinjau menyerap tinggi yang tersedia (SPEC-363)", () => {
     await openBerkas();
     fireEvent.click(await screen.findByText("README.md"));
     await waitFor(() => expect(pane()).toBeInTheDocument());
-    expect(pane().style.flex).toBe("1 1 auto");
-    expect(pane().style.overflow).toBe("auto");
+    // Z2 · pane IDE kini kelas (ide.css): nilainya dibaca dari kaskade, bukan inline.
+    expect(getComputedStyle(pane()).flex).toBe("1 1 auto");
+    expect(getComputedStyle(pane()).overflow).toBe("auto");
     expect(fixedHeightInsideFrame(pane())).toEqual([]);
   });
 });

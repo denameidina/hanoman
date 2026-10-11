@@ -41,12 +41,12 @@ function GitAskDialog({ ask, onClose }: { ask: Ask; onClose: () => void }) {
       <form onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <Field label={ask.label}>
           <Input size="sm" autoFocus value={value} aria-label={ask.label} placeholder={ask.placeholder}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue(e.target.value)} style={{ width: "100%" }} />
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue(e.target.value)} className="hn-ide-input-full" />
         </Field>
         {ask.second && (<>
           <Field label={ask.second.label} hint={ask.second.hint}>
             <Input size="sm" value={message} aria-label={ask.second.label} placeholder={ask.second.placeholder}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMessage(e.target.value)} style={{ width: "100%" }} />
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMessage(e.target.value)} className="hn-ide-input-full" />
           </Field>
           <Checkbox checked={push} onChange={setPush} label={ask.second.pushLabel} />
         </>)}
@@ -76,17 +76,18 @@ const LANE_W = 14, ROW_H = 30, DOT = 4;
 // padding 50. Di bawah ini kolom subject yang `flex: 1` runtuh ke 0px dan pill ref (yang
 // `flex: 0 0 auto`) meluber menimpa kolom author — terukur 200 tombol subject `0×44` di 390px.
 const GRAPH_ROW_MIN = 460;
-// Lebar minimum kolom subject. `GRAPH_ROW_MIN` saja tak cukup: pill ref `flex: 0 0 auto` memakan
-// kolom fleksibel lebih dulu, jadi baris HEAD (dua pill panjang) menyisakan 24px untuk subject-nya —
-// terukur di 390px SESUDAH scroller lokal dipasang. Dengan lantai ini baris yang pill-nya panjang
-// melebihi `GRAPH_ROW_MIN` dan scroller-nya ikut melebar, bukan memeras subject.
-const SUBJECT_MIN = 160;
+// Lantai lebar kolom subject (160px) ada di `.hn-git-subject` (ide.css): pill ref `flex: 0 0 auto`
+// memakan kolom fleksibel lebih dulu, dan lantai itu mencegah subject memeras ke 24px.
 // SPEC-245 · kadens live-refresh git graph. SPEC-908 · tinggal kadens FALLBACK; jalur
 // normalnya langganan berparameter di `/events/ws`.
 const POLL_MS = 4000;
 const PAGE = 200;     // SPEC-351 · besar satu halaman commit; jendela tumbuh kelipatan ini
-const COLORS = ["#a9791c", "#3b7a57", "#8a5a44", "#4a6fa5", "#7d5ba6", "#b0503a"]; // brass-leaf-clay-ink
-const laneColor = (i: number, palette: string[] = COLORS) => palette[i % palette.length];
+// Palet bawaan: enam CSS variable (brass, leaf, clay, ink, plum, rust), nilainya di ide.css. Palet dari
+// config menimpa lewat --lane per elemen. Lane dibedakan juga oleh bentuk simpul (merge = berongga).
+const COLORS = ["var(--graph-lane-0)", "var(--graph-lane-1)", "var(--graph-lane-2)", "var(--graph-lane-3)", "var(--graph-lane-4)", "var(--graph-lane-5)"];
+const laneColor = (i: number, palette: string[] = COLORS) => palette[i % palette.length] ?? COLORS[0]!;
+// Gaya dinamis lewat CSS variable (ide.css). Cast karena TS tak mengenal nama `--*` di CSSProperties.
+const cssVars = (vars: Record<string, string | number>) => vars as React.CSSProperties;
 const rel = (iso: string): string => {
   const t = new Date(iso).getTime();
   if (!t) return "";
@@ -111,12 +112,16 @@ function edgePath(e: Edge, style: "rounded" | "angular", height: number): string
 
 function RowSvg({ row, edges, maxLanes, style, palette, height }: { row: GraphRow; edges: Edge[]; maxLanes: number; style: "rounded" | "angular"; palette: string[]; height: number }) {
   const cx = LANE_W / 2 + row.lane * LANE_W;
+  // Merge = simpul berongga: pembeda non-warna, supaya lane hijau-merah tetap terbaca tanpa warna.
+  const merge = row.commit.parents.length > 1;
   return (
-    <svg aria-hidden="true" width={maxLanes * LANE_W} height={height} style={{ flex: "0 0 auto" }}>
+    <svg aria-hidden="true" width={maxLanes * LANE_W} height={height} className="hn-graph-lane">
       {edges.map((e, i) => (
-        <path key={i} d={edgePath(e, style, height)} fill="none" stroke={laneColor(e.colorLane, palette)} strokeWidth={1.5} />
+        <path key={i} d={edgePath(e, style, height)} className="hn-graph-edge" data-lane={e.colorLane}
+          style={cssVars({ "--lane": laneColor(e.colorLane, palette) })} />
       ))}
-      <circle cx={cx} cy={height / 2} r={DOT} fill={laneColor(row.lane, palette)} stroke="var(--surface-card)" strokeWidth={1.5} />
+      <circle cx={cx} cy={height / 2} r={DOT} className="hn-graph-node" data-lane={row.lane}
+        data-merge={merge ? "true" : undefined} style={cssVars({ "--lane": laneColor(row.lane, palette) })} />
     </svg>
   );
 }
@@ -530,22 +535,20 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
       <Tabs aria-label="Panel Git Graph" variant="pill" value={panel} onChange={(next) => setPanel(next as "graph" | "detail")}
         tabs={[{ value: "graph", label: "Graph" }, { value: "detail", label: "Detail" }]} />
     )}
-    <div className="hn-git-graph-layout" style={{ display: "grid",
-      gridTemplateColumns: narrow ? "minmax(0, 1fr)" : hasDetail ? "minmax(0, 1fr) 340px" : "minmax(0, 1fr)",
-      gap: 16, alignItems: "start", minWidth: 0 }}>
+    <div className="hn-git-graph-layout" style={cssVars({ "--git-cols": narrow ? "minmax(0, 1fr)" : hasDetail ? "minmax(0, 1fr) 340px" : "minmax(0, 1fr)" })}>
       <section data-panel="graph" aria-label="Graph" aria-hidden={narrow && hasDetail && panel !== "graph" ? "true" : "false"}
-        style={{ display: narrow && hasDetail && panel !== "graph" ? "none" : "block", minWidth: 0 }}>
+        hidden={narrow && hasDetail && panel !== "graph"} className="hn-git-panel">
       <Card padding={0}>
         {/* SPEC-233 · find widget (Ctrl/Cmd-F) + center HEAD (Ctrl/Cmd-H) */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", borderBottom: "1px solid var(--border-hair)" }}>
+        <div className="hn-git-find">
           {findOpen ? (
             <>
               <Icon name="search" size={13} color="var(--text-subtle)" />
               <input autoFocus value={find} aria-label="Cari commit" onChange={(e) => { setFind(e.target.value); setFindIdx(0); }}
                 onKeyDown={(e) => { if (e.key === "Enter") gotoHit(findIdx + (e.shiftKey ? -1 : 1)); if (e.key === "Escape") setFindOpen(false); }}
                 placeholder="mis. auto-merge, 3a3e7e0, atau hanoman/spec-490"
-                style={{ flex: 1, border: "none", background: "transparent", fontSize: 12.5, fontFamily: "var(--font-ui)", color: "var(--text-body)" }} />
-              <span style={{ fontSize: 11, color: "var(--text-subtle)", fontFamily: "var(--font-mono)" }}>
+                className="hn-git-find-input" />
+              <span className="hn-git-find-count">
                 {findHits.length ? `${findIdx + 1}/${findHits.length}` : find ? "0" : ""}
               </span>
               <Button size="sm" variant="ghost" leftIcon="chevron-up" aria-label="Hasil sebelumnya" disabled={!findHits.length} onClick={() => gotoHit(findIdx - 1)} />
@@ -556,14 +559,14 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             <>
               <Button size="sm" variant="ghost" leftIcon="search" onClick={() => setFindOpen(true)}>Cari</Button>
               <Button size="sm" variant="ghost" leftIcon="crosshair" onClick={centerHead}>HEAD</Button>
-              <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-subtle)" }}>⌘F cari · ⌘H ke HEAD</span>
+              <span className="hn-git-find-hint">⌘F cari · ⌘H ke HEAD</span>
             </>
           )}
         </div>
         {/* SPEC-233 · kontrol tampilan: filter branch, show/hide remote/tag, muted, style */}
         <div className="hn-ide-graph-bar">
           <select aria-label="Filter branch" value={gopts.branch} onChange={(e) => setView({ branch: e.target.value })}
-            style={{ fontSize: 12, padding: "3px 6px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)", color: "var(--text-body)" }}>
+            className="hn-git-branch-select">
             <option value="">semua branch</option>
             {/* Pilihan aktif tetap ada walau daftar branch belum termuat (mis. saat galat). */}
             {gopts.branch && !localBranches.includes(gopts.branch) && <option value={gopts.branch}>{gopts.branch}</option>}
@@ -590,14 +593,13 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
         )}
         {/* SPEC-233 · stash sebagai chip di puncak; klik-kanan → apply/pop/drop/branch/copy */}
         {stashes.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "6px 12px", borderBottom: "1px solid var(--border-hair)" }}>
-            <span className="hn-eyebrow" style={{ marginRight: 4 }}>stash</span>
+          <div className="hn-git-stash-row">
+            <span className="hn-eyebrow hn-git-stash-label">stash</span>
             {stashes.map((s) => (
               <button type="button" key={s.ref} title={s.message} aria-label={`Aksi ${s.ref}`}
                 onClick={(e) => { e.stopPropagation(); setStashMenu({ x: e.clientX, y: e.clientY, s, anchor: e.currentTarget }); }}
                 onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setStashMenu({ x: e.clientX, y: e.clientY, s, anchor: e.currentTarget }); }}
-                style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "2px 8px", borderRadius: 999, border: "none",
-                  cursor: "pointer", background: "var(--bone-200)", color: "var(--text-muted)", flex: "0 0 auto" }}>
+                className="hn-git-stash-chip">
                 {s.ref}: {s.message.length > 40 ? s.message.slice(0, 40) + "…" : s.message}
               </button>
             ))}
@@ -611,29 +613,27 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             yang menempel pada `<main>` yang menggulir tegak. */}
         {body ?? (<>
         <LocalOverflow data-testid="ide-graph-rows">
-          <div role="list" aria-label="Riwayat commit" style={{ minWidth: maxLanes * LANE_W + GRAPH_ROW_MIN }}>
+          <div role="list" aria-label="Riwayat commit" className="hn-git-rows"
+            style={cssVars({ "--graph-min-w": `${maxLanes * LANE_W + GRAPH_ROW_MIN}px`, "--row-h": `${graphRowHeight}px` })}>
             {/* SPEC-233 · baris uncommitted changes (lingkaran terbuka) di puncak bila working tree kotor */}
             {status && !status.clean && (() => {
               const n = status.staged.length + status.unstaged.length + status.untracked.length;
               const first = status.unstaged[0] ?? status.untracked[0] ?? status.staged[0];
               return (
                 <div role="listitem" className="hn-ide-graph-row" onClick={() => { if (first) onOpenFile(first, ""); }}
-                  onContextMenu={(e) => { e.preventDefault(); setUncMenu({ x: e.clientX, y: e.clientY, anchor: e.currentTarget }); }}
-                  style={{ display: "flex", alignItems: "center", gap: 10, height: graphRowHeight, padding: "0 12px",
-                    cursor: "pointer", borderBottom: "1px solid var(--border-hair)" }}>
+                  onContextMenu={(e) => { e.preventDefault(); setUncMenu({ x: e.clientX, y: e.clientY, anchor: e.currentTarget }); }}>
                   {/* Lane SVG hanya gambar: maknanya ikut di teks baris (subject, merge, HEAD). */}
-                  <svg aria-hidden="true" width={maxLanes * LANE_W} height={graphRowHeight} style={{ flex: "0 0 auto" }}>
-                    <circle cx={LANE_W / 2} cy={graphRowHeight / 2} r={DOT} fill="none" stroke={laneColor(0)} strokeWidth={1.5} />
+                  <svg aria-hidden="true" width={maxLanes * LANE_W} height={graphRowHeight} className="hn-graph-lane">
+                    <circle cx={LANE_W / 2} cy={graphRowHeight / 2} r={DOT} className="hn-graph-node hn-graph-node--open" />
                   </svg>
                   <button type="button" onClick={(event) => { event.stopPropagation(); if (first) onOpenFile(first, ""); }}
-                    style={{ border: 0, padding: 0, background: "transparent", textAlign: "left", cursor: first ? "pointer" : "default",
-                      fontSize: 12.5, fontStyle: "italic", color: "var(--text-muted)", flex: 1 }}>
+                    className={first ? "hn-git-uncommitted" : "hn-git-uncommitted hn-git-uncommitted--static"}>
                     Perubahan belum di-commit · {n} berkas
                   </button>
                   <button type="button" className="hn-graph-action" aria-label="Aksi working tree"
                     onClick={(e) => { e.stopPropagation(); setUncMenu({ x: e.clientX, y: e.clientY, anchor: e.currentTarget }); }}>⋮</button>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", flex: "0 0 auto", width: 88, textAlign: "right" }}>working tree</span>
-                  <span style={{ width: 40, flex: "0 0 auto" }} />
+                  <span className="hn-git-wt">working tree</span>
+                  <span className="hn-git-wt-gap" />
                 </div>
               );
             })()}
@@ -645,53 +645,41 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
               const activeHit = findHits[findIdx] === c.sha;
               // Warna latar hanya untuk keadaan terpilih/ditemukan; hover ditangani CSS (`.hn-ide-graph-row:hover`),
               // jadi baris biasa tak membawa latar inline yang menimpanya.
-              const rowBg = sel ? "var(--brass-100)" : activeHit ? "var(--brass-300)" : hit ? "var(--bone-100)" : undefined;
+              // Latar hanya untuk keadaan terpilih/ditemukan (prioritas sama seperti sebelumnya: terpilih > aktif > ditemukan).
+              const rowState = sel ? "is-sel" : activeHit ? "is-active" : hit ? "is-hit" : "";
               return (
                 <div key={c.sha} ref={(el) => { if (el) rowRefs.current.set(c.sha, el); }} role="listitem"
-                  className="hn-ide-graph-row"
+                  className={rowState ? `hn-ide-graph-row ${rowState}` : "hn-ide-graph-row"}
                   onClick={(e) => onRowClick(e, c.sha)}
                   onContextMenu={(e) => openMenu(e, c)}
-                  title={compareFrom ? "Ctrl/Cmd-klik untuk bandingkan dengan commit pertama" : "Ctrl/Cmd-klik untuk mulai compare"}
-                  style={{ display: "flex", alignItems: "center", gap: 10, height: graphRowHeight, padding: "0 12px",
-                    cursor: "pointer", borderBottom: "1px solid var(--border-hair)",
-                    background: rowBg }}>
+                  title={compareFrom ? "Ctrl/Cmd-klik untuk bandingkan dengan commit pertama" : "Ctrl/Cmd-klik untuk mulai compare"}>
                   <RowSvg row={r} edges={allEdges[i] ?? []} maxLanes={maxLanes} style={style} palette={palette} height={graphRowHeight} />
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
+                  <div className="hn-git-main">
                     {c.refs.map((ref) => (
                       <button type="button" key={ref} title={isHead && ref === current ? "branch aktif (HEAD) — pilih untuk aksi" : "branch — pilih untuk aksi"}
                         aria-label={`Aksi branch ${ref}`}
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
                         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
-                        style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "1px 6px", cursor: "pointer", border: "none",
-                        borderRadius: 999, background: isHead && ref === current ? "var(--brass-700)" : "var(--brass-100)",
-                        color: isHead && ref === current ? "var(--bone-000)" : "var(--brass-700)", flex: "0 0 auto" }}>{ref}</button>
+                        className={isHead && ref === current ? "hn-git-ref hn-git-ref--head" : "hn-git-ref"}>{ref}</button>
                     ))}
                     {/* SPEC-233 · tag = pill terpisah (warna leaf, ikon tag); klik-kanan → menu tag */}
                     {c.tags.map((t) => (
                       <button type="button" key={`tag:${t}`} title="tag — pilih untuk aksi" aria-label={`Aksi tag ${t}`}
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
                         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
-                        style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "1px 6px 1px 4px", borderRadius: 999, border: "none",
-                          display: "inline-flex", alignItems: "center", gap: 3, background: "var(--leaf-100, #e6efe9)",
-                          color: "var(--leaf-600, #3b7a57)", flex: "0 0 auto" }}>⌂{t}</button>
+                        className="hn-git-tag">⌂{t}</button>
                     ))}
                     {/* Merge dinyatakan TEKS, bukan hanya redup warnanya (audit a11y). */}
-                    {c.parents.length > 1 && (
-                      <span style={{ flex: "0 0 auto", fontFamily: "var(--font-mono)", fontSize: 10, padding: "0 5px",
-                        borderRadius: 999, border: "1px solid var(--border-strong)", color: "var(--text-muted)" }}>merge</span>
-                    )}
+                    {c.parents.length > 1 && <span className="hn-git-merge">merge</span>}
                     <button type="button" aria-label={`Buka commit ${c.sha}`} onClick={(event) => { event.stopPropagation(); onRowClick(event, c.sha); }}
-                      style={{ minWidth: SUBJECT_MIN, padding: 0, border: 0, background: "transparent", cursor: "pointer", textAlign: "left",
-                        fontSize: 12.5, color: muted && c.parents.length > 1 ? "var(--text-muted)" : "var(--text-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      className={muted && c.parents.length > 1 ? "hn-git-subject hn-git-subject--muted" : "hn-git-subject"}>
                       {msgOpts.emoji ? emojify(c.subject) : c.subject}
                     </button>
                   </div>
                   <button type="button" className="hn-graph-action" aria-label={`Aksi commit ${c.sha}`}
                     onClick={(e) => { e.stopPropagation(); openMenu(e, c); }}>⋮</button>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)",
-                    flex: "0 0 auto", width: 88, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>{c.author}</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)",
-                    flex: "0 0 auto", width: 40, textAlign: "right" }}>{rel(c.at)}</span>
+                  <span className="hn-git-author">{c.author}</span>
+                  <span className="hn-git-date">{rel(c.at)}</span>
                 </div>
               );
             })}
@@ -699,9 +687,8 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
         </LocalOverflow>
         {/* SPEC-351 · baris penutup: daftar tak pernah lagi berhenti tanpa kabar. Menyatakan
             berapa yang dimuat, apakah masih ada lanjutannya, dan jadi sentinel auto-load. */}
-        <div ref={moreRef} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-          padding: "9px 12px", borderTop: "1px solid var(--border-hair)" }}>
-          <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>
+        <div ref={moreRef} className="hn-git-more">
+          <span className="hn-git-more-count">
             {/* SPEC-523 · sisa dinyatakan. "200 commit dimuat" tak memberi tahu apakah tersisa
                 3 atau 30.000 — dan itulah yang membuat plafonnya terbaca sebagai bug. */}
             {total > 0 ? `${rows.length} dari ${total} commit` : `${rows.length} commit dimuat`}
@@ -719,28 +706,27 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
 
       {detail && (
         <section data-panel="detail" aria-label="Detail" aria-hidden={narrow && panel !== "detail" ? "true" : "false"}
-          style={{ display: narrow && panel !== "detail" ? "none" : "block", minWidth: 0 }}>
+          hidden={narrow && panel !== "detail"} className="hn-git-panel">
         <Card padding={16}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <div className="hn-git-head">
             <span className="hn-eyebrow">commit {detail.sha.slice(0, 8)}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div className="hn-git-cluster">
               {detail.signed && <Badge tone="ok" size="sm">signed</Badge>}
               <Button size="sm" variant="ghost" leftIcon="copy" onClick={() => void navigator.clipboard?.writeText(detail.sha)}>Hash</Button>
               <Button size="sm" variant="ghost" leftIcon="x" onClick={() => { setDetail(null); setPanel("graph"); }}>Tutup</Button>
             </div>
           </div>
-          <div style={{ fontSize: 13, color: "var(--text-strong)", fontWeight: 600, marginBottom: 4 }}>{msgOpts.emoji ? emojify(detail.subject) : detail.subject}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-subtle)", marginBottom: 6 }}>
-            {fetchAvatars && detail.authorEmail && <img src={gravatarUrl(detail.authorEmail, 20)} width={18} height={18} alt="" style={{ borderRadius: 999 }} />}
+          <div className="hn-git-detail-title">{msgOpts.emoji ? emojify(detail.subject) : detail.subject}</div>
+          <div className="hn-git-detail-meta">
+            {fetchAvatars && detail.authorEmail && <img src={gravatarUrl(detail.authorEmail, 20)} width={18} height={18} alt="" className="hn-git-avatar" />}
             <span>{detail.author}{detail.committer && detail.committer !== detail.author ? ` · committed by ${detail.committer}` : ""}</span>
           </div>
-          {detail.body && <pre style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, whiteSpace: "pre-wrap", color: "var(--text-muted)", marginBottom: 10 }}>{renderMessage(detail.body, msgOpts)}</pre>}
-          <div className="hn-eyebrow" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-            <span style={{ flex: 1 }}>{detail.changed.length} file berubah</span>
+          {detail.body && <pre className="hn-git-detail-body">{renderMessage(detail.body, msgOpts)}</pre>}
+          <div className="hn-eyebrow hn-git-changed-head">
+            <span className="hn-grow">{detail.changed.length} file berubah</span>
             {(["list", "tree"] as const).map((v) => (
               <button key={v} type="button" aria-label={v === "list" ? "Tampilan daftar" : "Tampilan pohon"} aria-pressed={detailView === v}
-                onClick={() => setDetailView(v)} style={{ display: "flex", padding: 3, border: "none",
-                cursor: "pointer", borderRadius: 4, background: detailView === v ? "var(--brass-100)" : "transparent" }}>
+                onClick={() => setDetailView(v)} className="hn-git-view-btn">
                 <Icon name={v === "list" ? "list" : "folder-tree"} size={13} color={detailView === v ? "var(--brass-700)" : "var(--text-subtle)"} />
               </button>
             ))}
@@ -751,11 +737,9 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                   <TreeRow key={nd.path} node={nd} selected={fileDiff?.path ?? ""} onSelect={(p) => openFileDiff(p, detail.sha)} defaultOpen />)}
               </TreeRoot>
             : detail.changed.map((f) => (
-              <div key={f.path} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 6px" }}>
+              <div key={f.path} className="hn-git-file">
                 <Badge tone={f.status === "A" ? "ok" : f.status === "D" ? "err" : "warn"} size="sm">{f.status}</Badge>
-                <button onClick={() => openFileDiff(f.path, detail.sha)} title="lihat diff" style={{ flex: 1, minWidth: 0, textAlign: "left",
-                  border: "none", background: "transparent", cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: 11.5,
-                  color: "var(--text-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.path}</button>
+                <button onClick={() => openFileDiff(f.path, detail.sha)} title="lihat diff" className="hn-git-file-path">{f.path}</button>
                 {/* Ikon-ikon ini dulu <Icon onClick> — tak bisa difokus lewat keyboard. Sekarang tombol. */}
                 <button type="button" className="hn-graph-action" aria-label={`Lihat ${f.path} pada commit ini`}
                   title="Lihat pada revisi ini" onClick={() => onOpenFile(f.path, detail.sha)}>
@@ -777,20 +761,18 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
 
       {compare && (
         <section data-panel="detail" aria-label="Detail" aria-hidden={narrow && panel !== "detail" ? "true" : "false"}
-          style={{ display: narrow && panel !== "detail" ? "none" : "block", minWidth: 0 }}>
+          hidden={narrow && panel !== "detail"} className="hn-git-panel">
         <Card padding={16}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <div className="hn-git-head">
             <span className="hn-eyebrow">compare {compare.from.slice(0, 7)} … {compare.to.slice(0, 7)}</span>
             <Button size="sm" variant="ghost" leftIcon="x" onClick={() => { setCompare(null); setPanel("graph"); }}>Tutup</Button>
           </div>
-          <div className="hn-eyebrow" style={{ marginBottom: 6 }}>{compare.changed.length} file berbeda</div>
-          {compare.changed.length === 0 && <div style={{ fontSize: 12, color: "var(--text-subtle)" }}>Tak ada perbedaan.</div>}
+          <div className="hn-eyebrow hn-git-count">{compare.changed.length} file berbeda</div>
+          {compare.changed.length === 0 && <div className="hn-git-empty">Tak ada perbedaan.</div>}
           {compare.changed.map((f) => (
-            <div key={f.path} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 6px" }}>
+            <div key={f.path} className="hn-git-file">
               <Badge tone={f.status === "A" ? "ok" : f.status === "D" ? "err" : "warn"} size="sm">{f.status}</Badge>
-              <button onClick={() => openFileDiff(f.path, compare.to, compare.from)} style={{ flex: 1, minWidth: 0, textAlign: "left",
-                border: "none", background: "transparent", cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: 11.5,
-                color: "var(--text-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.path}</button>
+              <button onClick={() => openFileDiff(f.path, compare.to, compare.from)} className="hn-git-file-path">{f.path}</button>
             </div>
           ))}
         </Card>
@@ -798,11 +780,9 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
       )}
 
       {compareFrom && (
-        <div style={{ position: "fixed", bottom: "max(16px, var(--safe-bottom))", left: "50%", transform: "translateX(-50%)", zIndex: 140,
-          background: "var(--brass-500)", color: "#fff", padding: "6px 14px", borderRadius: 999, fontSize: 12.5,
-          boxShadow: "var(--shadow-lg)", display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="hn-git-compare-pill">
           Compare dari {compareFrom.slice(0, 7)} — Ctrl/Cmd-klik commit kedua
-          <button type="button" aria-label="Batalkan perbandingan" onClick={() => setCompareFrom(null)} style={{ border: "none", background: "transparent", color: "#fff", cursor: "pointer", fontWeight: 700 }}>✕</button>
+          <button type="button" aria-label="Batalkan perbandingan" onClick={() => setCompareFrom(null)} className="hn-git-compare-close">✕</button>
         </div>
       )}
 
@@ -859,17 +839,15 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
       {/* SPEC-233 · modal diff satu file di commit (reuse DiffView), tab Diff|Source */}
       {fileDiff && (
         <Modal open title={`Diff ${fileDiff.path}`} eyebrow={`@ ${fileDiff.sha.slice(0, 8)}`} width={900} fillHeight onClose={() => setFileDiff(null)}>
-          <div className="hn-panel-flex" style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 12, paddingBottom: 10, borderBottom: "1px solid var(--border-hair)" }}>
-              <div style={{ display: "flex", gap: 2, background: "var(--bone-100)", borderRadius: "var(--radius-pill)", padding: 2 }}>
+          <div className="hn-panel-flex hn-git-diff-body">
+            <div className="hn-git-diff-bar">
+              <div className="hn-git-diff-tabs">
                 {(isMarkdownPath(fileDiff.path)
                   ? (["diff", "source", "preview"] as const)
                   : (["diff", "source"] as const)
                 ).map((t) => (
-                  <button key={t} onClick={() => setFileDiff((s) => (s ? { ...s, tab: t } : s))} style={{ padding: "4px 12px", border: "none",
-                    cursor: "pointer", borderRadius: "var(--radius-pill)", fontSize: 12, textTransform: "capitalize",
-                    background: fileDiff.tab === t ? "var(--surface-card)" : "transparent",
-                    color: fileDiff.tab === t ? "var(--text-strong)" : "var(--text-muted)", fontWeight: fileDiff.tab === t ? 600 : 400 }}>{t}</button>
+                  <button key={t} onClick={() => setFileDiff((s) => (s ? { ...s, tab: t } : s))}
+                    className={fileDiff.tab === t ? "hn-git-diff-tab hn-git-diff-tab--on" : "hn-git-diff-tab"}>{t}</button>
                 ))}
               </div>
               {/* SPEC-385 · ADR-0078 · pratinjau baru wajib bisa dibawa pergi sebagai .md/.pdf */}
@@ -879,18 +857,17 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                   : api.ideCommitFileDownloadUrl(projectId, fileDiff.sha, fileDiff.path, f))} />
               )}
             </div>
-            <div data-testid="gitgraph-file-scroll" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", padding: "10px 0" }}>
+            <div data-testid="gitgraph-file-scroll" className="hn-git-diff-scroll">
               {!fileDiff.data ? (fileDiff.err
                 ? <StateBlock kind="error" title="Diff belum bisa dibuka" hint={fileDiff.err} />
                 : <StateBlock kind="loading" title="Memuat diff…" hint={fileDiff.path} />)
                 : fileDiff.data.binary ? <StateBlock kind="empty" icon="file" title="Berkas biner" />
                 : fileDiff.tab === "diff" ? <DiffView diff={fileDiff.data.diff ?? ""} emptyHint="File tak berubah di commit ini." />
                 : fileDiff.tab === "preview"
-                  ? <div style={{ padding: "0 16px" }}>
+                  ? <div className="hn-git-md">
                       <MarkdownView text={fileDiff.data.content ?? ""} name={fileDiff.path} />
                     </div>
-                : <pre style={{ margin: 0, padding: "0 16px", fontFamily: "var(--font-mono)", fontSize: 12.5, lineHeight: 1.6,
-                    whiteSpace: "pre-wrap", wordBreak: "break-word", color: "var(--text-body)" }}>{fileDiff.data.content ?? "(kosong / dihapus)"}</pre>}
+                : <pre className="hn-git-source">{fileDiff.data.content ?? "(kosong / dihapus)"}</pre>}
             </div>
           </div>
         </Modal>

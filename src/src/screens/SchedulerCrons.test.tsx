@@ -43,7 +43,7 @@ beforeEach(() => { vi.clearAllMocks(); });
 
 // Fase 3I · setiap aksi cron ada di menu ⋯ barisnya (tabel/kartu), bukan tombol sebaris.
 const openRowMenu = (name = "Cek error pagi") => fireEvent.click(screen.getByRole("button", { name: `Aksi untuk cron ${name}` }));
-const menuItem = (name: RegExp | string) => fireEvent.click(screen.getByRole("button", { name }));
+const menuItem = (name: RegExp | string) => fireEvent.click(screen.getByRole("menuitem", { name }));
 
 describe("SchedulerCrons", () => {
   it("menampilkan cron dengan jadwal terbaca manusia", async () => {
@@ -86,7 +86,7 @@ describe("SchedulerCrons", () => {
     openRowMenu();
     const dialog = screen.getByRole("dialog", { name: "Cek error pagi" });
     for (const name of ["Ubah", "Jalankan sekarang", "Riwayat", "Hapus"]) {
-      expect(within(dialog).getByRole("button", { name })).toBeInTheDocument();
+      expect(within(dialog).getByRole("menuitem", { name })).toBeInTheDocument();
     }
   });
 
@@ -144,7 +144,7 @@ describe("SchedulerCrons", () => {
     menuItem("Riwayat");
     expect(await screen.findByText(/cap penuh/)).toBeTruthy();
     openRowMenu();
-    expect(screen.getByRole("button", { name: "Sembunyikan riwayat" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Sembunyikan riwayat" })).toBeInTheDocument();
   });
 
   // Fase 3I · jam server ditampilkan dalam zonanya, dan zona itu disebut terang-terangan.
@@ -156,23 +156,17 @@ describe("SchedulerCrons", () => {
     expect(screen.getAllByText(/07\.00/).length).toBeGreaterThan(0);
   });
 
-  it("preview form dihitung hanya bila zona browser sama dengan zona server", async () => {
-    const browser = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    render(<SchedulerCrons {...props} timeZone={browser} />);
-    await screen.findByText("Cek error pagi");
-    fireEvent.click(screen.getByRole("button", { name: /Cron baru/i }));
-    expect((await screen.findByTestId("cron-next-preview")).textContent).toMatch(/^Perkiraan jalan berikutnya/);
-  });
-
-  it("zona server berbeda dari browser: preview tak dihitung ulang, dan batasnya dijelaskan", async () => {
+  // ADR-0212 · keterbatasan lama (preview hanya bila zona browser = zona server) sudah dicabut:
+  // preview selalu dihitung dalam zona server, dan jam yang ditampilkan memakai zona yang sama.
+  it("preview tampil di form ketika zona server berbeda dari zona browser", async () => {
     const browser = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const other = browser === "Asia/Jakarta" ? "UTC" : "Asia/Jakarta";
     render(<SchedulerCrons {...props} timeZone={other} />);
     await screen.findByText("Cek error pagi");
     fireEvent.click(screen.getByRole("button", { name: /Cron baru/i }));
     const preview = await screen.findByTestId("cron-next-preview");
-    expect(preview.textContent).toContain(`zona server ${other}`);
-    expect(preview.textContent).not.toMatch(/Perkiraan jalan berikutnya/);
+    expect(preview.textContent).toMatch(/^Perkiraan jalan berikutnya/);
+    expect(preview.className).not.toMatch(/preview-warn/);
   });
 
   // Fase 3I · form memakai dua tab; pilihan lanjutan hanya di tab Lanjutan.
@@ -196,5 +190,26 @@ describe("SchedulerCrons", () => {
     fireEvent.change(jam, { target: { value: "99" } });
     fireEvent.blur(jam);
     expect(jam).toHaveValue(23);
+  });
+});
+
+// ADR-0212 · preview "jalan berikutnya" memakai zona SERVER, bukan zona browser.
+describe("SchedulerCrons · preview memakai zona server (ADR-0212)", () => {
+  it("preview dihitung dalam serverTimeZone walau zona browser berbeda", async () => {
+    // 2026-08-11 03:00Z. Harian 07:00 WIB (Asia/Jakarta) berikutnya = 12 Agu 2026 07.00 WIB.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-11T03:00:00Z"));
+    try {
+      render(<SchedulerCrons {...props} timeZone="Asia/Jakarta" />);
+      await screen.findByText("Cek error pagi");
+      fireEvent.click(screen.getByRole("button", { name: /Cron baru/i }));
+      await screen.findByLabelText("Nama cron");
+      const text = screen.getByTestId("cron-next-preview").textContent ?? "";
+      expect(text).toMatch(/12 Agu 2026/);
+      expect(text).toMatch(/07[.:]00/);
+      expect(screen.getByTestId("cron-next-preview").className).not.toMatch(/preview-warn/);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

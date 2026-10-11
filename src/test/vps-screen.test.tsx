@@ -32,6 +32,7 @@ vi.mock("../src/api/client", () => ({
     listVpsComponents, auditVps, hardenVps },
   ApiError: class extends Error {},
 }));
+import { api } from "../src/api/client";
 import { VpsScreen, isReachable, hardenedLabel, vpsFormToBody } from "../src/screens/VpsScreen";
 
 // Aksi jarang (tes, console, sesi, edit, hapus) ada di menu ⋯ tiap baris.
@@ -66,7 +67,7 @@ describe("VpsScreen (SPEC-164)", () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={onGotoTerminal} />);
     await screen.findByText("web-1");
     openMenu();
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Buka console" })); });
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Buka console" })); });
     await vi.waitFor(() => expect(vpsConsole).toHaveBeenCalledWith("v1"));
     await vi.waitFor(() => expect(onGotoTerminal).toHaveBeenCalledWith("vpsc-v1"));
   });
@@ -75,7 +76,7 @@ describe("VpsScreen (SPEC-164)", () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={onGotoTerminal} />);
     await screen.findByText("web-1");
     openMenu();
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Sesi Claude" })); });
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Sesi Claude" })); });
     expect(vpsSession).toHaveBeenCalledWith("v1");
     expect(onGotoTerminal).toHaveBeenCalledWith("vps-v1");
   });
@@ -83,7 +84,7 @@ describe("VpsScreen (SPEC-164)", () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
     await screen.findByText("web-1");
     openMenu();
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tes koneksi" })); });
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Tes koneksi" })); });
     await vi.waitFor(() => expect(testVps).toHaveBeenCalledWith("v1"));
   });
   it("klik baris VPS membuka modal detail+checklist langsung (UI 2026-07-18)", async () => {
@@ -114,7 +115,7 @@ describe("modal edit (SPEC-165)", () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
     await screen.findByText("web-1");
     openMenu();
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit" }));
     expect(await screen.findByDisplayValue("web-1")).toBeTruthy();
     expect(screen.getByDisplayValue("203.0.113.10")).toBeTruthy();
     await act(async () => { fireEvent.click(screen.getByText("Simpan")); });
@@ -138,10 +139,13 @@ describe("VpsScreen · daftar ringkas (Fase 3J)", () => {
     expect(screen.queryByRole("button", { name: "Audit" })).toBeNull();
   });
 
-  it("Periksa menjalankan audit dan menampilkan skornya di baris", async () => {
+  // ADR-0211 · skor di baris datang dari listing (`scoreTotal` audit tersimpan), bukan state lokal:
+  // sesudah audit daftar dimuat ulang, dan server membawa skor baru.
+  it("Periksa menjalankan audit lalu daftar memuat ulang dan menampilkan skornya di baris", async () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
     await screen.findByText("web-1");
     expect(screen.getByText("Skor —")).toBeInTheDocument();
+    vi.mocked(api.listVps).mockResolvedValue([{ ...VPS, lastAuditAt: "2026-07-11T00:00:00Z", scoreTotal: 64 }]);
     fireEvent.click(screen.getByRole("button", { name: "Periksa" }));
     expect(await screen.findByText("Skor 64%")).toBeInTheDocument();
     expect(auditVps).toHaveBeenCalledWith("v1");
@@ -152,7 +156,7 @@ describe("VpsScreen · daftar ringkas (Fase 3J)", () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
     await screen.findByText("web-1");
     fireEvent.click(screen.getByRole("button", { name: "Aksi lain untuk web-1" }));
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Harden" })); });
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Harden" })); });
     expect(await screen.findByText('Harden "web-1"?')).toBeInTheDocument();
     expect(hardenVps).not.toHaveBeenCalled();
   });

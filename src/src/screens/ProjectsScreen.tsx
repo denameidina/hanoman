@@ -6,9 +6,10 @@
    (Semua · Perlu perhatian · Sesi berjalan). Kolom ringkas: Project · Status · Dokumen ·
    Backlog terbuka. "Perlu perhatian" (dokumen drift/rusak) diurut paling atas.
 
-   Sumber data: daftar penuh `projects` (App memuat seluruh project) dipakai untuk tampilan default
-   dan untuk hitungan chip, sehingga urutan dan chip konsisten. Pencarian dan filter perangkat tetap
-   lewat API (SPEC-198/SPEC-880); di mode itu urutan berlaku per halaman yang dimuat. */
+   Sumber data (ADR-0212): daftar penuh `projects` (App memuat seluruh project) dipakai untuk hitungan
+   chip dan untuk chip "Sesi berjalan" (status sesi tak ada di API). Tampilan default dan chip "Perlu
+   perhatian" lewat API dengan `sort=attention`; chip "Perlu perhatian" juga `attention=1`. Urutan dan
+   penyaringan perhatian dikerjakan SERVER lintas seluruh hasil, jadi berlaku global, bukan per halaman. */
 import React from "react";
 import { StatusPill, ProgressBar, OverflowActions, Select, StateBlock, Button, serverPage, Pager,
   RowList, DenseRow, LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE } from "../ds";
@@ -36,14 +37,6 @@ const CHIP_MATCH: Record<Chip, (p: ProjectVM) => boolean> = {
   all: () => true, attention: needsAttention, running: isRunning,
 };
 
-/** Rank perhatian: rusak (0) → drift (1) → sisanya (2). Sort JS stabil: urutan asal dijaga dalam rank. */
-export function attentionRank(p: ProjectVM): number {
-  if (p.docStatus === "broken") return 0;
-  if (p.docStatus === "drift") return 1;
-  return 2;
-}
-export const sortByAttention = (list: ProjectVM[]): ProjectVM[] =>
-  [...list].sort((a, b) => attentionRank(a) - attentionRank(b));
 
 function hnCovTone(s: string) { return s === "broken" ? "err" : s === "drift" ? "warn" : "ok"; }
 
@@ -99,10 +92,11 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
     return () => { alive = false; };
   }, []);
 
-  // Dua sumber data. Tampilan "Semua" tanpa filter perangkat memakai API (SPEC-198: galat, muat
-  // ulang, dan paginasi Fase 1). Chip aktif memakai daftar penuh dari App, supaya hitungan chip
-  // dan hasilnya selalu sama. Tanpa `pageSize` (pemakaian non-paginasi) daftar penuh dipakai apa adanya.
-  const clientMode = !pageSize || (chip !== "all" && !handledBy);
+  // Dua sumber data (ADR-0212). Tampilan default dan chip "Perlu perhatian" memakai API dengan
+  // `sort=attention` (galat, muat ulang, paginasi: SPEC-198), sehingga urutan dan penyaringannya global.
+  // Chip "Sesi berjalan" memakai daftar penuh dari App: status sesi tak ada di API. Tanpa `pageSize`
+  // (pemakaian non-paginasi) daftar penuh dipakai apa adanya.
+  const clientMode = !pageSize || (chip === "running" && !handledBy);
   const serverMode = !clientMode;
 
   // Seed dari prop penuh supaya baris tampil seketika; muatan server menggantinya begitu tiba (Fase 1).
@@ -118,7 +112,11 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
   React.useEffect(() => {
     if (!serverMode) { setListError(null); setLoading(false); return; }
     let alive = true;
-    const p = api.listProjects?.({ q: search || undefined, handledBy: handledBy || undefined, page, limit: pageSize });
+    // ADR-0212 · urutan perhatian selalu diminta dari server; chip "Perlu perhatian" menambah filternya.
+    const p = api.listProjects?.({
+      q: search || undefined, handledBy: handledBy || undefined, page, limit: pageSize,
+      sort: "attention", attention: chip === "attention" || undefined,
+    });
     if (!p) return;
     setLoading(true);
     p.then((r) => {
@@ -128,7 +126,7 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
       .catch((e: unknown) => { if (alive) setListError(errorMessage(e, "tidak diketahui")); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [serverMode, search, handledBy, page, pageSize, dataVersion, projects, reloadKey]);
+  }, [serverMode, search, handledBy, chip, page, pageSize, dataVersion, projects, reloadKey]);
 
   const counts: Record<Chip, number> = {
     all: projects.length,
@@ -137,14 +135,14 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
   };
   const chipFilter = CHIP_MATCH[chip];
 
-  // Mode klien: seluruh daftar, dipangkas chip (dan pencarian nama bila ada), diurut perhatian,
-  // lalu dipaginasi di sini. Mode server: urutan perhatian berlaku pada halaman yang dimuat.
+  // Mode klien: seluruh daftar, dipangkas chip (dan pencarian nama bila ada), lalu dipaginasi di sini
+  // (urutannya tetap urutan App). Mode server: urutan & penyaring perhatian sudah dikerjakan server.
   const needle = search.trim().toLowerCase();
-  const clientFiltered = sortByAttention(projects.filter((p) => chipFilter(p)
-    && (!pageSize || !needle || `${p.name} ${p.desc ?? ""}`.toLowerCase().includes(needle))));
+  const clientFiltered = projects.filter((p) => chipFilter(p)
+    && (!pageSize || !needle || `${p.name} ${p.desc ?? ""}`.toLowerCase().includes(needle)));
   const clientTotal = clientFiltered.length;
   const clientPage = pageSize ? clientFiltered.slice((page - 1) * pageSize, page * pageSize) : clientFiltered;
-  const rows = serverMode ? sortByAttention(serverRows.filter(chipFilter)) : clientPage;
+  const rows = serverMode ? serverRows.filter(chipFilter) : clientPage;
   const total = serverMode ? serverTotal : clientTotal;
   const sp = serverPage(total, page, pageSize || total || 1);
   // Pemulihan scroll hanya setelah baris ada (SPEC-740): kalau tidak, posisi lama hilang saat kosong.

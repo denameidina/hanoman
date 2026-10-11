@@ -73,12 +73,12 @@ describe("detail: CTA jalankan agen untuk semua tahap", () => {
 describe("baris dan kartu: satu aksi utama, sisanya di menu ⋯", () => {
   it("Dokumen, Tandai selesai, dan Review perubahan ada di menu, bukan sejajar", () => {
     screenWith([spec({ id: "SPEC-5", title: "kartu" })], { onOpenReview: vi.fn(), onMarkDone: vi.fn() });
-    expect(screen.queryByRole("button", { name: "Lihat dokumen" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Tandai selesai" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Lihat dokumen" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Tandai selesai" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Aksi lain SPEC-5" }));
-    expect(screen.getByRole("button", { name: "Lihat dokumen" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Tandai selesai" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Review perubahan" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Lihat dokumen" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Tandai selesai" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Review perubahan" })).toBeTruthy();
   });
 });
 

@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { failureMessage } from "../lib/report-error";
 import { codexClientTooOld, codexModel, coerceCodexEffort, CODEX_DEFAULTS, type Agent } from "@hanoman/shared";
 import { runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./session-runtime";
+import "./styles/terminal.css";
 
 /**
  * SPEC-517 · form "Sesi baru" di halaman Terminal. Sampai sekarang tombol itu men-spawn agen
@@ -91,44 +92,41 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
         <Button leftIcon="play" disabled={busy} onClick={() => void create()}>Buka sesi</Button>
       </>}>
       {settingsNotice && (
-        <Callout tone="warn" title="Pengaturan belum terbaca" style={{ marginBottom: 12 }}>{settingsNotice}</Callout>
+        <Callout tone="warn" title="Pengaturan belum terbaca" className="hn-terminal-notice">{settingsNotice}</Callout>
       )}
       {createError && (
-        <Callout tone="err" title="Sesi belum terbuka" style={{ marginBottom: 12 }}>{createError}</Callout>
+        <Callout tone="err" title="Sesi belum terbuka" className="hn-terminal-notice">{createError}</Callout>
       )}
-      <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="hn-terminal-intro">
         Runtime untuk sesi ini. Default dari setelan global; ubah bila perlu. Sesi lahir dengan
         pilihan ini untuk seluruh hidupnya — <code>/model</code> di terminal tetap bisa mengubahnya.
       </div>
       {projects && onProjectChange && projects.length > 1 && (
         <Field label="Project" hint="Direktori repo tempat sesi dibuka.">
-          <Select aria-label="Project" value={projectId} style={{ width: "100%" }}
+          <Select aria-label="Project" value={projectId} className="hn-terminal-field-full"
             options={projects.map((p) => ({ value: p.id, label: p.name }))}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onProjectChange(e.target.value)} />
         </Field>
       )}
       <Field label="Agen" hint="Mesin yang menjalankan sesi ini. Perilaku sesi sama; hanya CLI-nya berbeda.">
-        <Select aria-label="Agen" value={agent} style={{ width: "100%" }}
+        <Select aria-label="Agen" value={agent} className="hn-terminal-field-full"
           options={[{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex CLI" }]}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickAgent(e.target.value as Agent)} />
       </Field>
       <Field label="Model">
-        <Select aria-label="Model" value={model} style={{ width: "100%" }}
+        <Select aria-label="Model" value={model} className="hn-terminal-field-full"
           options={runtimeModelOptions(agent, model)}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickModel(e.target.value)} />
       </Field>
       <Field label="Effort">
-        <Select aria-label="Effort" value={effort} style={{ width: "100%" }}
+        <Select aria-label="Effort" value={effort} className="hn-terminal-field-full"
           options={runtimeEfforts(agent, model).map((v) => ({ value: v, label: v }))}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEffort(e.target.value)} />
       </Field>
       {/* SPEC-339 · catatan LUNAK: CLI terlalu tua untuk model terpilih. Tak memblokir "Buka sesi" —
           aturannya sama persis dengan kartu Settings & picker Start (satu `codexClientTooOld`). */}
       {agent === "codex" && codexClientTooOld(model, codexVer) && (
-        <div data-testid="codex-version-note" style={{
-          fontSize: 12, lineHeight: 1.5, marginBottom: 12, padding: "8px 10px",
-          borderRadius: 8, background: "var(--status-warn-tint)", color: "var(--text-muted)",
-        }}>
+        <div data-testid="codex-version-note" className="hn-terminal-codex-note">
           Codex CLI terpasang <b>{codexVer}</b>, sedangkan <b>{model}</b> butuh <b>{codexModel(model)?.minClient}</b>.
           Sesi tetap boleh dijalankan, tapi modelnya belum tentu dikenali CLI ini.
         </div>

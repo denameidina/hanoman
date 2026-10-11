@@ -82,7 +82,7 @@ describe("TeamBoard · aksi eksplisit kartu", () => {
   it("Pindah kolom lewat menu mengirim mutasi yang sama dengan drag", () => {
     const { onMove } = board({ backlog: [task({ id: "a", title: "Desain" })] });
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
-    fireEvent.click(screen.getByRole("button", { name: "Pindah ke Selesai" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Pindah ke Selesai" }));
     expect(onMove.mock.calls[0]![1]).toBe("done");
   });
 
@@ -95,14 +95,14 @@ describe("TeamBoard · aksi eksplisit kartu", () => {
   it("Tugaskan lewat menu mengirim id anggota; Kosongkan penugasan mengirim null", () => {
     const { onAssign } = board({ backlog: [task({ id: "a", title: "Desain" })] });
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
-    fireEvent.click(screen.getByRole("button", { name: "Tugaskan ke Dena" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Tugaskan ke Dena" }));
     expect(onAssign.mock.calls[0]![1]).toBe("a@x.id");
   });
 
   it("Kosongkan penugasan mengirim null untuk kartu yang sudah ditugaskan", () => {
     const { onAssign } = board({ backlog: [task({ id: "a", title: "Desain", memberId: "a@x.id" })] });
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
-    fireEvent.click(screen.getByRole("button", { name: "Kosongkan penugasan" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Kosongkan penugasan" }));
     expect(onAssign.mock.calls[0]![1]).toBeNull();
   });
 
@@ -144,12 +144,12 @@ describe("TeamBoard · isi kartu", () => {
       totals={zeros} columns={TEAM_COLUMNS} members={[]} onMove={() => {}} onAssign={() => {}}
       onOpen={() => {}} onEscalate={() => {}} onUnlink={() => {}} onOpenSpec={() => {}} />);
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: A" }));
-    expect(screen.getByRole("button", { name: "Buka SPEC-1 di Backlog" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Lepas tautan (spec tak ditemukan)" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "Buka SPEC-1 di Backlog" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Lepas tautan (spec tak ditemukan)" })).toBeNull();
     unmount();
     board({ backlog: [task({ id: "b", title: "B", specId: "SPEC-9", spec: null })] });
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: B" }));
-    expect(screen.getByRole("button", { name: "Lepas tautan (spec tak ditemukan)" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Lepas tautan (spec tak ditemukan)" })).toBeInTheDocument();
   });
 });
 
@@ -159,7 +159,7 @@ describe("TeamBoard · eskalasi", () => {
   it("kartu belum tertaut membawa aksi Kirim ke Backlog di menu Ubah tugas", () => {
     const { onEscalate } = board({ backlog: [task({ id: "a" })] });
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
-    fireEvent.click(screen.getByRole("button", { name: "Kirim ke Backlog" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Kirim ke Backlog" }));
     expect(onEscalate).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
   });
 
@@ -167,8 +167,8 @@ describe("TeamBoard · eskalasi", () => {
     const { onUnlink } = board({ backlog: [task({
       id: "a", specId: "SPEC-9", spec: { id: "SPEC-9", stage: "executing", priority: "tinggi" } })] });
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
-    expect(screen.queryByRole("button", { name: "Kirim ke Backlog" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Lepas tautan" }));
+    expect(screen.queryByRole("menuitem", { name: "Kirim ke Backlog" })).toBeNull();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Lepas tautan" }));
     expect(onUnlink).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
   });
 
@@ -177,7 +177,7 @@ describe("TeamBoard · eskalasi", () => {
   it("tautan putus ditawarkan Lepas tautan (dengan keterangannya), bukan eskalasi ulang", () => {
     const { onUnlink } = board({ backlog: [task({ id: "a", specId: "SPEC-hantu", spec: null })] });
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
-    fireEvent.click(screen.getByRole("button", { name: "Lepas tautan (spec tak ditemukan)" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Lepas tautan (spec tak ditemukan)" }));
     expect(onUnlink).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
   });
 });
@@ -204,7 +204,7 @@ describe("TeamBoard · audit 2026-10", () => {
       totals={zeros} columns={TEAM_COLUMNS} members={[]} onMove={() => {}} onAssign={() => {}}
       onOpen={() => {}} onEscalate={() => {}} onUnlink={() => {}} onOpenSpec={onOpenSpec} />);
     fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
-    fireEvent.click(screen.getByRole("button", { name: "Buka SPEC-9 di Backlog" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Buka SPEC-9 di Backlog" }));
     expect(onOpenSpec).toHaveBeenCalledWith("SPEC-9");
   });
 

@@ -4,6 +4,7 @@ import React from "react";
 import { logs, logRetention, logTranscript, putLogRetention, type LogSearchQueryInput } from "../api/client";
 import type { LogEntryView, LogRetention } from "@hanoman/shared";
 import { StateBlock } from "../ds";
+import "./styles/panels.css";
 
 function defaultRange(): { from: string; to: string } {
   const to = new Date();
@@ -59,9 +60,8 @@ export function LogsPanel() {
   }
 
   return (
-    <div className="hn-logs-panel" style={{ display: "grid", gap: 12 }}>
-      <form onSubmit={(e) => { e.preventDefault(); void load(); }}
-        style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+    <div className="hn-logs-panel">
+      <form onSubmit={(e) => { e.preventDefault(); void load(); }} className="hn-logs-filter">
         <input type="datetime-local" aria-label="Dari" value={query.from.slice(0, 16)}
           onChange={(e) => setQuery((q) => ({ ...q, from: new Date(e.target.value).toISOString() }))} />
         <input type="datetime-local" aria-label="Sampai" value={query.to.slice(0, 16)}
@@ -99,21 +99,20 @@ export function LogsPanel() {
         : items.length === 0
           ? <StateBlock kind="empty" title="Tidak ada log pada rentang/penyaring ini" compact />
           : (
-            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            <ul className="hn-logs-list">
               {items.map((row) => (
-                <li key={row.id} className="hn-dense-row"
+                <li key={row.id}
+                  className={`hn-dense-row hn-logs-row${row.hasTranscript ? " hn-logs-row--open" : ""}`}
                   role={row.hasTranscript ? "button" : undefined}
                   tabIndex={row.hasTranscript ? 0 : undefined}
-                  onClick={() => void openRow(row)}
-                  style={{ cursor: row.hasTranscript ? "pointer" : "default", display: "flex",
-                    alignItems: "center", flexWrap: "wrap", gap: 10, minWidth: 0, padding: "6px 8px" }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-subtle)" }}>
+                  onClick={() => void openRow(row)}>
+                  <span className="hn-logs-ts">
                     {row.ts}
                   </span>
-                  <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{row.lane}</span>
-                  <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{row.level}</span>
-                  <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{row.kind}</span>
-                  <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)" }}>{row.msg}</span>
+                  <span className="hn-logs-meta">{row.lane}</span>
+                  <span className="hn-logs-meta">{row.level}</span>
+                  <span className="hn-logs-meta">{row.kind}</span>
+                  <span className="hn-logs-msg">{row.msg}</span>
                 </li>
               ))}
             </ul>
@@ -126,14 +125,14 @@ export function LogsPanel() {
       {openTranscript && (
         <section>
           <button type="button" onClick={() => setOpenTranscript(null)}>Tutup transkrip</button>
-          <pre style={{ maxHeight: 320, overflow: "auto" }}>{openTranscript.text}</pre>
+          <pre className="hn-logs-transcript">{openTranscript.text}</pre>
         </section>
       )}
 
       {retention && (
-        <section style={{ borderTop: "1px solid var(--border-hair)", paddingTop: 10 }}>
-          <h3 style={{ fontSize: 13, margin: "0 0 6px" }}>Retensi</h3>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <section className="hn-logs-retention">
+          <h3 className="hn-logs-h3">Retensi</h3>
+          <div className="hn-logs-filter">
             <label>
               event (hari)
               <input type="number" placeholder="mis. 90" value={retention.eventDays}

@@ -111,7 +111,7 @@ describe("TeamScreen · wiring eskalasi", () => {
       onProjectFilter={() => {}} onToast={() => {}} />);
     // Aksi kartu ada di menu "Ubah tugas", bukan tombol sejajar.
     fireEvent.click(await screen.findByRole("button", { name: /^Ubah tugas/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Kirim ke Backlog" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Kirim ke Backlog" }));
     expect(await screen.findByLabelText(/source/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/prioritas/i)).toBeInTheDocument();
   });
@@ -124,11 +124,11 @@ describe("TeamScreen · wiring eskalasi", () => {
     render(<TeamScreen projects={projects} projectFilter="all"
       onProjectFilter={() => {}} onToast={() => {}} />);
     fireEvent.click(await screen.findByRole("button", { name: /^Ubah tugas/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Lepas tautan" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Lepas tautan" }));
     await waitFor(() => expect(spy).toHaveBeenCalledWith("t1"));
     // Tautan sudah lepas: menu kini menawarkan eskalasi lagi, dan label tautan hilang.
     await waitFor(() => expect(screen.queryByRole("button", { name: /^Ubah tugas/ })).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: /^Ubah tugas/ }));
-    expect(await screen.findByRole("button", { name: "Kirim ke Backlog" })).toBeInTheDocument();
+    expect(await screen.findByRole("menuitem", { name: "Kirim ke Backlog" })).toBeInTheDocument();
   });
 });

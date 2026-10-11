@@ -23,18 +23,18 @@ const screenWith = (onMarkDone: any, backlog: Spec[] = [spec], detailId?: string
 // Tandai selesai kini aksi sekunder: buka menu ⋯ item (SPEC-804 · ADR-0120 → menu), lalu pilih itu.
 const openMarkDoneFromMenu = () => {
   fireEvent.click(screen.getAllByRole("button", { name: "Aksi lain SPEC-804" })[0]!);
-  fireEvent.click(screen.getByRole("button", { name: "Tandai selesai" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Tandai selesai" }));
 };
 
 describe("SPEC-804 · tandai selesai dari dashboard", () => {
   it("aksi ada di menu item belum selesai, hilang untuk item done", () => {
     const { unmount } = screenWith(vi.fn());
     fireEvent.click(screen.getAllByRole("button", { name: "Aksi lain SPEC-804" })[0]!);
-    expect(screen.getByRole("button", { name: "Tandai selesai" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Tandai selesai" })).toBeTruthy();
     unmount();
     screenWith(vi.fn(), [{ ...spec, stage: "done" } as Spec]);
     fireEvent.click(screen.getByRole("button", { name: "Aksi lain SPEC-804" }));
-    expect(screen.queryByRole("button", { name: "Tandai selesai" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Tandai selesai" })).toBeNull();
   });
 
   it("dialog meminta konfirmasi dan mengirim alasan", async () => {

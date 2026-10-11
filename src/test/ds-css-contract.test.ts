@@ -54,3 +54,18 @@ describe("komponen DS · warna teks tak memakai token fill", () => {
     expect(src).not.toMatch(/color: on \? "var\(--accent-hover\)"/);
   });
 });
+
+describe("menu aksi (.hn-overflow-item*) · satu definisi, di ui.css", () => {
+  // Blok duplikat di app.css sudah dicabut (Z11). Dua salinan berarti dua sumber kebenaran untuk fokus
+  // dan hover, dan urutan pemuatan menentukan mana yang menang.
+  it("app.css tak lagi mendefinisikan .hn-overflow-item", () => {
+    expect(code).not.toMatch(/\.hn-overflow-item/);
+  });
+
+  it("ui.css mendefinisikannya dan ui.tsx mengimpor ui.css (satu-satunya jalur pemuatan)", () => {
+    const uiCss = readFileSync(join(dsDir, "ui.css"), "utf8");
+    expect(uiCss).toMatch(/\.hn-overflow-item\s*\{/);
+    expect(uiCss).toMatch(/\.hn-overflow-item:focus-visible\s*\{\s*outline:\s*2px solid var\(--border-focus\)/);
+    expect(readFileSync(join(dsDir, "ui.tsx"), "utf8")).toMatch(/import "\.\/ui\.css";/);
+  });
+});

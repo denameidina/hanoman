@@ -113,8 +113,8 @@ function RemotesModal({ projectId, onClose }: { projectId: string; onClose: () =
           </div>
         ))}
         <div className="hn-stack-mobile hn-ide-remote-add">
-          <Input size="sm" value={name} aria-label="Nama remote" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="origin" style={{ width: 100 }} />
-          <Input size="sm" value={url} aria-label="URL remote" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)} placeholder="https://github.com/org/repo.git" style={{ flex: 1 }} />
+          <Input size="sm" value={name} aria-label="Nama remote" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="origin" className="hn-ide-input-100" />
+          <Input size="sm" value={url} aria-label="URL remote" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)} placeholder="https://github.com/org/repo.git" className="hn-grow" />
           <Button size="sm" leftIcon="plus" disabled={!name || !url}
             onClick={() => api.ideAddRemote(projectId, name, url)
               .then((rs) => { setRemotes(rs); setName(""); setUrl(""); setErr(""); })
@@ -585,7 +585,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                 ))}
               </div>
             </div>
-            <div data-testid="doc-preview-scroll" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+            <div data-testid="doc-preview-scroll" className="hn-ide-scroll-body">
               {!diffSel ? <StateBlock kind="empty" icon="file-text" title="Pilih file dari daftar Perubahan" />
                 : diff === null ? (viewErr
                     ? <StateBlock kind="error" title="Diff belum bisa dibuka" hint={viewErr} action={() => setViewNonce((n) => n + 1)} />
@@ -615,7 +615,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
       masterWidth={treeW}
       panels={[
         { id: "files", label: "Berkas", className: "hn-panel-flex", content: (
-          <div className="hn-ide-files-pane" style={{ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: 0 }}>
+          <div className="hn-ide-files-pane">
             <Card padding={0} fill>
               {/* ADR-0121 · satu baris kontrol. Tujuan unggah/buat wajib terlihat (→ folder). */}
               <div className="hn-ide-files-bar">
@@ -635,8 +635,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                 onDragLeave={() => setDropping(false)}
                 onDrop={(e) => { e.preventDefault(); setDropping(false);
                   void readDroppedEntries(e.dataTransfer).then((list) => runUpload(list)); }}
-                style={{ padding: 8, flex: "1 1 auto", minHeight: 0, overflow: "auto",
-                  outline: dropping ? "2px dashed var(--brass-500)" : "none", outlineOffset: -4 }}>
+                className={dropping ? "hn-ide-tree-scroll hn-ide-drop" : "hn-ide-tree-scroll"}>
                 {treeState === "loading" ? <StateBlock kind="loading" compact title="Memuat file…" />
                   : treeState === "error" ? <StateBlock kind="error" compact title="Gagal memuat file" action={() => reloadTree()} />
                   : files.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Tak ada file" />
@@ -707,7 +706,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                     <Button size="sm" leftIcon="check" onClick={() => void save()}>Simpan</Button>
                   </div>}
             </div>
-            <div data-testid="doc-preview-scroll" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+            <div data-testid="doc-preview-scroll" className="hn-ide-scroll-body">
               {!fileSel ? <StateBlock kind="empty" icon="file-text" title="Pilih file dari pohon di kiri" />
                 : file === null ? (viewErr
                     ? <StateBlock kind="error" title="Berkas belum bisa dibuka" hint={viewErr} action={() => setViewNonce((n) => n + 1)} />
@@ -734,8 +733,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   return (
     // SPEC-363 · Perubahan dan Berkas memakai rantai flex (dua pane menggulir sendiri); Riwayat dan
     // Cabang tetap tumbuh mengikuti isi — graph bergantung pada `<main>` yang menggulir (SPEC-351).
-    <div className="hn-ide-screen" style={{ display: "flex", flexDirection: "column", gap: 16,
-      ...(tab === "perubahan" || tab === "berkas" ? { flex: "1 1 0", minHeight: 0 } : null) }}>
+    <div className={tab === "perubahan" || tab === "berkas" ? "hn-ide-screen hn-ide-screen--fill" : "hn-ide-screen"}>
       <div className="hn-ide-head">
         <Tabs aria-label="Bagian IDE" tabs={[
           { value: "perubahan", label: "Perubahan", count: changedCount || undefined },
@@ -773,7 +771,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
             aria-label={nameDialog.mode === "dir" ? "Nama folder" : nameDialog.mode === "file" ? "Nama berkas" : "Path baru"}
             placeholder={nameDialog.mode === "dir" ? "komponen" : "Baru.tsx"}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNameDialog({ ...nameDialog, value: e.target.value })}
-            style={{ width: "100%" }} />
+            className="hn-ide-input-full" />
         </Modal>
       )}
       {conflict && (

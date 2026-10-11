@@ -3,6 +3,8 @@
 import React from "react";
 import { Icon } from "./icon";
 import { FieldLinkContext, ariaInvalid, useFieldLink, type FieldLinkValue } from "./components/forms";
+// Kelas Toast, Modal, Field, dan Pager (dan App/PetAnswer). Diimpor di sini: setelah app.css (main.tsx).
+import "../styles/app-shell.css";
 
 const modalStack: symbol[] = [];
 
@@ -100,26 +102,14 @@ function ToastItem({ toast, onDone }: { toast: ToastData; onDone?: (k: number) =
 
   if (gone) return null;
   return (
-    <div className="hn-toast" role={err ? "alert" : undefined} aria-live={err ? "assertive" : undefined}
+    <div className={action ? "hn-toast hn-toast--action" : "hn-toast"} role={err ? "alert" : undefined} aria-live={err ? "assertive" : undefined}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       onFocus={() => setFocus(true)}
-      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocus(false); }}
-      style={{
-        pointerEvents: "auto", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 10,
-        padding: action ? "9px 10px 9px 16px" : "11px 16px",
-        background: "var(--surface-inverse)", color: "var(--term-fg)",
-        borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-xl)",
-        fontFamily: "var(--font-sans)", fontSize: 13.5, maxWidth: "100%",
-        animation: "hn-fade-in 180ms var(--ease-out, ease-out)",
-      }}>
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocus(false); }}>
       <Icon name={icon} size={16} color={color} />
-      <span style={{ minWidth: 0, flex: "1 1 auto" }}>{toast.message}</span>
+      <span className="hn-toast-msg">{toast.message}</span>
       {action && (
-        <button type="button" onClick={() => { action.onAction(); dismiss(); }} style={{
-          border: "none", background: "transparent", cursor: "pointer", color: "var(--brass-300)",
-          font: "var(--weight-medium) 13px/1 var(--font-ui)", padding: "6px 8px", borderRadius: "var(--radius-sm)",
-          flex: "0 0 auto",
-        }}>{action.label}</button>
+        <button type="button" onClick={() => { action.onAction(); dismiss(); }} className="hn-toast-action">{action.label}</button>
       )}
     </div>
   );
@@ -134,12 +124,7 @@ export function ToastHost({ toast }: { toast?: ToastQueue | ToastData | null }) 
   const dismiss = queue ? queue.dismiss : undefined;
   const visible = items.slice(0, TOAST_VISIBLE);
   return (
-    <div data-hn-toast-host="" role="status" aria-live="polite" style={{
-      position: "fixed", left: "50%", bottom: "calc(28px + var(--safe-bottom))", transform: "translateX(-50%)", zIndex: 200,
-      display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-      width: "max-content", maxWidth: "min(460px, calc(100vw - var(--safe-left) - var(--safe-right) - 28px))",
-      pointerEvents: "none",
-    }}>
+    <div data-hn-toast-host="" role="status" aria-live="polite" className="hn-toast-host">
       {visible.map((t) => <ToastItem key={t.k} toast={t} onDone={dismiss} />)}
     </div>
   );
@@ -218,54 +203,36 @@ export function Modal({ open, title, eyebrow, icon, onClose, footer, width = 560
 
   if (!open) return null;
   return (
-    <div className="hn-modal-overlay" onMouseDown={(e) => { if (canDismiss && e.target === e.currentTarget) onClose?.(); }} style={{
-      position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center",
-      background: "color-mix(in srgb, var(--ink-900) 42%, transparent)",
-      animation: "hn-fade-in 160ms ease-out",
-    }}>
+    <div className="hn-modal-overlay hn-modal-scrim" onMouseDown={(e) => { if (canDismiss && e.target === e.currentTarget) onClose?.(); }}>
       {/* SPEC-363 · `fillHeight` untuk modal yang MEMBACA dokumen: tanpa tinggi pasti di panel,
           isinya cuma bisa memakai tinggi tetap (dulu `62vh`) dan membuang 18–23% ruang di tiap
           layar. Opt-in supaya 20-an modal lain tetap setinggi isinya. */}
       <div
         ref={panelRef}
         data-testid="modal-panel"
-        className="hn-modal-panel"
+        className={fillHeight ? "hn-modal-panel hn-modal-sheet hn-modal-panel--fill" : "hn-modal-panel hn-modal-sheet"}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
-        style={{
-        width, maxWidth: "100%", maxHeight: "calc(100dvh - 48px - var(--safe-top) - var(--safe-bottom))", display: "flex", flexDirection: "column",
-        ...(fillHeight ? { height: "min(88vh, calc(100dvh - 48px - var(--safe-top) - var(--safe-bottom)))" } : null),
-        background: "var(--surface-card)", borderRadius: "var(--radius-lg)",
-        border: "1px solid var(--border-hair)", boxShadow: "var(--shadow-xl)", overflow: "hidden",
-        animation: "hn-modal-in 200ms var(--ease-out, ease-out)",
-      }}>
-        <div className="hn-modal-header" style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "18px 20px 14px", borderBottom: "1px solid var(--border-hair)" }}>
+        style={{ width }}>
+        <div className="hn-modal-header">
           {icon && (
-            <span style={{ width: 32, height: 32, borderRadius: "var(--radius-sm)", flex: "0 0 auto",
-              background: "var(--brass-100)", color: "var(--brass-700)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <span className="hn-modal-icon">
               <Icon name={icon} size={17} />
             </span>
           )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {eyebrow && <div className="hn-eyebrow" style={{ marginBottom: 3 }}>{eyebrow}</div>}
+          <div className="hn-grow-min">
+            {eyebrow && <div className="hn-eyebrow hn-modal-eyebrow">{eyebrow}</div>}
             {title && (
-              <h2 id={titleId} style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-strong)", lineHeight: 1.15 }}>{title}</h2>
+              <h2 id={titleId} className="hn-modal-title">{title}</h2>
             )}
           </div>
-          <button type="button" onClick={() => { if (canDismiss) onClose?.(); }} disabled={!canDismiss} aria-label="Tutup" style={{
-            border: "none", background: "transparent", cursor: canDismiss ? "pointer" : "not-allowed", color: "var(--text-muted)",
-            opacity: canDismiss ? 1 : 0.4,
-            width: 44, height: 44, alignItems: "center", justifyContent: "center",
-            padding: 0, borderRadius: "var(--radius-sm)", display: "inline-flex", flex: "0 0 auto",
-          }}><Icon name="x" size={18} /></button>
+          <button type="button" onClick={() => { if (canDismiss) onClose?.(); }} disabled={!canDismiss} aria-label="Tutup" className="hn-modal-close"><Icon name="x" size={18} /></button>
         </div>
-        <div data-testid="modal-body" className="hn-modal-body" style={{ padding: "18px 20px", overflow: "auto",
-          ...(fillHeight ? { flex: "1 1 auto", minHeight: 0 } : null) }}>{children}</div>
+        <div data-testid="modal-body" className={fillHeight ? "hn-modal-body hn-modal-body--fill" : "hn-modal-body"}>{children}</div>
         {footer && (
-          <div className="hn-modal-footer" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10,
-            padding: "14px 20px", borderTop: "1px solid var(--border-hair)", background: "var(--bone-100)" }}>
+          <div className="hn-modal-footer">
             {footer}
           </div>
         )}
@@ -303,13 +270,13 @@ export function Field({ label, hint, error, children }: {
   }), [owner, describedBy, error, register, unregister]);
   return (
     <FieldLinkContext.Provider value={link}>
-      <div className="hn-field" style={{ display: "block", marginBottom: 14 }}>
+      <div className="hn-field">
         {label && (
-          <label htmlFor={owner?.id} style={{ display: "block", fontFamily: "var(--font-ui)", fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)", marginBottom: 6 }}>{label}</label>
+          <label htmlFor={owner?.id} className="hn-field-label">{label}</label>
         )}
         {children}
-        {hint && <div id={hintId} style={{ fontSize: 11.5, color: "var(--text-subtle)", marginTop: 5 }}>{hint}</div>}
-        {error && <div id={errorId} role="alert" style={{ fontSize: 12, color: "var(--status-err)", marginTop: 5, lineHeight: 1.4 }}>{error}</div>}
+        {hint && <div id={hintId} className="hn-field-hint">{hint}</div>}
+        {error && <div id={errorId} role="alert" className="hn-field-error">{error}</div>}
       </div>
     </FieldLinkContext.Provider>
   );
@@ -403,20 +370,16 @@ export function Pager({ page, pageCount, total, from, to, onPage, unit = "item" 
   { page: number; pageCount: number; total: number; from: number; to: number; onPage: (n: number) => void; unit?: string }) {
   if (total === 0) return null;
   return (
-    <div style={{
-      ...FIXED_ROW_STYLE,
-      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-      padding: "11px 14px", borderTop: "1px solid var(--border-hair)", background: "var(--bone-100)", flexWrap: "wrap",
-    }}>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-muted)" }}>
+    <div className="hn-pager">
+      <span className="hn-pager-count">
         {from}–{to} dari {total} {unit}
       </span>
-      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+      <div className="hn-pager-btns">
         <PagerBtn onClick={() => onPage(page - 1)} disabled={page <= 1} aria="Sebelumnya">
           <Icon name="chevron-left" size={15} />
         </PagerBtn>
         {pageWindow(page, pageCount).map((n, i) => n === "…"
-          ? <span key={"e" + i} style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)", padding: "0 2px" }}>…</span>
+          ? <span key={"e" + i} className="hn-pager-gap">…</span>
           : <PagerBtn key={n} onClick={() => onPage(n as number)} active={n === page} aria={"Halaman " + n}>{n}</PagerBtn>)}
         <PagerBtn onClick={() => onPage(page + 1)} disabled={page >= pageCount} aria="Berikutnya">
           <Icon name="chevron-right" size={15} />

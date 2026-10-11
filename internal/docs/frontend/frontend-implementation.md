@@ -258,7 +258,7 @@ Belum di Fase 2C (lihat [§Status pelaksanaan](ui-ux-audit-2026-10.md#status-pel
 
 - Tombol "Buat project pertama" di Overview masih `onGoto("projects")`. Membuka modal project baru langsung
   butuh prop `onCreateProject` di `OverviewScreen` (`screens/`, milik Fase 2F).
-- Tombol "Jawab" pada toast dan notifikasi keputusan (`notifications/`, milik Fase 2G).
+- Tombol "Jawab" pada toast dan notifikasi keputusan: sudah ada sejak Fase 4 (lihat § Fase 4 · Jawab dari notifikasi).
 
 ## Kontrak responsive seluruh frontend (SPEC-763)
 
@@ -385,7 +385,8 @@ dengan memotong atau menjepit, bukan dengan reflow. Ketiganya kini punya aturan:
   tetangga yang basis-nya selebar isinya — terukur judul tersisa **"Ba…"** (konten terpotong 667px)
   sementara id project yang identik di semua baris tampil penuh. Di mobile `.hn-picker-title` turun
   ke barisnya sendiri dan membungkus; `!important` wajib karena `white-space: nowrap`-nya inline.
-- **Pet melayang mencuri tap, dan z-index bukan yang membatasinya.** Pet `position: fixed` z-80
+- **Pet melayang mencuri tap, dan z-index bukan yang membatasinya.** (Catatan historis: sejak ADR-0206 jalur pet tak lagi
+  `position: fixed`.) Pet `position: fixed` z-80
   memang di bawah lapisan chrome (header 90, Modal 150), tapi **di atas konten halaman**. Tombol
   tembus-pandangnya dulu selebar seluruh panggung 76×76, sehingga tap yang ditujukan ke kontrol di
   bawahnya mendarat di pet — terukur `elementFromPoint` atas 9 titik sampel per kontrol: "Hapus
@@ -452,8 +453,8 @@ Terminal berpindah dari grid ke **Fokus**, yaitu satu pane terminal dengan rail 
 ada sebagai mode opsional (toggle **Fokus | Grid**) dan memakai workspace kanonik
 [ADR-0118](../adr/0118-workspace-terminal-kanonik-per-user.md) tanpa perubahan. Mode tampilan adalah state
 presentasional per browser ([ADR-0115](../adr/0115-state-tampilan-dashboard-persisten.md)). Tidak ada API baru,
-jadi tak ada keputusan MCP baru ([ADR-0202](../adr/0202-keputusan-mcp-wajib-untuk-setiap-api-baru.md)) dan tak ada
-ADR baru. Pola interaksinya ada di [design-system](../design-system/design-system.md).
+jadi tak ada keputusan MCP baru ([ADR-0202](../adr/0202-keputusan-mcp-wajib-untuk-setiap-api-baru.md)). Keputusan
+layar ini dicatat di [ADR-0209](../adr/0209-terminal-rail-sesi-fokus-default.md). Pola interaksinya ada di [design-system](../design-system/design-system.md).
 
 Berkas:
 
@@ -571,7 +572,8 @@ hilang dicabut, dan font tak lagi memblokir render. Perilaku dan tampilan layar 
 
 ## Audit UI/UX 2026-10 · Fase 3B · Overview "Hari ini" dan Dalang sebagai papan senyap
 
-Fase 3B dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md) untuk dua layar.
+Fase 3B dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md) untuk dua layar. Keputusan
+Dalang: [ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md).
 Aturan susunan ada di [design-system](../design-system/design-system.md) (Primitif layout) dan istilah di
 [glosarium](glossary.md).
 
@@ -601,7 +603,9 @@ count-up, ticker mengetik, footer slogan, KPI ganda, jam per detik, rig animasi,
 - Seksi "Menunggu jawabanmu" di atas, dengan tombol Jawab.
 - Daftar project sebagai baris `<button>`: wayang `WayangSilhouette` 24px, nama, fase, sesi, dan aksi.
 - Jalan keluar 44×44 di semua ukuran layar, di `.hn-dlg-actions` (bukan di `.hn-dlg-chips`).
-- Tanpa timer dan tanpa animasi. Pet tetap satu-satunya elemen yang bergerak.
+- Tanpa timer dan tanpa animasi. Pet **tidak** dirender di layar ini: Dalang berada di luar `Shell`, sehingga tak punya
+  slot pet (lihat [ADR-0206](../adr/0206-pet-footer-sidebar-default-per-tier.md) § 5). Koreksi atas teks Fase 3B sebelumnya
+  yang menyebut pet tetap bergerak di sini.
 
 Kelas `.hn-dlg-*` lama yang tak lagi dirender sudah dicabut di Fase 2E (lihat § Fase 2E). `dalang.css` menimpa
 kelas yang masih dipakai.
@@ -721,10 +725,9 @@ Tab kosong hanya menampilkan satu baris keterangan dan tak memakan ruang. Angka 
 lebih dari nol. Semua muat awal memakai `SkeletonList`. Galat muat tetap tampil sebagai galat dengan Coba lagi.
 
 Zona waktu (ADR-0204): instan dari server (jalan berikutnya, terakhir, riwayat) ditampilkan lewat `fmtAt`
-dalam `serverTimeZone`, dan tab Cron menyebut zonanya. **Keterbatasan:** `nextRunFor` di
-`shared/src/cron-expr.ts` tak punya parameter zona, jadi preview "jalan berikutnya" di form cron hanya dihitung
-bila zona browser sama dengan zona server. Jika berbeda, preview disembunyikan dan kalimatnya menjelaskan
-alasannya. Memperbaikinya butuh `nextRunFor(expr, after, tz)` di shared, yaitu keputusan terpisah.
+dalam `serverTimeZone`, dan tab Cron menyebut zonanya. Preview "jalan berikutnya" di form memakai
+`nextRunFor(expr, now, serverTimeZone)` (ADR-0212), jadi tampil dalam zona server walau zona browser berbeda.
+Tanpa keterbatasan zona lagi; `nextRunFor` tanpa `tz` tetap zona lokal proses.
 
 Keadaan tab: tab aktif bertahan di ui-state `scheduler.tab`, dan pilihan chip di `scheduler.riwayatStatus`.
 Riwayat dan Cron baru dimount saat tabnya dibuka (muat antrean dan daftar cron on-demand). Antre, Berjalan,
@@ -836,7 +839,8 @@ Tes:
 
 Fase 3G (Klien) dan 3J (VPS) dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md).
 Aturan layar mengikuti [audit § Klien dan VPS](ui-ux-audit-2026-10.md#2-per-layar) dan
-[glosarium](glossary.md). Tidak ada API baru: selektor tingkat memetakan ke grant `PUT /remote-control` yang sudah ada.
+[glosarium](glossary.md). Tidak ada API baru: selektor tingkat memetakan ke grant `PUT /remote-control` yang sudah ada. Keputusan selektor
+dicatat di [ADR-0210](../adr/0210-perangkat-tingkat-akses-lihat-kerja-tulis.md).
 
 Berkas:
 
@@ -876,8 +880,9 @@ Keputusan:
 - **Konfirmasi.** Naik ke Kerja atau Tulis memakai dialog `danger` dan menyebut apa yang diizinkan. Turun, atau
   grant yang dicabut, memakai dialog biasa yang menyebut "Dicabut: …". Lihat tak bisa dimatikan dari selektor.
   Mematikan kendali lewat master tidak mengubah grant yang tersimpan, sama seperti sebelumnya.
-- **Skor kepatuhan di daftar VPS.** `VpsView` tidak memuat skor. Daftar menampilkan skor dari audit atau
-  checklist yang dijalankan di sesi itu, dan "Skor —" bila belum ada. Menampilkannya selalu lewat DTO.
+- **Skor kepatuhan di daftar VPS.** Selesai (ADR-0211): `VpsView.scoreTotal` dari snapshot audit tersimpan,
+  dibaca langsung dari listing; "Skor —" bila belum pernah diaudit di mesin ini. Checklist yang dimuat
+  memuat ulang daftar, jadi N/A/attest yang baru ditandai ikut tampil di baris.
 - **Istilah.** Copy memakai glosarium: Terhubung/Diaudit/Diperkuat, Pratinjau, Terapkan, Tandai terpenuhi,
   "Lihat (baca saja)", "Baca-saja". Tak ada "hub", "Device", "basi", atau "retry" di teks tampil.
 
@@ -954,7 +959,7 @@ label 3I di rencana sudah milik Scheduler. Skills tetap dicatat sebagai 3K.
 
 Berkas (milik fase ini; CSS baru di `src/src/screens/styles/`):
 
-- `ProjectsScreen.tsx`: RowList diurut perhatian (dokumen rusak → drift → sisanya), chip Semua · Perlu perhatian · Sesi berjalan
+- `ProjectsScreen.tsx`: RowList diurut perhatian oleh server (`sort=attention`, ADR-0212: dokumen rusak → drift → sisanya), chip Semua · Perlu perhatian · Sesi berjalan
   dengan hitungan, StatStrip dibuang. Kolom: Project (nama + jenis + deskripsi) · Status (+ PresenceChip) · Dokumen · Backlog terbuka.
   Hapus di ⋯ per baris.
 - `ProjectDetailScreen.tsx`: header, tiga pintu besar (Backlog n · Terminal · Dokumen), `MissingRepoCard` di atas pintu,
@@ -980,8 +985,9 @@ Keputusan perilaku:
 
 1. **Sumber daftar project.** Tampilan "Semua" tanpa filter perangkat tetap memakai API (SPEC-198), jadi galat, Coba lagi,
    dan paginasi Fase 1 tidak berubah. Chip aktif memakai daftar penuh dari App, sehingga hitungan chip sama dengan hasilnya.
-   Urutan perhatian berlaku global di mode chip, dan per halaman di mode API. Urutan global di mode API butuh parameter
-   urut dari server (belum ada).
+   Urutan perhatian selalu global (ADR-0212): tampilan default dan chip "Perlu perhatian" meminta `sort=attention`
+   (chip itu juga `attention=true`) ke server, dan klien tak mengurutkan ulang. Chip "Sesi berjalan" tetap dari daftar
+   penuh App (status sesi tak ada di API), jadi urutannya urutan App.
 2. **Kolom yang dipindah.** "Ditangani oleh" dan "Aktivitas" tak lagi jadi kolom daftar; keduanya tampil di detail. Filter
    perangkat tetap di daftar. Jenis project ditampilkan sebagai teks, bukan lencana (maks. dua lencana per baris).
 3. **Tab Agen di Skills.** Katalog agen tidak dimuat sebelum tab dibuka. Ini menjaga halaman Skills tetap ringan dan
@@ -1065,8 +1071,8 @@ perubahan skema; setiap PUT/endpoint yang sudah ada dipakai apa adanya.
 **Keputusan IA.** Empat niat — **Sesi harian** (default) · **Agen & model** · **Integrasi & akses** ·
 **Lanjutan** (tertutup default di navigasi). Di desktop/tablet, niat dengan lebih dari satu bagian membuka daftar
 bagiannya di bawah dirinya; di mobile, satu `Select` "Bagian pengaturan" memuat semua bagian dengan awalan niatnya.
-Perubahan menu dalam Pengaturan ini **belum punya ADR tersendiri** (ADR-0205 hanya mencakup level hub); keputusannya
-perlu dicatat sebelum merge.
+Keputusan IA ini dicatat di [ADR-0207](../adr/0207-pengaturan-empat-niat-satu-aturan-simpan.md) (ADR-0205 hanya
+mencakup level hub).
 
 Berkas:
 
@@ -1139,7 +1145,7 @@ Test:
 Utang yang tersisa di Fase 3C:
 
 - `WebhookDocs.tsx`: copy "bisa basi" dan "Retry" masih di allowlist UTANG Fase 3 (keputusan istilah "Kirim ulang").
-- Keputusan ADR untuk IA Pengaturan (lihat di atas).
+- ADR untuk IA Pengaturan sudah ditulis: [ADR-0207](../adr/0207-pengaturan-empat-niat-satu-aturan-simpan.md).
 - `screens/AgentDocCard.tsx` dan `McpPanel.tsx` masih memakai inline style di dalam Akses AI Agent (bukan bagian Fase 3C).
 
 ## Audit UI/UX 2026-10 · Fase 3 · Review, Auth, Portal, Onboarding (3L · 3M · 3N)
@@ -1408,7 +1414,9 @@ besar.
 
 ## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142 · Pet hidup E SPEC-904 · Pet hidup F SPEC-905 ADR-0144 · Pet hidup G SPEC-909 ADR-0146)
 
-Widget maskot di tepi bawah, hadir di semua halaman. Pose-nya **turunan** keadaan sesi & backlog,
+Widget maskot: penempatan dan default per tier ada di [ADR-0206](../adr/0206-pet-footer-sidebar-default-per-tier.md)
+(menggantikan sebagian [ADR-0144](../adr/0144-pet-diseret-sumbu-y-jalur-melebar.md); desktop di footer sidebar,
+tablet dan ponsel di lajur bawah dan mati default; tak tampil di Dalang). Pose-nya **turunan** keadaan sesi & backlog,
 bukan hiasan, dan seluruh sinyalnya sudah ada di klien — tak ada endpoint status, tak ada skema,
 tak ada channel realtime baru (ADR-0024 & ADR-0039 utuh).
 
@@ -1733,7 +1741,7 @@ sebelum SPEC-909**, termasuk kalimat `"Pertanyaannya tak terbaca dari sini"`.
 Gelembung pose `waiting` menawarkan **"Jawab di sini"** yang menutup gelembung lalu membuka panel —
 jalur yang sama persis dengan tombol `Lihat` milik rekap.
 
-**Penempatan & mount (Audit UI/UX 2026-10 · lajur pet).** `HanomanPet` dibuat **sekali** di `App.tsx`
+**Penempatan & mount (Audit UI/UX 2026-10 · lajur pet; [ADR-0206](../adr/0206-pet-footer-sidebar-default-per-tier.md)).** `HanomanPet` dibuat **sekali** di `App.tsx`
 (satu elemen, di dalam `PetDockContext.Provider` yang membungkus `{screen}`; `petOn` = preferensi
 `hn.ui.v1.pet.enabled` atau default tier, lihat `ui-state/pet-pref.ts`). `Shell` menaruhnya di slot:
 `.hn-shell-dock` di footer sidebar (desktop) atau `.hn-shell-lane` di bawah `<main>` (tablet/ponsel).
@@ -2793,8 +2801,8 @@ bersandar pada notifikasi yang **dibuat server-side** (`GET /notifications`) —
   listener unlock audio). Klik notifikasi OS → `window.focus()` + redirect ke sesi (`onOpen`).
 - **`NotificationBell`** (`.../NotificationBell.tsx`) dirender di topbar `Shell` (konsumsi context,
   nol prop-threading ke ~9 call-site `<Shell>`; nilai context default aman untuk test tanpa provider):
-  tombol lonceng + badge unread (`--clay-500`), dropdown daftar (`SPEC-x · judul`, "selesai · Xm lalu",
-  dot unread). Membuka dropdown TIDAK menandai apa pun (audit 2026-10). "Buka" pada satu item =
+  tombol lonceng + badge unread (`--clay-500`), dropdown daftar (`SPEC-x · judul`, "selesai · 5 menit lalu" (`relativeTime`),
+  dot unread). Membuka dropdown TIDAK menandai apa pun (audit 2026-10). "Jawab" (keputusan, aksi primer) dan "Buka" pada satu item =
   `POST /notifications/:id/read` (ADR-0204): optimistik, galat → item kembali belum-dibaca + toast err;
   arsip "Semua notifikasi" memakai jalur yang sama. "Tandai semua dibaca" = `POST /notifications/read`.
   Tombol "Bersihkan" = `DELETE /notifications`.
@@ -2827,6 +2835,36 @@ bersandar pada notifikasi yang **dibuat server-side** (`GET /notifications`) —
   `NotificationsProvider`), supaya bunyi dari push notifikasi WS tak ditolak autoplay (SPEC-192).
 - **Setting** di layar Settings → section "Sesi & notifikasi": toggle **Notifikasi backlog selesai**
   (`notifyDone`), select **Sound** (`notifySound`: Short/Medium/Long/Senyap) + tombol **Preview**.
+
+## Audit UI/UX 2026-10 · Fase 4 · Jawab dari notifikasi & migrasi inline
+
+Lanjutan [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md) (Fase 2C/2G yang tertunda). Dua hal: aksi **Jawab** langsung dari notifikasi, dan migrasi `style={{` literal ke kelas CSS (visual-ekuivalen).
+
+**Jawab dari notifikasi.**
+
+- Toast keputusan (`NotificationsContext`, satu-satunya tempat toast notifikasi live) membawa `action: { label: "Jawab" }` dan `duration: 7000`. Aksi = `markRead(id)` lalu `onOpen(n)`, yaitu `App.openNotification` → Terminal terfokus ke sesi itu (`notifTarget`, fokus yang sudah ada).
+- Toast **dilewati** bila `isViewing(n)` bernilai benar: `section === "terminal" && focusSession === n.sessionId` (App). Bunyi dan notifikasi OS tetap berjalan. Batas: sesi yang dipilih manual di rail Terminal tak dilaporkan ke App (layar itu memegang fokusnya sendiri), jadi predikat hanya mengenali sesi yang dibuka dari notifikasi, palet, atau pet.
+- Satu notifikasi = satu toast: `toasted` (Set id, berbatas 200) di atas baseline frame pertama.
+- Lonceng dan arsip: keputusan menampilkan **Jawab** sebagai aksi primer (`.hn-notif-open--primary`); "Buka" dan "Lihat triase" tetap. Membuka dropdown tetap tak menandai apa pun.
+- Waktu relatif di lonceng dan arsip memakai `relativeTime` ("5 menit lalu"), bukan "5m lalu".
+
+**Migrasi inline → kelas.** Kelas baru di `src/src/styles/app-shell.css` (diimpor `ds/kit.tsx`) dan `src/src/notifications/notifications.css`. Nilai tiap kelas sama dengan inline yang diganti. `app.css` tak disentuh.
+
+| Berkas | `style={{` sebelum | sesudah | Sisa dan alasannya |
+|---|---|---|---|
+| `App.tsx` | 49 | 0 | — |
+| `ds/kit.tsx` | 24 | 3 | lebar panel Modal (prop `width`); `HnTextarea` (fokus dan invalid dinamis); `PagerBtn` (aktif, hover, disabled dinamis) |
+| `ds/shell.tsx` | 8 | 1 | tombol nav (aktif, hover, `interactive` dinamis). Skip link (`style={skipShown ? …}`) tetap dan dites di `shell-a11y` |
+| `notifications/NotificationBell.tsx` | 17 | 0 | — |
+| `notifications/NotificationsArchiveModal.tsx` | 5 | 0 | — |
+| `screens/PetAnswer.tsx` | 15 | 0 | `style={flat}` ×4 tetap: override reduced-motion ke `Button`, yang menaruh transisinya sendiri secara inline |
+
+Catatan:
+
+- `Input` dan `Select` meneruskan `className` dan `style` ke **pembungkus**, bukan ke `<input>`. Maka `width: 100%` → `hn-w-full`, `flex: 1` → `hn-grow`, dan `flex: 1, minWidth: 0` → `hn-grow-min`.
+- Aturan mobile `!important` di `app.css` (grid, modal, popover) tetap menang atas kelas baru.
+- Footer Modal memakai `.hn-modal-panel > .hn-modal-footer` (spesifisitas lebih) supaya padding bawahnya tetap 14px dan tak bergantung urutan impor CSS.
+- Test: `test/notifications-decision-toast.test.tsx` (aksi Jawab lewat `ToastHost`, dilewati saat sesi ditonton, durasi 7 dtk, satu notifikasi satu toast) dan `test/notification-bell.test.tsx` (Jawab menandai terbaca dan memanggil navigasi; waktu relatif).
 
 ## IDE Visual (SPEC-182 · ADR-0034)
 Nav entri **IDE** (`code-2`) membuka `IdeScreen` (`screens/IdeScreen.tsx`), difilter per project lewat
@@ -3262,6 +3300,7 @@ menyebut observasi transport server sejak boot, bukan mengklaim semua hook runti
 ## Obrolan portal klien — `ChatPanel` + `PortalChatPanel` (SPEC-854 · ADR-0129/0130)
 
 > Fase 3M: `ChatPanel` memakai kelas `hn-chat-*` (portal.css); tab-nya berlabel "Tanya & ide" dan teks pembedanya menunjuk ke "Keluhan saya".
+> ADR-0211: tab "Tanya & ide" mengikuti `chatEnabled` pada proyeksi project (tanpa probe ke `/chat/sessions`). Tab `tanya` yang tertinggal dari project tanpa chat jatuh ke Keluhan.
 
 
 Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa pun kecuali DTO.
@@ -3336,3 +3375,11 @@ Menu, halaman, pintu project, API client, setelan agen changelog, dan allowlist
 project token khusus memori dihapus. Notifikasi/badge memori tidak lagi dirender.
 URL `/memory*` dan `/changelog*` serta state section lama mengikuti fallback
 navigasi yang sudah ada. UI tidak menyediakan akses ke data fitur yang dihapus.
+
+## Audit UI/UX 2026-10 — gelombang 4 (penutupan)
+
+- Inline style → kelas/CSS-var: Terminal, IDE (GitGraph lane `--graph-lane-0..5`, `--lane`, `--depth`, `--row-h`), panel Pengaturan (Webhook/Logs/MCP/Members), `App.tsx`, `ds/kit.tsx`, dialog/timeline/VPS/limit. Berkas CSS baru di `screens/styles/` (`dialogs.css`, `limits.css`, `portal-chat.css`, `auto-merge.css`; tambahan `ide.css`, `team.css`, `vps.css`). Urutan aturan di `ide.css` penting (`.hn-ide-sel` harus setelah `.hn-ide-changed-row`).
+- `test/project-css.ts`: helper yang menyuntikkan CSS proyek ke jsdom agar tes layout membaca kaskade, bukan style inline; jsdom mengabaikan spesifisitas dan `@media` non-screen.
+- Tombol "Jawab" di toast keputusan dan lonceng; `OverflowActions` menu ARIA penuh (`role=menu/menuitem`, roving, typeahead); `Button variant="danger-outline"`; fokus keyboard Button/IconButton terlihat (ring `--border-focus`); toggle "Mode pembaca layar" xterm.
+- Review: prop `onIntegrate/onRevert/onDiscard` (Integrasikan, Kembalikan ke Dikerjakan, Hapus worktree) tanpa endpoint baru.
+- Backend aditif: `PortalProject.chatEnabled`, `VpsView.scoreTotal` (ADR-0211); `nextRunFor(expr, after, tz)` dan `GET /projects?sort=attention` (ADR-0212). ADR 0206–0210 mencatat keputusan pet, Pengaturan, Dalang, Terminal, Perangkat.

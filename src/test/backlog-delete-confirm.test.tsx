@@ -24,7 +24,7 @@ function renderWith(onDelete: (s: Spec) => unknown, onToast = vi.fn()) {
 // Hapus kini aksi sekunder di menu ⋯ kartu, bukan tombol sejajar.
 const openDeleteFromMenu = () => {
   fireEvent.click(screen.getByRole("button", { name: "Aksi lain SPEC-7" }));
-  fireEvent.click(screen.getByRole("button", { name: "Hapus spec" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Hapus spec" }));
 };
 
 describe("hapus spec wajib konfirmasi (audit UI/UX · P0)", () => {

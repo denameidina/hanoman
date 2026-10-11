@@ -1,7 +1,8 @@
 import React from "react";
 import type { MemberView } from "@hanoman/shared";
-import { Badge, Button, IconButton, Input, Modal, StateBlock, useConfirm } from "../ds";
+import { Badge, Button, Callout, IconButton, Input, Modal, StateBlock, useConfirm } from "../ds";
 import { api } from "../api/client";
+import "./styles/panels.css";
 
 /* SPEC-946 · direktori orang, dikelola DI DALAM layar Tim — bukan `SettingsScreen.tsx`, yang
    sudah 93 KB. Anggota GLOBAL, bukan per project: task boleh tanpa project, jadi direktorinya
@@ -19,11 +20,7 @@ function MemberRow({ m, busy, onSave, onToggle, onDelete }: {
 
   if (editing) {
     return (
-      <div style={{
-        display: "flex", flexDirection: "column", gap: 8, padding: "12px 14px", marginBottom: 8,
-        border: "1px solid var(--border-strong)", borderRadius: "var(--radius-md)",
-        background: "var(--surface-card)",
-      }}>
+      <div className="hn-mem-edit">
         <Input size="sm" value={name} aria-label={`Nama ${m.name}`} placeholder="mis. Dena Meidina"
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} />
         <Input size="sm" value={role} aria-label={`Peran ${m.name}`} placeholder="mis. desainer"
@@ -32,10 +29,10 @@ function MemberRow({ m, busy, onSave, onToggle, onDelete }: {
             rename — id yang berubah meninggalkan baris yatim di setiap mesin lain. Emailnya
             ditampilkan sebagai TEKS, tak pernah sebagai field yang bisa diketik: form yang
             menawarkannya lalu membuangnya persis kelas bug yang membuat route menolaknya lagi. */}
-        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
+        <div className="hn-mem-note">
           {m.email} — ganti email berarti hapus lalu buat baru.
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="hn-mem-actions">
           <Button size="sm" disabled={busy}
             onClick={() => { onSave(m.id, { name: name.trim(), role: role.trim() || null }); setEditing(false); }}>
             Simpan
@@ -47,21 +44,14 @@ function MemberRow({ m, busy, onSave, onToggle, onDelete }: {
   }
 
   return (
-    <div className="hn-dense-row" style={{
-      display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", marginBottom: 8,
-      border: "1px solid var(--border-hair)", borderRadius: "var(--radius-md)",
-      background: "var(--surface-card)", opacity: m.active ? 1 : 0.6,
-    }}>
-      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontWeight: "var(--weight-semibold)", color: "var(--text-strong)" }}>{m.name}</span>
+    <div className={`hn-dense-row hn-mem-row${m.active ? "" : " hn-mem-row--off"}`}>
+      <span className="hn-mem-main">
+        <span className="hn-mem-name-row">
+          <span className="hn-mem-name">{m.name}</span>
           {m.role && <Badge tone="neutral" size="sm">{m.role}</Badge>}
           {!m.active && <Badge tone="warn" size="sm">nonaktif</Badge>}
         </span>
-        <span style={{
-          display: "block", fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)",
-          color: "var(--text-subtle)", marginTop: 2,
-        }}>{m.email}</span>
+        <span className="hn-mem-email">{m.email}</span>
       </span>
       <IconButton icon="pencil" label={`Ubah ${m.name}`} size="sm" onClick={() => setEditing(true)} />
       <IconButton icon={m.active ? "user-minus" : "user-check"} size="sm"
@@ -78,6 +68,8 @@ export function MembersPanel({ open, onClose, onChanged, onToast }: {
 }) {
   const [list, setList] = React.useState<MemberView[]>([]);
   const [state, setState] = React.useState<"loading" | "ready" | "error">("loading");
+  // Galat muat ulang saat daftar sudah pernah tampil: daftar lama tetap di layar, galatnya di atasnya.
+  const [reloadFailed, setReloadFailed] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -88,12 +80,24 @@ export function MembersPanel({ open, onClose, onChanged, onToast }: {
   // effect di bawah memuat ulang tiap render pemanggilnya.
   const changed = React.useRef(onChanged);
   changed.current = onChanged;
+  // Sudah pernah ada daftar yang berhasil dimuat? Menentukan apakah muat ulang boleh senyap.
+  const hasData = React.useRef(false);
 
   const load = React.useCallback(() => {
-    setState("loading");
+    // Muat ulang senyap: bila daftar sudah pernah tampil, keadaan "loading" tak dipakai dan daftar
+    // tak dikosongkan. Galat muat ulang hanya muncul sebagai alert di atas data lama. "loading"
+    // dipakai hanya saat belum ada apa pun untuk ditampilkan (muat pertama, atau coba lagi dari galat).
+    if (!hasData.current) setState("loading");
     api.listMembers()
-      .then((r) => { setList(r.items); setState("ready"); changed.current(r.items); })
-      .catch(() => setState("error"));
+      .then((r) => {
+        hasData.current = true;
+        setList(r.items); setState("ready"); setReloadFailed(false);
+        changed.current(r.items);
+      })
+      .catch(() => {
+        if (hasData.current) setReloadFailed(true);
+        else setState("error");
+      });
   }, []);
   React.useEffect(() => { if (open) load(); }, [open, load]);
 
@@ -141,21 +145,24 @@ export function MembersPanel({ open, onClose, onChanged, onToast }: {
   return (
     <>
       <Modal open={open} onClose={onClose} icon="users" eyebrow="Papan tim" title="Anggota" width={620}>
-        <div style={{
-          display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 16,
-          paddingBottom: 16, borderBottom: "1px solid var(--border-hair)",
-        }}>
+        <div className="hn-mem-add">
           <Input size="sm" value={name} aria-label="Nama anggota baru" placeholder="Nama"
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
-            style={{ flex: "1 1 140px" }} />
+            className="hn-mem-in-name" />
           <Input size="sm" value={email} aria-label="Email anggota baru" placeholder="email@nafanesia.id"
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-            style={{ flex: "1 1 180px" }} />
+            className="hn-mem-in-email" />
           <Input size="sm" value={role} aria-label="Peran anggota baru" placeholder="Peran (opsional)"
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRole(e.target.value)}
-            style={{ flex: "1 1 130px" }} />
+            className="hn-mem-in-role" />
           <Button size="sm" leftIcon="user-plus" onClick={add} loading={busy}>Tambah anggota</Button>
         </div>
+        {reloadFailed && (
+          <Callout tone="err" title="Gagal memuat ulang anggota" className="hn-mem-alert"
+            action={<Button size="sm" variant="ghost" onClick={load}>Coba lagi</Button>}>
+            Yang tampil di bawah adalah data lama. Coba lagi untuk memuat yang terbaru.
+          </Callout>
+        )}
         {state === "loading" ? <StateBlock kind="loading" compact />
           : state === "error" ? <StateBlock kind="error" compact hint="Gagal memuat anggota."
               action={load} actionLabel="Coba lagi" />

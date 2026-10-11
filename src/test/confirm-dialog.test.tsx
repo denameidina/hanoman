@@ -80,7 +80,8 @@ describe("ConfirmDialog impact & icon (SPEC-847)", () => {
   it("tone danger memberi tombol konfirmasi varian danger", () => {
     render(<ConfirmDialog open title="Hapus?" confirmLabel="Hapus" onConfirm={() => {}} onCancel={() => {}} />);
     const btn = screen.getByRole("button", { name: "Hapus" });
-    expect(btn.style.background).toContain("--clay-600");
+    // Warna varian danger ada di forms.css (`.hn-btn-danger`), bukan inline.
+    expect(btn).toHaveClass("hn-btn-danger");
   });
 });
 

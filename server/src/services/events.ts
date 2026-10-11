@@ -10,6 +10,7 @@ import { isDeciding } from "./lead/deciding";
 import { liveAsks } from "./lead/ask";
 import { listCleanups } from "./worktree-reaper";
 import { presenceView } from "./presence/view";
+import { listVpsWithScore } from "./vps-list";
 import { pendingCounts } from "./pending-counts";
 import { prisma } from "../db";
 import { effectiveInt } from "../config";
@@ -92,8 +93,8 @@ const GROUPS: Group[] = [
   // (nyaris selalu kosong). Grup SENDIRI, bukan hiasan di `sessions`: frame itu sudah yang terbesar
   // di dashboard dan pembacanya jauh lebih banyak daripada pembaca daftar pendek ini.
   { everyTicks: 1,  last: "", build: async () => ({ t: "leadAsks", asks: liveAsks() }) },
-  // ponytail: cermin GET /vps (orderBy createdAt asc). Query sepele — tak diekstrak.
-  { everyTicks: 15, last: "", build: async () => ({ t: "vps", vps: await prisma.vps.findMany({ orderBy: { createdAt: "asc" } }) }) },
+  // Cermin GET /vps: SATU fungsi (ADR-0211) supaya skor di siaran sama dengan skor di listing.
+  { everyTicks: 15, last: "", build: async () => ({ t: "vps", vps: await listVpsWithScore() }) },
   { everyTicks: 30, last: "", build: async () => ({ t: "limits", limits: await getLimits() }) },
   // SPEC-338 · ADR-0074 · limit codex — grup TERPISAH dari `limits`. Bacaan berkas lokal berbatas
   // ekor + cache 30s, jadi biayanya jauh di bawah panggilan jaringan claude. Frame lahir hanya saat

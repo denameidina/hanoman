@@ -2,12 +2,13 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // SPEC-198 · ProjectsScreen: default lewat API (search+paginasi, galat/muat ulang Fase 1); chip aktif
-// memakai daftar penuh. Redesign 3P: RowList diurut perhatian, StatStrip dibuang (hitungan di chip).
+// memakai daftar penuh. Redesign 3P: StatStrip dibuang (hitungan di chip). ADR-0212: urutan perhatian
+// dikerjakan server (sort=attention), klien menampilkan urutan balasan apa adanya.
 vi.mock("../src/api/client", () => ({
   api: { listProjects: vi.fn() },
   ApiError: class extends Error {},
 }));
-import { ProjectsScreen, sortByAttention } from "../src/screens/ProjectsScreen";
+import { ProjectsScreen } from "../src/screens/ProjectsScreen";
 import { api } from "../src/api/client";
 import { uiKey, readUiState, writeUiState } from "../src/ui-state";
 
@@ -56,7 +57,7 @@ describe("ProjectsScreen via API (SPEC-198)", () => {
     expect(within(row).getByText(/terbuka/)).toBeInTheDocument();
     // Hapus bukan tombol baris: ia di menu ⋯, dan klik di dalam menu tak ikut membuka project.
     fireEvent.click(screen.getByRole("button", { name: "Aksi untuk project arta" }));
-    fireEvent.click(screen.getByRole("button", { name: /Hapus project/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Hapus project/ }));
     expect(onDelete).toHaveBeenCalledOnce();
     expect(onOpen).not.toHaveBeenCalled();
     fireEvent.click(opener("arta"));
@@ -97,19 +98,27 @@ describe("chip, hitungan, dan urutan perhatian (redesign 3P)", () => {
     expect(within(group).getByRole("button", { name: /Sesi berjalan 1/ })).toBeInTheDocument();
   });
 
-  it("urutan default: dokumen rusak, lalu drift, lalu sisanya (urutan asal dijaga dalam rank)", () => {
-    expect(sortByAttention(mixed as never).map((p) => p.id)).toEqual(["broke", "drift", "ok1", "run"]);
-    render(<ProjectsScreen projects={mixed as never} onOpen={() => {}} />);
-    const names = screen.getAllByRole("listitem").map((li) => li.querySelector(".hn-prj-name")?.textContent);
-    expect(names).toEqual(["broke", "drift", "ok1", "run"]);
+  const names = () => screen.getAllByRole("listitem").map((li) => li.querySelector(".hn-prj-name")?.textContent);
+
+  // ADR-0212 · urutan perhatian dikerjakan SERVER (sort=attention, lintas seluruh hasil). Klien tak
+  // menyusun ulang: balasan server, dalam urutan apa pun, ditampilkan apa adanya.
+  it("urutan baris mengikuti balasan server apa adanya, dan default meminta sort=attention", async () => {
+    vi.mocked(api.listProjects).mockResolvedValue(envelope([mixed[0], mixed[2], mixed[1], mixed[3]]));
+    render(<ProjectsScreen projects={mixed as never} onOpen={() => {}} pageSize={20} />);
+    await waitFor(() => expect(names()).toEqual(["ok1", "run", "drift", "broke"]));
+    expect(vi.mocked(api.listProjects).mock.calls.at(-1)![0]).toMatchObject({ sort: "attention" });
+    expect(vi.mocked(api.listProjects).mock.calls.at(-1)![0]).not.toHaveProperty("attention", true);
   });
 
-  it("chip 'Perlu perhatian' menyaring daftar penuh dan mengatur ulang halaman ke 1", () => {
-    render(<ProjectsScreen projects={mixed as never} onOpen={() => {}} />);
+  it("chip 'Perlu perhatian' meminta attention=true dan sort=attention, lalu menampilkan balasan server", async () => {
+    vi.mocked(api.listProjects).mockResolvedValue(envelope([mixed[3], mixed[1]]));
+    render(<ProjectsScreen projects={mixed as never} onOpen={() => {}} pageSize={20} />);
+    await waitFor(() => expect(api.listProjects).toHaveBeenCalled());
     fireEvent.click(screen.getByRole("button", { name: /Perlu perhatian 2/ }));
     expect(screen.getByRole("button", { name: /Perlu perhatian 2/ })).toHaveAttribute("aria-pressed", "true");
-    const names = screen.getAllByRole("listitem").map((li) => li.querySelector(".hn-prj-name")?.textContent);
-    expect(names).toEqual(["broke", "drift"]);
+    await waitFor(() => expect(vi.mocked(api.listProjects).mock.calls.at(-1)![0])
+      .toMatchObject({ sort: "attention", attention: true, page: 1 }));
+    await waitFor(() => expect(names()).toEqual(["broke", "drift"]));
   });
 
   it("chip tanpa hasil memberi empty state yang menawarkan Tampilkan semua", () => {

@@ -29,7 +29,7 @@ const openDialog = async () => {
   const btn = await screen.findByRole("button", { name: "Aksi untuk dokumen" });
   btn.focus();
   fireEvent.click(btn);
-  fireEvent.click(await screen.findByRole("button", { name: /Hapus dokumen…/ }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Hapus dokumen…/ }));
   await screen.findByRole("dialog");
   return btn;
 };

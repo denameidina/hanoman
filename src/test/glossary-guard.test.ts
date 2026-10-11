@@ -104,12 +104,6 @@ export const ALLOWLIST: { file: string; fragment: string; reason: string }[] = [
     reason: "UTANG Fase 3 (Sinkronisasi): 'hub' sebagai nama server pusat; belum ada keputusan istilah." },
   { file: "src/src/screens/SyncButton.tsx", fragment: "menyeberang ke hub pada sync berikutnya",
     reason: "UTANG Fase 3 (Sinkronisasi): 'hub' di tooltip penghapusan; belum ada keputusan istilah." },
-  { file: "src/src/screens/WebhookDocs.tsx", fragment: "bisa basi",
-    reason: "UTANG Fase 3 (Dokumen webhook): 'basi' di prosa; ganti 'bisa tak sesuai lagi'." },
-  { file: "src/src/screens/WebhookDocs.tsx", fragment: "Retry, pengiriman ganda",
-    reason: "UTANG Fase 3 (Dokumen webhook): judul kartu memakai 'Retry'; ganti 'Kirim ulang' bila istilahnya diputuskan." },
-  { file: "src/src/screens/WebhookDocs.tsx", fragment: "retry setelah jaringan putus",
-    reason: "UTANG Fase 3 (Dokumen webhook): 'retry' di prosa penjelasan; ikut keputusan istilah di atas." },
   // SAH — kutipan kode contoh untuk integrator; istilah 'retry' di sana adalah identifier protokol.
   { file: "src/src/screens/WebhookDocs.tsx", fragment: "Idempoten: retry mengirim event.id",
     reason: "SAH: kutipan kode contoh (Node) untuk integrator; 'retry' di komentar kode, bukan copy UI." },

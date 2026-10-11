@@ -232,7 +232,7 @@ describe("QaWorkspace", () => {
     expect(href("Unduh XLSX")).toBe("/api/projects/p1/qa/reports/r1/export?format=xlsx");
     expect(href("Unduh CSV (test case)")).toBe("/api/projects/p1/qa/reports/r1/export?format=csv");
     expect(href("Unduh .md")).toBe("/api/projects/p1/qa/reports/r1/export?format=md");
-    fireEvent.click(within(menu).getByRole("button", { name: "Pratinjau laporan" }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Pratinjau laporan" }));
     expect(await screen.findByRole("dialog", { name: "Pratinjau QA-001" })).toBeTruthy();
   });
 
@@ -328,7 +328,7 @@ it("kerjakan langsung dari menu ⋯ membuka sesi yang dikembalikan dan tautan ba
   await openReport();
   fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
   fireEvent.click(await screen.findByRole("button", { name: "Menu F-01" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Kerjakan langsung" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Kerjakan langsung" }));
   await waitFor(() => expect(openSession).toHaveBeenCalledWith("qa-f1"));
   expect(screen.getByRole("button", { name: "Kirim ke backlog" })).toBeTruthy();
   expect(fetch.mock.calls.some(([url, init]) => String(url).endsWith("/session") && init?.method === "POST")).toBe(true);
@@ -404,7 +404,7 @@ describe("QaWorkspace · konfirmasi, galat yang tampil, dan info laporan (Fase 1
     renderWs();
     await openReport();
     fireEvent.click(await screen.findByRole("button", { name: "Menu TC-01" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Hapus test case" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Hapus test case" }));
     const dialog = await screen.findByRole("dialog", { name: "Hapus TC-01?" });
     expect(within(dialog).getByText("Lampiran milik test case ini ikut terhapus.")).toBeTruthy();
     expect(calls).toHaveLength(0);
