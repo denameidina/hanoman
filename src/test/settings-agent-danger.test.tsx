@@ -38,7 +38,9 @@ describe("grid capability — kolom berbahaya", () => {
   it("kolomnya ada, dengan checkbox terpisah per capability danger", async () => {
     render(<AgentAccessPanel />);
     expect(await screen.findByText((t, el) => el?.tagName === "DIV" && t === "berbahaya")).toBeInTheDocument();
-    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"])
+    // ADR-0196..0198 · +access:admin, remote:control, relay:exec — tiap domain admin punya SATU
+    // kotak danger, itu sebabnya `relay` dan `remote` domain terpisah (grid hanya memuat satu per sel).
+    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "access:admin", "remote:control", "relay:exec"])
       expect(screen.getByLabelText(id), id).toBeInTheDocument();
   });
 
@@ -46,7 +48,10 @@ describe("grid capability — kolom berbahaya", () => {
     render(<AgentAccessPanel />);
     await screen.findByText((t, el) => el?.tagName === "DIV" && t === "berbahaya");
     const danger = CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id);
-    expect(danger).toHaveLength(4);
+    expect(danger).toHaveLength(7);
+    // grid merender SATU kotak danger per domain: tak boleh ada domain dengan dua danger
+    const perDomain = CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.domain);
+    expect(new Set(perDomain).size).toBe(perDomain.length);
     expect(screen.queryByLabelText("docs:danger")).toBeNull();
     expect(screen.queryByLabelText("support:danger")).toBeNull();
   });

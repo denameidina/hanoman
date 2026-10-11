@@ -64,7 +64,13 @@ export function explainHttpError(status: number, body: unknown, ctx: ErrorCtx): 
     const need = (body as { need?: string })?.need;
     if (need)
       return `Token yang dipakai kurang capability \`${need}\`. Ini tak bisa diakali dari sisi agen: MANUSIA harus menambahkan \`${need}\` ke token itu di Settings → Akses AI Agent. Sebutkan capability persis itu saat memintanya.`;
-    return "Route ini sengaja hanya untuk sesi manusia yang login — agent token tak akan pernah bisa mengaksesnya, apa pun capability-nya (kelola user, agent token, device token, dan sync). Jangan cari jalan lain; sampaikan ke manusia bila memang perlu.";
+    // ADR-0196 · pagar tak-eskalasi-diri: capability SUDAH cukup, tapi server menolak isi permintaannya.
+    const b = body as { exceeds?: unknown; self?: unknown; error?: unknown } | null;
+    if (Array.isArray(b?.exceeds))
+      return `Ditolak oleh pagar tak-eskalasi-diri: ${typeof b?.error === "string" ? b.error : "permintaan melebihi hak pemanggil"} (melebihi: ${(b!.exceeds as unknown[]).map(String).join(", ")}). Token ini hanya boleh memberi/mengubah sebatas capability yang ia miliki sendiri — itu bukan galat, dan tak bisa diakali. Minta MANUSIA di Settings → Akses AI Agent bila memang perlu hak lebih.`;
+    if (b?.self === true)
+      return `${typeof b.error === "string" ? b.error : "Token tak boleh mengubah atau mencabut dirinya sendiri."} Itu pagar yang disengaja; sampaikan ke manusia.`;
+    return "Route ini sengaja hanya untuk sesi manusia yang login — agent token tak akan pernah bisa mengaksesnya, apa pun capability-nya (login/logout/setup akun, sync mesin-ke-mesin, event hook sesi, tata letak terminal, portal klien, webhook, kredensial Telegram). Jangan cari jalan lain; sampaikan ke manusia bila memang perlu.";
   }
 
   if (status === 400)

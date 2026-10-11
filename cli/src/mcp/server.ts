@@ -8,7 +8,7 @@ import {
 } from "@hanoman/shared";
 import type { McpConfig } from "./config";
 import type { Caller } from "./client";
-import { redactToken } from "./redact";
+import { redactKeepingFresh, redactToken } from "./redact";
 
 
 export function buildMcpServer(
@@ -17,8 +17,11 @@ export function buildMcpServer(
   const server = new McpServer({ name: "hanoman", version: cliVersion }, { instructions: MCP_INSTRUCTIONS });
   const tools = mcpToolsFor(cfg.level);
   const mask = (s: string) => redactToken(s, cfg.token);
-  const text = (s: string, isError = false) =>
-    ({ content: [{ type: "text" as const, text: mask(s) }], ...(isError ? { isError: true } : {}) });
+  const text = (s: string, isError = false, keepFresh = false) =>
+    ({
+      content: [{ type: "text" as const, text: keepFresh ? redactKeepingFresh(s, cfg.token) : mask(s) }],
+      ...(isError ? { isError: true } : {}),
+    });
 
   for (const tool of tools) {
     server.registerTool(
@@ -59,7 +62,8 @@ export function buildMcpServer(
         if (!built) return text(`Tool ${tool.name} tak punya panggilan REST.`, true);
         const r = await call(built, tool.name);
         if (!r.ok) return text(r.message, true);
-        return text(renderResult(tool.shape(r.body, args), cfg.maxBytes));
+        // ADR-0196 · hanya HASIL SUKSES tool `revealsSecret` yang lolos topeng pola token.
+        return text(renderResult(tool.shape(r.body, args), cfg.maxBytes), false, tool.revealsSecret === true);
       },
     );
   }

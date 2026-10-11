@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { zLogin, zSetup, zSignup, zChangePassword, type UserView } from "@hanoman/shared";
+import { zLogin, zSetup, zSignup, zChangePassword, zAdminPasswordReset, type UserView } from "@hanoman/shared";
+import { auditAgentAdmin } from "../services/admin-audit";
 import { prisma } from "../db";
 import * as auth from "../services/auth";
 import { BootstrapError, consumeSetupToken, ensureSetupToken, verifySetupToken } from "../services/bootstrap";
@@ -90,6 +91,8 @@ export default async function (app: FastifyInstance, opts: { bootstrapRequired?:
       // (/api/client-accounts) supaya "undang rekan" dan "beri akses klien" tak pernah tertukar.
       data: { email: p.data.email, passwordHash: await auth.hashPassword(p.data.password), role: "admin" },
     });
+    // ADR-0196 · hanya capability `access:admin` yang sampai sini lewat agent token (peta route).
+    await auditAgentAdmin(req, "user.created", `akun admin ${user.email} dibuat`, { userId: user.id, email: user.email });
     return view(user);
   });
 
@@ -102,10 +105,28 @@ export default async function (app: FastifyInstance, opts: { bootstrapRequired?:
     if (target.role === "admin" && (await prisma.user.count({ where: { role: "admin" } })) <= 1)
       return reply.code(400).send({ error: "tak bisa hapus admin terakhir" });
     await prisma.user.deleteMany({ where: { id: req.params.id } });
+    await auditAgentAdmin(req, "user.deleted", `akun ${target.email} dihapus`, { userId: target.id, email: target.email });
     return reply.code(204).send();
   });
 
   app.post("/auth/change-password", async (req, reply) => {
+    // ADR-0196 · principal AGEN (capability `access:admin`, tanpa cookie → tanpa `req.user`): tak ada
+    // "password saya", jadi bentuknya lain — setel ulang password akun LAIN lewat `userId`, tanpa
+    // password lama. Semua sesi akun itu dicabut, dan TIDAK ada cookie diterbitkan ke agen.
+    if (req.agent && !req.user) {
+      const a = zAdminPasswordReset.safeParse(req.body);
+      if (!a.success) return reply.code(400).send({ error: a.error.flatten() });
+      const target = await prisma.user.findUnique({ where: { id: a.data.userId } });
+      if (!target) return reply.code(404).send({ error: "akun tidak ditemukan" });
+      await prisma.user.update({
+        where: { id: target.id }, data: { passwordHash: await auth.hashPassword(a.data.newPassword) },
+      });
+      await auth.deleteUserSessions(target.id);
+      await auditAgentAdmin(req, "user.password-reset", `password akun ${target.email} disetel ulang`, {
+        userId: target.id, email: target.email,
+      });
+      return { user: view(target) };
+    }
     const p = zChangePassword.safeParse(req.body);
     if (!p.success) return reply.code(400).send({ error: p.error.flatten() });
     const me = req.user!;

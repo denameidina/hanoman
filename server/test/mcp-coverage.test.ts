@@ -56,6 +56,17 @@ const UNWRAPPED = new Map<string, string>([
   ["POST /projects/:pid/qa/reports/:rid/cases/import", "multipart (XLSX/CSV)"],
   ["GET /qa/template.md", "unduhan template untuk manusia"],
   ["GET /qa/template.xlsx", "biner (template Excel untuk manusia), sama dengan template.md"],
+  // ADR-0196..0198 · route admin yang DIBUKA kini punya tool (admin.ts). Yang di bawah ini tetap
+  // cookie-only karena TAK BISA dibungkus bermakna secara teknis — kejujuran lebih penting dari
+  // centang. Semuanya COOKIE_ONLY di capabilityForRoute, jadi gerbang cakupan tak menuntutnya;
+  // dicatat di sini agar alasannya tak hilang, dan uji "daftar dikecualikan" memastikan route-nya ada.
+  ["GET /auth/status", "PUBLIK dan dijawab tanpa auth; `user` selalu null untuk agent token — tak ada isi untuk agen (hanoman_about / GET /health untuk probe)"],
+  ["POST /auth/setup", "bootstrap akun pertama + cookie sesi + setup token di berkas HANOMAN_HOME; bukan operasi agen"],
+  ["POST /auth/login", "menerbitkan cookie sesi untuk browser; agen tak punya sesi cookie (kredensialnya agent token)"],
+  ["POST /auth/logout", "menghapus cookie sesi browser; tak ada artinya untuk Bearer agent token"],
+  ["GET /terminal/workspace", "tata letak tab/pane BROWSER per akun (req.user.id); agent token tak punya req.user"],
+  ["PUT /terminal/workspace", "tata letak tab/pane BROWSER per akun (req.user.id); agent token tak punya req.user"],
+  ["POST /session-events", "kredensial = token HMAC turunan per sesi (header x-hanoman-session), bukan agent token; gate cookie mem-bypass-nya dan agent token dijawab 401 (SPEC-909/ADR-0146)"],
 ]);
 
 // Route yang TERCAKUP tool bercabang. Tool semacam itu memilih endpoint menurut argumen (isi `q` →

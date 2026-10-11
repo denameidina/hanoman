@@ -71,6 +71,23 @@ describe("explainHttpError", () => {
     expect(msg).toMatch(/tak akan pernah|tidak akan pernah/);
   });
 
+  // ADR-0196 · capability SUDAH cukup tapi isinya melanggar pagar tak-eskalasi-diri: pesan harus
+  // menyebut apa yang melebihi dan bahwa ini bukan galat yang bisa diakali — bukan "cookie-only".
+  it("403 pagar tak-eskalasi-diri menyebut `exceeds` dan bukan pesan cookie-only", () => {
+    const msg = explainHttpError(403, { error: "token baru tidak boleh memuat capability yang tidak dimiliki pemanggil", exceeds: ["vps:exec"] },
+      ctx({ method: "POST", path: "/agent-tokens" }));
+    expect(msg).toContain("vps:exec");
+    expect(msg).toMatch(/MANUSIA/);
+    expect(msg).not.toMatch(/hanya untuk sesi manusia yang login/);
+  });
+
+  it("403 token-sendiri menjelaskan pagarnya", () => {
+    const msg = explainHttpError(403, { error: "agent token tidak boleh mengubah atau mencabut dirinya sendiri", self: true },
+      ctx({ method: "DELETE", path: "/agent-tokens/t1" }));
+    expect(msg).toMatch(/dirinya sendiri/);
+    expect(msg).toMatch(/manusia/);
+  });
+
   it("400 zod flatten diterjemahkan per-field, bukan objek mentah", () => {
     const msg = explainHttpError(
       400,

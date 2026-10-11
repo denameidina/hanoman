@@ -538,6 +538,10 @@ export const zSetupApply = z.object({
 export type SetupApplyResult = { restart: "self" | "manual" };
 export const zChangePassword = z.object({
   currentPassword: z.string().min(1), newPassword: z.string().min(8) });
+// ADR-0196 · bentuk panggilan AGENT (capability `access:admin`) ke POST /auth/change-password:
+// setel ulang password akun LAIN tanpa password lama, lalu cabut semua sesi akun itu.
+export const zAdminPasswordReset = z.object({
+  userId: z.string().min(1), newPassword: z.string().min(8) }).strict();
 export type UserView = { id: string; email: string; role: UserRole; createdAt: string };
 export type AuthStatus = { needsSetup: boolean; user: UserView | null; setupTokenRequired?: boolean; setupTokenPath?: string };
 

@@ -29,7 +29,9 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   const seg = path.replace(/^\/api\/?/, "").replace(/\/+$/, "").split("/").filter(Boolean);
   const top = seg[0] ?? "";
 
-  // tak-boleh-didelegasikan.
+  // tak-boleh-didelegasikan. (Catatan sejarah di bawah: alasan `auth`/`agent-tokens`/`device-tokens`/
+  // `presence`/`remote-control`/`logs`/`devices`/metrik DIAMANDEMEN ADR-0196..0198 — kini capability
+  // opt-in; hanya sisa yang disebut di paragraf terakhir yang tetap cookie-only.)
   // SPEC-617 · ADR-0110 · `portal` & `client-accounts` ikut: portal adalah permukaan SESI COOKIE
   // ber-scope akun (respons bergantung `req.user`, jadi tak ada capability yang bisa berarti
   // apa pun di sana), dan client-accounts memegang kredensial (preseden /agent-tokens).
@@ -45,10 +47,31 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // (preseden `remote-control`).
   // SPEC-1217 · `logs` memaparkan lajur event/server/transcript SELURUH mesin operator (LogEntry
   // lintas device) — preseden `presence`: tak ada capability yang berarti apa pun untuk itu.
-  if (top === "auth" || top === "agent-tokens" || top === "device-tokens" || top === "sync"
-    || top === "presence" || top === "models" || top === "remote-control" || top === "logs"
-    || top === "portal" || top === "client-accounts" || top === "session-events"
-    || top === "devices") return "COOKIE_ONLY";
+  //
+  // ADR-0196..0198 · pemilik repo MEMINTA permukaan admin ini terbuka, jadi ADR-0065/0097/0110/0146/
+  // 0147/0165 diamandemen: `agent-tokens`, `device-tokens`, `auth/users`, `auth/change-password`,
+  // `remote-control`, `devices/:id/relay`, `logs`, `presence`, dan metrik custom agent KINI
+  // dipetakan ke capability baru yang opt-in (lihat blok di bawah). Pagar tak-eskalasi-diri hidup di
+  // HANDLER server (kemurnian (method, path) peta ini tak melihat body). Yang TETAP cookie-only dan
+  // tak bisa dibungkus secara teknis: `auth/{status,setup,login,logout}` (cookie sesi/bootstrap),
+  // `sync` (Bearer device-token mesin-ke-mesin), `session-events` (token HMAC per sesi),
+  // `terminal/workspace` (tata letak browser per-akun), `portal`, `client-accounts`, `models`.
+  if (top === "sync" || top === "models" || top === "portal" || top === "client-accounts"
+    || top === "session-events") return "COOKIE_ONLY";
+  if (top === "auth") {
+    // Hanya pengelolaan akun yang terbuka. status/setup/login/logout = cookie sesi & bootstrap.
+    if (seg[1] === "users") return read ? "access:read" : "access:admin";
+    if (seg[1] === "change-password") return "access:admin";
+    return "COOKIE_ONLY";
+  }
+  if (top === "agent-tokens") return rw("tokens");
+  if (top === "device-tokens") return rw("devices");
+  if (top === "remote-control") return read ? "remote:read" : "remote:control";
+  // Relay menjalankan aksi di MESIN LAIN: satu capability untuk SEMUA method (baca isi sesi mesin
+  // lain pun sensitif), dipisah dari `remote:control` (grant mesin INI).
+  if (top === "devices") return "relay:exec";
+  if (top === "logs") return rw("logs");
+  if (top === "presence") return read ? "presence:read" : "COOKIE_ONLY";
   // read-only global (status). SPEC-405 · ADR-0088 · `GLOBAL_READ` HANYA untuk method baca:
   // `POST /update/apply` me-restart instance, dan itu tak pernah boleh lolos hanya karena
   // prefix-nya kebetulan sama dengan endpoint status. Cookie = akses penuh, seperti sebelumnya.
@@ -72,7 +95,10 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // SPEC-450 · ADR-0094 keputusan 8 · dipetakan MENURUT METHOD, bukan prefix (kelas bug SPEC-405):
   // menulis definisi agen mengubah apa yang dilihat SETIAP sesi baru di seluruh workspace.
   if (top === "custom-agents") {
-    if (seg[1] === "metrics" || seg[1] === "invocations") return "COOKIE_ONLY";
+    // ADR-0198 · metrik & disposisi punya domain TERSENDIRI (`metrics`), bukan `agents`: menulis
+    // disposisi = vonis manusia atas mutu agen, dan `agents:write` (definisi agen) tak boleh
+    // diam-diam membuka penilaian-diri. Menurut METHOD (kelas bug SPEC-405).
+    if (seg[1] === "metrics" || seg[1] === "invocations") return rw("metrics");
     return rw("agents");
   }
   // Skills library · MENURUT METHOD (kelas bug SPEC-405): skill global hanoman disuntik ke setiap
@@ -126,6 +152,10 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   if (top === "terminal") {
     // SPEC-786 · workspace memuat preferensi per akun dan diturunkan dari req.user.id;
     // capability sesi tak membawa identitas admin yang diperlukan untuk isolasi row ini.
+    // ADR-0196 · DIPERTAHANKAN cookie-only setelah ditinjau ulang: ini tata letak tab/pane BROWSER
+    // satu akun manusia (revisi optimistik per akun), bukan data kerja. Agent token tak punya
+    // `req.user` — handler akan jatuh di `request.user!.id` — dan menulisnya hanya merusak layout
+    // operator tanpa nilai bagi agen. Bukan celah yang bisa dibungkus bermakna.
     if (seg[1] === "workspace") return "COOKIE_ONLY";
     if (seg[seg.length - 1] === "ws") return "sessions:write"; // WS = kontrol interaktif
     // ADR-0155 · membuka sesi BARU ≠ mengendalikan sesi yang sudah ada. Dicocokkan ke panjang

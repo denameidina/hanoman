@@ -20,6 +20,7 @@ import { LEAD_TOOLS } from "./lead";
 import { TEAM_TOOLS } from "./team";
 import { QA_TOOLS } from "./qa";
 import { SYSTEM_TOOLS } from "./system";
+import { ADMIN_TOOLS } from "./admin";
 import type { McpToolDef } from "./types";
 
 export const MCP_TOOLS: readonly McpToolDef[] = [
@@ -43,4 +44,5 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
   ...TEAM_TOOLS,
   ...QA_TOOLS,        // Workspace QA · laporan, test case, temuan
   ...SYSTEM_TOOLS,
+  ...ADMIN_TOOLS,     // ADR-0196..0198 · kredensial, akun, kendali jarak jauh, relay, log, presence, metrik
 ];

@@ -45,7 +45,11 @@ describe("/agent-tokens routes (cookie-only)", () => {
     // global hanoman yang disuntik ke SETIAP sesi baru di semua project — pelebaran yang disengaja.
     // Workspace QA menambahkan `qa:read`/`qa:write` → 34: laporan QA per project (`/projects/:id/qa/**`)
     // sebelumnya jatuh ke `projects:*`; kini domain sendiri.
-    expect(r.json().capabilities).toHaveLength(34);
+    // ADR-0196..0198 menambahkan 14 id admin (tokens, devices, access, remote, relay, logs, presence,
+    // metrics) → 48. Tiga di antaranya `danger` (access:admin, remote:control, relay:exec). Permukaan
+    // yang dulu cookie-only kini bisa didelegasikan — sengaja, atas permintaan pemilik — dan itu
+    // harus disadari manusia: jumlah kotak yang bisa dicentang bertambah.
+    expect(r.json().capabilities).toHaveLength(48);
     expect(r.json().capabilities[0]).toMatchObject({ id: expect.any(String), domain: expect.any(String), access: expect.any(String) });
   });
 

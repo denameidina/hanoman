@@ -63,7 +63,7 @@ describe("McpPanel", () => {
   // lahir. Yang dijaga sekarang adalah kalimat penggantinya, bukan kalimat yang berbohong.
   it("menyebut versi skema tool dan syarat munculnya tool berbahaya", () => {
     render(<McpPanel />);
-    expect(screen.getByText(/skema tool versi 1/i)).toBeTruthy();
+    expect(screen.getByText(/skema tool versi 2/i)).toBeTruthy();   // naik ke 2 sejak ADR-0182 (tes ini basi di main)
     expect(screen.getByText(/hanya muncul/i)).toBeTruthy();
     expect(screen.queryByText(/tidak tersedia lewat MCP/i)).toBeNull();
   });

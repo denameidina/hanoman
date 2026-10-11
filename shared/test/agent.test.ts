@@ -12,12 +12,18 @@ describe("agent capabilities", () => {
   // ADR-0157 · +domain `team` (papan Tim: `/api/tasks` & `/api/members`) → 13 domain, 30 id.
   // ADR-0172 · +domain `skills` (skill library: `/api/skills*`) → 14 domain, 32 id.
   // ADR-0174 · +domain `qa` (Workspace QA: `/api/projects/:id/qa/**`, `/api/qa/**`) → 15 domain, 34 id.
-  it("has 16 domains, 36 capability ids across three access levels, all in metadata", () => {
-    expect(CAPABILITY_IDS.length).toBe(36);
-    expect(new Set(CAPABILITY_IDS).size).toBe(36);
-    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(16);
+  // (Angka lama di berkas ini, 16/36, sudah basi sejak memori project dicabut — ADR-0182 — dan tak
+  // pernah dikoreksi; nilai sebenarnya sebelum ADR-0196 adalah 15 domain, 34 id.)
+  // ADR-0196..0198 · +8 domain admin (tokens, devices, access, remote, relay, logs, presence,
+  // metrics) dengan 14 id, tiga di antaranya `danger` → 23 domain, 48 id.
+  it("has 23 domains, 48 capability ids across three access levels, all in metadata", () => {
+    expect(CAPABILITY_IDS.length).toBe(48);
+    expect(new Set(CAPABILITY_IDS).size).toBe(48);
+    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(23);
     expect(CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id).sort())
-      .toEqual(["backlog:lifecycle", "ide:git", "sessions:spawn", "vps:exec"]);
+      .toEqual([
+        "access:admin", "backlog:lifecycle", "ide:git", "relay:exec", "remote:control", "sessions:spawn", "vps:exec",
+      ]);
     expect(CAPABILITIES.map((c) => c.id).sort()).toEqual([...CAPABILITY_IDS].sort());
     expect(zCapability.safeParse("projects:read").success).toBe(true);
     expect(zCapability.safeParse("telegram:write").success).toBe(true);
@@ -70,7 +76,7 @@ describe("agent capabilities", () => {
     expect(risky).toContain("vps:write");
     // ADR-0155 · keempat capability `danger` wajib bertanda risk; tanpa itu grid Settings
     // merendernya tanpa ⚠ dan pemecahannya kehilangan separuh gunanya.
-    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"])
+    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "access:admin", "remote:control", "relay:exec"])
       expect(risky, id).toContain(id);
   });
 

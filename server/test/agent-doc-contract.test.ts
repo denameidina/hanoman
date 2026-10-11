@@ -24,9 +24,21 @@ describe("naskah panduan AI agent", () => {
     // selalu 403 dan naskah harus mengatakannya.
     // SPEC-919 · ADR-0147 · `presence` ikut: naskah ini ada untuk MENJELASKAN arti 403, jadi 403
     // yang baru tanpa penjelasan meninggalkan agen eksternal tanpa rujukan sama sekali.
-    const kandidat = ["auth", "agent-tokens", "device-tokens", "sync", "webhooks",
-      "portal", "client-accounts", "presence", "remote-control"];
+    // ADR-0196..0198 · `agent-tokens`, `device-tokens`, `presence`, `remote-control`, `logs`, dan
+    // `devices` KELUAR dari daftar ini (kini capability opt-in, dijelaskan di §3 dan §5 naskah);
+    // `auth` tinggal status/setup/login/logout, dan `session-events` ikut dicatat karena 401-nya
+    // perlu penjelasan. Daftar kedua memastikan yang dibuka memang memetakan ke capability.
+    const kandidat = ["auth", "sync", "webhooks", "portal", "client-accounts", "session-events"];
     for (const seg of kandidat) expect(capabilityForRoute("GET", `/api/${seg}`)).toBe("COOKIE_ONLY");
+    const dibuka: [string, string][] = [
+      ["agent-tokens", "tokens:read"], ["device-tokens", "devices:read"], ["presence", "presence:read"],
+      ["remote-control", "remote:read"], ["logs", "logs:read"], ["devices/d/relay/x", "relay:exec"],
+      ["auth/users", "access:read"],
+    ];
+    for (const [seg, cap] of dibuka) {
+      expect(capabilityForRoute("GET", `/api/${seg}`)).toBe(cap);
+      expect(doc, seg).toContain(`/api/${seg.split("/")[0]}`);
+    }
     const hilang = kandidat.filter((s) => !doc.includes(`/api/${s}`));
     expect(hilang).toEqual([]);
     // Sub-path kredensial Telegram (ADR-0097) juga cookie-only dan wajib disebut.
