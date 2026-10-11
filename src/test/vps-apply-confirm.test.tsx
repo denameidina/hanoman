@@ -62,7 +62,9 @@ describe("VPS apply remediasi · konfirmasi aplikasi (SPEC-847)", () => {
     await openApply();
     const dialog = within(confirmDialog());
     expect(dialog.getByText(TITLE)).toBeTruthy();
+    // Item yang akan dijalankan disebut namanya, sebelum catatan dampaknya.
     expect(dialog.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "fw-b1 · Aktifkan UFW",
       "Langkahnya idempoten dan anti-lockout.", "Checklist diaudit ulang setelah selesai.",
     ]);
   });

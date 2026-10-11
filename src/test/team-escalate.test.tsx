@@ -109,7 +109,7 @@ describe("TeamScreen · wiring eskalasi", () => {
       page(p.status === "doing" ? [task()] : []) as any);
     render(<TeamScreen projects={projects} projectFilter="all"
       onProjectFilter={() => {}} onToast={() => {}} />);
-    fireEvent.click(await screen.findByRole("button", { name: /eskalasi ke backlog/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /kirim ke backlog/i }));
     expect(await screen.findByLabelText(/source/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/prioritas/i)).toBeInTheDocument();
   });

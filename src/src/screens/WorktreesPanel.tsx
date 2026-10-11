@@ -5,10 +5,7 @@
    satu-satunya baris yang tak bisa dihapus adalah checkout utama repo (SPEC-1150/ADR-0163). */
 import React from "react";
 import { Card, Button, Badge, Checkbox, StateBlock, useConfirm } from "../ds";
-import { usePersistedState, scoped } from "../ui-state";
 import { api, type WorktreeReport, type WorktreeStats, type WorktreeDeleteResult } from "../api/client";
-
-const isBool = (v: unknown): v is boolean => typeof v === "boolean";
 
 const rel = (iso: string | null): string => {
   const t = iso ? new Date(iso).getTime() : 0;
@@ -30,12 +27,13 @@ const size = (b: number | null): string => {
 export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
   projectId: string; focus?: string; onOpenBranch?: (branch: string) => void;
 }) {
-  const ui = scoped("worktrees", projectId);
   const [state, setState] = React.useState<"loading" | "ready" | "error">("loading");
   const [report, setReport] = React.useState<WorktreeReport | null>(null);
   const [stats, setStats] = React.useState<Record<string, WorktreeStats>>({});
   const [picked, setPicked] = React.useState<Set<string>>(new Set());
-  const [withBranch, setWithBranch] = usePersistedState(ui, "withBranch", false, isBool);
+  // Audit 2026-10 · TIDAK dipersist: menghapus branch adalah tindakan yang harus dipilih ulang
+  // setiap kali panel dibuka. Dulu pilihan ini tersimpan dan diam-diam ikut aktif di kunjungan berikut.
+  const [withBranch, setWithBranch] = React.useState(false);
   const [results, setResults] = React.useState<WorktreeDeleteResult[] | null>(null);
   const { confirm, dialog } = useConfirm();
 
@@ -127,10 +125,13 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
     <Card padding={0}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
         borderBottom: "1px solid var(--border-hair)", flexWrap: "wrap" }}>
-        <span className="hn-eyebrow" style={{ flex: 1 }}>worktree hidup</span>
+        <span className="hn-eyebrow" style={{ flex: 1 }}>worktree aktif</span>
+        {/* Satu tempat utama untuk menghapus branch dari panel ini; tab Branches dan menu branch
+            di Git Graph tetap bisa menghapus branch tanpa worktree-nya. */}
         {anyBranch && (
           <Checkbox data-testid="with-branch" checked={withBranch}
-            onChange={() => setWithBranch(!withBranch)} label="Hapus branch-nya juga" />
+            onChange={() => setWithBranch(!withBranch)} label="Hapus branch-nya juga"
+            description="Mati: branch tetap ada. Hapus branch saja juga bisa dari tab Branches." />
         )}
         <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={load}>Muat ulang</Button>
         <Button size="sm" variant="primary" leftIcon="trash-2" data-testid="bulk-delete"
@@ -142,9 +143,12 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
       {orphans.length > 0 && state === "ready" && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
           padding: "10px 14px", borderBottom: "1px solid var(--border-hair)", fontSize: 12.5 }}>
-          <span style={{ flex: 1 }}>{orphans.length} worktree sesi yatim — dipertahankan sampai kamu memungutnya.</span>
+          <span style={{ flex: 1 }}>
+            {orphans.length} worktree sesi terputus — disimpan sampai kamu membersihkannya.
+            Sesi yang sudah hidup kembali dilewati.
+          </span>
           <Button size="sm" variant="ghost" leftIcon="trash-2" disabled={!collectible.length}
-            onClick={() => void ask(collectible, true)}>Pungut yatim ({collectible.length})</Button>
+            onClick={() => void ask(collectible, true)}>Bersihkan sesi terputus ({collectible.length})</Button>
         </div>
       )}
 
@@ -169,7 +173,7 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
       )}
 
       {state === "loading" ? <StateBlock kind="loading" title="Memuat worktree…" />
-        : state === "error" ? <StateBlock kind="error" title="Gagal memuat worktree" action={load} />
+        : state === "error" ? <StateBlock kind="error" title="Gagal memuat worktree" action={() => load()} />
         : rows.length === 0 ? <StateBlock kind="empty" icon="folder" title="Tak ada worktree"
             hint="Project ini belum punya checkout lokal, atau git tak bisa dibaca." />
         : (
@@ -195,7 +199,7 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
                 {w.branch
                   ? <button data-testid={`goto-branch-${w.name}`} onClick={() => onOpenBranch?.(w.branch!)}
                       style={{ background: "none", border: 0, padding: 0, cursor: "pointer",
-                        fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--brass)" }}>{w.branch}</button>
+                        fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--brass-700)" }}>{w.branch}</button>
                   /* ADR-0002 · sesi hanoman selalu detached — kolom ini wajib sanggup jadi SHA. */
                   : <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)" }}>
                       {w.head.slice(0, 7) || "—"}
@@ -203,7 +207,7 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
                 {!w.branch && <Badge size="sm" tone="brass">detached</Badge>}
                 {w.spec && <Badge size="sm" tone="brass">{w.spec.id} · {w.spec.stage}</Badge>}
                 {w.session && <Badge size="sm" tone="warn">sesi aktif</Badge>}
-                {w.orphan && <Badge size="sm" tone="warn">sesi yatim</Badge>}
+                {w.orphan && <Badge size="sm" tone="warn">sesi terputus</Badge>}
                 {w.prunable && <Badge size="sm" tone="warn">prunable</Badge>}
                 {w.locked && <Badge size="sm" tone="warn">terkunci git</Badge>}
                 {w.blocked && <Badge size="sm" tone="warn">{w.blocked}</Badge>}

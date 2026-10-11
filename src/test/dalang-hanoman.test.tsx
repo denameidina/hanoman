@@ -1,10 +1,13 @@
 import React from "react";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { DalangHanomanScreen } from "../src/screens/DalangHanomanScreen";
 import { HN_NAV } from "../src/ds/shell";
+// Status koneksi nyata dikendalikan test lewat objek hoisted (ticker harus mencerminkannya).
+const { conn } = vi.hoisted(() => ({ conn: { connected: true, since: 0, paused: false } }));
+vi.mock("../src/api/live", () => ({ useEventsStatus: () => conn }));
 import type { TerminalSession } from "../src/api/client";
 import type { ProjectVM, Spec } from "../src/screens/types";
 
@@ -56,7 +59,7 @@ describe("Dalang Hanoman — menu & layar panggung orkestrasi", () => {
     expect(list.querySelectorAll("[data-puppet]")).toHaveLength(2);        // benang emas mengalir ke yang hidup; sisanya benang kendur
     expect(list.querySelectorAll('.hn-dlg-prj[data-waiting]')).toHaveLength(1);
     expect(list.querySelectorAll(".hn-dlg-prj--off")).toHaveLength(1);     // gamma redup, tetap wayang
-    fireEvent.click(screen.getByRole("button", { name: /Buka terminal — alpha, SPEC-1 · executing/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Buka terminal — alpha, SPEC-1 · Dikerjakan/ }));
     expect(onOpenSession).toHaveBeenCalledWith("s1");
     fireEvent.click(screen.getByRole("button", { name: "Buka project gamma" }));
     expect(onOpenProject).toHaveBeenCalled();
@@ -85,8 +88,8 @@ describe("Dalang Hanoman — menu & layar panggung orkestrasi", () => {
       ]}
       onOpenSession={noop} onOpenProject={noop} onGoto={noop} onExit={noop} />);
     const leg = document.querySelector(".hn-dlg-leg")!;
-    expect(leg.textContent).toContain("Done 2");
-    expect(leg.textContent).toContain("Execute 1");
+    expect(leg.textContent).toContain("Selesai 2");
+    expect(leg.textContent).toContain("Dikerjakan 1");
     expect(document.querySelector(".hn-dlg-donut-c b")!.textContent).toBe("5");
   });
 
@@ -96,5 +99,46 @@ describe("Dalang Hanoman — menu & layar panggung orkestrasi", () => {
     expect(src).not.toMatch(/\b(rgba?|hsla?)\(/);
     // sumber hidup wajib sessions WS, bukan ProjectView.session yang basi
     expect(src).not.toMatch(/\.session\.(status|phase|flow)/);
+  });
+});
+
+describe("Dalang Hanoman — jalan keluar, status koneksi, semantik daftar", () => {
+  const base = { projects, backlog: [] as Spec[], sessions: [] as TerminalSession[], onOpenSession: noop, onOpenProject: noop, onGoto: noop };
+
+  beforeEach(() => { conn.connected = true; });
+  afterEach(() => { delete (window as { matchMedia?: unknown }).matchMedia; });
+
+  it("tombol keluar berada di luar .hn-dlg-chips (agar tampil di mobile)", () => {
+    render(<DalangHanomanScreen {...base} onExit={noop} />);
+    expect(document.querySelector(".hn-dlg-chips .hn-dlg-exit")).toBeNull();
+    expect(document.querySelector(".hn-dlg-top > .hn-dlg-exit")).not.toBeNull();
+  });
+
+  it("dengan `previous`, tombol keluar kembali ke halaman sebelumnya", () => {
+    const onBack = vi.fn(); const onExit = vi.fn();
+    render(<DalangHanomanScreen {...base} onExit={onExit} previous={{ label: "Overview", onBack }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Kembali ke Overview" }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(onExit).not.toHaveBeenCalled();
+  });
+
+  it("ticker mencerminkan status koneksi nyata, bukan teks tetap", () => {
+    // Gerak dimatikan agar ticker menampilkan baris pertamanya secara statis.
+    window.matchMedia = ((q: string) => ({ matches: true, media: q, onchange: null,
+      addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
+    conn.connected = false;
+    const { container, unmount } = render(<DalangHanomanScreen {...base} onExit={noop} />);
+    expect(container.querySelector(".hn-dlg-boot")!.textContent).toContain("KONEKSI TERPUTUS");
+    unmount();
+    conn.connected = true;
+    const again = render(<DalangHanomanScreen {...base} onExit={noop} />);
+    expect(again.container.querySelector(".hn-dlg-boot")!.textContent).toContain("HANOMAN TERHUBUNG");
+    expect(again.container.textContent).not.toContain("SEMUA SISTEM NORMAL");
+  });
+
+  it("daftar wayang memakai listitem di tiap kartu", () => {
+    render(<DalangHanomanScreen {...base} onExit={noop} />);
+    const list = screen.getByRole("list", { name: "Wayang project" });
+    expect(within(list).getAllByRole("listitem")).toHaveLength(3);
   });
 });

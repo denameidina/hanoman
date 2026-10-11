@@ -407,7 +407,13 @@ textarea:focus-visible,
 
 @media (pointer: coarse), (max-width: 767px) {
   button:not(.hn-shell-backdrop) { min-width: var(--touch-target); min-height: var(--touch-target); }
-  input, select, textarea { min-width: var(--touch-target); min-height: var(--touch-target); }
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    min-width: var(--touch-target); min-height: var(--touch-target);
+  }
+  /* Checkbox/radio mentah mendapat 24×24 (batas minimum WCAG 2.5.8), bukan 44: 44 pada kotak 13–18px
+     membuat kotak biru 44×44 dan melebarkan baris (SPEC-879). Kontrol DS membawa 44 lewat
+     `.hn-choice-target` di bawah. */
+  input[type="checkbox"], input[type="radio"] { min-width: 24px; min-height: 24px; }
   .hn-touch-target,
   .hn-project-open,
   .hn-terminal-unplaced-action,
@@ -747,8 +753,9 @@ textarea:focus-visible,
   }
 }
 
-/* Primary/danger button text + icon white (buttons only) */
-button { --accent-on: #fff; }
+/* Teks + ikon tombol primer memakai `--accent-on` (ink-900 di atas brass-500, 5,74:1). Dulu di-override
+   putih di sini: #fff di atas brass-500 hanya 3,2:1. Tombol danger memberi #fff sendiri lewat inline
+   style (ds/components/forms.tsx), jadi tak bergantung pada aturan ini. */
 
 a { color: var(--text-link); text-decoration: none; }
 a:hover { color: var(--wind-700); text-decoration: underline; }
@@ -1012,6 +1019,10 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 }
 .hn-dlg-exit:hover { color: var(--term-fg); border-color: var(--brass-700); }
 .hn-dlg-exit:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+/* Tombol keluar Dalang selalu tampil (di semua tier). 44×44 pada pointer kasar dan di ponsel. */
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-dlg-exit { width: var(--touch-target); height: var(--touch-target); }
+}
 .hn-dlg-kpis { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-top: 16px; }
 .hn-dlg-kpi {
   display: flex; gap: 11px; align-items: flex-start; min-width: 0; padding: 12px 14px;
@@ -1022,9 +1033,9 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 .hn-dlg-tone-leaf { background: rgba(95,131,64,0.18); color: var(--leaf-500); }
 .hn-dlg-tone-brass { background: rgba(184,134,59,0.18); color: var(--brass-400); }
 .hn-dlg-tone-amber { background: rgba(207,143,40,0.18); color: var(--amber-500); }
-.hn-dlg-kpi-l { display: block; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.12em; color: var(--term-dim); }
+.hn-dlg-kpi-l { display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; color: var(--term-dim); }
 .hn-dlg-kpi-v { display: block; font-family: var(--font-display); font-size: 25px; font-weight: 700; line-height: 1.15; color: var(--term-fg); font-variant-numeric: tabular-nums; }
-.hn-dlg-kpi-s { display: block; font-size: 10.5px; color: var(--term-dim); margin-top: 1px; }
+.hn-dlg-kpi-s { display: block; font-size: 11px; color: var(--term-dim); margin-top: 1px; }
 .hn-dlg-grid { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 14px; align-items: start; margin-top: 14px; }
 .hn-dlg-hero {
   position: relative; overflow: hidden; border: 1px solid var(--term-line); border-radius: var(--radius-lg);
@@ -1104,7 +1115,7 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 .hn-dlg-puppet img { display: block; height: 108px; width: auto; filter: drop-shadow(0 0 10px rgba(227,201,136,0.5)); }
 .hn-dlg-prj--off .hn-dlg-puppet img { height: 88px; }
 .hn-dlg-prj-name { display: block; font-family: var(--font-mono); font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hn-dlg-prj-sub { display: block; font-family: var(--font-mono); font-size: 10.5px; color: var(--brass-400); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hn-dlg-prj-sub { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--brass-400); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hn-dlg-prj-sub--amber { color: var(--amber-500); }
 .hn-dlg-empty { position: relative; text-align: center; padding: 26px 0 30px; color: var(--term-dim); font-size: 12.5px; line-height: 1.7; }
 .hn-dlg-cmd {
@@ -1121,10 +1132,10 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 @keyframes hn-dlg-ping { 0% { transform: scale(0.85); opacity: 0.8; } 70% { transform: scale(1.4); opacity: 0; } 100% { opacity: 0; } }
 .hn-dlg-cmd-t { font-family: var(--font-mono); font-size: 12px; color: var(--term-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hn-dlg-cmd-t b { color: var(--brass-300); font-weight: 500; }
-.hn-dlg-cmd-k { margin-left: auto; flex: none; font-family: var(--font-mono); font-size: 10px; color: var(--term-dim); border: 1px solid var(--term-line); border-radius: var(--radius-sm); padding: 2px 8px; }
+.hn-dlg-cmd-k { margin-left: auto; flex: none; font-family: var(--font-mono); font-size: 11px; color: var(--term-dim); border: 1px solid var(--term-line); border-radius: var(--radius-sm); padding: 2px 8px; }
 .hn-dlg-rail { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .hn-dlg-card { border: 1px solid var(--term-line); border-radius: var(--radius-md); background: rgba(255,253,248,0.03); padding: 12px 14px; }
-.hn-dlg-rt { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.12em; color: var(--brass-300); margin-bottom: 9px; }
+.hn-dlg-rt { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; color: var(--brass-300); margin-bottom: 9px; }
 .hn-dlg-mut { font-size: 12px; color: var(--term-dim); }
 .hn-dlg-act { display: flex; gap: 9px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--term-line); font-size: 11.5px; }
 .hn-dlg-act:last-of-type { border-bottom: 0; }
@@ -1149,19 +1160,24 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 .hn-dlg-leg i.hn-dlg-seg--brass { background: var(--brass-400); }
 .hn-dlg-donut-c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .hn-dlg-donut-c b { font-family: var(--font-display); font-size: 23px; color: var(--term-fg); line-height: 1; }
-.hn-dlg-donut-c span { font-size: 9.5px; color: var(--term-dim); margin-top: 2px; }
-.hn-dlg-chart { display: block; width: 100%; height: auto; }
+.hn-dlg-donut-c span { font-size: 11px; color: var(--term-dim); margin-top: 2px; }
+/* Teks grafik dalam satuan viewBox (260 unit). 11 unit membuat label hari terakhir menjorok sedikit
+   melewati tepi viewBox, jadi overflow dibiarkan terlihat: lebih baik menjorok ke padding kartu
+   daripada terpotong. */
+.hn-dlg-chart { display: block; width: 100%; height: auto; overflow: visible; }
 .hn-dlg-chart line { stroke: var(--term-line); stroke-width: 0.6; }
-.hn-dlg-chart text { font-family: var(--font-mono); font-size: 7.5px; fill: var(--term-dim); }
+.hn-dlg-chart text { font-family: var(--font-mono); font-size: 11px; fill: var(--term-dim); }
 .hn-dlg-chart circle { fill: var(--wind-500); }
 .hn-dlg-trend { fill: none; stroke: var(--wind-500); stroke-width: 1.6; }
-.hn-dlg-foot { text-align: center; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.28em; color: var(--brass-700); padding: 12px 0 4px; }
+/* brass-500 = 6,10:1 di #0d0b07 (brass-700 hanya 2,91:1). */
+.hn-dlg-foot { text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.28em; color: var(--brass-500); padding: 12px 0 4px; }
 @media (max-width: 1199px) {
   .hn-dlg-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 767px) {
   .hn-dlg-kpis { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .hn-dlg-chips { display: none; }
+  /* Sembunyikan hanya chip tanggal/jam. Wadah `.hn-dlg-chips` tetap tampil karena memuat tombol keluar. */
+  .hn-dlg-chip { display: none; }
   .hn-dlg-hero-art { width: min(360px, 100%); }
 }
 

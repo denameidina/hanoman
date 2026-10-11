@@ -2,9 +2,10 @@
    BUAT (berkas belum punya specId, jadi ditahan di memori sampai item lahir) dan
    `SpecAttachmentsPanel` untuk detail item yang sudah ada. Keduanya berbagi tampilan kartu. */
 import React from "react";
-import { Button, Icon, IconButton } from "../ds";
+import { Button, Icon, IconButton, useConfirm } from "../ds";
 import { paths, type SpecAttachmentView } from "@hanoman/shared";
 import { api } from "../api/client";
+import { failureMessage } from "../lib/report-error";
 
 // Cermin allowlist server (`services/spec-attachment.ts` + `DOCUMENT_TYPES`). Mime DAN ekstensi
 // disebut keduanya: picker macOS menyaring lewat ekstensi, Linux lewat mime.
@@ -102,6 +103,7 @@ export type AttachmentToast = (msg: string, tone?: "ok" | "warn" | "err") => voi
 export function SpecAttachmentsPanel({ specId, onToast }: { specId: string; onToast: AttachmentToast }) {
   const [items, setItems] = React.useState<SpecAttachmentView[]>([]);
   const [busy, setBusy] = React.useState(false);
+  const { confirm, dialog } = useConfirm();
 
   // Dua penjagaan, dua sebab berbeda — keduanya kelas "detail backlog roboh seluruhnya":
   // `?.` untuk klien yang tak punya method ini (layar yang me-mock `../api/client` sebagian, pola
@@ -125,15 +127,25 @@ export function SpecAttachmentsPanel({ specId, onToast }: { specId: string; onTo
         onToast(`${r.rejected.length} berkas ditolak: ${r.rejected.map((x) => x.filename).join(", ")}`, "warn");
       if (r.saved.length) onToast(`${r.saved.length} lampiran ditambahkan`, "ok");
       await load();
-    } catch { onToast("Gagal mengunggah lampiran", "err"); }
+    } catch (e) { onToast(failureMessage("mengunggah lampiran", e), "err"); }
     finally { setBusy(false); }
   }
 
+  // Hapus lampiran = konfirmasi dulu. Berkasnya hilang dari disk (bukan sekadar daftar), dan fase sesi
+  // berikutnya tak lagi membacanya — dua hal itu yang harus terbaca sebelum tombol ditekan.
   async function remove(a: SpecAttachmentView) {
-    setBusy(true);
-    try { await api.deleteSpecAttachment(specId, a.id); await load(); }
-    catch { onToast("Gagal menghapus lampiran", "err"); }
-    finally { setBusy(false); }
+    try {
+      const ok = await confirm({
+        title: `Hapus lampiran ${a.filename}?`,
+        impact: [
+          "Berkas dihapus dari disk dan tak bisa dikembalikan.",
+          "Fase sesi berikutnya tak lagi membaca lampiran ini.",
+        ],
+        confirmLabel: "Hapus lampiran", tone: "danger", icon: "trash-2",
+        run: () => api.deleteSpecAttachment(specId, a.id),
+      });
+      if (ok) await load();
+    } catch (e) { onToast(failureMessage("menghapus lampiran", e), "err"); }
   }
 
   return (
@@ -161,6 +173,7 @@ export function SpecAttachmentsPanel({ specId, onToast }: { specId: string; onTo
           </div>
         )}
       </Dropzone>
+      {dialog}
     </div>
   );
 }

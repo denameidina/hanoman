@@ -35,7 +35,7 @@ describe("SPEC-880 · daftar project: kolom 'Ditangani'", () => {
       handledBy: [{ deviceId: "d1", name: "hm-dena", revoked: false }],
     })] as never} onOpen={() => {}} />);
     const row = screen.getByRole("button", { name: "Buka project arta" }).closest(".hn-project-row")!;
-    expect(row.querySelector('[data-label="Ditangani"]')).toBeInTheDocument();
+    expect(row.querySelector('[data-label="Ditangani oleh"]')).toBeInTheDocument();
     expect(screen.getByText("hm-dena")).toBeInTheDocument();
   });
 
@@ -61,7 +61,7 @@ describe("SPEC-880 · daftar project: kolom 'Ditangani'", () => {
   it("instance tanpa katalog device: filter tak dirender", async () => {
     render(<ProjectsScreen projects={[P()] as never} pageSize={20} dataVersion={0} />);
     await waitFor(() => expect(api.listDeviceTokens).toHaveBeenCalled());
-    expect(screen.queryByLabelText("Saring per client")).toBeNull();
+    expect(screen.queryByLabelText("Saring per perangkat")).toBeNull();
   });
 
   it("dengan katalog device: filter dirender dan meneruskan handledBy ke API", async () => {
@@ -71,7 +71,7 @@ describe("SPEC-880 · daftar project: kolom 'Ditangani'", () => {
     ] as never);
     vi.mocked(api.listProjects).mockResolvedValue(envelope([P()]));
     render(<ProjectsScreen projects={[P()] as never} pageSize={20} dataVersion={0} />);
-    const select = await screen.findByLabelText("Saring per client");
+    const select = await screen.findByLabelText("Saring per perangkat");
     // device yang sudah dicabut tak ditawarkan sebagai pilihan baru
     expect(screen.queryByRole("option", { name: /sudah-dicabut/ })).toBeNull();
     (select as HTMLSelectElement).value = "d1";

@@ -78,7 +78,8 @@ describe("pane pratinjau menyerap tinggi yang tersedia (SPEC-363)", () => {
   it("DocsWorkspace exposes mounted tree/viewer panels on mobile", async () => {
     mockViewport(390);
     render(<DocsWorkspace projectId="p1" projectName="P1" docStatus="ok" />);
-    await screen.findByRole("tablist", { name: "Panel Docs" });
+    // Label landmark ikut glosarium Indonesia audit UI/UX 2026-10 ("Docs" → "Dokumen"), bukan hilang.
+    await screen.findByRole("tablist", { name: "Panel Dokumen" });
     expect(document.querySelector('[data-panel="tree"]')).toHaveAttribute("aria-hidden", "false");
     fireEvent.click(screen.getByRole("tab", { name: "Dokumen" }));
     expect(document.querySelector('[data-panel="viewer"]')).toHaveAttribute("aria-hidden", "false");

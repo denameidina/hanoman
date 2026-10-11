@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 
 vi.mock("../src/api/client", () => ({
   api: {
@@ -78,6 +78,20 @@ describe("SPEC-471 · panel issue GitHub", () => {
     render(<GithubIssuesPanel projectId="p" />);
     expect(await screen.findByText("SPEC-472")).toBeTruthy();
     expect(screen.queryByRole("checkbox", { name: /pilih issue 9/i })).toBeNull();
+  });
+
+  // Tolak issue = keputusan yang menutup issue di hanoman: lewat dialog, sama seperti tiket.
+  it("tolak issue meminta konfirmasi; Batal tak menolak, konfirmasi memanggil API", async () => {
+    render(<GithubIssuesPanel projectId="p" />);
+    await screen.findByText(/History purge/);
+    fireEvent.click(screen.getByRole("button", { name: "Tolak" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Issue di GitHub tidak diubah.")).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Batal" }));
+    expect(m.rejectGithubIssue).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Tolak" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Tolak issue" }));
+    await waitFor(() => expect(m.rejectGithubIssue).toHaveBeenCalledWith("p:o/r#9"));
   });
 });
 

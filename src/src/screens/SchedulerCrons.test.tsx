@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { SchedulerCrons } from "./SchedulerCrons";
 
 const cron = (over: Record<string, unknown> = {}) => ({
@@ -22,6 +22,7 @@ const listCronRuns = vi.fn(async (..._a: unknown[]) => ({
 const createCron = vi.fn(async (..._a: unknown[]) => cron({ id: "c2" }));
 const runCronNow = vi.fn(async (..._a: unknown[]) => ({ id: "r2" }));
 const updateProject = vi.fn(async (..._a: unknown[]) => ({}));
+const deleteCron = vi.fn(async (..._a: unknown[]) => undefined);
 
 vi.mock("../api/client", () => ({
   api: {
@@ -29,7 +30,7 @@ vi.mock("../api/client", () => ({
     listCronRuns: (...a: unknown[]) => listCronRuns(...a),
     createCron: (...a: unknown[]) => createCron(...a),
     patchCron: vi.fn(async () => cron()),
-    deleteCron: vi.fn(async () => undefined),
+    deleteCron: (...a: unknown[]) => deleteCron(...a),
     runCronNow: (...a: unknown[]) => runCronNow(...a),
     updateProject: (...a: unknown[]) => updateProject(...a),
   },
@@ -60,7 +61,7 @@ describe("SchedulerCrons", () => {
     await screen.findByText("Cek error pagi");
     fireEvent.click(screen.getByRole("button", { name: /Cron baru/i }));
     fireEvent.change(await screen.findByLabelText("Preset jadwal"), { target: { value: "lanjutan" } });
-    expect(screen.getByLabelText("Cron expression")).toBeTruthy();
+    expect(screen.getByLabelText("Ekspresi cron")).toBeTruthy();
   });
 
   it("menyimpan cron baru lewat api.createCron dengan expr hasil preset", async () => {
@@ -92,8 +93,53 @@ describe("SchedulerCrons", () => {
   it("project belum opt-in: peringatan + tombol opt-in inline", async () => {
     render(<SchedulerCrons {...props} projects={[{ id: "p1", name: "P1", schedulerOptIn: false }] as never} />);
     await screen.findByText("Cek error pagi");
-    expect(screen.getByText(/belum di-opt-in/i)).toBeTruthy();
+    expect(screen.getByText(/belum diizinkan/i)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Aktifkan scheduler di project ini/ }));
     await waitFor(() => expect(updateProject).toHaveBeenCalledWith("p1", { schedulerOptIn: true }));
+  });
+
+  // Audit 1G · hapus cron = hard delete, jadi minta konfirmasi lebih dulu dan menyebut dampaknya.
+  it("hapus cron meminta konfirmasi dulu dan baru menghapus setelah disetujui", async () => {
+    render(<SchedulerCrons {...props} />);
+    await screen.findByText("Cek error pagi");
+    fireEvent.click(screen.getByRole("button", { name: /^Hapus$/ }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Hapus cron ini?");
+    expect(screen.getByRole("dialog")).toHaveTextContent("tidak bisa dibatalkan");
+    expect(deleteCron).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Hapus cron" }));
+    await waitFor(() => expect(deleteCron).toHaveBeenCalledWith("c1"));
+  });
+
+  // Audit 1G · galat memuat daftar TAMPIL sebagai galat dengan Coba lagi, bukan "Belum ada cron".
+  it("galat memuat daftar cron tampil sebagai galat, bukan daftar kosong", async () => {
+    listCrons.mockRejectedValueOnce(new Error("404"));
+    render(<SchedulerCrons {...props} />);
+    expect(await screen.findByText("Gagal memuat daftar cron: 404")).toBeTruthy();
+    expect(screen.queryByText(/Belum ada cron/)).toBeNull();
+    expect(screen.getByRole("button", { name: /coba lagi/i })).toBeTruthy();
+  });
+
+  // Audit 1G · tombol Riwayat menyatakan keadaan bukanya.
+  it("tombol Riwayat menyatakan aria-expanded", async () => {
+    render(<SchedulerCrons {...props} />);
+    await screen.findByText("Cek error pagi");
+    const riwayat = screen.getByRole("button", { name: /Riwayat/i });
+    expect(riwayat.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(riwayat);
+    expect(riwayat.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  // Audit 1G · kolom jam boleh kosong saat diketik; dijepit ke nilai sah saat blur.
+  it("kolom 'Tiap berapa jam' boleh kosong saat diketik dan kembali ke nilai sah saat blur", async () => {
+    render(<SchedulerCrons {...props} />);
+    await screen.findByText("Cek error pagi");
+    fireEvent.click(screen.getByRole("button", { name: /Cron baru/i }));
+    fireEvent.change(await screen.findByLabelText("Preset jadwal"), { target: { value: "tiap-n-jam" } });
+    const jam = screen.getByLabelText("Tiap berapa jam");
+    fireEvent.change(jam, { target: { value: "" } });
+    expect(jam).toHaveValue(null);
+    fireEvent.change(jam, { target: { value: "99" } });
+    fireEvent.blur(jam);
+    expect(jam).toHaveValue(23);
   });
 });

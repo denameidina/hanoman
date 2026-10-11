@@ -1,4 +1,4 @@
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { subKey } from "@hanoman/shared";
 import { eventsStub, resetEventsStub, setTopics, emitTopic, lastSubParams, allSubs } from "./helpers/events-stub";
@@ -75,18 +75,36 @@ describe("SPEC-908 · SchedulerScreen live", () => {
     expect(await screen.findByText(/Judul satu/)).toBeTruthy();
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
     expect(getSchedulerState).toHaveBeenCalledTimes(1);
-    // Empat seksi (queued/canceled/done/failed) = empat muat awal, bukan lebih.
-    expect(getSchedulerQueue).toHaveBeenCalledTimes(4);
+    // Tiga seksi yang tampil (queued/done/failed) = tiga muat awal, bukan lebih. `canceled` ber-count
+    // nol dan disembunyikan (Audit 1G), jadi ia tak memuat apa pun dan tak berlangganan.
+    expect(getSchedulerQueue).toHaveBeenCalledTimes(3);
   });
 
-  it("empat seksi berlangganan dengan `status` masing-masing", async () => {
+  it("seksi berlangganan dengan `status` masing-masing; seksi ber-count nol tak berlangganan", async () => {
     setTopics(["schedulerState", "schedulerQueue"]);
     render(view());
     await screen.findByText(/Judul satu/);
     const subs = allSubs("schedulerQueue");
-    expect(subs).toHaveLength(4);
-    expect(subs.map((s) => s.status).sort()).toEqual(["canceled", "done", "failed", "queued"]);
+    expect(subs).toHaveLength(3);
+    expect(subs.map((s) => s.status).sort()).toEqual(["done", "failed", "queued"]);
     for (const s of subs) expect(s).toMatchObject({ page: 1, limit: 10 });
+  });
+
+  // Audit 1G · draft setelan yang sedang diedit tak boleh hilang saat frame schedulerState datang
+  // (mis. karena Jeda dari perangkat lain). Snapshot baru hanya menggantikan draft yang belum diedit.
+  it("frame schedulerState tak menimpa draft setelan yang sedang diedit", async () => {
+    setTopics(["schedulerState", "schedulerQueue"]);
+    render(view());
+    await screen.findByText(/Judul satu/);
+    fireEvent.change(screen.getByLabelText("Batas sesi berjalan"), { target: { value: "9" } });
+    await act(async () => {
+      emitTopic({
+        t: "schedulerState", key: subKey("schedulerState", {}),
+        state: { ...STATE, config: { ...STATE.config, paused: true } } as never,
+      });
+    });
+    expect(screen.getByLabelText("Batas sesi berjalan")).toHaveValue(9);
+    expect(screen.getByText("Ada perubahan yang belum disimpan.")).toBeTruthy();
   });
 
   it("layar berlangganan `schedulerState` tanpa parameter", async () => {

@@ -66,6 +66,7 @@ export function BranchesPanel({ projectId, onOpenWorktree }: {
   React.useEffect(() => {
     api.listBranches(projectId)
       .then((r) => setBases([...new Set([...r.branches, ...r.remotes])].sort()))
+      // Daftar base hanya pilihan tambahan: gagal dibaca = tinggal "base otomatis" (yang selalu ada).
       .catch(() => setBases([]));
   }, [projectId]);
 
@@ -121,17 +122,17 @@ export function BranchesPanel({ projectId, onOpenWorktree }: {
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
         borderBottom: "1px solid var(--border-hair)", flexWrap: "wrap" }}>
         <span className="hn-eyebrow" style={{ flex: 1 }}>
-          branch project{report?.base ? ` · base ${report.base}` : ""}
+          branch proyek{report?.base ? ` · base ${report.base}` : ""}
         </span>
-        <Input size="sm" data-testid="cari" leftIcon="search" placeholder="cari branch…"
+        <Input size="sm" data-testid="cari" leftIcon="search" aria-label="Cari branch" placeholder="mis. fitur/login"
           value={q} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
           style={{ width: 180 }} />
-        <Select size="sm" data-testid="status" value={status}
+        <Select size="sm" data-testid="status" aria-label="Status branch" value={status}
           onChange={(e) => setStatus(e.target.value as Status)} options={STATUSES} />
-        <Select size="sm" data-testid="base" value={base} onChange={(e) => setBase(e.target.value)}
+        <Select size="sm" data-testid="base" aria-label="Base pembanding" value={base} onChange={(e) => setBase(e.target.value)}
           options={[{ value: "", label: `base otomatis${report?.base ? ` (${report.base})` : ""}` },
             ...bases.map((b) => ({ value: b, label: b }))]} />
-        <Select size="sm" data-testid="scope" value={scope}
+        <Select size="sm" data-testid="scope" aria-label="Cakupan hapus" value={scope}
           onChange={(e) => setScope(e.target.value as BranchScope)} options={SCOPES} />
         <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={load}>Muat ulang</Button>
         <Button size="sm" variant="primary" leftIcon="trash-2" data-testid="bulk-delete"
@@ -154,7 +155,7 @@ export function BranchesPanel({ projectId, onOpenWorktree }: {
       )}
 
       {state === "loading" ? <StateBlock kind="loading" title="Memuat branch…" />
-        : state === "error" ? <StateBlock kind="error" title="Gagal memuat branch" action={load} />
+        : state === "error" ? <StateBlock kind="error" title="Gagal memuat branch" action={() => load()} />
         : branches.length === 0 ? <StateBlock kind="empty" icon="git-branch" title="Tak ada branch"
             hint="Project ini belum punya branch local maupun origin." />
         : filtered.length === 0 ? <StateBlock kind="empty" icon="filter" title="Tak ada branch cocok filter"
@@ -173,7 +174,7 @@ export function BranchesPanel({ projectId, onOpenWorktree }: {
               <div key={b.name} className="hn-dense-row"
                 style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
                   padding: "8px 14px", borderBottom: "1px solid var(--border-hair)" }}>
-                <Checkbox data-testid={`pick-${b.name}`} checked={picked.has(b.name)}
+                <Checkbox data-testid={`pick-${b.name}`} aria-label={`Pilih branch ${b.name}`} checked={picked.has(b.name)}
                   disabled={!deletable(b)} onChange={() => toggle(b.name)} />
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", flex: 1 }}>
                   {b.name}

@@ -29,7 +29,8 @@ export function QaPreview({ detail, projectId }: { detail: QaReportDetail; proje
       ].join("")}</style>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {EXPORTS.map((x) => (
-          <Button key={x.format} variant={x.format === "zip" ? "secondary" : "ghost"} leftIcon="download" as="a"
+          // Ekspor utama ada di header laporan; di sini semua format berstatus ghost (satu pintu menonjol).
+          <Button key={x.format} variant="ghost" leftIcon="download" as="a"
             href={api.qaExportUrl(projectId, detail.id, x.format)}>{x.label}</Button>
         ))}
       </div>

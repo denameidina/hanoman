@@ -1,3 +1,4 @@
+import type React from "react";
 import type { AgentMetricsView } from "@hanoman/shared";
 import { Badge } from "../ds";
 
@@ -5,6 +6,16 @@ const durationText = (value: number | null): string => value === null ? "—"
   : value < 1000 ? `${value} ms` : `${(value / 1000).toFixed(1)} dtk`;
 const tokenText = (value: number | null | undefined): string =>
   value == null ? "—" : value.toLocaleString("id-ID");
+
+/** Angka + keterangan yang terlihat di bawahnya, supaya arti metrik tak bergantung pada hover. */
+function Stat({ caption, testId, children }: { caption: string; testId?: string; children: React.ReactNode }) {
+  return (
+    <span data-testid={testId} style={{ display: "flex", flexDirection: "column", gap: 2, maxWidth: 280 }}>
+      <span>{children}</span>
+      <span style={{ color: "var(--text-muted)" }}>{caption}</span>
+    </span>
+  );
+}
 
 export function CustomAgentMetrics({ name, metrics }: { name: string; metrics: AgentMetricsView | null }) {
   const metric = metrics?.agents.find((entry) => entry.agentName === name);
@@ -16,14 +27,20 @@ export function CustomAgentMetrics({ name, metrics }: { name: string; metrics: A
       paddingTop: 9, borderTop: "1px solid var(--border-hair)",
       fontSize: "var(--text-xs)", color: "var(--text-subtle)",
     }}>
-      <span>{metrics ? metric?.invocationCount ?? 0 : "—"} invocation tercatat · 30 hari</span>
-      <span>Durasi median: {durationText(metric?.medianDurationMs ?? null)}</span>
-      <span>Token masuk: {tokenText(metric?.inputTokens)} · keluar: {tokenText(metric?.outputTokens)} · cache: {tokenText(metric?.cachedTokens)}</span>
-      <span data-testid={`precision-${name}`} title="Hasil diterima atau parsial dibagi seluruh hasil yang dinilai; bukan akurasi menemukan semua bug.">
+      <Stat caption="Jumlah pemanggilan agen ini yang terekam dalam 30 hari terakhir.">
+        {metrics ? metric?.invocationCount ?? 0 : "—"} invocation tercatat · 30 hari
+      </Stat>
+      <Stat caption="Separuh pemanggilan selesai lebih cepat dari angka ini.">
+        Durasi median: {durationText(metric?.medianDurationMs ?? null)}
+      </Stat>
+      <Stat caption="Token yang dibaca agen, yang ditulisnya, dan yang dilayani dari cache; dihitung terpisah.">
+        Token masuk: {tokenText(metric?.inputTokens)} · keluar: {tokenText(metric?.outputTokens)} · cache: {tokenText(metric?.cachedTokens)}
+      </Stat>
+      <Stat testId={`precision-${name}`} caption="Hasil diterima atau parsial dibagi seluruh hasil yang dinilai; bukan akurasi menemukan semua bug.">
         Diterima/parsial: {metric?.operationalPrecision == null
           ? "—" : `${Math.round(metric.operationalPrecision * 100)}%`}
         {` · ${evaluated} dinilai · ${metric?.dispositions.pending ?? 0} belum dinilai`}
-      </span>
+      </Stat>
       {metric && <span>
         Diterima {metric.dispositions.accepted} · Parsial {metric.dispositions.partial}
         {" · "}Ditolak {metric.dispositions.rejected} · False-positive {metric.dispositions.falsePositive}

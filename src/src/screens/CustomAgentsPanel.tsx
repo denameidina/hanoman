@@ -8,8 +8,9 @@
    Itu lapis 2 anti-loop, dan lapis yang tak terlihat adalah lapis yang dikira tak ada. */
 import React from "react";
 import { useModelCatalog } from "../api/model-catalog";
-import { Card, Button, Badge, Input, Switch, MultiSelect, Select, Field, HnTextarea, StateBlock, Callout, Modal } from "../ds";
+import { Card, Button, Badge, Input, Switch, MultiSelect, Select, Field, HnTextarea, StateBlock, Callout, Modal, useConfirm } from "../ds";
 import { api, ApiError } from "../api/client";
+import { failureMessage } from "../lib/report-error";
 import { CustomAgentMetrics } from "./CustomAgentMetrics";
 import {
   AGENT_NAME_RE, DEFAULT_AGENT_TOOLS, ALL_TOOLS, resolveTools, modelsForRuntime,
@@ -74,6 +75,22 @@ function errorText(e: unknown): string {
   return `Gagal (${e.status})`;
 }
 
+const failed = (action: string, e: unknown): string => failureMessage(action, new Error(errorText(e)));
+
+const NAME_ERROR = "Nama tidak sah: pakai huruf kecil, angka, dan tanda hubung; minimal 2 karakter.";
+
+/** Atribut ARIA yang mengikat kontrol ke pesan galatnya; kosong bila field sah. */
+const invalidAria = (id: string, message: string | null) =>
+  message ? { "aria-invalid": true as const, "aria-describedby": id } : {};
+
+/** Hint field + pesan galat terlihat di bawahnya (ditunjuk `aria-describedby` kontrolnya). */
+const hintWithError = (hint: React.ReactNode, id: string, message: string | null) => (
+  <>
+    {hint}
+    {message && <span id={id} role="alert" style={{ display: "block", marginTop: 3, color: "var(--clay-600)" }}>{message}</span>}
+  </>
+);
+
 export type CustomAgentsPanelProps = {
   projectId: string | null;
   runtime?: AgentRuntime;
@@ -91,14 +108,18 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
   const [err, setErr] = React.useState<string>("");
   const [editing, setEditing] = React.useState<{ id: string | null; draft: Draft } | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [loadError, setLoadError] = React.useState("");
+  const [advancedOpen, setAdvancedOpen] = React.useState(false);
+  const { confirm, dialog } = useConfirm();
+  const fieldId = React.useId();
 
   const load = React.useCallback(async () => {
-    let nextRows: CustomAgentView[] = [];
+    let nextRows: CustomAgentView[] | null = null;
     let nextCatalog: AgentCatalogView = { tools: [], models: [], runtimes: [] };
     let nextMetrics: AgentMetricsView | null = null;
-    setMetricsError(false);
+    setMetricsError(false); setLoadError("");
     try { nextRows = await api.listCustomAgents(projectId ?? undefined, sessionRuntime); }
-    catch (e) { setErr(errorText(e)); }
+    catch (e) { setLoadError(failed("memuat daftar agen", e)); }
     // Katalog gagal dimuat TIDAK boleh menyembunyikan daftar agen: ia jatuh ke katalog kosong, dan
     // setiap nilai tersimpan lalu tampil sebagai chip bertanda — terlihat, bukan hilang senyap.
     try { nextCatalog = await api.getCustomAgentCatalog(projectId ?? undefined); }
@@ -109,7 +130,8 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
         from: new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString(),
       });
     } catch { setMetricsError(true); }
-    setCatalog(nextCatalog); setMetrics(nextMetrics); setRows(nextRows);
+    setCatalog(nextCatalog); setMetrics(nextMetrics);
+    if (nextRows) setRows(nextRows);
   }, [projectId, sessionRuntime]);
 
   const reloadMetrics = React.useCallback(async () => {
@@ -157,6 +179,24 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
   ) : false;
   const blocked = invalidTools.length > 0 || invalidMentions.length > 0
     || modelInvalid || effortInvalid || profileInvalid;
+  const draftNow = editing?.draft;
+  const errors = {
+    name: nameValid ? null : NAME_ERROR,
+    model: modelInvalid ? `Model "${draftNow?.model}" tak ada di katalog untuk runtime ini.` : null,
+    effort: effortInvalid ? `Effort "${draftNow?.effort}" tak didukung oleh model ini.` : null,
+    maxTurns: draftNow && !optionalIntValid(draftNow.maxTurns, 1, 200) ? "Isi bilangan bulat 1–200, atau kosongkan." : null,
+    timeoutSeconds: draftNow && !optionalIntValid(draftNow.timeoutSeconds, 30, 3_600) ? "Isi bilangan bulat 30–3600, atau kosongkan." : null,
+    workspacePolicy: draftNow?.workspacePolicy === "isolated-worktree" && draftNow.runtime !== "claude"
+      ? "Worktree terisolasi hanya tersedia untuk runtime Claude; pilih runtime Claude atau ganti kebijakan." : null,
+  };
+  const errorId = (field: keyof typeof errors) => `${fieldId}-${field}`;
+  // Field lanjutan yang salah tak boleh tersembunyi di balik bagian tertutup.
+  const advancedInvalid = Boolean(errors.effort || errors.maxTurns || errors.timeoutSeconds || errors.workspacePolicy);
+  const advancedSet = draftNow ? [
+    draftNow.runtime, draftNow.effort, draftNow.workspacePolicy !== "inherit", draftNow.maxTurns, draftNow.timeoutSeconds,
+  ].filter(Boolean).length : 0;
+  const openEditor = (next: { id: string | null; draft: Draft }) => { setErr(""); setAdvancedOpen(false); setEditing(next); };
+  const closeEditor = () => { setEditing(null); setErr(""); };
 
   /** `*` dan nama eksplisit saling meniadakan — cermin aturan server, ditegakkan di kontrol. */
   const setTools = (next: string[]) => {
@@ -208,20 +248,35 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
       setEditing(null);
       await load();
       onToast?.(editing.id ? "Agen diperbarui" : "Agen dibuat", "ok");
-    } catch (e) { setErr(errorText(e)); }
+    } catch (e) { setErr(failed("menyimpan agen", e)); }
     finally { setBusy(false); }
   }
 
   async function toggleEnabled(a: CustomAgentView, on: boolean) {
     setErr("");
     try { await api.updateCustomAgent(a.id, { enabled: on }); await load(); }
-    catch (e) { setErr(errorText(e)); }
+    catch (e) { setErr(failed(on ? "mengaktifkan agen" : "menonaktifkan agen", e)); }
   }
 
   async function remove(a: CustomAgentView) {
     setErr("");
-    try { await api.deleteCustomAgent(a.id); await load(); onToast?.("Agen dihapus", "ok"); }
-    catch (e) { setErr(errorText(e)); }
+    const mentionedBy = (rows ?? []).filter((r) => r.id !== a.id && r.mentions.includes(a.name)).map((r) => r.name);
+    try {
+      const deleted = await confirm({
+        title: `Hapus agen ${a.name}?`, eyebrow: projectId ? "agen project" : "agen global", tone: "danger",
+        message: a.description || undefined, confirmLabel: "Hapus agen", cancelLabel: "Batal",
+        impact: [
+          "Definisi agen dihapus permanen dan tak bisa dipulihkan dari sini.",
+          mentionedBy.length
+            ? `Agen yang menyebutnya di Mention akan menunjuk agen yang tak ada: ${mentionedBy.join(", ")}.`
+            : "Tak ada agen lain yang menyebutnya di Mention.",
+        ],
+        run: () => api.deleteCustomAgent(a.id),
+      });
+      if (!deleted) return;
+      await load();
+      onToast?.("Agen dihapus", "ok");
+    } catch (e) { setErr(failed("menghapus agen", e)); }
   }
 
   async function judge(id: string) {
@@ -236,10 +291,14 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
       });
       await reloadMetrics();
       onToast?.("Penilaian invocation disimpan", "ok");
-    } catch (e) { setErr(errorText(e)); }
+    } catch (e) { setErr(failed("menyimpan penilaian invocation", e)); }
     finally { setBusy(false); }
   }
 
+  if (rows === null && loadError) {
+    return <StateBlock kind="error" title="Gagal memuat custom agent" hint={loadError}
+      action={() => void load()} actionLabel="Coba lagi" />;
+  }
   if (rows === null) return <StateBlock kind="loading" title="Memuat custom agent…" />;
 
   return (
@@ -250,12 +309,16 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
             ? "Agen project ini, ditambah agen global yang berlaku di sini. Agen project menimpa agen global bernama sama."
             : "Agen global — tersedia di semua project. Satu project bisa menimpanya dengan agen bernama sama."}
         </div>
-        <Button size="sm" onClick={() => { setErr(""); setEditing({ id: null, draft: emptyDraft() }); }}>
+        <Button size="sm" onClick={() => openEditor({ id: null, draft: emptyDraft() })}>
           Agen baru
         </Button>
       </div>
 
       {err && !editing && <Callout tone="err">{err}</Callout>}
+      {loadError && <Callout tone="err">
+        {loadError}
+        <Button size="sm" variant="ghost" onClick={() => void load()}>Coba lagi</Button>
+      </Callout>}
       {metricsError && <Callout tone="warn">
         Bukti penggunaan gagal dimuat. Angka yang masih terlihat berasal dari pemuatan sebelumnya.
         <Button size="sm" variant="ghost" onClick={() => void reloadMetrics()}>Muat ulang bukti</Button>
@@ -280,7 +343,7 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
         {metrics.telemetry.relay.lastIssueAt && ` · kendala terakhir ${new Date(metrics.telemetry.relay.lastIssueAt).toLocaleString("id-ID")}`}
       </div>}
 
-      {rows.length === 0 && (
+      {rows.length === 0 && !loadError && (
         <StateBlock kind="empty" compact title="Belum ada custom agent"
           hint="Custom agent adalah persona yang bisa dipilih sesi claude & codex — misalnya peninjau keamanan atau penulis migration." />
       )}
@@ -314,11 +377,17 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
               <Switch checked={a.enabled} disabled={readOnly} aria-label={`Aktifkan ${a.name}`}
                 onChange={(on) => void toggleEnabled(a, on)} />
               <Button size="sm" variant="ghost" disabled={readOnly}
-                onClick={() => { setErr(""); setEditing({ id: a.id, draft: draftOf(a) }); }}>Ubah</Button>
-              <Button size="sm" variant="ghost" disabled={readOnly}
+                onClick={() => openEditor({ id: a.id, draft: draftOf(a) })}>Ubah</Button>
+              <Button size="sm" variant="ghost" disabled={readOnly || a.builtin}
+                aria-describedby={a.builtin ? `${fieldId}-builtin-${a.id}` : undefined}
                 onClick={() => void remove(a)}>Hapus</Button>
             </div>
             <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 6 }}>{a.description}</div>
+            {a.builtin && (
+              <div id={`${fieldId}-builtin-${a.id}`} style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)", marginBottom: 6 }}>
+                Agen bawaan tak bisa dihapus
+              </div>
+            )}
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
               {/* HASIL RESOLUSI, bukan ketikan operator: `Task` muncul hanya untuk agen ber-mention,
                   dan dicabut untuk agen daun walau operator mengetiknya (lapis 2 anti-loop). */}
@@ -411,19 +480,20 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
           lagi untuk menemukan formnya. Modal memberi isian yang menggulir sendiri dengan aksi
           yang tetap terlihat di footer. */}
       {editing && (
-        <Modal open onClose={() => { setEditing(null); setErr(""); }}
+        <Modal open onClose={closeEditor}
           icon="bot" eyebrow={projectId ? "agen project" : "agen global"}
           title={editing.id ? `Ubah ${editing.draft.name}` : "Agen baru"} width={640}
           footer={<>
-            <Button variant="ghost" onClick={() => { setEditing(null); setErr(""); }}>Batal</Button>
+            <Button variant="ghost" onClick={closeEditor}>Batal</Button>
             <Button onClick={() => void save()} loading={busy} disabled={!nameValid || blocked}>Simpan</Button>
           </>}>
           {err && <Callout tone="err">{err}</Callout>}
-          <Field label="Nama" hint={editing.id
+          <Field label="Nama" hint={hintWithError(editing.id
             ? "Nama tak bisa diubah — hapus lalu buat baru (definisi ini menyeberang lewat sync)."
-            : "huruf kecil, angka, dan tanda hubung; minimal 2 karakter"}>
+            : "huruf kecil, angka, dan tanda hubung; minimal 2 karakter", errorId("name"), errors.name)}>
             <Input value={editing.draft.name} aria-label="Nama" disabled={Boolean(editing.id)}
-              invalid={!nameValid} placeholder="mis. peninjau-keamanan" style={{ width: "100%" }}
+              invalid={!nameValid} {...invalidAria(errorId("name"), errors.name)}
+              placeholder="mis. peninjau-keamanan" style={{ width: "100%" }}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setEditing({ ...editing, draft: { ...editing.draft, name: e.target.value } })} />
           </Field>
@@ -443,66 +513,19 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
               invalidValues={invalidTools} onChange={setTools}
               placeholder="Pilih tools…" searchPlaceholder="mis. Read atau Bash" />
           </Field>
-          {/* Runtime menyetir Model — berdampingan supaya penyempitannya terlihat saat terjadi. */}
           <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Runtime agent" hint="Mesin sesi yang memakai agen ini. Kosongkan untuk ikut sesi induk.">
-              <Select aria-label="Runtime agent" value={editing.draft.runtime}
-                options={[{ value: "", label: "Ikut sesi induk" },
-                  ...(catalog?.runtimes ?? []).map((r) => ({ value: r.id, label: r.label }))]}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRuntime(e.target.value)} />
-            </Field>
-            <Field label="Model" hint="Kosongkan untuk mewarisi model sesi.">
+            <Field label="Model" hint={hintWithError("Kosongkan untuk mewarisi model sesi.", errorId("model"), errors.model)}>
               <Select aria-label="Model" value={editing.draft.model} invalid={modelInvalid}
+                {...invalidAria(errorId("model"), errors.model)}
                 options={[{ value: "", label: "Ikut sesi induk" }, ...modelOptions,
                   ...(modelInvalid ? [{ value: editing.draft.model, label: `⚠ ${editing.draft.model} — tak ada di katalog` }] : [])]}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setModel(e.target.value)} />
             </Field>
-          </div>
-          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Aktivasi" hint="Smart hanya masuk saat flow dan diff relevan.">
               <Select aria-label="Aktivasi" value={editing.draft.activation}
                 options={[{ value: "always", label: "Selalu" }, { value: "smart", label: "Smart" }]}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditing({
                   ...editing, draft: { ...editing.draft, activation: e.target.value },
-                })} />
-            </Field>
-            <Field label="Effort" hint="Kosongkan untuk mewarisi sesi.">
-              <Select aria-label="Effort" value={editing.draft.effort} invalid={effortInvalid}
-                options={[{ value: "", label: "Ikut sesi induk" },
-                  ...effortOptions.map((effort) => ({ value: effort, label: effort })),
-                  ...(effortInvalid
-                    ? [{ value: editing.draft.effort, label: `⚠ ${editing.draft.effort} — tak didukung` }]
-                    : [])]}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditing({
-                  ...editing, draft: { ...editing.draft, effort: e.target.value },
-                })} />
-            </Field>
-          </div>
-          <Field label="Kebijakan workspace" hint="Read-only dipagari hook; isolated hanya tersedia untuk Claude.">
-            <Select aria-label="Kebijakan workspace" value={editing.draft.workspacePolicy}
-              options={[
-                { value: "inherit", label: "Ikut parent" },
-                { value: "read-only", label: "Hanya baca" },
-                { value: "isolated-worktree", label: "Worktree terisolasi", disabled: editing.draft.runtime !== "claude" },
-              ]}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditing({
-                ...editing, draft: { ...editing.draft, workspacePolicy: e.target.value },
-              })} />
-          </Field>
-          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Maksimum giliran" hint="Kosong = warisi; 1–200.">
-              <Input aria-label="Maksimum giliran" type="number" min={1} max={200} placeholder="mis. 40"
-                invalid={!optionalIntValid(editing.draft.maxTurns, 1, 200)} value={editing.draft.maxTurns}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditing({
-                  ...editing, draft: { ...editing.draft, maxTurns: e.target.value },
-                })} />
-            </Field>
-            <Field label="Timeout detik" hint="Kosong = tanpa batas Hanoman; 30–3600.">
-              <Input aria-label="Timeout detik" type="number" min={30} max={3600} placeholder="mis. 600"
-                invalid={!optionalIntValid(editing.draft.timeoutSeconds, 30, 3_600)}
-                value={editing.draft.timeoutSeconds}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditing({
-                  ...editing, draft: { ...editing.draft, timeoutSeconds: e.target.value },
                 })} />
             </Field>
           </div>
@@ -513,6 +536,64 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
               placeholder="Pilih agen…" searchPlaceholder="mis. peninjau-keamanan"
               emptyText="Belum ada agen lain." />
           </Field>
+          {/* Tertutup default; membuka sendiri bila ada field di dalamnya yang salah supaya Simpan
+              yang terkunci selalu terlihat sebabnya. */}
+          <details open={advancedOpen || advancedInvalid} style={{ marginBottom: 14 }}
+            onToggle={(e: React.SyntheticEvent<HTMLDetailsElement>) => setAdvancedOpen(e.currentTarget.open)}>
+            <summary style={{ cursor: "pointer", fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)", marginBottom: 10 }}>
+              Lanjutan{advancedSet > 0 ? ` · ${advancedSet} diatur` : ""}
+            </summary>
+            <Field label="Runtime agent" hint="Mesin sesi yang memakai agen ini. Kosongkan untuk ikut sesi induk.">
+              <Select aria-label="Runtime agent" value={editing.draft.runtime}
+                options={[{ value: "", label: "Ikut sesi induk" },
+                  ...(catalog?.runtimes ?? []).map((r) => ({ value: r.id, label: r.label }))]}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRuntime(e.target.value)} />
+            </Field>
+            <Field label="Effort" hint={hintWithError("Kosongkan untuk mewarisi sesi.", errorId("effort"), errors.effort)}>
+              <Select aria-label="Effort" value={editing.draft.effort} invalid={effortInvalid}
+                {...invalidAria(errorId("effort"), errors.effort)}
+                options={[{ value: "", label: "Ikut sesi induk" },
+                  ...effortOptions.map((effort) => ({ value: effort, label: effort })),
+                  ...(effortInvalid
+                    ? [{ value: editing.draft.effort, label: `⚠ ${editing.draft.effort} — tak didukung` }]
+                    : [])]}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditing({
+                  ...editing, draft: { ...editing.draft, effort: e.target.value },
+                })} />
+            </Field>
+            <Field label="Kebijakan workspace"
+              hint={hintWithError("Read-only dipagari hook; isolated hanya tersedia untuk Claude.", errorId("workspacePolicy"), errors.workspacePolicy)}>
+              <Select aria-label="Kebijakan workspace" value={editing.draft.workspacePolicy}
+                invalid={Boolean(errors.workspacePolicy)} {...invalidAria(errorId("workspacePolicy"), errors.workspacePolicy)}
+                options={[
+                  { value: "inherit", label: "Ikut parent" },
+                  { value: "read-only", label: "Hanya baca" },
+                  { value: "isolated-worktree", label: "Worktree terisolasi", disabled: editing.draft.runtime !== "claude" },
+                ]}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditing({
+                  ...editing, draft: { ...editing.draft, workspacePolicy: e.target.value },
+                })} />
+            </Field>
+            <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Field label="Maksimum giliran" hint={hintWithError("Kosong = warisi; 1–200.", errorId("maxTurns"), errors.maxTurns)}>
+                <Input aria-label="Maksimum giliran" type="number" min={1} max={200} placeholder="mis. 40"
+                  invalid={Boolean(errors.maxTurns)} {...invalidAria(errorId("maxTurns"), errors.maxTurns)}
+                  value={editing.draft.maxTurns}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditing({
+                    ...editing, draft: { ...editing.draft, maxTurns: e.target.value },
+                  })} />
+              </Field>
+              <Field label="Timeout detik"
+                hint={hintWithError("Kosong = tanpa batas Hanoman; 30–3600.", errorId("timeoutSeconds"), errors.timeoutSeconds)}>
+                <Input aria-label="Timeout detik" type="number" min={30} max={3600} placeholder="mis. 600"
+                  invalid={Boolean(errors.timeoutSeconds)} {...invalidAria(errorId("timeoutSeconds"), errors.timeoutSeconds)}
+                  value={editing.draft.timeoutSeconds}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditing({
+                    ...editing, draft: { ...editing.draft, timeoutSeconds: e.target.value },
+                  })} />
+              </Field>
+            </div>
+          </details>
           {blocked && (
             <Callout tone="warn">
               Ada nilai yang tak ada di katalog mesin ini (ditandai ⚠). Buang dulu sebelum menyimpan —
@@ -521,6 +602,7 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
           )}
         </Modal>
       )}
+      {dialog}
     </div>
   );
 }

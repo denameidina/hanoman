@@ -77,16 +77,19 @@ export function onExternalInput(state: ComposerState): { state: ComposerState; s
 
 /** Penanda kejujuran pengiriman. Tanpa ini kolom ketik memperburuk masalah yang sedang diselidiki:
  *  ia terasa mulus persis ketika byte-nya tidak ke mana-mana (terukur: 26 glyph tampil ~21 ms
- *  sementara `tmux capture-pane` menunjukkan prompt kosong). */
-export type ComposerStatus = { kind: "sent" | "queued" | "held"; text: string };
+ *  sementara `tmux capture-pane` menunjukkan prompt kosong).
+ *
+ *  Hanya konfirmasi SESAAT sesudah Enter (`sentRecently`, dipegang komponen dengan timer). Terpasang
+ *  terus-menerus ia cuma derau: tak membedakan apa pun dari keadaan normal. Antrean dan tertahan
+ *  tidak dikerjakan di sini — strip status di atas pane sudah menyatakannya (role="status" di sana),
+ *  dan mengulanginya di kolom ketik hanya menghasilkan dua pengumuman untuk satu keadaan. */
+export type ComposerStatus = { kind: "sent"; text: string };
 
 export function statusFor(
-  linkState: string, queue: { n: number; held: boolean },
+  linkState: string, queue: { n: number; held: boolean }, sentRecently: boolean,
 ): ComposerStatus | null {
-  if (queue.held) return { kind: "held", text: "tertahan — Kirim di atas" };
-  if (queue.n > 0) return { kind: "queued", text: `diantre ${queue.n}` };
-  if (linkState === "open") return { kind: "sent", text: "terkirim" };
-  // Strip status di atas pane sudah mengatakan "menyambung ulang…"; penanda kedua yang mengulangnya
-  // hanya menambah derau.
-  return null;
+  // "terkirim" hanya jujur bila byte itu benar-benar lewat: sambungan terbuka dan tak ada yang
+  // tertahan atau diantre di belakangnya. Selain itu diam — strip pane yang bicara.
+  if (!sentRecently || linkState !== "open" || queue.held || queue.n > 0) return null;
+  return { kind: "sent", text: "terkirim" };
 }

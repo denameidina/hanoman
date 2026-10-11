@@ -1,7 +1,14 @@
-import type { QaAttachmentSyncState, QaCaseStatus, QaReportStatus, QaSeverity, QaVerdict } from "@hanoman/shared";
+import { failureMessage } from "../../lib/report-error";
+import type {
+  QaAttachmentSyncState, QaCaseStatus, QaFindingStatus, QaPriority, QaReportStatus, QaSeverity, QaVerdict,
+} from "@hanoman/shared";
 
 export type Tone = "neutral" | "brass" | "info" | "ok" | "warn" | "err";
 export const SEVERITY_TONE: Record<QaSeverity, Tone> = { blocker: "err", critical: "err", major: "warn", minor: "info", trivial: "neutral" };
+// Prioritas dibedakan lewat nada (bukan semua brass): P0 mendesak, P3 bisa menunggu.
+export const PRIORITY_TONE: Record<QaPriority, Tone> = { P0: "err", P1: "warn", P2: "info", P3: "neutral" };
+export const FINDING_STATUS_LABEL: Record<QaFindingStatus, string> = { open: "Perlu diperbaiki", sent: "Sudah di backlog", wontfix: "Tidak akan diperbaiki" };
+export const FINDING_STATUS_TONE: Record<QaFindingStatus, Tone> = { open: "warn", sent: "info", wontfix: "neutral" };
 export const CASE_TONE: Record<QaCaseStatus, Tone> = { todo: "neutral", pass: "ok", fail: "err", blocked: "warn", skipped: "info" };
 export const REPORT_TONE: Record<QaReportStatus, Tone> = { draft: "neutral", submitted: "brass", closed: "ok" };
 export const VERDICT_TONE: Record<QaVerdict, Tone> = { go: "ok", "no-go": "err", conditional: "warn" };
@@ -9,12 +16,20 @@ export const VERDICT_LABEL: Record<QaVerdict, string> = { go: "Siap digunakan", 
 
 export const pct = (r: number | null): string => (r === null ? "—" : `${Math.round(r * 100)}%`);
 
-/** Pesan galat dari ApiError (`detail.error` string) atau Error biasa. */
+/**
+ * Alasan galat yang layak dibaca: pesan server (`detail.error`), selain itu status HTTP. Pesan bawaan
+ * klien memuat URL mentah ("PATCH /api/… → 400") dan tak boleh sampai ke layar.
+ */
 export function errText(e: unknown): string {
   const d = (e as { detail?: { error?: unknown } } | null)?.detail?.error;
-  if (typeof d === "string") return d;
+  if (typeof d === "string" && d.trim()) return d;
+  const status = (e as { status?: unknown } | null)?.status;
+  if (typeof status === "number") return `server menolak permintaan (HTTP ${status})`;
   return e instanceof Error ? e.message : "Gagal";
 }
+
+/** "Gagal <aksi>: <alasan>" untuk galat yang harus tetap terlihat (inline), memakai helper galat bersama. */
+export const failText = (action: string, e: unknown): string => failureMessage(action, new Error(errText(e)));
 
 export const envToText = (e: Record<string, string>): string =>
   Object.entries(e).map(([k, v]) => `${k}=${v}`).join("\n");

@@ -26,10 +26,10 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
+  // Audit UI/UX 2026-10 · membuka bell TIDAK menandai apa pun terbaca: itu membuat notifikasi yang
+  // belum dilihat diam-diam hilang dari badge. Tandai terbaca hanya lewat "Tandai semua dibaca".
   function toggle() {
-    const next = !open;
-    setOpen(next);
-    if (next && unread > 0) markAllRead(); // membuka = melihat
+    setOpen((v) => !v);
   }
 
   return (

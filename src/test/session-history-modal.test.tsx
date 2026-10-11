@@ -160,3 +160,30 @@ describe("SessionHistoryModal — detail (SPEC-362)", () => {
     expect(screen.queryByText("Mulai lagi")).toBeNull();
   });
 });
+
+describe("SessionHistoryModal · galat & salin (audit UI/UX)", () => {
+  it("gagal memuat daftar tampil sebagai galat ber-Coba lagi, bukan 'Belum ada riwayat sesi'", async () => {
+    listSessionHistory.mockRejectedValueOnce(new Error("server 500"));
+    listSessionHistory.mockResolvedValueOnce({ items: [row()], total: 1, page: 1, pageSize: 20 });
+    render(<SessionHistoryModal projects={projects} onClose={() => {}} onRestart={() => {}} />);
+    expect(await screen.findByText("Riwayat belum bisa dimuat")).toBeTruthy();
+    expect(screen.getByText(/Gagal memuat riwayat sesi: server 500/)).toBeTruthy();
+    expect(screen.queryByText("Belum ada riwayat sesi")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    expect(await screen.findByText("History session terminal")).toBeTruthy();
+  });
+
+  it("Salin transkrip mengumumkan hasilnya: disalin, atau gagal dengan alasannya", async () => {
+    listSessionHistory.mockResolvedValue({ items: [row()], total: 1, page: 1, pageSize: 20 });
+    sessionTranscript.mockResolvedValue({ text: "PENANDA-TRANSKRIP", bytes: 17 });
+    const writeText = vi.fn().mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("izin ditolak"));
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<SessionHistoryModal projects={projects} onClose={() => {}} onRestart={() => {}} />);
+    fireEvent.click(await screen.findByText("History session terminal"));
+    fireEvent.click(await screen.findByRole("button", { name: "Salin transkrip" }));
+    expect(await screen.findByText("Transkrip disalin.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Salin transkrip" }));
+    expect(await screen.findByText("Gagal menyalin transkrip: izin ditolak")).toBeTruthy();
+  });
+});

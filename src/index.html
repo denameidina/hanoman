@@ -2,7 +2,11 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover: tanpa ini env(safe-area-inset-*) bernilai 0 dan token --safe-* tak aktif. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- fonts.css memuat IBM Plex dari Google Fonts lewat @import; preconnect memangkas RTT sebelum CSS itu terunduh. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>hanoman</title>
   </head>

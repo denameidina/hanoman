@@ -5,9 +5,33 @@ import { Card, Button, Input, Field, ProductStateIllustration } from "../ds";
 import { Wordmark } from "../ds/marks";
 import { api, ApiError } from "../api/client";
 import type { UserView } from "@hanoman/shared";
+import { failureMessage } from "../lib/report-error";
 
-export function AuthScreen({ needsSetup, setupTokenRequired = false, onDone }: {
-  needsSetup: boolean; setupTokenRequired?: boolean; onDone: (u: UserView) => void;
+// Path default setup.token (server menulisnya di `${HANOMAN_HOME}/setup.token`, HANOMAN_HOME
+// default ~/.hanoman). Dipakai bila server tak mengirim lokasi konkretnya.
+const DEFAULT_SETUP_TOKEN_PATH = "~/.hanoman/setup.token";
+
+// Galat dipisah per penyebab — "Email atau password salah" untuk semua kegagalan membuat
+// operator menebak. Kode status server diterjemahkan di sini; teks mentahnya tak ditampilkan.
+export function authErrorMessage(e: unknown, needsSetup: boolean): string {
+  if (e instanceof ApiError) {
+    if (needsSetup) {
+      if (e.status === 409) return "Akun sudah ada. Silakan masuk.";
+      if (e.status === 429) return "Terlalu banyak percobaan membuat akun. Tunggu sebentar, lalu coba lagi.";
+      if (e.status === 403) return "Setup token salah. Salin ulang isinya dari berkas setup.token di host server.";
+      if (e.status === 400) return "Email atau password belum valid. Password minimal 8 karakter.";
+    } else {
+      if (e.status === 401) return "Email atau password salah.";
+      if (e.status === 429) return "Terlalu banyak percobaan masuk. Tunggu sebentar, lalu coba lagi.";
+    }
+    return failureMessage(needsSetup ? "membuat akun" : "masuk", e);
+  }
+  // Bukan respons HTTP sama sekali (fetch gagal): penyebabnya jaringan, bukan kredensial.
+  return "Tidak bisa terhubung ke server. Periksa koneksi, lalu coba lagi.";
+}
+
+export function AuthScreen({ needsSetup, setupTokenRequired = false, setupTokenPath, onDone }: {
+  needsSetup: boolean; setupTokenRequired?: boolean; setupTokenPath?: string; onDone: (u: UserView) => void;
 }) {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -19,8 +43,14 @@ export function AuthScreen({ needsSetup, setupTokenRequired = false, onDone }: {
   // pernah membaca `setupTokenRequired` yang sudah dikirim /auth/status — jadi walau server tak
   // meminta token, akun pertama TAK BISA dibuat dari UI. Server tetap otoritasnya; ini cuma cermin.
   const needsToken = needsSetup && setupTokenRequired;
-  const canSubmit = /\S+@\S+\.\S+/.test(email) && password.length >= (needsSetup ? 8 : 1)
-    && (!needsToken || setupToken.trim().length > 0);
+  const emailOk = /\S+@\S+\.\S+/.test(email);
+  const minPassword = needsSetup ? 8 : 1;
+  const canSubmit = emailOk && password.length >= minPassword && (!needsToken || setupToken.trim().length > 0);
+  // Alasan tombol nonaktif ditampilkan — tombol mati tanpa penjelasan dianggap rusak.
+  const blockReason = !emailOk ? "Isi email yang valid."
+    : password.length < minPassword ? (needsSetup ? "Password minimal 8 karakter." : "Isi password.")
+    : needsToken && !setupToken.trim() ? "Isi setup token dari host server."
+    : null;
 
   async function submit() {
     if (!canSubmit || busy) return;
@@ -31,9 +61,7 @@ export function AuthScreen({ needsSetup, setupTokenRequired = false, onDone }: {
         : api.login({ email, password }));
       onDone(user);
     } catch (e) {
-      setErr(needsSetup
-        ? (e instanceof ApiError && e.status === 409 ? "Sudah ada akun — silakan masuk." : "Gagal membuat akun. Password minimal 8 karakter.")
-        : "Email atau password salah.");
+      setErr(authErrorMessage(e, needsSetup));
       setBusy(false);
     }
   }
@@ -53,9 +81,9 @@ export function AuthScreen({ needsSetup, setupTokenRequired = false, onDone }: {
               ? "Belum ada akun. Akun pertama ini yang bisa mengundang user lain."
               : "Masuk dengan email dan password."}
           </div>
-          <form onSubmit={(e) => { e.preventDefault(); submit(); }}>
+          <form onSubmit={(e) => { e.preventDefault(); void submit(); }}>
             <Field label="Email">
-              <Input type="email" autoComplete="username" value={email} placeholder="kamu@nafanesia.id"
+              <Input type="email" autoComplete={needsSetup ? "email" : "username"} value={email} placeholder="mis. kamu@nafanesia.id"
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} style={{ width: "100%" }} />
             </Field>
             <Field label="Password" hint={needsSetup ? "minimal 8 karakter" : undefined}>
@@ -63,11 +91,22 @@ export function AuthScreen({ needsSetup, setupTokenRequired = false, onDone }: {
                 value={password} placeholder="••••••••"
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} style={{ width: "100%" }} />
             </Field>
-            {needsToken && <Field label="Setup token" hint="baca setup.token di HANOMAN_HOME pada host server">
-              <Input type="password" autoComplete="off" value={setupToken} placeholder="••••••••"
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSetupToken(e.target.value)} style={{ width: "100%" }} />
-            </Field>}
-            {err && <div style={{ fontSize: 12.5, color: "var(--status-err)", marginBottom: 12 }}>{err}</div>}
+            {needsToken && (
+              <Field label="Setup token"
+                hint={`Ada di ${setupTokenPath ?? DEFAULT_SETUP_TOKEN_PATH} pada host server (berkas setup.token di folder HANOMAN_HOME).`}>
+                <Input type="password" autoComplete="off" value={setupToken} placeholder="••••••••"
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSetupToken(e.target.value)} style={{ width: "100%" }} />
+              </Field>
+            )}
+            {err && (
+              <div role="alert" style={{ fontSize: 12.5, color: "var(--clay-600)", background: "var(--status-err-tint)",
+                border: "1px solid var(--clay-500)", borderRadius: "var(--radius-sm)", padding: "8px 10px", marginBottom: 12 }}>
+                {err}
+              </div>
+            )}
+            {!canSubmit && blockReason && (
+              <div id="auth-block-reason" style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>{blockReason}</div>
+            )}
             <Button type="submit" leftIcon={needsSetup ? "user-plus" : "log-in"} disabled={!canSubmit || busy}
               style={{ width: "100%", justifyContent: "center" }}>
               {busy ? "Memproses…" : needsSetup ? "Buat akun & masuk" : "Masuk"}

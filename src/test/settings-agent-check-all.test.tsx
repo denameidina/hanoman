@@ -23,7 +23,9 @@ beforeEach(() => {
 });
 
 const ids = (access: string) => CAPABILITIES.filter((c) => c.access === access).map((c) => c.id);
-const box = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
+// Checkbox capability diberi label manusiawi dari katalog ("Sesi — tulis"), bukan id mentah.
+const labelOf = (id: string) => CAPABILITIES.find((c) => c.id === id)!.label;
+const box = (id: string) => screen.getByLabelText(labelOf(id)) as HTMLInputElement;
 
 // Mencentang 30-an kotak satu per satu adalah alasan nyata orang memberi token capability
 // seadanya. Yang dijaga: tiap "pilih semua" mengenai KOLOMNYA saja, dan capability yang benar-
@@ -64,8 +66,8 @@ describe("pilih semua capability", () => {
 
   it("kolom yang setengah terisi tampil indeterminate, bukan kosong", async () => {
     render(<AgentAccessPanel />);
-    fireEvent.click(await screen.findByLabelText(ids("read")[0] as string));
-    const head = box("pilih semua baca");
+    fireEvent.click(await screen.findByLabelText(labelOf(ids("read")[0] as string)));
+    const head = screen.getByLabelText("pilih semua baca") as HTMLInputElement;
     expect(head.checked).toBe(false);
     expect(head.indeterminate).toBe(true);
   });

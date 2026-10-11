@@ -5,7 +5,8 @@ import { api } from "../src/api/client";
 import type { PresenceView } from "@hanoman/shared";
 
 vi.mock("../src/api/client", () => ({
-  api: { presence: vi.fn() },
+  // issueWsTicket: TerminalPane (mode remote) memintanya lewat `api` global saat mount.
+  api: { presence: vi.fn(), issueWsTicket: vi.fn().mockResolvedValue({ ticket: "t" }) },
   // SPEC-1217 · D6/AC-S8 · tab "Log" merender LogsPanel, yang memanggil fungsi ini di mount.
   logs: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
   logTranscript: vi.fn().mockResolvedValue(""),
@@ -147,16 +148,46 @@ describe("ClientsScreen tombol Buka (SPEC-1218 · AC-C1/C7)", () => {
   });
 });
 
-describe("ClientsScreen tab Device|Log (SPEC-1217 D6/AC-S8)", () => {
-  it("tab default Device — test layar Klien yang ada tetap hijau tanpa perubahan ekspektasi (AC-S8)", () => {
+describe("ClientsScreen tab Perangkat|Log (SPEC-1217 D6/AC-S8)", () => {
+  it("tab default Perangkat — istilah baku, bukan Device (audit UI/UX 2026-10)", () => {
     render(<ClientsScreen view={view} specTitles={{}} onOpenSpec={() => {}} />);
-    expect(screen.getByRole("tab", { name: /device/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /perangkat/i })).toHaveAttribute("aria-selected", "true");
   });
 
   it("tab Log merender LogsPanel", async () => {
     render(<ClientsScreen view={view} specTitles={{}} onOpenSpec={() => {}} />);
     fireEvent.click(screen.getByRole("tab", { name: /log/i }));
     await waitFor(() => expect(screen.getByRole("tab", { name: /log/i })).toHaveAttribute("aria-selected", "true"));
+  });
+});
+
+describe("ClientsScreen tombol Buka: alasan terlihat & sesi terpilih", () => {
+  it("perangkat offline menampilkan alasannya sebagai teks, bukan hanya title", () => {
+    const v: PresenceView = {
+      enabled: true, hubVersion: "0.5.0",
+      devices: [{ deviceId: "d1", name: "laptop", local: false, online: false, lastSeenAt: null, sessions: [],
+        control: { state: "available", protocol: 1, version: "0.5.0", capabilities: ["sessions:read"], since: "" } }],
+    };
+    render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={() => {}} />);
+    expect(screen.getByTestId("device-open-reason-d1")).toHaveTextContent("Perangkat sedang offline");
+    expect(screen.getByRole("button", { name: /buka/i })).toHaveAttribute("aria-describedby", expect.any(String));
+    expect(screen.getByRole("button", { name: /buka/i })).toBeDisabled();
+  });
+
+  it("tab IDE membawa project dari sesi yang dibuka (bukan 'Project belum diketahui')", async () => {
+    const v: PresenceView = {
+      enabled: true, hubVersion: "0.5.0",
+      devices: [{
+        deviceId: "d1", name: "laptop", local: false, online: true, lastSeenAt: null,
+        control: { state: "available", protocol: 1, version: "0.5.0", capabilities: ["sessions:read", "ide:read"], since: "" },
+        sessions: [{ sessionId: "s1", projectId: "toko-mekar", agent: "claude", status: "working",
+          startedAt: "2026-08-24T00:00:00.000Z", statusAt: "2026-08-24T00:00:00.000Z" }],
+      }],
+    };
+    render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /buka/i }));
+    fireEvent.click(await screen.findByRole("tab", { name: "IDE" }));
+    expect(screen.queryByText("Project belum diketahui")).toBeNull();
   });
 });
 
@@ -180,10 +211,22 @@ describe("ClientsScreen muat awal HTTP", () => {
     expect(api.presence).not.toHaveBeenCalled();
   });
 
-  it("server lama (fetch gagal) tetap merender keadaan kosong, bukan melempar", async () => {
-    vi.mocked(api.presence).mockRejectedValue(new Error("404"));
+  // Gagal memuat bukan "Belum ada perangkat": itu jawaban palsu. Galat + "Coba lagi" yang jujur.
+  it("gagal memuat tampil sebagai galat dengan Coba lagi, bukan daftar kosong", async () => {
+    vi.mocked(api.presence).mockRejectedValueOnce(new Error("404"));
     render(<ClientsScreen view={{ enabled: false, hubVersion: "0.5.0", devices: [] }} specTitles={{}} onOpenSpec={() => {}} />);
-    await waitFor(() => expect(screen.getByText("Belum ada device")).toBeTruthy());
+    expect(await screen.findByText("Gagal memuat daftar perangkat")).toBeTruthy();
+    expect(screen.queryByText("Belum ada perangkat")).toBeNull();
+    vi.mocked(api.presence).mockResolvedValueOnce({ enabled: false, hubVersion: "0.5.0", devices: [] });
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    expect(await screen.findByText("Belum ada perangkat")).toBeTruthy();
+  });
+
+  it("selama memuat awal tampil 'Memuat', bukan 'Belum ada'", () => {
+    vi.mocked(api.presence).mockReturnValueOnce(new Promise(() => {}));
+    render(<ClientsScreen view={{ enabled: false, hubVersion: "0.5.0", devices: [] }} specTitles={{}} onOpenSpec={() => {}} />);
+    expect(screen.getByText("Memuat perangkat…")).toBeTruthy();
+    expect(screen.queryByText("Belum ada perangkat")).toBeNull();
   });
 });
 

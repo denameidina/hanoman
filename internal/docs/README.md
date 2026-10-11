@@ -338,7 +338,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [threat model deployment publik](security/threat-model.md) — asset, aktor, trust boundary, abuse case, kontrol, residual risk, invariant test, dan batas otorisasi DAST SPEC-761
 
 ## design-system
-- [design-system](design-system/design-system.md) — editorial instrument-panel, sistem responsive bersama (SPEC-763), kontrak ikon lewat namespace lucide (SPEC-906), ilustrasi (termasuk band **pet** 80–128 px), dan grammar motion Pet Hanoman: sprite atlas v02 16 baris + `steps()` sejak Pet hidup A (SPEC-648 · ADR-0140 · SPEC-904)
+- [design-system](design-system/design-system.md) — editorial instrument-panel, sistem responsive bersama (SPEC-763), kontrak ikon lewat namespace lucide (SPEC-906), ilustrasi (termasuk band **pet** 80–128 px), grammar motion Pet Hanoman: sprite atlas v02 16 baris + `steps()` sejak Pet hidup A (SPEC-648 · ADR-0140 · SPEC-904), serta token kontras WCAG AA dan aturan konfirmasi/error (Audit UI/UX 2026-10 · Fase 1)
 
 ## frontend
 - [ui-ux-audit-2026-10](frontend/ui-ux-audit-2026-10.md) — audit UI/UX seluruh dashboard (52 subagent, statis): skor per layar, masalah sistemik, daftar P0, usulan IA 17→8 menu, aturan minimalis, glosarium copy, dan rencana perbaikan bertahap

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { ClientAccessPanel } from "../src/screens/ClientAccessPanel";
 
 vi.mock("../src/api/client", () => ({
@@ -62,11 +62,34 @@ describe("ClientAccessPanel (SPEC-617)", () => {
     await waitFor(() => expect(api.updateClientAccount).toHaveBeenCalledWith("u1", { projects: ["p1", "p2"] }));
   });
 
-  it("menghapus akun", async () => {
+  // Hapus akun tak boleh terjadi dengan satu klik: dialog menyebut dampaknya dulu.
+  it("menghapus akun hanya setelah dikonfirmasi lewat dialog yang menyebut dampaknya", async () => {
     render(<ClientAccessPanel />);
     await screen.findByText("klien@x.co");
-    fireEvent.click(screen.getByRole("button", { name: /hapus/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^hapus$/i }));
+    expect(api.deleteClientAccount).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/tak bisa dibatalkan/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/1 project yang diberikan/i)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Hapus akun" }));
     await waitFor(() => expect(api.deleteClientAccount).toHaveBeenCalledWith("u1"));
+  });
+
+  it("gagal memuat akun tampil sebagai galat dengan Coba lagi, bukan 'Belum ada akun'", async () => {
+    (api.listClientAccounts as any).mockRejectedValueOnce(new Error("500"));
+    render(<ClientAccessPanel />);
+    expect(await screen.findByText("Akun klien gagal dimuat")).toBeInTheDocument();
+    expect(screen.queryByText(/belum ada akun klien/i)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    expect(await screen.findByText("klien@x.co")).toBeInTheDocument();
+  });
+
+  it("perubahan akses yang gagal tampil sebagai galat, tidak diam", async () => {
+    (api.updateClientAccount as any).mockRejectedValueOnce(new Error("403 forbidden"));
+    render(<ClientAccessPanel />);
+    await screen.findByText("klien@x.co");
+    pick("klien@x.co · Warung Sedap");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Gagal memperbarui akun klien@x.co: 403 forbidden");
   });
 
   it("belum ada akun → keadaan kosong", async () => {

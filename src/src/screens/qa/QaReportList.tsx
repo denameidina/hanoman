@@ -17,10 +17,10 @@ export function QaReportList({ reports, onOpen }: { reports: QaReportView[]; onO
             {r.verdict && <Badge tone={VERDICT_TONE[r.verdict]} size="sm">{VERDICT_LABEL[r.verdict]}</Badge>}
           </div>
           <div style={{ fontWeight: 600, color: "var(--text-strong)", marginBottom: 4, overflowWrap: "anywhere" }}>{r.title}</div>
-          <div style={{ fontSize: 12.5, color: "var(--text-subtle)" }}>
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--text-subtle)" }}>
             {[r.buildVersion && `Versi ${r.buildVersion}`, r.tester].filter(Boolean).join(" · ") || "—"}
           </div>
-          <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 8 }}>
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginTop: 8 }}>
             {r.stats.cases.pass}/{r.stats.cases.total} lulus ({pct(r.stats.passRate)}) · {r.stats.findings.total} temuan ({r.stats.findings.open} belum ditangani)
           </div>
         </Card>

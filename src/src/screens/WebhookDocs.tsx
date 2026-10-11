@@ -99,6 +99,23 @@ const ENVELOPE_FIELDS: [string, string][] = [
   ["truncatedFields", "Nama field yang dipangkas, mis. after.objective."],
 ];
 
+/* Bagian dokumentasi yang bisa dilipat. `<details>` native: bisa dibuka lewat keyboard, dan kontennya
+   tetap ada di DOM (pencarian halaman & pembaca layar tetap menemukannya). Tertutup secara default
+   supaya halaman tak memanjang sebelum orang tahu bagian mana yang dicari. */
+function FoldCard({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
+  return (
+    <Card>
+      <details>
+        <summary style={{ cursor: "pointer", padding: 20, fontFamily: "var(--font-ui)" }}>
+          <span className="hn-eyebrow">{eyebrow}</span>
+          <span style={{ display: "block", marginTop: 2, fontSize: 15, fontWeight: 600, color: "var(--text-strong)" }}>{title}</span>
+        </summary>
+        <div style={{ padding: "0 20px 20px", display: "flex", flexDirection: "column", gap: 12 }}>{children}</div>
+      </details>
+    </Card>
+  );
+}
+
 export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
   const byEntity = WEBHOOK_ENTITIES.map((d) => ({
     label: d.label,
@@ -123,9 +140,12 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
           ber-versi <code>{WEBHOOK_SPEC_VERSION}</code>, jadi penerima yang ditulis hari ini tetap
           bekerja saat jenis peristiwa baru ditambahkan.
         </div>
+        <div style={{ ...prose, marginTop: 10 }}>
+          Setiap bagian di bawah bisa dibuka sendiri dan semuanya tertutup dulu, supaya halaman ini tak memanjang.
+        </div>
       </Card>
 
-      <Card eyebrow="katalog" title="Jenis peristiwa dan kapan terpicu">
+      <FoldCard eyebrow="katalog" title="Jenis peristiwa dan kapan terpicu">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {byEntity.map((g) => (
             <div key={g.label}>
@@ -154,9 +174,9 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
             oleh database, di luar jangkauan pengirim; jumlahnya ada di <code>data.cascade</code>.
           </div>
         </Callout>
-      </Card>
+      </FoldCard>
 
-      <Card eyebrow="amplop" title="Anatomi amplop">
+      <FoldCard eyebrow="amplop" title="Anatomi amplop">
         <div className="hn-local-overflow" style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
             <tbody>
@@ -169,9 +189,9 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
             </tbody>
           </table>
         </div>
-      </Card>
+      </FoldCard>
 
-      <Card eyebrow="contoh" title="Contoh payload per jenis">
+      <FoldCard eyebrow="contoh" title="Contoh payload per jenis">
         <div style={{ ...prose, marginBottom: 10 }}>
           Contoh di bawah dibangun dari katalog yang sama dengan pengirimnya — bukan salinan yang
           bisa basi. Salin salah satunya sebagai fixture test penerima Anda.
@@ -187,9 +207,9 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
             </div>
           ))}
         </div>
-      </Card>
+      </FoldCard>
 
-      <Card eyebrow="keamanan" title="Header dan verifikasi tanda tangan">
+      <FoldCard eyebrow="keamanan" title="Header dan verifikasi tanda tangan">
         <div style={prose}>
           Setiap permintaan membawa header berikut:
         </div>
@@ -208,9 +228,9 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
         </div>
         <div style={{ marginTop: 12 }}><Copyable text={NODE_SNIPPET} label="Salin contoh Node.js" /></div>
         <div style={{ marginTop: 12 }}><Copyable text={PY_SNIPPET} label="Salin contoh Python" /></div>
-      </Card>
+      </FoldCard>
 
-      <Card eyebrow="pengiriman" title="Retry, pengiriman ganda, dan idempotensi">
+      <FoldCard eyebrow="pengiriman" title="Retry, pengiriman ganda, dan idempotensi">
         <div style={prose}>
           Pengiriman berjalan lewat antrean, jadi penerima yang lambat tak pernah memperlambat
           hanoman. Pengiriman gagal diulang sampai <b>{WEBHOOK_MAX_ATTEMPTS} percobaan</b> dengan
@@ -253,9 +273,9 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
           {" "}<b>{WEBHOOK_FAIL_LIMIT} pengiriman gagal beruntun</b> (yakni yang sudah kehabisan
           seluruh percobaannya) menonaktifkan endpoint otomatis, dan operator diberi notifikasi.
         </div>
-      </Card>
+      </FoldCard>
 
-      <Card eyebrow="batas" title="Batas ukuran, laju, dan antrean">
+      <FoldCard eyebrow="batas" title="Batas ukuran, laju, dan antrean">
         <div style={prose}>
           Amplop dibatasi <b>{Math.round(WEBHOOK_MAX_BYTES / 1024)} KiB</b>. Yang melewatinya
           dipangkas bertahap — field teks panjang dipotong lebih dulu, lalu <code>data.before</code>
@@ -266,9 +286,9 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
           dibatasi <b>{WEBHOOK_QUEUE_CAP}</b> kiriman menunggu — kelebihannya tercatat sebagai
           {" "}<code>dropped</code> di riwayat, bukan hilang diam-diam.
         </div>
-      </Card>
+      </FoldCard>
 
-      <Card eyebrow="keamanan" title="Yang kami jaga, dan yang tetap jadi tanggung jawab Anda">
+      <FoldCard eyebrow="keamanan" title="Yang kami jaga, dan yang tetap jadi tanggung jawab Anda">
         <div style={prose}>
           Secret setiap endpoint disimpan terenkripsi dan <b>tak pernah</b> dikembalikan utuh oleh
           API — ia ditampilkan sekali saat dibuat atau dirotasi. Payload hanya memuat field yang
@@ -284,9 +304,9 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
             dan jangan menyalakan "izinkan alamat internal" kecuali penerimanya memang milik Anda.
           </div>
         </Callout>
-      </Card>
+      </FoldCard>
 
-      <Card eyebrow="panduan" title="Membuat penerima webhook pertama Anda">
+      <FoldCard eyebrow="panduan" title="Membuat penerima webhook pertama Anda">
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
             <div style={{ fontWeight: 600, fontSize: 13 }}>Langkah 1 — jalankan penerima</div>
@@ -325,7 +345,7 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
             </div>
           </div>
         </div>
-      </Card>
+      </FoldCard>
     </>
   );
 }

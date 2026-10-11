@@ -247,3 +247,88 @@ berikutnya; sentence case; jangan tampilkan enum mentah.
 ## Catatan kepatuhan repo
 Perubahan IA/menu butuh ADR dan pembaruan docs yang tersentuh dalam commit yang sama; setiap API baru wajib keputusan MCP (ADR-0202).
 Perubahan skema tidak termasuk dalam audit ini.
+
+## Status pelaksanaan
+
+Diverifikasi terhadap kode branch `ui-ux-audit` (diff terhadap `main`), bukan terhadap rencana. `[x]` berarti
+ada di kode; `[ ]` berarti belum. Rincian per layar ada di
+[frontend-implementation](frontend-implementation.md#audit-uiux-2026-10--fase-1-quick-win).
+
+### Fase 1 — quick win (selesai)
+
+- [x] 1. Token kontras: `--text-subtle` `#776853`, `--amber-700` untuk teks warning (`--status-warn`),
+  `--border-strong` = ink-400, `--border-focus` = brass-600, tombol primer `--accent-on` tanpa override
+  putih, alias `--brass`/`--danger`/`--line` (`ds/tokens/colors.css`, `app.css:756`).
+- [x] 2. `useConfirm` untuk daftar P0 destruktif (satu sisa, lihat tindak lanjut); nol `window.confirm`,
+  `window.prompt`, dan `window.alert` di layar.
+- [x] 3. Guard dirty di Docs, IDE, Skills, dan QA; simpan memakai try/catch dan galat inline.
+- [x] 4. Helper `lib/report-error.ts` (`errorMessage`, `failureMessage`); kebijakan larangan `.catch(() => {})`
+  kosong (sisa 9, lihat tindak lanjut). Daftar yang gagal dimuat kini dipisah dari empty state di Projects,
+  Tim, PRD, Reconcile, Review, dan Portal.
+- [x] 5. `viewport-fit=cover`; `hn-grid-mobile` pada tiga grid inline `App.tsx`; tombol keluar Dalang 44×44
+  pada mobile dan pointer kasar.
+- [x] 6. Digest snapshot WS `sessions`/`pending`/`leadAsks`; ticker dan jam Dalang terisolasi; `preconnect`
+  font; throttle tulis scroll. `@import` font belum diubah (lihat tindak lanjut).
+- [x] 7. `projectId` tab IDE di Klien; Edit IDE diblokir saat ref lain dipilih; `FolderPicker` bisa dinavigasi
+  keyboard; galat `ReconcileModal` tak lagi tampil sebagai "Tak ada konflik".
+
+Di luar daftar: skip link dan `<h1>` di shell; `Ctrl+Shift+Esc` melepas fokus terminal; target sentuh
+checkbox/radio; state kosong Overview; draft Scheduler dan Lead; Diagnostik tertutup dan banner "Berakhir"
+di Terminal; persist Settings yang jujur; label ramah Portal.
+
+### Fase 2 — fondasi DS (belum)
+
+- [ ] Komponen `PageHeader`, `FilterBar`, `RowList`/`DenseRow`, `Stack`/`Inline`, `Text`, dan `Interactive row`.
+  Yang sudah ada hanya kelas `.hn-dense-row` dan token skala 11/12/13/14/16.
+- [ ] `Field` dengan `aria-describedby`/`aria-invalid`; `Radio` sebagai `radiogroup` (saat ini hanya
+  radiogroup ad hoc di Lead); `Modal` dengan `inert` dan `h2`; ikon `aria-hidden` secara default.
+- [ ] Toast antrean dengan aksi "Batalkan" dan `aria-live` permanen (saat ini satu toast, tanpa aksi).
+- [ ] Command palette (⌘K), shortcut `g`+huruf dan `?`, tombol "Jawab" di toast dan notifikasi keputusan.
+- [ ] Satu skeleton untuk loading; glosarium dan map label terpusat.
+- [ ] Hapus layout inline: `style={{` di `screens/` naik dari 1.416 menjadi 1.545; `!important` di `app.css`
+  berjumlah 49; `[style*=` tersisa satu selektor di `app.css:297`.
+- [ ] Varian `danger` pada `ProgressBar`, `Radio`, `Field`, `Callout`, dan `OverflowActions`; hanya `Button` yang punya.
+
+### Fase 3 — redesign per layar (belum)
+
+- [ ] IA 17 → 8 menu dengan ADR baru (menimpa sebagian ADR-0160), redirect path lama, dan
+  `NAV_KEYS`/`routes.test.ts` diperbarui.
+- [ ] Redesign per layar sesuai urutan usulan: Overview → Settings → Backlog/Tim → Terminal → Triase/Lead →
+  Klien → IDE → Scheduler → VPS → Skills → Review → Portal → Onboarding.
+
+### Tindak lanjut Fase 1 (belum selesai)
+
+1. **Tandai terbaca per item notifikasi.** Server hanya punya `POST /notifications/read` (tandai semua)
+  (`server/src/routes/notifications.ts:9-18`). Endpoint per item butuh API baru dan keputusan MCP (ADR-0202).
+2. **`markRequeued` hanya menerima `canceled`** (`server/src/services/scheduler/queue.ts:153-158`). Baris
+  `failed` selalu 409 (`server/src/routes/scheduler.ts:73`), sehingga "Antre ulang" untuk Gagal
+  (`screens/SchedulerScreen.tsx:172`) tak pernah berhasil. Izin untuk token agen memetakan rute ini ke
+  `settings:write` (`server/src/services/agent-capabilities.ts:114-126`); izin `failed` belum diputuskan.
+  Frontend tak memeriksa izin apa pun.
+3. **Preview cron memakai zona waktu browser.** `screens/SchedulerCrons.tsx:140` memanggil `nextRunFor` dengan
+  `new Date()` lokal; server belum mengekspos zona waktunya.
+4. **`SetupWizard` di Settings tak menerima `onCancel`.** Pemanggilan ada di `screens/SettingsScreen.tsx:754`
+  (rujukan awal `:632` tidak tepat); `screens/SetupWizard.tsx:120` tak merender Batal tanpa `onCancel`.
+5. **Prop yang belum diteruskan di `App.tsx`:** `onOpenSpec` ke `TeamScreen` (`:1597-1598`), `previous` ke
+  `DalangHanomanScreen` (`:1532-1535`), dan `setupTokenPath` ke `AuthScreen` (`:1511-1513`).
+6. **Copy belum seragam.** Tombol "Kirim ke Backlog" ada di `screens/team-board.tsx:120`; `EscalateDialog`
+  memakai "Eskalasi" (`screens/EscalateDialog.tsx:68`).
+7. **Teks amber-600 dan brass-600 di atas tint** memakai token fill sebagai teks: 12 pemakaian inline
+  (9 `--amber-600`, 3 `--brass-600`), contoh `ds/components/feedback.tsx:85,87,89`. Ganti ke token teks.
+8. **Token tak terdefinisi** (nol definisi di `ds/tokens/*.css`): `--brass-50` (`screens/PrdScreen.tsx:196`),
+  `--brass-200` (`PrdScreen.tsx:196`, `GitGraph.tsx:678`), `--bone-50` (`VpsChecklist.tsx:79,124,275,302`),
+  `--clay-700` (`VpsChecklist.tsx:267`), `--ink-100` (`McpPanel.tsx:65`, `GitGraph.tsx:631`), `--text`
+  (`VpsChecklist.tsx:79,279`), `--text-primary` (`VpsProvision.tsx:44,100`), dan `--rule` (nol pemakaian).
+  `--brass-050` ada di `colors.css:31` dengan nama berbeda.
+9. **Sisa `.catch(() => {})` kosong, 9 di kode non-test:** `screens/IdeReadPanel.tsx:140`,
+  `screens/NewTerminalModal.tsx:54`, `screens/SettingsScreen.tsx:572,573,814,826,869`,
+  `screens/TerminalScreen.tsx:832`, dan `notifications/sound.ts:39`. Yang terakhir disengaja dan berkomentar,
+  tetapi tetap melanggar kebijakan; perlu keputusan.
+10. **"Hapus sel" di Terminal tanpa konfirmasi.** `screens/TerminalPane.tsx:854-856` memanggil `killSession`
+  (`screens/TerminalScreen.tsx:376`) saat tmux sudah tak punya sesi.
+11. **Review belum punya aksi keputusan.** `screens/ReviewScreen.tsx` hanya memiliki Muat ulang, Preview,
+  tab Diff/Sumber, dan kembali; Merge dan Buang belum ada.
+12. **Setup status 400 masih memuat "Password minimal 8 karakter"** (`screens/AuthScreen.tsx:22`).
+13. **Font masih `@import`** di `ds/tokens/fonts.css:9` (render-blocking). `preconnect` sudah ada.
+14. **`screenReaderMode` xterm belum ada di kode** (`src/` dan `shared/`); menunggu uji VoiceOver.
+15. **Verifikasi visual belum dilakukan** di 320, 390, 768, dan 1024 px. Audit ini statis; belum ada screenshot.

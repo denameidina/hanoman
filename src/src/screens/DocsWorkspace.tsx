@@ -1,10 +1,14 @@
 /* DocsWorkspace — interactive Source-of-Truth browser. Ported and wired
    to the API: tree+coverage from GET /docs, file bodies from GET/PUT
-   /docs/*path (server-persisted, replacing the prototype's localStorage). */
+   /docs/*path (server-persisted, replacing the prototype's localStorage).
+   Audit UI/UX 2026-10 (P0): draft kotor ditandai & dijaga (konfirmasi saat pindah berkas/Batal),
+   simpan dengan try/catch + busy + galat inline, Ctrl/Cmd+S, pohon terbuka sampai berkas terpilih,
+   filter berkas, dan label bahasa Indonesia. */
 import React from "react";
-import { Card, StatusPill, Badge, Button, ProgressBar, Icon, StateBlock, MarkdownView, DocDownload, ResponsivePanels, useConfirm } from "../ds";
+import { Card, StatusPill, Badge, Button, ProgressBar, Icon, StateBlock, MarkdownView, DocDownload, ResponsivePanels, Input, useConfirm } from "../ds";
 import { api } from "../api/client";
 import { usePersistedState, scoped, isStr } from "../ui-state";
+import { failureMessage } from "../lib/report-error";
 
 type DocCat = { cat: string; files: string[]; linked: boolean; scored: boolean; root?: boolean };
 
@@ -46,14 +50,20 @@ export function firstDoc(cats: DocCat[]): string {
   return pick && pick.files[0] ? `${pick.cat}/${pick.files[0]}` : "";
 }
 
+/** Kunci berkas (`cat/file`) di bawah node ini — dipakai untuk membuka folder yang memuat pilihan. */
+const containsSelected = (node: TreeNode, selected: string) => !!selected && selected.startsWith(node.path + "/");
+
 function DocTreeCat({ node, selected, onSelect, depth = 0 }:
   { node: TreeNode; selected: string; onSelect: (k: string) => void; depth?: number }) {
-  const [open, setOpen] = React.useState(false);
+  // Folder yang memuat berkas terpilih terbuka dari awal dan saat pilihan berpindah ke dalamnya.
+  const inside = containsSelected(node, selected);
+  const [open, setOpen] = React.useState(inside);
+  React.useEffect(() => { if (inside) setOpen(true); }, [inside]);
   const scored = node.cat?.scored ?? true;
   const linked = node.cat?.linked ?? true;
   return (
     <div style={depth === 0 ? { borderBottom: "1px solid var(--border-hair)" } : undefined}>
-      <button onClick={() => setOpen((o) => !o)} style={{
+      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{
         display: "flex", alignItems: "center", gap: 8, width: "100%",
         padding: "9px 6px", paddingLeft: 6 + depth * 12,
         border: "none", background: "transparent", cursor: "pointer", textAlign: "left",
@@ -73,9 +83,9 @@ function DocTreeCat({ node, selected, onSelect, depth = 0 }:
             const key = node.path + "/" + f;
             const on = key === selected;
             return (
-              <button key={f} onClick={() => onSelect(key)} style={{
+              <button type="button" key={f} onClick={() => onSelect(key)} aria-current={on ? "true" : undefined} style={{
                 display: "flex", alignItems: "center", gap: 8, width: "100%",
-                padding: "6px 8px", paddingLeft: 18 + depth * 12,
+                padding: "6px 8px", paddingLeft: 18 + depth * 12, minHeight: 32,
                 borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer", textAlign: "left",
                 background: on ? "var(--brass-100)" : "transparent",
               }}>
@@ -105,6 +115,10 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
   const [panel, setPanel] = React.useState<"tree" | "viewer">("tree");
   const [draft, setDraft] = React.useState("");
   const [scanning, setScanning] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  // Galat simpan/hapus tampil inline di atas isi dokumen; draft tetap utuh saat gagal.
+  const [actionErr, setActionErr] = React.useState("");
+  const [query, setQuery] = React.useState("");
   // SPEC-847 · ADR-0127 · konfirmasi hapus dokumen memakai dialog aplikasi.
   const { confirm, dialog } = useConfirm();
   const [ixStatus, setIxStatus] = React.useState<"loading" | "ready" | "error">("loading");
@@ -118,6 +132,7 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
       if (!alive) return;
       const t = ix.tree as DocCat[];
       setTree(t); setCoverage(ix.coverage); setCache({}); setMode("preview"); setIxStatus("ready");
+      setActionErr(""); setQuery("");
       setSelected(firstDoc(t));
     }).catch(() => { if (alive) { setTree([]); setSelected(""); setIxStatus("error"); } });
     return () => { alive = false; };
@@ -145,18 +160,44 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
   const cat = selected.includes("/") ? selected.slice(0, selected.lastIndexOf("/")) : ".";
   const node = tree.find((n) => n.cat === cat);
   const displayPath = selected;
+  // Draft kotor = mode edit dengan isi yang berbeda dari yang tersimpan.
+  const dirty = mode === "edit" && draft !== current;
+
+  // Filter berkas: daftar datar semua berkas, dicocokkan terhadap path lengkapnya.
+  const allFiles = React.useMemo(() => tree.flatMap((c) => c.files.map((f) => ({
+    key: `${c.cat}/${f}`, scored: c.scored, linked: c.linked,
+  }))), [tree]);
+  const needle = query.trim().toLowerCase();
+  const matches = needle ? allFiles.filter((f) => f.key.toLowerCase().includes(needle)) : [];
 
   const covTone = docStatus === "broken" ? "err" : docStatus === "drift" ? "warn" : "ok";
   const status = docStatus === "broken" ? "broken" : docStatus === "drift" ? "drift" : "ok";
 
-  function startEdit() { setDraft(current); setMode("edit"); }
-  function cancelEdit() { setMode("preview"); }
-  async function save() {
-    await api.putDoc(projectId, selected, draft);
-    setCache((c) => ({ ...c, [selected]: draft }));
-    setMode("preview");
+  /** Jalankan `run` setelah draft kotor dikonfirmasi dibuang; tanpa draft kotor langsung jalan. */
+  function whenClean(run: () => void) {
+    if (!dirty) { setMode("preview"); run(); return; }
+    void confirm({
+      title: "Buang perubahan?", eyebrow: selected,
+      message: "Isi dokumen yang kamu ubah belum disimpan.",
+      impact: ["Perubahan di editor hilang dan tak bisa dikembalikan dari dashboard."],
+      confirmLabel: "Buang perubahan", cancelLabel: "Lanjut mengedit", tone: "danger", icon: "trash-2",
+    }).then((ok) => { if (ok) { setMode("preview"); run(); } });
   }
-  function selectFile(k: string) { setSelected(k); setMode("preview"); setPanel("viewer"); }
+  function startEdit() { setActionErr(""); setDraft(current); setMode("edit"); }
+  const cancelEdit = () => whenClean(() => undefined);
+  async function save() {
+    if (saving || !selected) return;
+    setSaving(true); setActionErr("");
+    try {
+      await api.putDoc(projectId, selected, draft);
+      setCache((c) => ({ ...c, [selected]: draft }));
+      setMode("preview");
+    } catch (e) {
+      // Draft dipertahankan: operator bisa mencoba lagi tanpa mengetik ulang.
+      setActionErr(failureMessage("menyimpan dokumen", e));
+    } finally { setSaving(false); }
+  }
+  function selectFile(k: string) { whenClean(() => { setSelected(k); setMode("preview"); setPanel("viewer"); }); }
 
   async function reloadIndex() {
     const ix = await api.getDocs(projectId);
@@ -171,18 +212,26 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
   async function rescan() {
     if (scanning) return;
     setScanning(true);
-    try { await reloadIndex(); } finally { setScanning(false); }
+    try { await reloadIndex(); }
+    catch { setIxStatus("error"); }   // indeks gagal dibaca → error + "Coba lagi", bukan daftar kosong
+    finally { setScanning(false); }
   }
   async function removeDoc() {
     if (!selected) return;
-    if (!await confirm({
-      title: `Hapus ${selected}?`,
-      message: "Berkas aslinya di disk ikut dihapus — dokumen ini adalah Source of Truth project.",
-      confirmLabel: "Hapus dokumen",
-      run: () => api.deleteDoc(projectId, selected),
-    })) return;
-    setCache((c) => { const n = { ...c }; delete n[selected]; return n; });
-    await reloadIndex();
+    const path = selected;
+    let ok = false;
+    try {
+      ok = await confirm({
+        title: `Hapus ${path}?`, eyebrow: "Source of Truth",
+        message: "Dokumen ini adalah Source of Truth project. Berkas aslinya di disk ikut dihapus.",
+        impact: ["Berkas di disk dihapus dan tak bisa dikembalikan dari dashboard.", "Kategori indeks dihitung ulang setelah penghapusan."],
+        confirmLabel: "Hapus dokumen", tone: "danger", icon: "trash-2",
+        run: () => api.deleteDoc(projectId, path),
+      });
+    } catch (e) { setActionErr(failureMessage("menghapus dokumen", e)); return; }
+    if (!ok) return;
+    setCache((c) => { const n = { ...c }; delete n[path]; return n; });
+    try { await reloadIndex(); } catch { setIxStatus("error"); }
   }
 
   return (
@@ -195,31 +244,54 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
     // tinggi container pasti lebih dulu, lalu item mengisi sisanya.
     <>
     <ResponsivePanels
-      ariaLabel="Panel Docs"
+      ariaLabel="Panel Dokumen"
       active={panel}
       onActiveChange={(next) => setPanel(next as "tree" | "viewer")}
       masterWidth={288}
       className="hn-workspace-panels"
       panels={[
-        { id: "tree", label: "Files", className: "hn-panel-flex", content: (
+        { id: "tree", label: "Berkas", className: "hn-panel-flex", content: (
       <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0, overflow: "auto" }}>
         <Card padding={0}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border-hair)" }}>
-            <span className="hn-eyebrow">docs · {projectName}</span>
+            <span className="hn-eyebrow">dokumen · {projectName}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <StatusPill status={status} size="sm" />
               <Button size="sm" variant="ghost" leftIcon={scanning ? "loader" : "radar"} onClick={rescan} disabled={scanning}>
-                {scanning ? "…" : "Muat ulang"}
+                {scanning ? "Memuat…" : "Muat ulang"}
               </Button>
             </div>
           </div>
+          {ixStatus === "ready" && tree.length > 0 && (
+            <div style={{ padding: "8px 14px 0" }}>
+              <Input size="sm" aria-label="Cari berkas dokumen" leftIcon="search" value={query}
+                placeholder="mis. product/prd" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+                style={{ width: "100%" }} />
+            </div>
+          )}
           <div style={{ padding: "4px 8px" }}>
-            {ixStatus === "loading" ? <StateBlock kind="loading" compact title="Memuat index…" />
-              : ixStatus === "error" ? <StateBlock kind="error" compact title="Gagal memuat index docs"
+            {ixStatus === "loading" ? <StateBlock kind="loading" compact title="Memuat indeks…" />
+              : ixStatus === "error" ? <StateBlock kind="error" compact title="Gagal memuat indeks dokumen"
                   hint={projectName} action={() => setIxTry((n) => n + 1)} />
-              : tree.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Belum ada docs"
+              : tree.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Belum ada dokumen"
                   hint="Belum ada Markdown di repo ini."
                   action={rescan} actionLabel="Muat ulang" actionIcon="radar" />
+              : needle ? (
+                  matches.length === 0
+                    ? <StateBlock kind="empty" compact icon="search" title="Tak ada berkas cocok" hint={`Tak ada yang cocok dengan “${query.trim()}”.`} />
+                    : <div role="list" aria-label="Hasil pencarian berkas">
+                        {matches.map((m) => (
+                          <button type="button" key={m.key} aria-current={m.key === selected ? "true" : undefined}
+                            onClick={() => selectFile(m.key)} style={{
+                              display: "flex", alignItems: "center", gap: 8, width: "100%", minHeight: 32,
+                              padding: "6px 8px", borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer", textAlign: "left",
+                              background: m.key === selected ? "var(--brass-100)" : "transparent" }}>
+                            <Icon name="file-text" size={13} color="var(--text-subtle)" />
+                            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-body)" }}>{m.key}</span>
+                          </button>
+                        ))}
+                      </div>
+                )
               : (<>
                   {nested.map((n) => <DocTreeCat key={n.path} node={n} selected={selected} onSelect={selectFile} />)}
                   {unscored.length > 0 && (
@@ -233,10 +305,10 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
         </Card>
         <Card padding={16}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <span className="hn-eyebrow">SoT coverage</span>
+            <span className="hn-eyebrow">Cakupan SoT</span>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)" }}>{projectName}</span>
           </div>
-          <ProgressBar value={coverage} showLabel label="Kategori ter-index" tone={covTone} />
+          <ProgressBar value={coverage} showLabel label="Kategori terindeks" tone={covTone} />
         </Card>
       </div>
         ) },
@@ -249,30 +321,37 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
           <Icon name="file-text" size={15} color="var(--text-muted)" />
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--text-strong)", fontWeight: 500 }}>{displayPath}</span>
           {node && node.scored && (node.linked
-            ? <Badge tone="ok" size="sm" icon="link">indexed</Badge>
-            : <Badge tone="err" size="sm" icon="unlink">unlinked</Badge>)}
+            ? <Badge tone="ok" size="sm" icon="link">terindeks</Badge>
+            : <Badge tone="err" size="sm" icon="unlink">tak tertaut</Badge>)}
+          {dirty && <Badge tone="warn" size="sm">belum disimpan</Badge>}
           <span style={{ flex: 1 }} />
           {mode === "preview" ? (
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {/* SPEC-361 · unduh dokumen SoT; hanya di mode preview (isi tersimpan, bukan draft) */}
               <DocDownload href={(f) => api.docDownloadUrl(projectId, selected, f)}
                 disabled={!selected || docLoading || docFailed} />
-              <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={removeDoc} disabled={!selected}>Hapus</Button>
               <Button size="sm" variant="secondary" leftIcon="pencil" onClick={startEdit}
                 disabled={!selected || docLoading || docFailed}>Edit</Button>
+              {/* Hapus dipisah dari Edit: bukan aksi biasa, dan tombolnya merah. */}
+              <span aria-hidden="true" style={{ width: 1, alignSelf: "stretch", background: "var(--border-hair)" }} />
+              <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={removeDoc} disabled={!selected}>Hapus</Button>
             </div>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Button size="sm" variant="ghost" onClick={cancelEdit}>Batal</Button>
-              <Button size="sm" leftIcon="check" onClick={save}>Simpan</Button>
+              <Button size="sm" variant="ghost" onClick={cancelEdit} disabled={saving}>Batal</Button>
+              <Button size="sm" leftIcon="check" onClick={() => void save()} loading={saving} disabled={saving}>Simpan</Button>
             </div>
           )}
         </div>
+        {actionErr && (
+          <div role="alert" style={{ flex: "0 0 auto", padding: "8px 16px", fontSize: 12.5, color: "var(--clay-600)",
+            borderBottom: "1px solid var(--border-hair)" }}>{actionErr}</div>
+        )}
 
         {mode === "preview" ? (
           <div data-testid="doc-preview-scroll" style={{ padding: "8px 30px 34px", flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
             {!selected ? <StateBlock kind="empty" icon="file-text" title="Tidak ada dokumen dipilih"
-                hint="Pilih file dari pohon docs di kiri." />
+                hint="Pilih file dari pohon dokumen di kiri." />
               : docLoading ? <StateBlock kind="loading" title="Memuat dokumen…" hint={selected} />
               : docFailed ? <StateBlock kind="error" title="Gagal memuat dokumen" hint={selected} action={retryDoc} />
               : <MarkdownView text={current} name={selected} />}
@@ -283,16 +362,18 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
               <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--border-hair)", background: "var(--bone-100)" }}>
                 <span className="hn-eyebrow">Markdown</span>
               </div>
-              <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false}
+              <textarea aria-label={`Isi ${displayPath}`} value={draft} spellCheck={false}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void save(); } }}
                 placeholder={"# Judul dokumen\n\nParagraf pembuka…"} style={{
-                flex: 1, width: "100%", boxSizing: "border-box", resize: "none", border: "none", outline: "none",
+                flex: 1, width: "100%", boxSizing: "border-box", resize: "none", border: "none",
                 padding: "16px 18px", fontFamily: "var(--font-mono)", fontSize: 12.5, lineHeight: 1.7,
                 color: "var(--text-body)", background: "var(--surface-card)",
               }} />
             </div>
             <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
               <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--border-hair)", background: "var(--bone-100)" }}>
-                <span className="hn-eyebrow">Preview langsung</span>
+                <span className="hn-eyebrow">Pratinjau langsung</span>
               </div>
               <div style={{ flex: 1, overflow: "auto", padding: "4px 24px 24px" }}>
                 <MarkdownView text={draft} name={selected} />

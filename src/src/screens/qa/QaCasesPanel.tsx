@@ -1,13 +1,18 @@
 import React from "react";
 import { QA_CASE_STATUSES, type QaCaseStatus, type QaCaseView } from "@hanoman/shared";
-import { Badge, Button, Card, Field, HnTextarea, Input, Select, StateBlock } from "../../ds";
+import { Button, Card, HnTextarea, Input, Select, StateBlock, useConfirm } from "../../ds";
 import { useApi } from "../../api/instance";
 import { QaAttachments } from "./QaAttachments";
+import { QaField } from "./QaField";
 import type { PanelProps } from "./QaReportEditor";
-import { CASE_LABEL, CASE_TONE, errText } from "./qa-ui";
+import { CASE_LABEL, errText, failText } from "./qa-ui";
+
+type SaveState = { state: "idle" } | { state: "saving" } | { state: "saved" } | { state: "error"; message: string };
+type CaseBody = Parameters<ReturnType<typeof useApi>["patchQaCase"]>[3];
 
 export function QaCasesPanel(p: PanelProps) {
   const api = useApi();
+  const { confirm, dialog } = useConfirm();
   const [title, setTitle] = React.useState("");
   const run = async (fn: () => Promise<PanelProps["detail"]>) => {
     try { p.onChange(await fn()); return true; } catch (e) { p.onToast?.(errText(e)); return false; }
@@ -16,6 +21,19 @@ export function QaCasesPanel(p: PanelProps) {
     const t = title.trim();
     if (!t) return;
     if (await run(() => api.createQaCase(p.projectId, p.detail.id, { title: t }))) setTitle("");
+  };
+  // Hapus menunggu konfirmasi; `run` menahan dialog tetap sibuk sampai server menjawab (tak ada klik ganda).
+  const removeCase = async (c: QaCaseView) => {
+    try {
+      await confirm({
+        title: `Hapus ${c.code}?`,
+        message: c.title,
+        impact: ["Langkah dan hasil pengujian ikut terhapus.", "Lampiran milik test case ini ikut terhapus."],
+        tone: "danger",
+        confirmLabel: "Hapus",
+        run: async () => { p.onChange(await api.deleteQaCase(p.projectId, p.detail.id, c.id)); },
+      });
+    } catch (e) { p.onToast?.(errText(e)); }
   };
   const fileRef = React.useRef<HTMLInputElement>(null);
   // Matriks test case = sheet "Test case" XLSX / CSV: diunduh, diisi di spreadsheet, diimpor kembali (upsert lewat Ref).
@@ -42,31 +60,46 @@ export function QaCasesPanel(p: PanelProps) {
         )}
       </div>
       {p.detail.cases.length === 0 && <StateBlock kind="empty" compact title="Belum ada test case" hint="Mulai dari satu aktivitas, misalnya login. Isi langkahnya, hasil yang diharapkan, lalu catat hasil saat dicoba." />}
-      {p.detail.cases.map((c) => <CaseCard key={c.id} c={c} p={p} run={run} />)}
+      {p.detail.cases.map((c) => <CaseCard key={c.id} c={c} p={p} onRemove={() => void removeCase(c)} />)}
       {!p.locked && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 240px" }}>
-            <Field label="Nama pengujian baru"><Input aria-label="Judul test case baru" placeholder="Contoh: Login dengan akun yang benar" value={title}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
-              onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter") void add(); }} /></Field>
+            <QaField label="Nama pengujian baru">
+              <Input placeholder="Contoh: Login dengan akun yang benar" value={title}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
+                onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter") void add(); }} />
+            </QaField>
           </div>
           <Button leftIcon="plus" onClick={() => void add()} disabled={!title.trim()}>Tambah</Button>
         </div>
       )}
+      {dialog}
     </div>
   );
 }
 
-function CaseCard({ c, p, run }: { c: QaCaseView; p: PanelProps; run: (fn: () => Promise<PanelProps["detail"]>) => Promise<boolean> }) {
+function CaseCard({ c, p, onRemove }: { c: QaCaseView; p: PanelProps; onRemove: () => void }) {
   const api = useApi();
   const [d, setD] = React.useState({ code: c.code, title: c.title, steps: c.steps, expected: c.expected, actual: c.actual });
+  const [save, setSave] = React.useState<SaveState>({ state: "idle" });
   React.useEffect(() => { setD({ code: c.code, title: c.title, steps: c.steps, expected: c.expected, actual: c.actual }); }, [c.id, c.code, c.title, c.steps, c.expected, c.actual]);
+  // Satu PATCH per simpanan. Hasilnya tampil di kartu ini (Menyimpan / Tersimpan / gagal + alasan),
+  // bukan hanya toast yang hilang dalam 2,6 detik.
+  const persist = async (body: CaseBody, onFail?: () => void) => {
+    setSave({ state: "saving" });
+    try {
+      p.onChange(await api.patchQaCase(p.projectId, p.detail.id, c.id, body));
+      setSave({ state: "saved" });
+    } catch (e) {
+      setSave({ state: "error", message: failText("menyimpan test case", e) });
+      onFail?.();
+    }
+  };
   // Simpan saat blur, hanya bila berubah — ketikan tak membanjiri server.
   const commit = (k: "code" | "title" | "steps" | "expected" | "actual") => {
     if (d[k] === c[k] || (k === "title" && !d.title.trim())) return;
     // Kode kosong = kembali ke nomor otomatis; galat (mis. kode bentrok) mengembalikan isian ke kode tersimpan.
-    void run(() => api.patchQaCase(p.projectId, p.detail.id, c.id, { [k]: k === "code" ? d.code.trim() || null : d[k] }))
-      .then((ok) => { if (!ok && k === "code") setD((s) => ({ ...s, code: c.code })); });
+    void persist({ [k]: k === "code" ? d.code.trim() || null : d[k] }, () => { if (k === "code") setD((s) => ({ ...s, code: c.code })); });
   };
   const bind = (k: keyof typeof d) => ({
     value: d[k], disabled: p.locked, onBlurCapture: () => commit(k),
@@ -75,22 +108,37 @@ function CaseCard({ c, p, run }: { c: QaCaseView; p: PanelProps; run: (fn: () =>
   const grid: React.CSSProperties = { display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))" };
   return (
     <Card padding={14}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
-        <div style={{ flex: "0 1 120px" }}><Field label="Kode"><Input aria-label={`Kode ${c.code}`} maxLength={40} {...bind("code")} /></Field></div>
-        <div style={{ flex: "1 1 200px" }}><Field label="Nama pengujian"><Input aria-label={`Judul ${c.code}`} {...bind("title")} /></Field></div>
-        <Select aria-label={`Status ${c.code}`} value={c.status} disabled={p.locked}
-          onChange={(e) => void run(() => api.patchQaCase(p.projectId, p.detail.id, c.id, { status: e.target.value as QaCaseStatus }))}
-          options={QA_CASE_STATUSES.map((s) => ({ value: s, label: CASE_LABEL[s] }))} />
-        <Badge tone={CASE_TONE[c.status]} size="sm">{CASE_LABEL[c.status]}</Badge>
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div style={{ flex: "0 1 120px" }}><QaField label="Kode"><Input aria-label={`Kode ${c.code}`} maxLength={40} placeholder="kosong = nomor otomatis" {...bind("code")} /></QaField></div>
+        <div style={{ flex: "1 1 200px" }}><QaField label="Nama pengujian"><Input aria-label={`Nama pengujian ${c.code}`} placeholder="mis. Login dengan akun yang benar" {...bind("title")} /></QaField></div>
+        {/* Status tampil sekali: select ini sekaligus penanda status (terkunci bila laporan closed). */}
+        <div style={{ flex: "0 0 auto" }}>
+          <QaField label="Status">
+            <Select aria-label={`Status ${c.code}`} value={c.status} disabled={p.locked}
+              onChange={(e) => void persist({ status: e.target.value as QaCaseStatus })}
+              options={QA_CASE_STATUSES.map((s) => ({ value: s, label: CASE_LABEL[s] }))} />
+          </QaField>
+        </div>
         {!p.locked && (
-          <Button size="sm" variant="ghost" leftIcon="trash-2" aria-label={`Hapus ${c.code}`}
-            onClick={() => void run(() => api.deleteQaCase(p.projectId, p.detail.id, c.id))} />
+          <div style={{ paddingTop: 26 }}>
+            <Button size="sm" variant="ghost" leftIcon="trash-2" aria-label={`Hapus ${c.code}`} onClick={onRemove} />
+          </div>
         )}
       </div>
+      <div role={save.state === "error" ? "alert" : "status"}
+        style={{ fontSize: "var(--text-xs)", color: save.state === "error" ? "var(--status-err)" : "var(--text-subtle)", minHeight: 16, marginBottom: 6 }}>
+        {save.state === "saving" ? "Menyimpan…" : save.state === "saved" ? "Tersimpan" : save.state === "error" ? save.message : ""}
+      </div>
       <div style={grid}>
-        <Field label="Langkah pengujian" hint="Satu langkah per baris."><HnTextarea rows={4} placeholder={"Buka halaman login\nIsi email dan kata sandi\nKlik Masuk"} aria-label={`Langkah ${c.code}`} {...bind("steps")} /></Field>
-        <Field label="Hasil yang diharapkan"><HnTextarea rows={4} placeholder="Contoh: Halaman beranda terbuka." aria-label={`Diharapkan ${c.code}`} {...bind("expected")} /></Field>
-        <Field label="Hasil yang terjadi"><HnTextarea rows={4} placeholder="Tulis apa yang terlihat saat dicoba." aria-label={`Aktual ${c.code}`} {...bind("actual")} /></Field>
+        <QaField label="Langkah pengujian" hint="Satu langkah per baris.">
+          <HnTextarea rows={4} placeholder={"Buka halaman login\nIsi email dan kata sandi\nKlik Masuk"} aria-label={`Langkah pengujian ${c.code}`} {...bind("steps")} />
+        </QaField>
+        <QaField label="Hasil yang diharapkan">
+          <HnTextarea rows={4} placeholder="Contoh: Halaman beranda terbuka." aria-label={`Hasil yang diharapkan ${c.code}`} {...bind("expected")} />
+        </QaField>
+        <QaField label="Hasil yang terjadi">
+          <HnTextarea rows={4} placeholder="Tulis apa yang terlihat saat dicoba." aria-label={`Hasil yang terjadi ${c.code}`} {...bind("actual")} />
+        </QaField>
       </div>
       <QaAttachments {...p} ownerType="case" ownerId={c.id} compact />
     </Card>

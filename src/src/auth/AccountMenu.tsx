@@ -1,6 +1,7 @@
 import React from "react";
 import { Icon } from "../ds/icon";
 import { usePopoverFocus } from "../ds/popover";
+import { useConfirm } from "../ds/useConfirm";
 import { useAuth } from "./AuthContext";
 
 // Widget topbar akun — mirror NotificationBell: konsumsi context, klik-luar menutup.
@@ -10,6 +11,10 @@ export function AccountMenu() {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
   const popover = usePopoverFocus(open, () => setOpen(false), "menu");
+  // Audit UI/UX 2026-10 · "Keluar" tak lagi langsung memutus sesi login: satu konfirmasi ringan lewat
+  // dialog aplikasi (ADR-0127). Tak ada akses ke daftar sesi dari widget ini, jadi tak ada "dampak"
+  // yang bisa disebut — pesannya cukup menyatakan konsekuensi yang pasti: harus masuk lagi.
+  const { confirm, dialog } = useConfirm();
 
   React.useEffect(() => {
     if (!open) return;
@@ -21,9 +26,23 @@ export function AccountMenu() {
   if (!user) return null;
   const initial = user.email.slice(0, 1).toUpperCase();
 
+  async function signOut() {
+    setOpen(false);
+    if (!await confirm({
+      title: "Keluar dari hanoman?",
+      message: "Anda perlu masuk lagi untuk membuka dashboard ini.",
+      confirmLabel: "Keluar",
+      cancelLabel: "Tetap masuk",
+      tone: "default",
+      icon: "log-out",
+    })) return;
+    void logout();
+  }
+
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button ref={popover.triggerRef} aria-label="Akun" aria-haspopup="menu" aria-controls={popover.panelId} aria-expanded={open} title={user.email} onClick={() => setOpen((v) => !v)} style={{
+      {/* hn-touch-target: pada pointer kasar/mobile trigger dipaksa ≥44×44 (app.css), 34 px hanya di desktop. */}
+      <button ref={popover.triggerRef} className="hn-touch-target" aria-label="Akun" aria-haspopup="menu" aria-controls={popover.panelId} aria-expanded={open} title={user.email} onClick={() => setOpen((v) => !v)} style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34,
         border: "none", background: open ? "var(--bone-200)" : "transparent",
         borderRadius: "var(--radius-sm)", cursor: "pointer",
@@ -46,7 +65,7 @@ export function AccountMenu() {
             </div>
             <div style={{ fontSize: 13, color: "var(--text-strong)", wordBreak: "break-all" }}>{user.email}</div>
           </div>
-          <button role="menuitem" onClick={() => { setOpen(false); void logout(); }} style={{
+          <button role="menuitem" onClick={() => { void signOut(); }} style={{
             display: "flex", alignItems: "center", gap: 8, width: "100%", marginTop: 4, padding: "9px 10px",
             border: "none", borderTop: "1px solid var(--border-hair)", background: "transparent",
             cursor: "pointer", color: "var(--text-body)", fontSize: 13, fontFamily: "var(--font-ui)", textAlign: "left",
@@ -55,6 +74,7 @@ export function AccountMenu() {
           </button>
         </div>
       )}
+      {dialog}
     </div>
   );
 }

@@ -1,13 +1,73 @@
 /* GitGraph — DAG commit read + aksi (SPEC-182). Lane dihitung computeLanes (nol dep).
    Baris = grid [svg lane | subject | refs | meta]; klik = detail; klik-kanan = context-menu. */
 import React from "react";
-import { Card, Button, Checkbox, StateBlock, Badge, Icon, DocDownload, MarkdownView, isMarkdownPath, Tabs, LocalOverflow, Modal, useCoarsePointer, useResponsiveTier, LiveConnectionBadge } from "../ds";
-import { api, type GraphCommit, type CommitDetail, type GitOp, type RepoStatus, type Stash, type ReviewFile } from "../api/client";
+import { Card, Button, Checkbox, StateBlock, Badge, Icon, DocDownload, MarkdownView, isMarkdownPath, Tabs, LocalOverflow, Modal, Input, Field, useCoarsePointer, useResponsiveTier, LiveConnectionBadge, useConfirm, type ConfirmOptions } from "../ds";
+import { api, ApiError, type GraphCommit, type CommitDetail, type GitOp, type RepoStatus, type Stash, type ReviewFile } from "../api/client";
 import { useLiveTopic } from "../api/live";
 import { computeLanes, rowEdges, type GraphRow, type Edge } from "./git-graph";
-import { buildFileTree, TreeRow } from "./file-tree";
+import { buildFileTree, TreeRow, TreeRoot } from "./file-tree";
 import { DiffView } from "./diff-view";
 import { emojify, renderMessage, gravatarUrl } from "./git-graph-render";
+import { failureMessage } from "../lib/report-error";
+
+type Toast = (msg: string, tone: "ok" | "warn" | "err" | "info", icon?: string) => void;
+
+// Audit UI/UX 2026-10 · input teks (nama branch/tag/pesan) lewat Modal DS, bukan window.prompt.
+// `second` menambah field kedua + pilihan dorong (dipakai dialog tag). Penutupan selalu lewat
+// `onClose`; submit kosong dicegah, tak ada promise yang menggantung.
+type Ask = {
+  title: string; eyebrow?: string; label: string; initial?: string; placeholder?: string; submit: string;
+  second?: { label: string; placeholder?: string; hint?: string; pushLabel: string };
+  onSubmit: (value: string, extra?: { message: string; push: boolean }) => void;
+};
+
+function GitAskDialog({ ask, onClose }: { ask: Ask; onClose: () => void }) {
+  const [value, setValue] = React.useState(ask.initial ?? "");
+  const [message, setMessage] = React.useState("");
+  const [push, setPush] = React.useState(false);
+  const ok = value.trim().length > 0;
+  const submit = () => {
+    if (!ok) return;
+    onClose();
+    ask.onSubmit(value.trim(), ask.second ? { message: message.trim(), push } : undefined);
+  };
+  return (
+    <Modal open title={ask.title} eyebrow={ask.eyebrow} onClose={onClose} width={460} footer={<>
+      <Button size="sm" variant="ghost" onClick={onClose}>Batal</Button>
+      <Button size="sm" leftIcon="check" disabled={!ok} onClick={submit}>{ask.submit}</Button>
+    </>}>
+      <form onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        <Field label={ask.label}>
+          <Input size="sm" autoFocus value={value} aria-label={ask.label} placeholder={ask.placeholder}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue(e.target.value)} style={{ width: "100%" }} />
+        </Field>
+        {ask.second && (<>
+          <Field label={ask.second.label} hint={ask.second.hint}>
+            <Input size="sm" value={message} aria-label={ask.second.label} placeholder={ask.second.placeholder}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMessage(e.target.value)} style={{ width: "100%" }} />
+          </Field>
+          <Checkbox checked={push} onChange={setPush} label={ask.second.pushLabel} />
+        </>)}
+      </form>
+    </Modal>
+  );
+}
+
+// Label operasi untuk pesan galat ("Gagal reset branch: …"), bukan nama enum git mentah.
+const OP_LABEL: Partial<Record<GitOp["op"], string>> = {
+  checkout: "checkout", branch: "membuat branch", merge: "merge", "cherry-pick": "cherry-pick", revert: "revert",
+  "delete-branch": "menghapus branch", reset: "reset", tag: "membuat tag", "delete-tag": "menghapus tag",
+  "push-tag": "push tag", "reset-worktree": "reset working tree", clean: "membersihkan berkas untracked",
+  stash: "stash", "stash-apply": "apply stash", "stash-pop": "pop stash", "stash-drop": "drop stash",
+  "stash-branch": "membuat branch dari stash", "rename-branch": "mengganti nama branch",
+  "push-branch": "push branch", fetch: "fetch",
+};
+
+/** Daftar nama berkas untuk dampak konfirmasi: tiga pertama, sisanya dihitung. */
+function fileList(names: string[]): string {
+  const head = names.slice(0, 3).join(", ");
+  return names.length > 3 ? `${head} dan ${names.length - 3} lainnya` : head;
+}
 
 const LANE_W = 14, ROW_H = 30, DOT = 4;
 // SPEC-879 · lebar minimum region baris: subject 238 + author 88 + tanggal 40 + aksi ⋮ 44 + gap &
@@ -116,13 +176,32 @@ type MenuItem = { label: string; run: () => void };
 // SPEC-229 · aksi merge lewat `merge` (jalur worktree isolasi + sesi claude), bukan `act`/onRunGit.
 type MergeFn = (source: string, opts?: { ff?: "no-ff" | "ff-only"; deleteBranch?: string }) => void;
 type RefFn = (ref: string) => void; // rebase(onto) / drop(sha) / pull(source)
-function menuItems(c: GraphCommit, current: string, act: (op: GitOp) => void, merge: MergeFn, rebase: RefFn, drop: RefFn): MenuItem[] {
+// Perbandingan dua commit tanpa Ctrl/Cmd-klik: item menu ⋮ (jalur keyboard, SPEC-847 audit a11y).
+type CompareCtl = { from: string | null; mark: (sha: string | null) => void; compare: (from: string, to: string) => void };
+type Ctl = {
+  act: (op: GitOp) => void; merge: MergeFn; rebase: RefFn; drop: RefFn;
+  ask: (a: Ask) => void;
+  // Aksi destruktif: dialog DS dengan dampak terstruktur; `run` menahan dialog sampai selesai.
+  guard: (o: ConfirmOptions, run: () => unknown) => void;
+  cmp: CompareCtl;
+  // Dampak reset hard / clean: berkas tak ter-commit dan berkas untracked saat ini.
+  dirty: string[]; untracked: string[];
+};
+function menuItems(c: GraphCommit, current: string, ctl: Ctl): MenuItem[] {
+  const { act, merge, rebase, drop, ask, guard, cmp } = ctl;
   const locals = c.refs.filter((r) => !r.startsWith("origin/"));
   const origins = c.refs.filter((r) => r.startsWith("origin/") && r !== "origin/HEAD").map((r) => r.slice("origin/".length));
   const names = [...new Set([...locals, ...origins])];
   const copy = (t: string) => { void navigator.clipboard?.writeText(t); };
+  const sha7 = c.sha.slice(0, 7);
+  const resetHardImpact = [
+    `Commit di atas ${sha7} lepas dari branch ${current || "saat ini"}; pemulihannya hanya lewat reflog.`,
+    ctl.dirty.length
+      ? `Perubahan tak ter-commit di ${ctl.dirty.length} berkas dibuang: ${fileList(ctl.dirty)}.`
+      : "Tak ada perubahan tak ter-commit yang ikut dibuang.",
+  ];
   return [
-    { label: `Checkout ${c.sha.slice(0, 7)}`, run: () => act({ op: "checkout", ref: c.sha }) },
+    { label: `Checkout ${sha7}`, run: () => act({ op: "checkout", ref: c.sha }) },
     { label: "Merge (fast-forward bila bisa)", run: () => merge(c.sha) },
     { label: "Merge tanpa fast-forward", run: () => merge(c.sha, { ff: "no-ff" }) },
     { label: "Merge fast-forward saja", run: () => merge(c.sha, { ff: "ff-only" }) },
@@ -130,25 +209,41 @@ function menuItems(c: GraphCommit, current: string, act: (op: GitOp) => void, me
     { label: "Revert", run: () => act({ op: "revert", sha: c.sha }) },
     // SPEC-233 · rebase current ke commit ini / buang commit ini (isolasi + konflik → sesi claude)
     { label: "Rebase current → sini", run: () => rebase(c.sha) },
-    { label: "Drop commit", run: () => drop(c.sha) },
-    // SPEC-233 · reset branch current ke commit ini (soft/mixed/hard). hard ireversibel → gate force.
+    { label: "Drop commit…", run: () => guard({
+      title: `Drop commit ${sha7}?`, eyebrow: c.subject, tone: "danger", icon: "trash-2",
+      message: "Commit ini dibuang dari riwayat branch.",
+      impact: ["Riwayat branch ditulis ulang tanpa commit ini; pemulihannya hanya lewat reflog."],
+      confirmLabel: "Drop commit",
+    }, () => drop(c.sha)) },
+    // SPEC-233 · reset branch current ke commit ini (soft/mixed/hard). hard ireversibel → dialog dampak.
     { label: "Reset current → sini (soft)", run: () => act({ op: "reset", sha: c.sha, mode: "soft" }) },
     { label: "Reset current → sini (mixed)", run: () => act({ op: "reset", sha: c.sha, mode: "mixed" }) },
-    { label: "Reset current → sini (hard)", run: () => act({ op: "reset", sha: c.sha, mode: "hard" }) },
-    { label: "Copy hash", run: () => copy(c.sha) },
-    { label: "Copy subject", run: () => copy(c.subject) },
-    { label: "Buat branch di sini…", run: () => { const name = window.prompt("Nama branch baru:"); if (name) act({ op: "branch", name, at: c.sha, checkout: true }); } },
+    { label: "Reset current → sini (hard)", run: () => guard({
+      title: `Reset ${current || "branch"} ke ${sha7} secara hard?`, eyebrow: "Reset hard", tone: "danger", icon: "rotate-ccw",
+      message: "Reset hard memindahkan branch dan membuang perubahan tak ter-commit.",
+      impact: resetHardImpact, confirmLabel: "Reset hard",
+    }, () => act({ op: "reset", sha: c.sha, mode: "hard" })) },
+    { label: "Salin hash", run: () => copy(c.sha) },
+    { label: "Salin subject", run: () => copy(c.subject) },
+    { label: "Buat branch di sini…", run: () => ask({
+      title: `Branch baru di ${sha7}`, label: "Nama branch baru", placeholder: "mis. fitur/login", submit: "Buat branch",
+      onSubmit: (name) => { void act({ op: "branch", name, at: c.sha, checkout: true }); },
+    }) },
     // SPEC-233 · buat tag di commit ini. Pesan kosong = lightweight; terisi = annotated.
-    { label: "Add tag…", run: () => {
-      const name = window.prompt("Nama tag:"); if (!name) return;
-      const message = window.prompt("Pesan (kosong = lightweight):") || undefined;
-      // SPEC-847 · confirm-exempt: bukan gerbang destruktif — jawabannya adalah NILAI `push`,
-      // bukan izin, dan membatalkannya tetap membuat tag. Merendernya sebagai ConfirmDialog
-      // justru menipu ("Batal" yang tetap mengeksekusi). Bentuk benarnya modal form bersama
-      // kedua window.prompt di atas; itu di luar scope SPEC-847 yang menyoal window.confirm.
-      const push = window.confirm("Dorong tag ke origin?");
-      act({ op: "tag", name, message, at: c.sha, push });
-    } },
+    // Dorong ke origin adalah NILAI form (bukan izin), jadi ia checkbox di dialog — bukan confirm.
+    { label: "Tambah tag…", run: () => ask({
+      title: `Tag baru di ${sha7}`, label: "Nama tag", placeholder: "mis. v1.2.0", submit: "Buat tag",
+      second: { label: "Pesan (opsional)", placeholder: "mis. rilis stabil", hint: "Kosong = tag ringan tanpa pesan.", pushLabel: "Dorong tag ke origin" },
+      onSubmit: (name, extra) => {
+        void act({ op: "tag", name, message: extra?.message || undefined, at: c.sha, push: extra?.push ?? false });
+      },
+    }) },
+    // Perbandingan lewat menu: tandai commit pertama, lalu bandingkan dengan commit kedua.
+    ...(cmp.from === null
+      ? [{ label: "Tandai untuk dibandingkan", run: () => cmp.mark(c.sha) }]
+      : cmp.from === c.sha
+        ? [{ label: "Batal tandai perbandingan", run: () => cmp.mark(null) }]
+        : [{ label: `Bandingkan dengan ${cmp.from.slice(0, 7)}`, run: () => cmp.compare(cmp.from as string, c.sha) }]),
     // Merge branch ini lalu hapus (local + origin bila ada). Hanya branch lokal selain yang aktif.
     ...locals.filter((r) => r !== current).map((r) => ({
       label: `Merge ${r} lalu hapus (local${origins.includes(r) ? " + origin" : ""})`,
@@ -168,7 +263,7 @@ function menuItems(c: GraphCommit, current: string, act: (op: GitOp) => void, me
 
 // SPEC-233 · menu klik-kanan pada pill branch. Local vs origin dibedakan prefix `origin/`.
 // Branch aktif (== current) hanya Rename/Push/Copy (tak boleh checkout/merge/hapus diri sendiri).
-function branchMenuItems(ref: string, current: string, allRefs: string[], act: (op: GitOp) => void, merge: MergeFn, rebase: RefFn, pull: RefFn, pr: RefFn, archive: RefFn): MenuItem[] {
+function branchMenuItems(ref: string, current: string, allRefs: string[], act: (op: GitOp) => void, merge: MergeFn, rebase: RefFn, pull: RefFn, pr: RefFn, archive: RefFn, ask: (a: Ask) => void): MenuItem[] {
   const isOrigin = ref.startsWith("origin/");
   const name = isOrigin ? ref.slice("origin/".length) : ref;
   const copy = () => { void navigator.clipboard?.writeText(ref); };
@@ -176,37 +271,48 @@ function branchMenuItems(ref: string, current: string, allRefs: string[], act: (
     { label: `Checkout ${ref}`, run: () => act({ op: "checkout", ref }) },
     { label: `Merge ${ref} → current`, run: () => merge(ref) },
     { label: `Pull ${name} → current`, run: () => pull(name) },
-    { label: "Create Pull Request", run: () => pr(name) },
-    { label: "Create archive", run: () => archive(ref) },
+    { label: "Buat Pull Request", run: () => pr(name) },
+    { label: "Buat arsip", run: () => archive(ref) },
     { label: `Hapus origin/${name}`, run: () => act({ op: "delete-branch", name, local: false, remote: true }) },
-    { label: "Copy nama branch", run: copy },
+    { label: "Salin nama branch", run: copy },
   ];
   const self = ref === current;
   const hasOrigin = allRefs.includes(`origin/${name}`);
   const items: MenuItem[] = [];
   if (!self) items.push({ label: `Checkout ${ref}`, run: () => act({ op: "checkout", ref }) });
-  items.push({ label: "Rename…", run: () => { const to = window.prompt(`Nama baru untuk ${ref}:`, ref); if (to && to !== ref) act({ op: "rename-branch", from: ref, to }); } });
+  items.push({ label: "Ganti nama…", run: () => ask({
+    title: `Ganti nama ${ref}`, label: "Nama baru", initial: ref, placeholder: "mis. fitur/login-ulang", submit: "Ganti nama",
+    onSubmit: (to) => { if (to !== ref) void act({ op: "rename-branch", from: ref, to }); },
+  }) });
   items.push({ label: "Push ke origin", run: () => act({ op: "push-branch", name: ref, setUpstream: true }) });
   if (!self) items.push({ label: `Merge ${ref} → current`, run: () => merge(ref) });
   if (!self) items.push({ label: `Rebase current → ${ref}`, run: () => rebase(ref) });
-  items.push({ label: "Create Pull Request", run: () => pr(ref) });
-  items.push({ label: "Create archive", run: () => archive(ref) });
+  items.push({ label: "Buat Pull Request", run: () => pr(ref) });
+  items.push({ label: "Buat arsip", run: () => archive(ref) });
   if (!self) {
     items.push({ label: hasOrigin ? `Hapus ${ref} (local + origin)` : `Hapus ${ref} (local)`, run: () => act({ op: "delete-branch", name: ref, remote: hasOrigin }) });
     if (hasOrigin) items.push({ label: `Hapus ${ref} (local saja)`, run: () => act({ op: "delete-branch", name: ref }) });
   }
-  items.push({ label: "Copy nama branch", run: copy });
+  items.push({ label: "Salin nama branch", run: copy });
   return items;
 }
 
-export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDrop, onOpenFile }:
+export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDrop, onOpenFile, onToast }:
   { projectId: string; onRunGit: (op: GitOp) => Promise<unknown>;
     onMerge: (source: string, opts?: { ff?: "no-ff" | "ff-only"; deleteBranch?: string }) => Promise<void>;
     onRebase: (onto: string) => Promise<void>;
     onPull: (source: string) => Promise<void>;
     onDrop: (sha: string) => Promise<void>;
-    onOpenFile: (path: string, ref: string) => void }) {
+    onOpenFile: (path: string, ref: string) => void; onToast?: Toast }) {
   const [state, setState] = React.useState<"loading" | "ready" | "error">("loading");
+  // Dialog DS untuk input teks (form kecil) dan konfirmasi destruktif — keduanya dirender di bawah.
+  const [ask, setAsk] = React.useState<Ask | null>(null);
+  const { confirm, dialog } = useConfirm();
+  const toastErr = React.useCallback((action: string, err: unknown) => {
+    // 409 = working tree kotor; IdeScreen sudah membuka dialog "Paksa" untuk itu, jadi tak perlu toast ganda.
+    if (err instanceof ApiError && err.status === 409) return;
+    onToast?.(failureMessage(action, err), "err", "x-circle");
+  }, [onToast]);
   const [rows, setRows] = React.useState<GraphRow[]>([]);
   // SPEC-351 · jendela commit berhalaman: `hasMore` = halaman terakhir balas penuh, `paging` = halaman
   // berikutnya sedang diambil, `moreRef` = baris penutup yang jadi sentinel auto-load.
@@ -232,15 +338,22 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
   const [detailView, setDetailView] = React.useState<"list" | "tree">("list");
   // SPEC-385 · tab ketiga `preview` untuk .md. Permukaan ini SUDAH modal, jadi pratinjaunya
   // tab — bukan DocPreviewModal di atas modal (Escape jadi ambigu, dua backdrop menumpuk).
-  const [fileDiff, setFileDiff] = React.useState<{ path: string; sha: string; from?: string; data: ReviewFile | null; tab: "diff" | "source" | "preview" } | null>(null);
+  const [fileDiff, setFileDiff] = React.useState<{ path: string; sha: string; from?: string; data: ReviewFile | null; err?: string; tab: "diff" | "source" | "preview" } | null>(null);
   const openFileDiff = React.useCallback((path: string, sha: string, from?: string) => {
     setFileDiff({ path, sha, from, data: null, tab: "diff" });
     const p = from ? api.ideCompareFile(projectId, from, sha, path) : api.ideCommitFile(projectId, sha, path);
-    p.then((d) => setFileDiff((s) => (s && s.path === path ? { ...s, data: d } : s))).catch(() => {});
+    p.then((d) => setFileDiff((s) => (s && s.path === path ? { ...s, data: d } : s)))
+      .catch((e: unknown) => setFileDiff((s) => (s && s.path === path ? { ...s, err: failureMessage("memuat diff", e) } : s)));
   }, [projectId]);
   // SPEC-233 · compare dua commit: Ctrl/Cmd-klik commit kedua. compareFrom = commit pertama.
   const [compareFrom, setCompareFrom] = React.useState<string | null>(null);
   const [compare, setCompare] = React.useState<{ from: string; to: string; changed: import("../api/client").ChangedFile[] } | null>(null);
+  const compareCommits = React.useCallback((from: string, to: string) => {
+    setCompareFrom(null);
+    api.ideCompare(projectId, from, to)
+      .then((c) => { setCompare(c); setDetail(null); setPanel("detail"); })
+      .catch((e: unknown) => toastErr("membandingkan commit", e));
+  }, [projectId, toastErr]);
   // SPEC-233 · find widget + center HEAD. rowRefs → scrollIntoView per sha.
   const rowRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
   const [findOpen, setFindOpen] = React.useState(false);
@@ -289,8 +402,13 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
       // SPEC-351 · sengaja BUKAN `setView`: ini inisialisasi preferensi, bukan perubahan pilihan
       // manusia. `getConfig` bisa balas setelah operator sempat memuat halaman berikutnya, dan
       // reset jendela di sini akan menariknya balik ke 200 tanpa sebab.
-      setGopts((o) => ({ ...o, showRemote: m["gitGraph.showRemoteBranches"] !== "0", showTags: m["gitGraph.showTags"] !== "0" }));
-    }).catch(() => {});
+      // Audit 2026-10 · objek `gopts` baru TANPA perubahan nilai memicu `load` ulang → daftar
+      // berkedip ke "Memuat…" saat mount (baris yang sedang diklik pun lepas). Hanya ganti bila beda.
+      setGopts((o) => {
+        const showRemote = m["gitGraph.showRemoteBranches"] !== "0", showTags = m["gitGraph.showTags"] !== "0";
+        return o.showRemote === showRemote && o.showTags === showTags ? o : { ...o, showRemote, showTags };
+      });
+    }).catch(() => { /* preferensi opsional: gagal dibaca = pakai default bawaan, bukan galat operator */ });
   }, []);
   const palette = React.useMemo(() => {
     const c = cfg["gitGraph.colours"]?.split(",").map((s) => s.trim()).filter(Boolean);
@@ -301,11 +419,12 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
   const onRowClick = React.useCallback((e: React.MouseEvent, sha: string) => {
     if (e.metaKey || e.ctrlKey) {
       if (!compareFrom) { setCompareFrom(sha); return; }
-      if (compareFrom !== sha) { api.ideCompare(projectId, compareFrom, sha).then((c) => { setCompare(c); setDetail(null); setPanel("detail"); }).catch(() => {}); }
+      if (compareFrom !== sha) compareCommits(compareFrom, sha);
       setCompareFrom(null); return;
     }
-    api.ideCommit(projectId, sha).then((next) => { setDetail(next); setPanel("detail"); }).catch(() => {});
-  }, [projectId, compareFrom]);
+    api.ideCommit(projectId, sha).then((next) => { setDetail(next); setPanel("detail"); })
+      .catch((e: unknown) => toastErr("membuka commit", e));
+  }, [projectId, compareFrom, compareCommits, toastErr]);
 
   // SPEC-245 · `silent` = live-refresh (poll): jangan flip ke loading/error supaya
   // graph yang sudah tampil tak berkedip/tertutup StateBlock tiap tick, dan kegagalan
@@ -383,28 +502,63 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
     setMenu({ x: e.clientX, y: e.clientY, c, anchor: e.currentTarget as HTMLElement });
   }
   // SPEC-245 · `() => load()` (bukan `.then(load)`) supaya nilai resolve tak tersalur ke param `silent`.
-  async function act(op: GitOp) { setMenu(null); await onRunGit(op).then(() => load()).catch(() => {}); }
-  // SPEC-229 · merge lewat jalur isolasi; sukses → reload graph, konflik/error ditangani onMerge (toast/nav).
-  async function mergeAct(source: string, opts?: { ff?: "no-ff" | "ff-only"; deleteBranch?: string }) {
-    setMenu(null); await onMerge(source, opts).then(() => load()).catch(() => {});
+  // Galat SELALU tampil sebagai toast (kecuali 409, yang sudah dijawab dialog "Paksa" di host).
+  async function act(op: GitOp) {
+    setMenu(null);
+    try { await onRunGit(op); load(); }
+    catch (e) { toastErr(`menjalankan ${OP_LABEL[op.op] ?? op.op}`, e); }
   }
-  // SPEC-233 · rebase/pull/drop lewat jalur isolasi (pola merge); konflik/error ditangani host (toast/nav).
-  async function rebaseAct(onto: string) { setMenu(null); setBranchMenu(null); await onRebase(onto).then(() => load()).catch(() => {}); }
-  async function pullAct(source: string) { setMenu(null); setBranchMenu(null); await onPull(source).then(() => load()).catch(() => {}); }
-  async function dropAct(sha: string) { setMenu(null); await onDrop(sha).then(() => load()).catch(() => {}); }
+  // SPEC-229 · merge lewat jalur isolasi; sukses → reload graph. Galat sudah ditampilkan host
+  // (IdeScreen.mergeGraph memberi toast lalu melempar lagi), jadi di sini hanya tak memuat ulang.
+  async function mergeAct(source: string, opts?: { ff?: "no-ff" | "ff-only"; deleteBranch?: string }) {
+    setMenu(null);
+    try { await onMerge(source, opts); load(); } catch { /* sudah ditampilkan host */ }
+  }
+  // SPEC-233 · rebase/pull/drop lewat jalur isolasi (pola merge); galat juga sudah ditampilkan host.
+  async function rebaseAct(onto: string) {
+    setMenu(null); setBranchMenu(null);
+    try { await onRebase(onto); load(); } catch { /* sudah ditampilkan host */ }
+  }
+  async function pullAct(source: string) {
+    setMenu(null); setBranchMenu(null);
+    try { await onPull(source); load(); } catch { /* sudah ditampilkan host */ }
+  }
+  async function dropAct(sha: string) {
+    setMenu(null);
+    try { await onDrop(sha); load(); } catch { /* sudah ditampilkan host */ }
+  }
+  // Konfirmasi destruktif: `run` berjalan SETELAH dikonfirmasi, dan dialog tetap terbuka + busy
+  // sampai selesai (submit ganda mustahil). Setiap aksi di sini menangani galatnya sendiri.
+  const guard = React.useCallback((o: ConfirmOptions, run: () => unknown) => {
+    confirm({ ...o, run: async () => { await run(); } })
+      .catch((e: unknown) => toastErr("menjalankan aksi", e));
+  }, [confirm, toastErr]);
   // SPEC-233 · Create PR (buka URL provider dari origin) & Create archive (unduh git archive).
   function prAct(branch: string) {
     setBranchMenu(null);
-    api.idePrUrl(projectId, branch).then((r) => { if (r.url) window.open(r.url, "_blank", "noreferrer"); else window.alert("origin bukan github/gitlab/bitbucket — tak bisa buat PR otomatis"); }).catch(() => {});
+    api.idePrUrl(projectId, branch)
+      .then((r) => { if (r.url) window.open(r.url, "_blank", "noreferrer"); else onToast?.("origin bukan github/gitlab/bitbucket — tak bisa buat PR otomatis", "warn", "git-branch"); })
+      .catch((e: unknown) => toastErr("membuat Pull Request", e));
   }
   function archiveAct(ref: string) { setBranchMenu(null); window.open(api.ideArchiveUrl(projectId, ref), "_blank"); }
+  // Konteks yang dibutuhkan builder menu commit (lihat `Ctl`).
+  const ctl: Ctl = {
+    act, merge: mergeAct, rebase: rebaseAct, drop: dropAct, ask: setAsk, guard,
+    cmp: { from: compareFrom, mark: setCompareFrom, compare: compareCommits },
+    dirty: [...(status?.staged ?? []), ...(status?.unstaged ?? [])],
+    untracked: status?.untracked ?? [],
+  };
 
   const maxLanes = Math.max(1, ...rows.map((r) => r.width));
   const allEdges = React.useMemo(() => rowEdges(rows), [rows]);
 
-  if (state === "loading") return <StateBlock kind="loading" title="Memuat git graph…" />;
-  if (state === "error") return <StateBlock kind="error" title="Gagal memuat git graph" action={load} />;
-  if (rows.length === 0) return <StateBlock kind="empty" icon="git-commit" title="Belum ada commit" />;
+  // Audit 2026-10 · keadaan memuat/galat/kosong MENGGANTI daftar saja. Dulu `return` dini membuang
+  // seluruh komponen — filter bar dan tombol cari ikut hilang, dan "Coba lagi" tak punya konteks.
+  // `action` tanpa argumen: StateBlock meneruskan MouseEvent, dan `load(silent)` akan membacanya.
+  const body = state === "loading" ? <StateBlock kind="loading" title="Memuat git graph…" />
+    : state === "error" ? <StateBlock kind="error" title="Gagal memuat git graph" action={() => load()} />
+    : rows.length === 0 ? <StateBlock kind="empty" icon="git-commit" title="Belum ada commit" />
+    : null;
 
   const narrow = tier !== "desktop";
   const graphRowHeight = tier === "mobile" || coarsePointer ? 44 : ROW_H;
@@ -425,30 +579,32 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
           {findOpen ? (
             <>
               <Icon name="search" size={13} color="var(--text-subtle)" />
-              <input autoFocus value={find} onChange={(e) => { setFind(e.target.value); setFindIdx(0); }}
+              <input autoFocus value={find} aria-label="Cari commit" onChange={(e) => { setFind(e.target.value); setFindIdx(0); }}
                 onKeyDown={(e) => { if (e.key === "Enter") gotoHit(findIdx + (e.shiftKey ? -1 : 1)); if (e.key === "Escape") setFindOpen(false); }}
                 placeholder="mis. auto-merge, 3a3e7e0, atau hanoman/spec-490"
-                style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 12.5, fontFamily: "var(--font-ui)", color: "var(--text-body)" }} />
+                style={{ flex: 1, border: "none", background: "transparent", fontSize: 12.5, fontFamily: "var(--font-ui)", color: "var(--text-body)" }} />
               <span style={{ fontSize: 11, color: "var(--text-subtle)", fontFamily: "var(--font-mono)" }}>
                 {findHits.length ? `${findIdx + 1}/${findHits.length}` : find ? "0" : ""}
               </span>
-              <Button size="sm" variant="ghost" leftIcon="chevron-up" disabled={!findHits.length} onClick={() => gotoHit(findIdx - 1)} />
-              <Button size="sm" variant="ghost" leftIcon="chevron-down" disabled={!findHits.length} onClick={() => gotoHit(findIdx + 1)} />
-              <Button size="sm" variant="ghost" leftIcon="x" onClick={() => { setFindOpen(false); setFind(""); }} />
+              <Button size="sm" variant="ghost" leftIcon="chevron-up" aria-label="Hasil sebelumnya" disabled={!findHits.length} onClick={() => gotoHit(findIdx - 1)} />
+              <Button size="sm" variant="ghost" leftIcon="chevron-down" aria-label="Hasil berikutnya" disabled={!findHits.length} onClick={() => gotoHit(findIdx + 1)} />
+              <Button size="sm" variant="ghost" leftIcon="x" aria-label="Tutup pencarian" onClick={() => { setFindOpen(false); setFind(""); }} />
             </>
           ) : (
             <>
               <Button size="sm" variant="ghost" leftIcon="search" onClick={() => setFindOpen(true)}>Cari</Button>
               <Button size="sm" variant="ghost" leftIcon="crosshair" onClick={centerHead}>HEAD</Button>
-              <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-subtle)" }}>⌘F cari · ⌘H center HEAD</span>
+              <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-subtle)" }}>⌘F cari · ⌘H ke HEAD</span>
             </>
           )}
         </div>
         {/* SPEC-233 · kontrol tampilan: filter branch, show/hide remote/tag, muted, style */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "6px 12px", borderBottom: "1px solid var(--border-hair)", fontSize: 12 }}>
-          <select value={gopts.branch} onChange={(e) => setView({ branch: e.target.value })}
+          <select aria-label="Filter branch" value={gopts.branch} onChange={(e) => setView({ branch: e.target.value })}
             style={{ fontSize: 12, padding: "3px 6px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)", color: "var(--text-body)" }}>
             <option value="">semua branch</option>
+            {/* Pilihan aktif tetap ada walau daftar branch belum termuat (mis. saat galat). */}
+            {gopts.branch && !localBranches.includes(gopts.branch) && <option value={gopts.branch}>{gopts.branch}</option>}
             {localBranches.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
           {/* SPEC-879 · `input` telanjang direntangkan aturan mobile `input { min-height:
@@ -456,10 +612,10 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
               DALAM area sentuh itu. */}
           <Checkbox checked={gopts.showRemote} onChange={(next) => setView({ showRemote: next })} label="remote" />
           <Checkbox checked={gopts.showTags} onChange={(next) => setView({ showTags: next })} label="tag" />
-          <Checkbox checked={muted} onChange={(next) => setMuted(next)} label="muted merge" />
+          <Checkbox checked={muted} onChange={(next) => setMuted(next)} label="redupkan merge" />
           <button onClick={() => setStyle((s) => (s === "rounded" ? "angular" : "rounded"))}
             style={{ border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)", cursor: "pointer", padding: "3px 8px", fontSize: 12, color: "var(--text-muted)" }}>
-            style: {style}
+            gaya: {style === "rounded" ? "lengkung" : "siku"}
           </button>
           <LiveConnectionBadge />
         </div>
@@ -484,6 +640,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             digulir (terukur 362 = 362 di 390px). Widget cari, kontrol tampilan, chip stash, dan
             baris penutup sengaja DI LUAR: yang terakhir sentinel IntersectionObserver SPEC-351
             yang menempel pada `<main>` yang menggulir tegak. */}
+        {body ?? (<>
         <LocalOverflow data-testid="ide-graph-rows">
           <div style={{ minWidth: maxLanes * LANE_W + GRAPH_ROW_MIN }}>
             {/* SPEC-233 · baris uncommitted changes (lingkaran terbuka) di puncak bila working tree kotor */}
@@ -503,7 +660,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                   <button type="button" onClick={(event) => { event.stopPropagation(); if (first) onOpenFile(first, ""); }}
                     style={{ border: 0, padding: 0, background: "transparent", textAlign: "left", cursor: first ? "pointer" : "default",
                       fontSize: 12.5, fontStyle: "italic", color: "var(--text-muted)", flex: 1 }}>
-                    Uncommitted changes · {n} file
+                    Perubahan belum di-commit · {n} berkas
                   </button>
                   <button type="button" className="hn-graph-action" aria-label="Aksi working tree"
                     onClick={(e) => { e.stopPropagation(); setUncMenu({ x: e.clientX, y: e.clientY, anchor: e.currentTarget }); }}>⋮</button>
@@ -532,13 +689,13 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                   <RowSvg row={r} edges={allEdges[i] ?? []} maxLanes={maxLanes} style={style} palette={palette} height={graphRowHeight} />
                   <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
                     {c.refs.map((ref) => (
-                      <button type="button" key={ref} title="branch — pilih untuk aksi"
+                      <button type="button" key={ref} title={isHead && ref === current ? "branch aktif (HEAD) — pilih untuk aksi" : "branch — pilih untuk aksi"}
                         aria-label={`Aksi branch ${ref}`}
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
                         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
                         style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "1px 6px", cursor: "pointer", border: "none",
-                        borderRadius: 999, background: isHead && ref === current ? "var(--brass-500)" : "var(--brass-100)",
-                        color: isHead && ref === current ? "#fff" : "var(--brass-700)", flex: "0 0 auto" }}>{ref}</button>
+                        borderRadius: 999, background: isHead && ref === current ? "var(--brass-700)" : "var(--brass-100)",
+                        color: isHead && ref === current ? "var(--bone-000)" : "var(--brass-700)", flex: "0 0 auto" }}>{ref}</button>
                     ))}
                     {/* SPEC-233 · tag = pill terpisah (warna leaf, ikon tag); klik-kanan → menu tag */}
                     {c.tags.map((t) => (
@@ -549,9 +706,14 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                           display: "inline-flex", alignItems: "center", gap: 3, background: "var(--leaf-100, #e6efe9)",
                           color: "var(--leaf-600, #3b7a57)", flex: "0 0 auto" }}>⌂{t}</button>
                     ))}
+                    {/* Merge dinyatakan TEKS, bukan hanya redup warnanya (audit a11y). */}
+                    {c.parents.length > 1 && (
+                      <span style={{ flex: "0 0 auto", fontFamily: "var(--font-mono)", fontSize: 10, padding: "0 5px",
+                        borderRadius: 999, border: "1px solid var(--border-strong)", color: "var(--text-muted)" }}>merge</span>
+                    )}
                     <button type="button" aria-label={`Buka commit ${c.sha}`} onClick={(event) => { event.stopPropagation(); onRowClick(event, c.sha); }}
                       style={{ minWidth: SUBJECT_MIN, padding: 0, border: 0, background: "transparent", cursor: "pointer", textAlign: "left",
-                        fontSize: 12.5, color: muted && c.parents.length > 1 ? "var(--text-subtle)" : "var(--text-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        fontSize: 12.5, color: muted && c.parents.length > 1 ? "var(--text-muted)" : "var(--text-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {msgOpts.emoji ? emojify(c.subject) : c.subject}
                     </button>
                   </div>
@@ -582,6 +744,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             </Button>
           )}
         </div>
+        </>)}
       </Card>
       </section>
 
@@ -606,27 +769,37 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
           <div className="hn-eyebrow" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
             <span style={{ flex: 1 }}>{detail.changed.length} file berubah</span>
             {(["list", "tree"] as const).map((v) => (
-              <button key={v} aria-label={v} onClick={() => setDetailView(v)} style={{ display: "flex", padding: 3, border: "none",
+              <button key={v} type="button" aria-label={v === "list" ? "Tampilan daftar" : "Tampilan pohon"} aria-pressed={detailView === v}
+                onClick={() => setDetailView(v)} style={{ display: "flex", padding: 3, border: "none",
                 cursor: "pointer", borderRadius: 4, background: detailView === v ? "var(--brass-100)" : "transparent" }}>
                 <Icon name={v === "list" ? "list" : "folder-tree"} size={13} color={detailView === v ? "var(--brass-700)" : "var(--text-subtle)"} />
               </button>
             ))}
           </div>
           {detailView === "tree"
-            ? buildFileTree(detail.changed.map((f) => f.path)).map((nd) =>
-                <TreeRow key={nd.path} node={nd} selected={fileDiff?.path ?? ""} onSelect={(p) => openFileDiff(p, detail.sha)} defaultOpen />)
+            ? <TreeRoot label="Berkas commit" nodes={buildFileTree(detail.changed.map((f) => f.path))}>
+                {buildFileTree(detail.changed.map((f) => f.path)).map((nd) =>
+                  <TreeRow key={nd.path} node={nd} selected={fileDiff?.path ?? ""} onSelect={(p) => openFileDiff(p, detail.sha)} defaultOpen />)}
+              </TreeRoot>
             : detail.changed.map((f) => (
               <div key={f.path} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 6px" }}>
                 <Badge tone={f.status === "A" ? "ok" : f.status === "D" ? "err" : "warn"} size="sm">{f.status}</Badge>
                 <button onClick={() => openFileDiff(f.path, detail.sha)} title="lihat diff" style={{ flex: 1, minWidth: 0, textAlign: "left",
                   border: "none", background: "transparent", cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: 11.5,
                   color: "var(--text-body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.path}</button>
-                <Icon name="git-commit" size={12} color="var(--text-subtle)" title="view at revision"
-                  onClick={() => onOpenFile(f.path, detail.sha)} style={{ cursor: "pointer" }} />
-                <Icon name="external-link" size={12} color="var(--text-subtle)" title="open (working tree)"
-                  onClick={() => onOpenFile(f.path, "")} style={{ cursor: "pointer" }} />
-                <Icon name="copy" size={12} color="var(--text-subtle)" title="copy path"
-                  onClick={() => void navigator.clipboard?.writeText(f.path)} style={{ cursor: "pointer" }} />
+                {/* Ikon-ikon ini dulu <Icon onClick> — tak bisa difokus lewat keyboard. Sekarang tombol. */}
+                <button type="button" className="hn-graph-action" aria-label={`Lihat ${f.path} pada commit ini`}
+                  title="Lihat pada revisi ini" onClick={() => onOpenFile(f.path, detail.sha)}>
+                  <Icon name="git-commit" size={12} color="var(--text-subtle)" />
+                </button>
+                <button type="button" className="hn-graph-action" aria-label={`Buka ${f.path} dari working tree`}
+                  title="Buka dari working tree" onClick={() => onOpenFile(f.path, "")}>
+                  <Icon name="external-link" size={12} color="var(--text-subtle)" />
+                </button>
+                <button type="button" className="hn-graph-action" aria-label={`Salin path ${f.path}`}
+                  title="Salin path" onClick={() => void navigator.clipboard?.writeText(f.path)}>
+                  <Icon name="copy" size={12} color="var(--text-subtle)" />
+                </button>
               </div>
             ))}
         </Card>
@@ -660,33 +833,57 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
           background: "var(--brass-500)", color: "#fff", padding: "6px 14px", borderRadius: 999, fontSize: 12.5,
           boxShadow: "var(--shadow-pop, 0 6px 24px rgba(0,0,0,.15))", display: "flex", alignItems: "center", gap: 10 }}>
           Compare dari {compareFrom.slice(0, 7)} — Ctrl/Cmd-klik commit kedua
-          <button onClick={() => setCompareFrom(null)} style={{ border: "none", background: "transparent", color: "#fff", cursor: "pointer", fontWeight: 700 }}>✕</button>
+          <button type="button" aria-label="Batalkan perbandingan" onClick={() => setCompareFrom(null)} style={{ border: "none", background: "transparent", color: "#fff", cursor: "pointer", fontWeight: 700 }}>✕</button>
         </div>
       )}
 
-      {menu && <Menu x={menu.x} y={menu.y} returnFocus={menu.anchor} onClose={() => setMenu(null)} items={menuItems(menu.c, current, act, mergeAct, rebaseAct, dropAct)} />}
+      {menu && <Menu x={menu.x} y={menu.y} returnFocus={menu.anchor} onClose={() => setMenu(null)} items={menuItems(menu.c, current, ctl)} />}
       {tagMenu && <Menu x={tagMenu.x} y={tagMenu.y} returnFocus={tagMenu.anchor} onClose={() => setTagMenu(null)} items={[
         { label: `Hapus tag ${tagMenu.tag} (local)`, run: () => { setTagMenu(null); void act({ op: "delete-tag", name: tagMenu.tag }); } },
         { label: `Hapus tag ${tagMenu.tag} (local + origin)`, run: () => { setTagMenu(null); void act({ op: "delete-tag", name: tagMenu.tag, remote: true }); } },
         { label: "Push tag ke origin", run: () => { setTagMenu(null); void act({ op: "push-tag", name: tagMenu.tag }); } },
-        { label: "Copy nama tag", run: () => { setTagMenu(null); void navigator.clipboard?.writeText(tagMenu.tag); } },
+        { label: "Salin nama tag", run: () => { setTagMenu(null); void navigator.clipboard?.writeText(tagMenu.tag); } },
       ]} />}
       {uncMenu && <Menu x={uncMenu.x} y={uncMenu.y} returnFocus={uncMenu.anchor} onClose={() => setUncMenu(null)} items={[
-        // SPEC-233 · aksi baris uncommitted. reset --hard & clean ireversibel → gate force via act.
-        { label: "Stash perubahan…", run: () => { setUncMenu(null); const m = window.prompt("Pesan stash (opsional):") || undefined; void act({ op: "stash", message: m, includeUntracked: true }); } },
+        // SPEC-233 · aksi baris uncommitted. Reset hard & clean ireversibel → dialog dampak (guard).
+        { label: "Stash perubahan…", run: () => { setUncMenu(null); setAsk({
+          title: "Stash perubahan", label: "Pesan stash (opsional)", placeholder: "mis. WIP login", submit: "Stash",
+          onSubmit: (m) => { void act({ op: "stash", message: m || undefined, includeUntracked: true }); },
+        }); } },
         { label: "Reset working tree (mixed — unstage)", run: () => { setUncMenu(null); void act({ op: "reset-worktree", mode: "mixed" }); } },
-        { label: "Reset working tree (hard — buang semua)", run: () => { setUncMenu(null); void act({ op: "reset-worktree", mode: "hard" }); } },
-        { label: "Clean untracked", run: () => { setUncMenu(null); void act({ op: "clean", directories: true }); } },
+        { label: "Reset working tree (hard — buang semua)", run: () => { setUncMenu(null); guard({
+          title: "Buang semua perubahan tak ter-commit?", eyebrow: "Reset hard", tone: "danger", icon: "rotate-ccw",
+          message: "Berkas yang diubah atau di-stage kembali ke isi commit HEAD.",
+          impact: [ctl.dirty.length
+            ? `${ctl.dirty.length} berkas diubah kembali: ${fileList(ctl.dirty)}. Isinya tak bisa dikembalikan.`
+            : "Tak ada berkas tracked yang berubah.",
+          "Berkas untracked tidak tersentuh oleh reset ini."],
+          confirmLabel: "Buang perubahan",
+        }, () => act({ op: "reset-worktree", mode: "hard" })); } },
+        { label: "Hapus berkas untracked…", run: () => { setUncMenu(null); guard({
+          title: "Hapus berkas untracked?", eyebrow: "Clean untracked", tone: "danger", icon: "trash-2",
+          message: "Berkas dan folder yang tak pernah di-add ke git dihapus permanen.",
+          impact: [ctl.untracked.length
+            ? `${ctl.untracked.length} berkas/folder dihapus: ${fileList(ctl.untracked)}.`
+            : "Tak ada berkas untracked.",
+          "Tidak ada di riwayat git, sehingga tak bisa dipulihkan."],
+          confirmLabel: "Hapus berkas",
+        }, () => act({ op: "clean", directories: true })); } },
       ]} />}
       {stashMenu && <Menu x={stashMenu.x} y={stashMenu.y} returnFocus={stashMenu.anchor} onClose={() => setStashMenu(null)} items={[
         { label: "Apply (jaga stash)", run: () => { const s = stashMenu.s; setStashMenu(null); void act({ op: "stash-apply", ref: s.ref }); } },
         { label: "Pop (apply + buang)", run: () => { const s = stashMenu.s; setStashMenu(null); void act({ op: "stash-pop", ref: s.ref }); } },
         { label: "Drop (buang stash)", run: () => { const s = stashMenu.s; setStashMenu(null); void act({ op: "stash-drop", ref: s.ref }); } },
-        { label: "Buat branch dari stash…", run: () => { const s = stashMenu.s; setStashMenu(null); const name = window.prompt("Nama branch baru:"); if (name) void act({ op: "stash-branch", ref: s.ref, name }); } },
-        { label: "Copy nama stash", run: () => { const s = stashMenu.s; setStashMenu(null); void navigator.clipboard?.writeText(s.ref); } },
+        { label: "Buat branch dari stash…", run: () => { const s = stashMenu.s; setStashMenu(null); setAsk({
+          title: `Branch dari ${s.ref}`, label: "Nama branch baru", placeholder: "mis. fitur/dari-stash", submit: "Buat branch",
+          onSubmit: (name) => { void act({ op: "stash-branch", ref: s.ref, name }); },
+        }); } },
+        { label: "Salin nama stash", run: () => { const s = stashMenu.s; setStashMenu(null); void navigator.clipboard?.writeText(s.ref); } },
       ]} />}
       {branchMenu && <Menu x={branchMenu.x} y={branchMenu.y} returnFocus={branchMenu.anchor} onClose={() => setBranchMenu(null)}
-        items={branchMenuItems(branchMenu.ref, current, allRefs, act, mergeAct, rebaseAct, pullAct, prAct, archiveAct)} />}
+        items={branchMenuItems(branchMenu.ref, current, allRefs, act, mergeAct, rebaseAct, pullAct, prAct, archiveAct, setAsk)} />}
+      {ask && <GitAskDialog ask={ask} onClose={() => setAsk(null)} />}
+      {dialog}
 
       {/* SPEC-233 · modal diff satu file di commit (reuse DiffView), tab Diff|Source */}
       {fileDiff && (
@@ -712,7 +909,9 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
               )}
             </div>
             <div data-testid="gitgraph-file-scroll" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", padding: "10px 0" }}>
-              {!fileDiff.data ? <StateBlock kind="loading" title="Memuat diff…" hint={fileDiff.path} />
+              {!fileDiff.data ? (fileDiff.err
+                ? <StateBlock kind="error" title="Diff belum bisa dibuka" hint={fileDiff.err} />
+                : <StateBlock kind="loading" title="Memuat diff…" hint={fileDiff.path} />)
                 : fileDiff.data.binary ? <StateBlock kind="empty" icon="file" title="Berkas biner" />
                 : fileDiff.tab === "diff" ? <DiffView diff={fileDiff.data.diff ?? ""} emptyHint="File tak berubah di commit ini." />
                 : fileDiff.tab === "preview"

@@ -8,7 +8,7 @@ import { MarkdownView } from "../ds/markdown";
 import { useApi } from "../api/instance";
 import type { RepoFile, ReviewFile, WorkingStatus } from "../api/client";
 import type { GraphCommit } from "@hanoman/shared";
-import { buildFileTree, TreeRow, ChangedSection } from "./file-tree";
+import { buildFileTree, TreeRow, TreeRoot, ChangedSection } from "./file-tree";
 import { DiffView } from "./diff-view";
 
 export function IdeReadPanel({ projectId }: { projectId: string }) {
@@ -81,9 +81,13 @@ export function IdeReadPanel({ projectId }: { projectId: string }) {
                   {treeState === "loading" ? <StateBlock kind="loading" compact title="Memuat file…" />
                     : treeState === "error" ? <StateBlock kind="error" compact title="Gagal memuat file" />
                     : files.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Tak ada file" />
-                    : buildFileTree(files, dirs).map((n) => (
-                        <TreeRow key={n.path} node={n} selected={selKind === "file" ? selected : ""} onSelect={selectFile} />
-                      ))}
+                    : (
+                      <TreeRoot label="Pohon berkas" nodes={buildFileTree(files, dirs)}>
+                        {buildFileTree(files, dirs).map((n) => (
+                          <TreeRow key={n.path} node={n} selected={selKind === "file" ? selected : ""} onSelect={selectFile} />
+                        ))}
+                      </TreeRoot>
+                    )}
                 </div>
               </Card>
             ) },

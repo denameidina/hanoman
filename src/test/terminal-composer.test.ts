@@ -99,25 +99,25 @@ describe("onExternalInput", () => {
 });
 
 describe("statusFor", () => {
-  it("mengatakan terkirim saat sambungan terbuka dan antrean kosong", () => {
-    expect(statusFor("open", { n: 0, held: false })).toEqual({ kind: "sent", text: "terkirim" });
+  it("mengatakan terkirim sesaat sesudah Enter saat sambungan terbuka dan antrean kosong", () => {
+    expect(statusFor("open", { n: 0, held: false }, true)).toEqual({ kind: "sent", text: "terkirim" });
   });
 
-  it("mengatakan berapa yang diantre saat antrean terisi dan tak ditahan", () => {
-    expect(statusFor("open", { n: 7, held: false })).toEqual({ kind: "queued", text: "diantre 7" });
-    expect(statusFor("retrying", { n: 7, held: false })).toEqual({ kind: "queued", text: "diantre 7" });
+  // Audit UI/UX Terminal · badge "terkirim" tak boleh tampil terus; ia hanya konfirmasi sesaat.
+  it("diam saat tak ada Enter baru, walau sambungan terbuka dan antrean kosong", () => {
+    expect(statusFor("open", { n: 0, held: false }, false)).toBeNull();
   });
 
-  it("mengatakan tertahan dan menunjuk tombol Kirim di strip atas", () => {
-    expect(statusFor("open", { n: 3, held: true }))
-      .toEqual({ kind: "held", text: "tertahan — Kirim di atas" });
+  // Antrean dan tertahan dinyatakan oleh strip status pane; kolom ketik tak mengulanginya.
+  it("tak pernah mengaku terkirim bila ada yang diantre atau tertahan", () => {
+    expect(statusFor("open", { n: 7, held: false }, true)).toBeNull();
+    expect(statusFor("retrying", { n: 7, held: false }, true)).toBeNull();
+    expect(statusFor("open", { n: 3, held: true }, true)).toBeNull();
   });
 
-  // Strip status di atas pane sudah bicara sendiri saat menyambung ulang; penanda kedua yang
-  // mengatakan hal yang sama hanya menambah derau.
-  it("diam saat sambungan belum terbuka dan tak ada apa pun yang menunggu", () => {
-    expect(statusFor("retrying", { n: 0, held: false })).toBeNull();
-    expect(statusFor("gone", { n: 0, held: false })).toBeNull();
+  it("diam saat sambungan belum terbuka, walau Enter baru saja ditekan", () => {
+    expect(statusFor("retrying", { n: 0, held: false }, true)).toBeNull();
+    expect(statusFor("gone", { n: 0, held: false }, true)).toBeNull();
   });
 });
 

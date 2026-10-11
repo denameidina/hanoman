@@ -106,7 +106,8 @@ describe("TeamScreen · mutasi", () => {
   it("pindah kolom mengirim status & order tujuan, lalu kartunya pindah tanpa menunggu refetch", async () => {
     view();
     await screen.findByTestId("team-card-t1");
-    fireEvent.change(screen.getByLabelText("Pindah kolom: Desain"), { target: { value: "done" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pindah ke Selesai" }));
     await waitFor(() => expect(api.patchTask).toHaveBeenCalledWith("t1", { status: "done", order: 0 }));
     expect(screen.getByTestId("team-col-done")).toHaveTextContent("Desain");
   });
@@ -115,7 +116,8 @@ describe("TeamScreen · mutasi", () => {
     vi.mocked(api.patchTask).mockRejectedValueOnce(new Error("boom"));
     const { onToast } = view();
     await screen.findByTestId("team-card-t1");
-    fireEvent.change(screen.getByLabelText("Pindah kolom: Desain"), { target: { value: "done" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pindah ke Selesai" }));
     await waitFor(() => expect(onToast).toHaveBeenCalled());
     expect(screen.getByTestId("team-col-backlog")).toHaveTextContent("Desain");
   });

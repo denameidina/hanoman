@@ -47,14 +47,77 @@ describe("ProjectsScreen via API (SPEC-198)", () => {
     const open = screen.getByRole("button", { name: "Buka project arta" });
     const row = open.closest(".hn-project-row")!;
     expect(row).toHaveClass("hn-project-row");
-    for (const label of ["Project", "Status", "Docs · SoT", "Backlog", "Aktivitas"]) {
+    for (const label of ["Project", "Status", "Dokumen", "Backlog", "Aktivitas"]) {
       expect(row.querySelector(`[data-label="${label}"]`)).toBeInTheDocument();
     }
     expect(screen.getByText("ERP toko")).toBeInTheDocument();
     expect(screen.getByText("baru saja")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hapus project arta" })).toBeInTheDocument();
+    // Audit 2026-10: hapus tak lagi tombol di baris — ia di menu ⋯, dan klik di dalam menu
+    // tak ikut membuka project (Modal menaikkan event lewat pohon React).
+    fireEvent.click(screen.getByRole("button", { name: "Aksi untuk project arta" }));
+    fireEvent.click(screen.getByRole("button", { name: /Hapus project/ }));
+    expect(onDelete).toHaveBeenCalledOnce();
+    expect(onOpen).not.toHaveBeenCalled();
     fireEvent.click(open);
     expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  it("memakai semantik tabel: role table, header columnheader, baris row", () => {
+    render(<ProjectsScreen projects={[P()] as never} onOpen={() => {}} />);
+    expect(screen.getByRole("table", { name: "Daftar project" })).toBeInTheDocument();
+    expect(screen.getAllByRole("columnheader")).toHaveLength(6);
+    expect(screen.getAllByRole("row")).toHaveLength(2);   // header + satu project
+  });
+
+  it("kind enum ditampilkan sebagai label Indonesia, bukan nilai mentah", () => {
+    render(<ProjectsScreen projects={[P({ kind: "from-scratch" }), P({ id: "b", name: "beta", kind: "existing" })] as never}
+      onOpen={() => {}} />);
+    expect(screen.getByText("Dari nol")).toBeInTheDocument();
+    expect(screen.getByText("Repo sudah ada")).toBeInTheDocument();
+    expect(screen.queryByText("from-scratch")).toBeNull();
+  });
+});
+
+describe("galat & empty state Projects (audit 2026-10)", () => {
+  it("galat memuat daftar tampil sebagai blok error dengan Coba lagi, bukan daftar kosong", async () => {
+    vi.mocked(api.listProjects)
+      .mockRejectedValueOnce(new Error("GET /api/projects → 500"))
+      .mockResolvedValueOnce(envelope([P({ id: "arta", name: "arta" })]));
+    render(<ProjectsScreen projects={[] as never} pageSize={20} dataVersion={0} />);
+    expect(await screen.findByText("Gagal memuat daftar project")).toBeInTheDocument();
+    expect(screen.getByText(/GET \/api\/projects → 500/)).toBeInTheDocument();
+    expect(screen.queryByText("Belum ada project")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    expect(await screen.findByRole("button", { name: "Buka project arta" })).toBeInTheDocument();
+  });
+
+  it("muat ulang yang gagal tak menghapus data lama — galat tampil di atas baris terakhir", async () => {
+    vi.mocked(api.listProjects).mockResolvedValueOnce(envelope([P({ id: "arta", name: "arta" })]));
+    const { rerender } = render(<ProjectsScreen projects={[P()] as never} search="" pageSize={20} dataVersion={0} />);
+    expect(await screen.findByRole("button", { name: "Buka project arta" })).toBeInTheDocument();
+    vi.mocked(api.listProjects).mockRejectedValueOnce(new Error("jaringan putus"));
+    rerender(<ProjectsScreen projects={[P()] as never} search="x" pageSize={20} dataVersion={0} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Gagal memuat ulang");
+    expect(screen.getByRole("button", { name: "Buka project arta" })).toBeInTheDocument();
+  });
+
+  it("filter Ditangani oleh yang menyaring habis → pesan dan Reset filter", async () => {
+    writeUiState(uiKey("projects", "handledBy"), "d9");
+    vi.mocked(api.listProjects).mockResolvedValue(envelope([]));
+    render(<ProjectsScreen projects={[P()] as never} pageSize={20} dataVersion={0} />);
+    expect(await screen.findByText("Tak ada project yang ditangani perangkat ini")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reset filter" }));
+    await waitFor(() => expect(vi.mocked(api.listProjects).mock.calls.at(-1)![0])
+      .toMatchObject({ handledBy: undefined, page: 1 }));
+  });
+
+  it("halaman yang sudah habis → kembali ke halaman 1", async () => {
+    writeUiState(uiKey("projects", "page"), 3);
+    vi.mocked(api.listProjects).mockResolvedValue({ items: [], total: 5, page: 3, pageSize: 20 } as never);
+    render(<ProjectsScreen projects={[P()] as never} pageSize={20} dataVersion={0} />);
+    expect(await screen.findByText("Halaman ini sudah kosong")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Kembali ke halaman 1" }));
+    await waitFor(() => expect(vi.mocked(api.listProjects).mock.calls.at(-1)![0]).toMatchObject({ page: 1 }));
   });
 });
 

@@ -84,6 +84,8 @@ describe("menutup sesi (SPEC-742)", () => {
     const tutup = await screen.findByLabelText("Tutup sesi spec-742");
 
     fireEvent.click(tutup);
+    // Menutup sesi yang masih berjalan dikonfirmasi dulu; setelah "ya", sel tetap dilepas seketika.
+    fireEvent.click(await screen.findByRole("button", { name: "Tutup sesi" }));
 
     await waitFor(() => expect(screen.queryByLabelText("Tutup sesi spec-742")).toBeNull());
     expect(deleteTerminal).toHaveBeenCalledWith("spec-742");

@@ -4,6 +4,7 @@ import type { ShowToast } from "../ds/kit";
 import { api } from "../api/client";
 import { subscribe } from "../api/events";
 import { playNotifySound, unlockNotifySound, type NotifySound } from "./sound";
+import { failureMessage } from "../lib/report-error";
 
 export function maxAt(items: Notification[]): string {
   return items.reduce((m, n) => (n.createdAt > m ? n.createdAt : m), "");
@@ -99,14 +100,26 @@ export function NotificationsProvider({ showToast, onOpen, children }: { showToa
     return () => { unsub(); window.removeEventListener("pointerdown", unlock); window.removeEventListener("keydown", unlock); };
   }, [handle, loadPrefs]);
 
+  // Audit UI/UX 2026-10 · galat tak lagi ditelan. Yang gagal dikembalikan ke keadaan sebelum tombol
+  // ditekan (badge tetap jujur) dan toast menyebut aksinya beserta alasannya.
+  const shown = React.useRef({ items, unread, total });
+  shown.current = { items, unread, total };
   const markAllRead = React.useCallback(() => {
+    const before = shown.current.unread;
     setUnread(0);
-    api.markNotificationsRead().catch(() => { });
-  }, []);
+    api.markNotificationsRead().catch((e) => {
+      setUnread(before);
+      showToast(failureMessage("menandai notifikasi dibaca", e), "err", "x-circle");
+    });
+  }, [showToast]);
   const clear = React.useCallback(() => {
+    const before = shown.current;
     setItems([]); setUnread(0); setTotal(0);
-    api.clearNotifications().catch(() => { });
-  }, []);
+    api.clearNotifications().catch((e) => {
+      setItems(before.items); setUnread(before.unread); setTotal(before.total);
+      showToast(failureMessage("membersihkan notifikasi", e), "err", "x-circle");
+    });
+  }, [showToast]);
 
   return (
     <NotificationsContext.Provider value={{ items, unread, total, markAllRead, clear, onOpen }}>

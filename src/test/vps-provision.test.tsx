@@ -123,3 +123,26 @@ describe("SPEC-883 · panel provisioning", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /login lewat console/i })).toBeTruthy());
   });
 });
+
+describe("SPEC-883 · alasan & pesan galat (audit VPS)", () => {
+  it("Pasang yang nonaktif menjelaskan alasannya: belum ada komponen dipilih", async () => {
+    panel();
+    await waitFor(() => screen.getByRole("checkbox", { name: "Paket dasar" }));
+    expect((screen.getByRole("button", { name: /^pasang$/i }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Pilih minimal satu komponen.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Paket dasar" }));
+    expect(screen.queryByText("Pilih minimal satu komponen.")).toBeNull();
+  });
+
+  it("hasil langkah bisa difokus dan diumumkan (aria-live + pre fokusabel)", async () => {
+    vi.spyOn(api, "provisionPreview").mockResolvedValue({ steps: [{ item: "base", status: "would", detail: "akan dipasang" }] } as never);
+    panel();
+    await waitFor(() => screen.getByRole("checkbox", { name: "Paket dasar" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Paket dasar" }));
+    fireEvent.click(screen.getByRole("button", { name: /pratinjau/i }));
+    const pre = await screen.findByLabelText("Hasil langkah provisioning");
+    expect(pre.getAttribute("tabindex")).toBe("0");
+    expect(pre.parentElement?.getAttribute("aria-live")).toBe("polite");
+  });
+});
+

@@ -1,7 +1,8 @@
 import React from "react";
-import { Badge, Button, Callout, Card, Checkbox, ConfirmDialog, Field, Icon, Input, StateBlock, Switch } from "../ds";
+import { Badge, Button, Callout, Card, Checkbox, Field, Icon, Input, StateBlock, Switch, useConfirm } from "../ds";
 import type { ShowToast } from "../ds";
 import { api } from "../api/client";
+import { failureMessage } from "../lib/report-error";
 import { WEBHOOK_ENTITIES, WEBHOOK_EVENTS, WEBHOOK_PING_TYPE } from "@hanoman/shared";
 import type { WebhookDeliveryView, WebhookEndpointView, WebhookTestResult } from "@hanoman/shared";
 
@@ -43,7 +44,8 @@ export function WebhooksPanel({ onToast, onOpenDocs }:
   const [result, setResult] = React.useState<Record<string, WebhookTestResult>>({});
   const [historyFor, setHistoryFor] = React.useState<string | null>(null);
   const [history, setHistory] = React.useState<WebhookDeliveryView[]>([]);
-  const [doomed, setDoomed] = React.useState<WebhookEndpointView | null>(null);
+  // Konfirmasi hapus lewat dialog aplikasi dengan daftar dampak (audit UI/UX 2026-10).
+  const { confirm, dialog } = useConfirm();
 
   const load = React.useCallback(async () => {
     try { setRows((await api.listWebhooks()).endpoints); setFailed(false); }
@@ -78,7 +80,7 @@ export function WebhooksPanel({ onToast, onOpenDocs }:
       setDraft(null);
       await load();
     } catch (e) {
-      onToast?.(`Gagal menyimpan: ${(e as Error).message}`, "err");
+      onToast?.(failureMessage("menyimpan endpoint", e), "err");
     } finally { setBusy(false); }
   };
 
@@ -94,7 +96,7 @@ export function WebhooksPanel({ onToast, onOpenDocs }:
 
   const toggle = async (e: WebhookEndpointView, on: boolean) => {
     try { await api.updateWebhook(e.id, { enabled: on }); await load(); }
-    catch (err) { onToast?.(`Gagal mengubah status: ${(err as Error).message}`, "err"); }
+    catch (err) { onToast?.(failureMessage("mengubah status endpoint", err), "err"); }
   };
 
   const test = async (id: string) => {
@@ -108,11 +110,19 @@ export function WebhooksPanel({ onToast, onOpenDocs }:
     } finally { setBusy(false); }
   };
 
-  const remove = async () => {
-    if (!doomed) return;
-    try { await api.deleteWebhook(doomed.id); onToast?.("Endpoint webhook dihapus"); await load(); }
-    catch (e) { onToast?.(`Gagal menghapus: ${(e as Error).message}`, "err"); }
-    finally { setDoomed(null); }
+  const remove = async (target: WebhookEndpointView) => {
+    try {
+      const done = await confirm({
+        title: `Hapus endpoint "${target.name}"?`,
+        message: "Endpoint ini tak lagi menerima peristiwa dari hanoman.",
+        impact: ["Riwayat pengiriman endpoint ini ikut dihapus.", "Tindakan ini tak bisa dibatalkan."],
+        confirmLabel: "Hapus endpoint",
+        tone: "danger",
+        icon: "trash-2",
+        run: () => api.deleteWebhook(target.id),
+      });
+      if (done) { onToast?.("Endpoint webhook dihapus"); await load(); }
+    } catch (err) { onToast?.(failureMessage("menghapus endpoint", err), "err"); }
   };
 
   const retry = async (deliveryId: string) => {
@@ -178,7 +188,7 @@ export function WebhooksPanel({ onToast, onOpenDocs }:
                             enabled: e.enabled, allowPrivate: e.allowPrivate,
                           });
                         }}>Ubah</Button>
-                        <Button size="sm" variant="ghost" onClick={() => setDoomed(e)}>Hapus</Button>
+                        <Button size="sm" variant="ghost" onClick={() => void remove(e)}>Hapus</Button>
                       </div>
                     </div>
                     <div style={{ ...mono, color: "var(--text-muted)", marginTop: 6 }}>{e.url}</div>
@@ -328,9 +338,7 @@ export function WebhooksPanel({ onToast, onOpenDocs }:
         </Card>
       ) : null}
 
-      <ConfirmDialog open={!!doomed} title="Hapus endpoint webhook?"
-        message={doomed ? `"${doomed.name}" beserta seluruh riwayat pengirimannya akan dihapus.` : ""}
-        confirmLabel="Hapus" onCancel={() => setDoomed(null)} onConfirm={() => void remove()} />
+      {dialog}
     </>
   );
 }

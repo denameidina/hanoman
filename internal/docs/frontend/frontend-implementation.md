@@ -80,6 +80,118 @@ menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
   lokal tiap layar (SPEC-146) — detail project memakainya untuk membuka Backlog dalam keadaan tersaring.
   Sentinel `"all"` = "Semua project" (PRD → `GET /prds` lintas-project; Backlog → `project` di-omit).
 
+## Audit UI/UX 2026-10 · Fase 1 (quick win)
+
+Fase 1 dari [audit UI/UX](ui-ux-audit-2026-10.md) sudah ada di kode; diverifikasi terhadap diff `main`,
+bukan terhadap rencana. Status per butir dan sisanya ada di [§Status pelaksanaan](ui-ux-audit-2026-10.md#status-pelaksanaan).
+Token dan aturan lintas-layar ada di [design-system](../design-system/design-system.md#kontras-konfirmasi-dan-error-audit-uiux-2026-10--fase-1).
+
+Per layar:
+
+- **Overview** — state kosong (belum ada project) hanya menampilkan kartu dan CTA "Buat project pertama",
+  tanpa KPI strip (`screens/OverviewScreen.tsx:126-137`; `test/overview-screen.test.tsx`).
+- **Dalang** — ticker 26 ms terisolasi di `BootTicker` dan jam 1 dtk di `DalangClock`
+  (`screens/DalangHanomanScreen.tsx:46-104`), sehingga layar induk tak ikut re-render. Teks statis
+  "HANOMAN ONLINE" diganti status koneksi nyata dari `events.connected` (`:172`). Tombol keluar berada di
+  luar `.hn-dlg-chips` dan berukuran 44×44 pada `(pointer: coarse)` atau ≤767px (`app.css:1013-1025`,
+  `--touch-target`). Di desktop tombol tetap 34px. Tes: `test/dalang-hanoman.test.tsx`.
+- **Backlog** — hapus spec lewat `useConfirm` (`screens/BacklogScreen.tsx:1082-1096`). Kartu menampilkan
+  satu aksi utama sadar-stage; sisanya di `OverflowActions` ⋯ (`:600-638`). `TaskModal` tak bisa ditutup
+  saat menyimpan (`screens/TaskModal.tsx:125`), dan hapus tugas berkonfirmasi (`:102-105`). Tes:
+  `test/backlog-delete-confirm.test.tsx`, `test/backlog-ui-audit.test.tsx`, `test/task-modal-busy.test.tsx`.
+- **Terminal** — kill sesi berkonfirmasi (`requestKill`, `screens/TerminalScreen.tsx:336-350`); "Buang"
+  ketikan tertahan berkonfirmasi (`confirmDiscard`, `screens/TerminalPane.tsx:828-835`). Panel Diagnostik
+  tertutup secara default (`TerminalScreen.tsx:531`). Sesi berakhir memakai banner "Berakhir" tanpa
+  meredupkan badan (`:1362-1372`). Modal fullscreen tak ditutup oleh Escape (`:1389`). `Ctrl+Shift+Esc`
+  melepas fokus dari terminal (`TerminalPane.tsx:517-518`). Tes: `test/terminal-screen.test.tsx`,
+  `test/terminal-pane.test.tsx`. Celah: "Hapus sel" (`TerminalPane.tsx:854-856`) masih memanggil
+  `killSession` tanpa konfirmasi.
+- **Settings** — persist jujur: toast sukses hanya setelah PUT berhasil, galat tampil, dan nilai kembali ke
+  nilai tersimpan saat gagal (`screens/SettingsScreen.tsx:871-874`). Penyimpanan berurutan lewat antrean
+  GET → rebase → PUT (`:801,865-869`; `test/settings-rebase.test.tsx`). Gagal memuat setelan menampilkan
+  galat dan tidak jatuh ke default yang bisa menimpa server (`:828-832`). Reset konfigurasi, hapus atau
+  cabut token, hapus log, hapus pengguna, dan hapus kredensial Telegram memakai `useConfirm`
+  (`:231,299,362,435,609,947`). Tab default adalah **Sesi** (`:803`; `test/settings-nav.test.tsx`).
+- **Klien** — tab IDE meneruskan `projectId` (`screens/ClientsScreen.tsx:193` → `RemoteInstanceView.tsx:59`;
+  `test/clients-screen.test.tsx`). Hapus akun berkonfirmasi (`screens/ClientAccessPanel.tsx:89-96`;
+  `test/client-access-panel.test.tsx`). Grant berisiko (Tulis, Mulai sesi) berkonfirmasi di
+  `screens/RemoteControlPanel.tsx:134-139`, yaitu di Settings → Kendali jarak jauh, bukan di Klien.
+- **IDE** — guard draft saat pindah berkas atau ganti ref (`screens/IdeScreen.tsx:225-238,434`). Edit
+  diblokir saat ref lain dipilih (`:302,607`; `test/ide-edit-guard.test.tsx`). Input nama, folder, dan
+  rename memakai `Modal` design system (`:673-686`), hapus memakai `useConfirm` (`:370-374`), dan konflik
+  unggah memakai Modal (`:689`). Tree memakai ARIA tree dan navigasi panah (`screens/file-tree.tsx`;
+  `test/file-tree-keyboard.test.tsx`).
+- **Docs** — guard draft saat pindah dokumen (`screens/DocsWorkspace.tsx:177-187,200`). Simpan memakai
+  try/catch dengan galat inline (`:191-195,346-348`; `test/docs-save-guard.test.tsx`).
+- **Skills** — guard dirty (`screens/skills/SkillsWorkspace.tsx:43-52`, `SkillEditor.tsx:136-137`).
+  "Timpa" berkonfirmasi (`SkillEditor.tsx:200`). Nama skill baru lewat `Modal` (`SkillEditor.tsx:79-93`,
+  `SkillsWorkspace.tsx:105-133`; `screens/skills/SkillsWorkspace.test.tsx`).
+- **GitGraph** — tak ada pemanggilan `window.confirm`. Reset hard dan Clean untracked lewat `guard` →
+  `confirm` aplikasi (`screens/GitGraph.tsx:222-224,532-535,855-871`; `test/git-graph-destructive.test.tsx`).
+  `test/confirm-inventory.test.ts` menjaga jumlah `window.*` native tetap nol.
+- **Scheduler** — input angka tak dipaksa ke minimum saat dikosongkan. Nilai disimpan sebagai draft; blur
+  mengembalikannya ke nilai tersimpan, dan komit lewat Enter atau "Simpan setelan" (`screens/SchedulerScreen.tsx:270-320`).
+  Jeda dan Hentikan berkonfirmasi (`:458-474`). Simpan setelan tak menimpa `enabled`/`paused` (`:289-291`).
+  Hapus cron berkonfirmasi (`screens/SchedulerCrons.tsx:178-190`; `screens/SchedulerCrons.test.tsx`).
+- **Lead** — input angka memakai draft, tanpa PUT per ketukan dan tanpa `disabled={busy}`. Komit saat blur
+  atau Enter (`screens/LeadScreen.tsx:85,103-109,140-161`). Batal keputusan dan batal atau kirim rangkaian
+  berkonfirmasi (`:475-492`). Helper `screens/sched-lead-shared.tsx` dipakai Scheduler, Cron, dan Lead
+  (`test/sched-lead-shared.test.tsx`).
+- **QA** — hapus test case, lampiran, dan "Kirim semua ke backlog" berkonfirmasi (`screens/qa/QaCasesPanel.tsx:28`,
+  `QaAttachments.tsx:41`, `QaFindingsPanel.tsx:79,100`; `screens/qa/QaWorkspace.test.tsx`, `screens/qa/QaAttachments.test.tsx`).
+  "Kembali" dengan isian belum tersimpan bertanya dulu, dan badge "Belum disimpan" tampil
+  (`qa/QaReportEditor.tsx:79-88,115`). Severity dan status tampil sebagai label (`qa/qa-ui.ts:10,62-63`).
+  `QaField` memisahkan label (`htmlFor`) dari hint (`qa/QaField.tsx:23-26`).
+- **Triase** — tolak tiket dan tolak issue GitHub berkonfirmasi (`screens/TriageScreen.tsx:145-160,362-373`).
+  Clipboard punya catch dengan toast galat (`:162-167`). Query di-debounce, dan loading penuh hanya tampil
+  bila belum ada data (`:445-460`). Label filter kosong "Semua project" dan "Semua status" (`:541-545`).
+- **Projects** — galat dipisah dari daftar kosong (`screens/ProjectsScreen.tsx:181-186`). Muat ulang yang
+  gagal mempertahankan baris lama (`:139-141`). Enum `from-scratch` memakai label "Dari nol" (`:22`). Clone
+  dikonfirmasi satu kali di modal (`screens/MissingRepoCard.tsx:44-51`).
+- **PRD** — seleksi tersimpan tak dibuang saat mount (`screens/PrdScreen.tsx:333-343`). Daftar memiliki
+  loading dan error (`:315,365-368`); isi memiliki error (`:224-227`).
+- **Tim** — filter kosong memiliki "Hapus filter" (`screens/TeamScreen.tsx:278-281,356-357`). Anggota yang
+  gagal dimuat tampil sebagai galat dengan Coba lagi (`:87-89,325-328`).
+- **Review dan Reconcile** — `ReconcileModal` gagal memuat tak lagi menampilkan "Tak ada konflik"; teks itu
+  hanya tampil bila `loadError` kosong (`screens/ReconcileModal.tsx:94,106-112`). `ReviewScreen`
+  mengubah 409 menjadi empty state, bukan galat merah (`:40-41`). Review belum punya aksi Merge/Buang.
+- **Auth dan Setup** — galat login dibedakan per penyebab: 401, 429, dan jaringan (`screens/AuthScreen.tsx:16-31`).
+  Galat setup selain 409 jatuh ke `failureMessage` (`:27`). Status 400 masih memuat "Password minimal 8 karakter"
+  (`:22`); sisanya ada di tindak lanjut.
+- **VPS** — preview di-reset saat pilihan item berubah (`screens/VpsChecklist.tsx:170-173`). Konfirmasi
+  menyebut item (`:193-204`). Galat `r.out` tampil di toast, tidak dibuang (`screens/VpsScreen.tsx:128,152`).
+- **Portal** — label ramah untuk kategori dan prioritas (`portal/labels.ts:4-18`) serta stage
+  (`portal/ClientPortal.tsx:23`). Pesan yang gagal terkirim ditandai "Gagal terkirim" (`portal/ChatPanel.tsx:101,190-196`).
+  Muat gagal dipisah dari "Belum ada pekerjaan" (`ClientPortal.tsx:180-185`; `portal/ChatPanel.test.tsx`).
+
+Lintas layar:
+
+- **Shell** — `ds/shell.tsx` merender tautan "Lewati ke konten" (`:138-154,224`) dan judul layar sebagai
+  `<h1>` (`:266-272`). `src/index.html:6` memakai `viewport-fit=cover`.
+- **Responsif** — tiga grid inline di `App.tsx` (`:577,595,618`) memakai kelas `hn-grid-mobile`, yang di
+  bawah 768px menjadi satu kolom (`app.css:287`).
+- **Konfirmasi dan galat** — `useConfirm` dipakai 34 berkas. `ConfirmDialog` menerima `impact` (daftar bebas)
+  dan `confirmLabel`. `lib/report-error.ts` menyediakan `errorMessage` dan `failureMessage`. Sisa
+  `.catch(() => {})` di kode non-test berjumlah 9 dan ada di tindak lanjut.
+- **FolderPicker** — baris folder berupa `<button>` native sehingga bisa difokus dengan keyboard
+  (`screens/FolderPicker.tsx:17-21`). "Pilih folder ini" aktif hanya bila draft sama dengan folder yang
+  dimuat dan tidak sedang memuat atau galat (`:62,68`; `test/folder-picker.test.tsx`).
+- **Performa** — `lib/snapshot-digest.ts` (`digestOf`, `applyIfChanged`) dipasang di `App.tsx` untuk frame
+  WS `sessions`, `leadAsks`, dan `pending`: frame yang isinya sama tak menyentuh state (`App.tsx:949-950,1007-1013`).
+  `specs` memakai `specsDigestOf` yang sudah ada (`:1000-1001`). Tulis scroll ke `localStorage` di-throttle
+  200 ms dan di-flush saat `scrollend` dan unmount (`ui-state/hooks.ts:66,84-107`). `index.html:8-9`
+  memakai `preconnect` untuk Google Fonts; `@import` di `ds/tokens/fonts.css:9` belum diubah.
+- **Design system** — token kontras, alias, dan aturan konfirmasi/error ada di
+  [design-system](../design-system/design-system.md#kontras-konfirmasi-dan-error-audit-uiux-2026-10--fase-1).
+
+Test baru Fase 1 (berkas tak terlacak di `main`): `test/app-snapshot-digest.test.tsx`,
+`test/backlog-delete-confirm.test.tsx`, `test/backlog-ui-audit.test.tsx`, `test/docs-save-guard.test.tsx`,
+`test/file-tree-keyboard.test.tsx`, `test/folder-picker.test.tsx`, `test/git-graph-destructive.test.tsx`,
+`test/ide-edit-guard.test.tsx`, `test/limit-indicator-a11y.test.tsx`, `test/notifications-mark-read.test.tsx`,
+`test/orchestration-panel.test.tsx`, `test/overview-screen.test.tsx`, `test/portal-labels.test.ts`,
+`test/report-error.test.ts`, `test/sched-lead-shared.test.tsx`, `test/shell-a11y.test.tsx`,
+`test/task-modal-busy.test.tsx`, `test/ui-audit-tokens.test.ts`, dan `lib/snapshot-digest.test.ts`.
+
 ## Kontrak responsive seluruh frontend (SPEC-763)
 
 Semua permukaan — seluruh `HN_NAV`, section transien App, Auth/setup, Modal/form, Pet Hanoman, Help

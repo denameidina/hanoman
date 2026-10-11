@@ -1,8 +1,9 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import type { MemberView, TaskStatus, TaskView } from "@hanoman/shared";
 import { TeamBoard } from "../src/screens/team-board";
 import { TEAM_COLUMNS, emptyBoard, type Board } from "../src/screens/team-rules";
+import { mockViewport, resetViewport } from "./viewport";
 
 const task = (over: Partial<TaskView> = {}): TaskView => ({
   id: "t1", projectId: "p", title: "Desain", detail: null, status: "backlog",
@@ -75,21 +76,34 @@ describe("TeamBoard · drag sungguhan", () => {
   });
 });
 
-/* Drag HTML5 mati total di keyboard dan di layar sentuh; di sana dua Select ini SATU-SATUNYA jalan. */
+/* Drag HTML5 mati total di keyboard dan di layar sentuh; jalur itu sekarang satu menu "Ubah…" per
+   kartu (Modal DS: fokus terkurung, Escape, fokus kembali). Audit 2026-10 menggantikan dua Select. */
 describe("TeamBoard · aksi eksplisit kartu", () => {
-  it("Pindah kolom mengirim mutasi yang sama dengan drag", () => {
+  it("Pindah kolom lewat menu mengirim mutasi yang sama dengan drag", () => {
     const { onMove } = board({ backlog: [task({ id: "a", title: "Desain" })] });
-    fireEvent.change(screen.getByLabelText("Pindah kolom: Desain"), { target: { value: "done" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pindah ke Selesai" }));
     expect(onMove.mock.calls[0]![1]).toBe("done");
   });
 
-  it("Tugaskan mengirim id anggota, dan kosong berarti null", () => {
+  it("kolom sendiri tak ditawarkan sebagai tujuan pindah", () => {
+    board({ backlog: [task({ id: "a", title: "Desain" })] });
+    fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
+    expect(screen.queryByRole("button", { name: "Pindah ke Menunggu" })).toBeNull();
+  });
+
+  it("Tugaskan lewat menu mengirim id anggota; Kosongkan penugasan mengirim null", () => {
     const { onAssign } = board({ backlog: [task({ id: "a", title: "Desain" })] });
-    const sel = screen.getByLabelText("Tugaskan: Desain");
-    fireEvent.change(sel, { target: { value: "a@x.id" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tugaskan ke Dena" }));
     expect(onAssign.mock.calls[0]![1]).toBe("a@x.id");
-    fireEvent.change(sel, { target: { value: "" } });
-    expect(onAssign.mock.calls[1]![1]).toBeNull();
+  });
+
+  it("Kosongkan penugasan mengirim null untuk kartu yang sudah ditugaskan", () => {
+    const { onAssign } = board({ backlog: [task({ id: "a", title: "Desain", memberId: "a@x.id" })] });
+    fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Kosongkan penugasan" }));
+    expect(onAssign.mock.calls[0]![1]).toBeNull();
   });
 
   it("judul membuka detail", () => {
@@ -129,16 +143,16 @@ describe("TeamBoard · isi kartu", () => {
       task({ id: "b", specId: "SPEC-9", spec: null }),
     ] });
     expect(screen.getByTestId("team-card-a")).toHaveTextContent("SPEC-1");
-    expect(screen.getByTestId("team-card-b")).toHaveTextContent("tautan putus");
+    expect(screen.getByTestId("team-card-b")).toHaveTextContent("spec tak ditemukan");
   });
 });
 
 /* SPEC-947 · jembatan ke dunia agen. Aksi eksplisit, bukan menu: drag mati di keyboard dan layar
    sentuh, dan alasan itu pula yang sudah melahirkan dua Select di kartu. */
 describe("TeamBoard · eskalasi", () => {
-  it("kartu belum tertaut membawa aksi Eskalasi", () => {
+  it("kartu belum tertaut membawa aksi Kirim ke Backlog", () => {
     const { onEscalate } = board({ backlog: [task({ id: "a" })] });
-    fireEvent.click(screen.getByRole("button", { name: /eskalasi.*desain/i }));
+    fireEvent.click(screen.getByRole("button", { name: /kirim ke backlog.*desain/i }));
     expect(onEscalate).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
   });
 
@@ -146,7 +160,7 @@ describe("TeamBoard · eskalasi", () => {
     const { onUnlink } = board({ backlog: [task({
       id: "a", specId: "SPEC-9", spec: { id: "SPEC-9", stage: "executing", priority: "tinggi" } })] });
     expect(screen.getByText("SPEC-9 · executing")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /eskalasi/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /kirim ke backlog/i })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /lepas tautan.*desain/i }));
     expect(onUnlink).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
   });
@@ -155,8 +169,46 @@ describe("TeamBoard · eskalasi", () => {
   // ulang: operator perlu melihat keadaan itu dulu.
   it("tautan putus merender lencananya + aksi Lepas tautan", () => {
     const { onUnlink } = board({ backlog: [task({ id: "a", specId: "SPEC-hantu", spec: null })] });
-    expect(screen.getByText(/tautan putus/i)).toBeInTheDocument();
+    expect(screen.getByText(/spec tak ditemukan/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /lepas tautan.*desain/i }));
     expect(onUnlink).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
+  });
+});
+
+// Audit UI/UX 2026-10 · kartu Tim: nama project (bukan id), lencana spec bisa diklik ke Backlog,
+// dan di mobile satu kolom per layar lewat pemilih kolom.
+describe("TeamBoard · audit 2026-10", () => {
+  afterEach(() => resetViewport());
+
+  it("kartu menampilkan nama project, dan id yang tak dikenal jatuh ke label netral", () => {
+    render(<TeamBoard board={{ ...emptyBoard(), backlog: [
+        task({ id: "a", projectId: "p" }), task({ id: "b", projectId: "hilang" }) ] }}
+      totals={zeros} columns={TEAM_COLUMNS} members={[]} projects={[{ id: "p", name: "Erp Toko" }]}
+      onMove={() => {}} onAssign={() => {}} onOpen={() => {}} onEscalate={() => {}} onUnlink={() => {}} />);
+    expect(screen.getByTestId("team-card-a")).toHaveTextContent("Erp Toko");
+    expect(screen.getByTestId("team-card-b")).toHaveTextContent("project tak dikenal");
+    expect(screen.getByTestId("team-card-b")).not.toHaveTextContent("hilang");
+  });
+
+  it("lencana spec yang tertaut membuka spec-nya di Backlog", () => {
+    const onOpenSpec = vi.fn();
+    render(<TeamBoard board={{ ...emptyBoard(), backlog: [
+        task({ id: "a", specId: "SPEC-9", spec: { id: "SPEC-9", stage: "executing", priority: "tinggi" } }) ] }}
+      totals={zeros} columns={TEAM_COLUMNS} members={[]} onMove={() => {}} onAssign={() => {}}
+      onOpen={() => {}} onEscalate={() => {}} onUnlink={() => {}} onOpenSpec={onOpenSpec} />);
+    fireEvent.click(screen.getByRole("button", { name: "Buka SPEC-9 di Backlog" }));
+    expect(onOpenSpec).toHaveBeenCalledWith("SPEC-9");
+  });
+
+  it("mobile: satu kolom per layar lewat pemilih kolom, bukan papan yang digeser", () => {
+    mockViewport(390);
+    render(<TeamBoard board={{ ...emptyBoard(), backlog: [task({ id: "a", title: "Desain" })] }}
+      totals={zeros} columns={TEAM_COLUMNS} members={[]} onMove={() => {}} onAssign={() => {}}
+      onOpen={() => {}} onEscalate={() => {}} onUnlink={() => {}} />);
+    expect(screen.getByTestId("team-board")).toHaveAttribute("data-layout", "mobile");
+    expect(screen.getByTestId("team-col-backlog")).toHaveTextContent("Desain");
+    expect(screen.queryByTestId("team-col-done")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /Selesai/ }));
+    expect(screen.getByTestId("team-col-done")).toHaveTextContent("Tak ada tugas di Selesai.");
   });
 });

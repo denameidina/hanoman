@@ -43,7 +43,10 @@ describe("ReviewScreen (SPEC-171)", () => {
   it("tab Source menampilkan content", async () => {
     render(<ReviewScreen specId="SPEC-171" title="X" onBack={() => {}} />);
     await screen.findByText("+new");
-    fireEvent.click(screen.getByText("source"));
+    const toggle = screen.getByRole("button", { name: "Sumber" });
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
     expect(await screen.findByText("new content")).toBeInTheDocument();
   });
 });
@@ -134,5 +137,25 @@ describe("ReviewScreen preview .md (SPEC-385)", () => {
     render(<ReviewScreen specId="SPEC-385" title="X" onBack={() => {}} />);
     await waitFor(() => expect(api.specReviewFile).toHaveBeenCalled());
     expect(screen.queryByRole("button", { name: /preview/i })).toBeNull();
+  });
+});
+
+describe("ReviewScreen · berkas gagal, legenda, CTA lanjut", () => {
+  it("gagal memuat berkas → galat + Coba lagi, bukan 'Memuat file…' selamanya", async () => {
+    (api.specReviewFile as any).mockRejectedValueOnce(new Error("boom"));
+    render(<ReviewScreen specId="SPEC-171" title="X" onBack={() => {}} />);
+    await screen.findByText("Gagal memuat berkas");
+    expect(screen.queryByText("Memuat file…")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    expect(await screen.findByText("+new")).toBeTruthy();
+  });
+
+  it("legenda A/M/D tampil dan CTA kembali ke backlog memanggil onBack", async () => {
+    const onBack = vi.fn();
+    render(<ReviewScreen specId="SPEC-171" title="X" onBack={onBack} />);
+    await screen.findByText("+new");
+    expect(screen.getByText(/A = baru · M = diubah · D = dihapus/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Kembali ke backlog" }));
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });

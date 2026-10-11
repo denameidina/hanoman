@@ -73,3 +73,38 @@ describe("SetupWizard (SPEC-884)", () => {
     expect(screen.getByText(/dipasang lewat env/)).toBeTruthy();
   });
 });
+
+describe("SetupWizard · penomoran jujur, Batal, dan alasan galat (audit)", () => {
+  it("setup pertama 1/3 (akun dibuat di layar ketiga); diulang dari Pengaturan 1/2", () => {
+    const { unmount } = render(<SetupWizard status={status()} onDone={() => {}} />);
+    expect(screen.getByText("hanoman · setup 1/3")).toBeTruthy();
+    unmount();
+    render(<SetupWizard status={{ ...status(), needed: false }} onDone={() => {}} />);
+    expect(screen.getByText("hanoman · setup 1/2")).toBeTruthy();
+  });
+
+  it("Batal hanya tampil bila diulang (onCancel diberikan)", () => {
+    const onCancel = vi.fn();
+    const { unmount } = render(<SetupWizard status={status()} onDone={() => {}} />);
+    expect(screen.queryByRole("button", { name: "Batal" })).toBeNull();
+    unmount();
+    render(<SetupWizard status={{ ...status(), needed: false }} onDone={() => {}} onCancel={onCancel} />);
+    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("galat simpan membawa alasan server, tak diganti kalimat generik", async () => {
+    vi.mocked(api.applySetup).mockRejectedValueOnce(new Error("disk penuh"));
+    render(<SetupWizard status={green(status())} onDone={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /Lanjut/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Simpan/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Gagal menyimpan setup: disk penuh");
+  });
+
+  it("tombol Simpan yang nonaktif menjelaskan alasannya (pengakuan risiko)", () => {
+    render(<SetupWizard status={status()} onDone={() => {}} />);
+    fireEvent.click(screen.getByLabelText("Diakses orang lain"));
+    fireEvent.click(screen.getByRole("button", { name: /Lanjut/ }));
+    expect(screen.getByText("Centang pernyataan risiko untuk melanjutkan tanpa hardening.")).toBeTruthy();
+  });
+});

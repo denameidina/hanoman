@@ -8,8 +8,10 @@ import { TASK_STATUSES, type TaskStatus, type TaskView } from "@hanoman/shared";
 /** Label kolom. `Record<TaskStatus, …>` supaya status baru = galat kompilasi, bukan kolom tanpa
     judul. Kolomnya lahir dari `TASK_STATUSES`, BUKAN daftar literal baru: `COLUMNS` milik
     `BacklogScreen` sudah jadi cermin kedua, dan yang ketiga akan drift. */
+// Audit 2026-10: kolom pertama "Menunggu", bukan "Backlog" — kata itu milik papan Backlog (item
+// sesi agen), dan dua papan dengan kolom bernama sama membuat operator salah pindah.
 const COLUMN_LABEL: Record<TaskStatus, string> = {
-  backlog: "Backlog", doing: "Dikerjakan", review: "Review", done: "Selesai",
+  backlog: "Menunggu", doing: "Dikerjakan", review: "Review", done: "Selesai",
 };
 
 export const TEAM_COLUMNS: { key: TaskStatus; label: string }[] =

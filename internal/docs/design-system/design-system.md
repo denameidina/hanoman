@@ -59,6 +59,47 @@ Escape/outside-click menutup, fokus kembali, dan menu mendukung Arrow/Home/End.
 Target responsif bukan menyederhanakan fitur: data, status, field penting, dan aksi yang tersedia di
 desktop wajib tetap dapat dicapai di tablet/mobile; yang berubah hanya susunan dan cara berpindah panel.
 
+## Kontras, konfirmasi, dan error (Audit UI/UX 2026-10 · Fase 1)
+
+Fase 1 [audit UI/UX](../frontend/ui-ux-audit-2026-10.md) menutup token yang gagal WCAG AA dan
+menetapkan aturan perilaku yang dulu dilanggar diam-diam. Nilai token dibaca dari
+`src/src/ds/tokens/colors.css`; rasio di komentar berkas itu dihitung dari hex, bukan diukur di browser.
+
+| token | nilai | alasan |
+|---|---|---|
+| `--text-subtle` | `#776853` (dulu `ink-400` `#90826c`) | 5,31:1 di kartu `#fffdf8`, 5,00:1 di page `#faf6ec`, 4,55:1 di panel `#f2ebdc`. Dipakai sebagai teks sekunder. |
+| `--amber-700` | `#8f5a0f` (baru) | Teks warning: 5,68:1 di kartu, 4,86:1 di panel, 4,80:1 di tint `--amber-100`. |
+| `--status-warn` | `var(--amber-700)` | Dipakai sebagai teks. Tint tetap `--amber-100`. |
+| `--amber-600` | `#b3771a` (tak berubah) | Hanya **fill** (titik, border). 3,7:1 di kartu; komentar `colors.css` melarangnya sebagai teks. |
+| `--border-strong` | `var(--ink-400)` (dulu `bone-400`) | Batas kontrol (input, checkbox, tombol secondary). `bone-400` 1,51:1 di kartu; `ink-400` 3,69:1 kartu, 3,48:1 page, 3,16:1 panel. WCAG 1.4.11 minimal 3:1. |
+| `--border-focus` | `var(--brass-600)` (dulu `brass-500`) | `brass-500` 2,99:1 di page. `brass-600` 4,83:1 kartu, 4,55:1 page, 4,14:1 panel, 3,60:1 di `--term-bg` (fokus di panel Dalang gelap). |
+| `--accent-on` | `var(--ink-900)` | Teks dan ikon tombol primer di atas `--accent` (brass-500): 5,74:1. Override putih di `app.css` (≈3,2:1) dihapus. Tombol danger tetap `#fff` lewat inline style di `ds/components/forms.tsx`. |
+
+Alias untuk nama yang dipakai TSX tetapi dulu tak terdefinisi (jatuh diam-diam ke `currentColor`):
+`--brass` → `brass-600`, `--danger` → `clay-600`, `--line` → `--border-hair`.
+
+Aturan:
+
+1. **Aksi destruktif memakai `useConfirm`.** Hapus, reset, kill sesi, buang ketikan, sign-out, dan
+   "Timpa" wajib lewat `ConfirmDialog` dengan nama objek, daftar dampak (`impact`, daftar bebas), dan
+   label aksi eksplisit (`confirmLabel`; default "Hapus"). Lihat juga bagian responsif di atas.
+   `window.confirm`, `window.prompt`, dan `window.alert` native tidak dipakai di layar; input nama
+   memakai `Modal` design system.
+2. **Tanpa `.catch(() => {})` kosong.** Kegagalan ditampilkan lewat `src/src/lib/report-error.ts`:
+   `errorMessage(err, fallback)` menormalkan pesan galat, dan `failureMessage(action, err)` menghasilkan
+   `Gagal <aksi>: <alasan>` untuk toast `err` dan blok error inline. Satu-satunya pengecualian adalah
+   akses `localStorage`. Daftar yang gagal dimuat tampil sebagai error, bukan sebagai empty state
+   ("Belum ada …"); pembedaan ini wajib di setiap daftar.
+3. **Viewport.** `src/index.html` memakai `viewport-fit=cover`. Tanpa itu `env(safe-area-inset-*)`
+   bernilai 0 dan token `--safe-*` tidak aktif.
+4. **Landmark shell.** `Shell` merender tautan "Lewati ke konten" sebagai elemen pertama yang muncul
+   saat difokus, dan judul layar sebagai `<h1>` dengan `margin: 0`.
+5. **Keluar fokus terminal.** Pane terminal meneruskan semua tombol ke pty. `Ctrl+Shift+Esc` melepas
+   fokus dari terminal (handler di `TerminalPane.tsx`, teks hint di sebelahnya).
+6. **Target sentuh pilihan.** Checkbox dan radio DS (`.hn-choice-target` / `.hn-choice-control`,
+   `ds/components/forms.tsx`) mendapat area 44×44 pada `(pointer: coarse), (max-width: 767px)`
+   (`app.css`). Checkbox/radio native tetap 24×24 di desktop; itu disengaja.
+
 ## Ikon (SPEC-906)
 
 Semua ikon dipanggil lewat `Icon` (`src/src/ds/icon.tsx`) dengan nama **kebab-case**, tak pernah

@@ -84,7 +84,7 @@ describe("portal klien bisa digulir (SPEC-626)", () => {
   it("daftar Help desk memakai scroller yang sama", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     await screen.findByTestId("portal-list");
-    fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /laporan/i }));
     const scroller = screen.getByTestId("portal-scroll");
     expect(scrolls(scroller)).toBe(true);
     expect(scrollerOf(await screen.findByTestId("portal-list"))).toBe(scroller);

@@ -38,6 +38,7 @@ import { ClientsScreen } from "./screens/ClientsScreen";
 import { presenceIndex } from "./screens/presence-map";
 import { specsDigestOf, toSlim } from "./lib/specs-digest";
 import { presenceKeyOf } from "./lib/presence-key";
+import { applyIfChanged } from "./lib/snapshot-digest";
 import { repoBasename, cloneErrorText } from "./screens/git-remote";
 import { parseSpecHash } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
@@ -528,7 +529,7 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
         <Select value={f.project} onChange={set("project")} style={{ width: "100%" }}
           options={projects.map((p) => ({ value: p.id, label: p.name }))} />
       </Field>
-      <Field label="Branch" hint="branch yang di-copy ke git worktree saat run">
+      <Field label="Branch" hint="branch yang disalin ke worktree (salinan kerja terpisah untuk sesi ini) saat sesi dimulai">
         <Select value={f.branchFrom} onChange={set("branchFrom")} disabled={!branches.length}
           style={{ width: "100%" }} options={branchOptions(branches, remoteOnly)} />
       </Field>
@@ -573,7 +574,7 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
             <HnTextarea aria-label="Selesai bila" value={f.done} onChange={set("done")} rows={2}
               placeholder="mis. output benchmark menunjukkan < 200 ms" />
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
             <Field label="Batasan" hint="opsional">
               <Input aria-label="Batasan" value={f.constraints} onChange={set("constraints")}
                 placeholder="mis. tanpa cache eksternal" style={{ width: "100%" }} />
@@ -591,7 +592,7 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
           <Field label="Langkah reproduksi">
             <HnTextarea value={f.steps} onChange={set("steps")} rows={3} mono placeholder={"1. Buka …\n2. Lakukan …\n3. Amati …"} />
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Diharapkan"><HnTextarea value={f.expected} onChange={set("expected")} rows={2} placeholder="mis. total funnel sama dengan jumlah baris laporan harian" /></Field>
             <Field label="Aktual"><HnTextarea value={f.actual} onChange={set("actual")} rows={2} placeholder="mis. total funnel dua kali lipat untuk sesi yang melewati tengah malam" /></Field>
           </div>
@@ -614,7 +615,7 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
             <HnTextarea value={f.outcome} onChange={set("outcome")} rows={2}
               placeholder={isAudit ? "Jawaban/kepastian yang dicari…" : "mis. satu badge di Overview menunjukkan jumlah sesi yang menunggu"} />
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
             <Field label="Batasan" hint="opsional">
               <Input value={f.constraints} onChange={set("constraints")} placeholder="mis. reuse queue yang ada" style={{ width: "100%" }} />
             </Field>
@@ -653,9 +654,9 @@ function NewProjectModal({ open, onClose, onCreate }:
     try { await onCreate(f); } finally { setBusy(false); }
   };
   const [picker, setPicker] = React.useState(false);
-  const submitLabel = scratch ? "Buat → brainstorm objective"
-    : clone ? (busy ? "Meng-clone…" : "Clone → reverse-engineer docs")
-    : "Tambah → reverse-engineer docs";
+  const submitLabel = scratch ? "Buat dan susun tujuan"
+    : clone ? (busy ? "Menyalin repo…" : "Salin repo dan susun dokumen")
+    : "Tambah dan susun dokumen";
   return (
     <Modal open={open} onClose={onClose} icon="box" eyebrow="workspace" title="Project baru"
       footer={<>
@@ -665,12 +666,12 @@ function NewProjectModal({ open, onClose, onCreate }:
       </>}>
       <div style={{ marginBottom: 16 }}>
         <Tabs variant="pill" value={f.kind} onChange={(v) => setF((s) => ({ ...s, kind: v }))} tabs={[
-          { value: "from-scratch", label: "From scratch", icon: "sparkles" },
-          { value: "existing", label: "Existing codebase", icon: "folder-git-2" },
+          { value: "from-scratch", label: "Dari nol", icon: "sparkles" },
+          { value: "existing", label: "Kode yang sudah ada", icon: "folder-git-2" },
         ]} />
         <div style={{ fontSize: 12, color: "var(--text-subtle)", marginTop: 8, lineHeight: 1.5 }}>
-          {scratch ? "hanoman brainstorm sampai MVP objective terkunci, lalu scaffold seluruh doc index sebagai Source of Truth."
-            : "hanoman reverse-engineer docs dari codebase yang ada, lalu menyusun Source of Truth-nya."}
+          {scratch ? "hanoman menggali ide sampai tujuan MVP disepakati (brainstorm), lalu membuat kerangka dokumen acuan (Source of Truth)."
+            : "hanoman membaca kode yang sudah ada, lalu menyusun dokumen acuan (Source of Truth) dari kode itu."}
         </div>
       </div>
       {scratch ? (
@@ -678,7 +679,7 @@ function NewProjectModal({ open, onClose, onCreate }:
           <Field label="Nama project" hint="lowercase, tanpa spasi">
             <Input value={f.name} onChange={set("name")} placeholder="mis. kirana" style={{ width: "100%" }} />
           </Field>
-          <Field label="Direktori" hint="folder tempat repo baru di-init (mesin ini)">
+          <Field label="Direktori" hint="folder tempat repo baru dibuat (mesin ini)">
             <div style={{ display: "flex", gap: 8 }}>
               <Input value={f.dir} onChange={set("dir")} leftIcon="folder" mono placeholder="/path/ke/project-baru" style={{ flex: 1 }} />
               <Button size="sm" variant="secondary" leftIcon="folder-open" onClick={() => setPicker(true)}>Pilih folder</Button>
@@ -686,7 +687,7 @@ function NewProjectModal({ open, onClose, onCreate }:
           </Field>
           <FolderPicker open={picker} onClose={() => setPicker(false)}
             start={f.dir} onPick={(p) => setF((s) => ({ ...s, dir: p }))} />
-          <Field label="Ide awal" hint="bahan brainstorm objective → jadi deskripsi & seed scaffold">
+          <Field label="Ide awal" hint="bahan awal brainstorm tujuan; menjadi deskripsi dan kerangka dokumen">
             <HnTextarea value={f.objective} onChange={set("objective")} rows={2} placeholder="mis. POS ritel dengan stok multi-gudang dan laporan harian" />
           </Field>
         </>
@@ -696,7 +697,7 @@ function NewProjectModal({ open, onClose, onCreate }:
           <div style={{ marginBottom: 12 }}>
             <Tabs variant="pill" value={f.mode} onChange={(v) => setF((s) => ({ ...s, mode: v as "local" | "clone" }))} tabs={[
               { value: "local", label: "Dari folder lokal", icon: "folder" },
-              { value: "clone", label: "Clone dari URL git", icon: "git-branch" },
+              { value: "clone", label: "Salin dari URL git", icon: "git-branch" },
             ]} />
           </div>
           {clone ? (
@@ -705,8 +706,8 @@ function NewProjectModal({ open, onClose, onCreate }:
                 placeholder="https://github.com/org/repo.git" style={{ width: "100%" }} />
             </Field>
           ) : null}
-          <Field label={clone ? "Folder tujuan clone" : "Direktori"}
-            hint={clone ? "path lokal tempat repo di-clone (mesin ini)" : "opsional · path checkout lokal (bisa diedit belakangan per-mesin)"}>
+          <Field label={clone ? "Folder tujuan salinan" : "Direktori"}
+            hint={clone ? "folder lokal tempat repo disalin (git clone) di mesin ini" : "opsional · folder checkout lokal (bisa diedit belakangan per-mesin)"}>
             <div style={{ display: "flex", gap: 8 }}>
               <Input value={f.dir} onChange={set("dir")} leftIcon="folder" mono placeholder="/path/ke/repo" style={{ flex: 1 }} />
               <Button size="sm" variant="secondary" leftIcon="folder-open" onClick={() => setPicker(true)}>Pilih folder</Button>
@@ -941,6 +942,13 @@ function AppInner() {
      (jebakan yang sama yang membuat muat awal presence duduk di ClientsScreen). */
   const [pending, setPending] = React.useState<PendingCounts | null>(null);
 
+  /* Audit UI/UX 2026-10 · frame `sessions`, `leadAsks`, `pending` hanya menyentuh state bila isinya
+     berbeda dari yang SEDANG tampil. Ref ini diperbarui tiap render, jadi perubahan lokal (mis. sesi
+     yang baru dimulai) ikut terhitung dan tak tertimpa frame identik. Tanpa ini tiap snapshot WS
+     me-render ulang App — dan HanomanPet serta modal di dalamnya — walau tak ada yang berubah. */
+  const shown = React.useRef({ sessions, leadAsks, pending });
+  shown.current = { sessions, leadAsks, pending };
+
   const load = React.useCallback(() => {
     setStatus("loading");
     Promise.all([api.listProjects(), api.listSpecs(), api.listTerminals()])
@@ -996,13 +1004,13 @@ function AppInner() {
         setDataVersion((v) => v + 1);
       }
     }
-    else if (m.t === "sessions") setSessions(m.sessions as TerminalSession[]);
-    else if (m.t === "leadAsks") setLeadAsks(m.asks);
+    else if (m.t === "sessions") applyIfChanged(shown.current.sessions, m.sessions as TerminalSession[], setSessions);
+    else if (m.t === "leadAsks") applyIfChanged(shown.current.leadAsks, m.asks, setLeadAsks);
     else if (m.t === "presence") {
       const next = { enabled: m.enabled, devices: m.devices, hubVersion: m.hubVersion };
       setPresence((cur) => (presenceKeyOf(cur) === presenceKeyOf(next) ? cur : next));
     }
-    else if (m.t === "pending") setPending(m.counts);
+    else if (m.t === "pending") applyIfChanged(shown.current.pending, m.counts, setPending);
   }), []);
 
   const proj = projectsView.find((p) => p.id === projectId) || projectsView[0];
@@ -1124,7 +1132,7 @@ function AppInner() {
         try {
           const { id } = await api.scaffoldDocs(created.id);
           setProjectId(created.id); openTerminal(id);
-          showToast(`Project ${created.id} dibuat · scaffold docs · sesi ${id} dimulai`, "ok", "sparkles");
+          showToast(`Project ${created.id} dibuat · buat kerangka dokumen · sesi ${id} dimulai`, "ok", "sparkles");
           return;
         } catch { /* jatuh ke layar project di bawah */ }
       }
@@ -1139,13 +1147,13 @@ function AppInner() {
     try {
       const { id } = await api.reverseDocs(created.id);
       openTerminal(id);
-      showToast(`Project ${created.id} dibuat · reverse docs · sesi ${id} dimulai`, "ok", "radar");
+      showToast(`Project ${created.id} dibuat · susun dokumen · sesi ${id} dimulai`, "ok", "radar");
     } catch (e) {
       // Project dipertahankan (cermin kegagalan clone di atas): mendarat di detail project, tempat
       // pintu "Reverse docs" jadi retry-nya — bukan Docs kosong yang tak menawarkan langkah apa pun.
       const detail = (e as { detail?: { error?: string } }).detail?.error;
       goProject(created.id);
-      showToast(`Project ${created.id} dibuat, tapi reverse docs gagal dimulai`
+      showToast(`Project ${created.id} dibuat, tapi susun dokumen gagal dimulai`
         + (detail ? ` · ${detail}` : "") + ` · ulangi lewat "Reverse docs"`, "warn", "radar");
     }
   }
@@ -1222,9 +1230,9 @@ function AppInner() {
     try {
       const { id } = await (force ? api.reverseDocs(p.id, { force }) : api.reverseDocs(p.id));
       openTerminal(id);
-      showToast(p.id + " · reverse docs · sesi " + id + " dimulai", "info", "radar");
+      showToast(p.id + " · susun dokumen · sesi " + id + " dimulai", "info", "radar");
     } catch (e) {
-      if (launchAdmission.offerRetry(e, `${p.id} · reverse docs`, (next) => reverseDocs(p, next))) return;
+      if (launchAdmission.offerRetry(e, `${p.id} · susun dokumen`, (next) => reverseDocs(p, next))) return;
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
       showToast(p.id + " · gagal mulai reverse" + (noRepo ? " · project belum punya repoDir" : ""), "warn", "x-circle");
     }
@@ -1235,9 +1243,9 @@ function AppInner() {
     try {
       const { id } = await (force ? api.scaffoldDocs(p.id, { force }) : api.scaffoldDocs(p.id));
       openTerminal(id);
-      showToast(p.id + " · scaffold docs · sesi " + id + " dimulai", "info", "sparkles");
+      showToast(p.id + " · buat kerangka dokumen · sesi " + id + " dimulai", "info", "sparkles");
     } catch (e) {
-      if (launchAdmission.offerRetry(e, `${p.id} · scaffold docs`, (next) => scaffoldDocs(p, next))) return;
+      if (launchAdmission.offerRetry(e, `${p.id} · buat kerangka dokumen`, (next) => scaffoldDocs(p, next))) return;
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
       showToast(p.id + " · gagal mulai scaffold" + (noRepo ? " · project belum punya repoDir" : ""), "warn", "x-circle");
     }
@@ -1266,7 +1274,7 @@ function AppInner() {
       openTerminal(id);
       showToast(`Breakdown · sesi ${id} dimulai`, "info", "split");
     } catch (e) {
-      if (launchAdmission.offerRetry(e, `${project} · breakdown`, (next) => startBreakdown(project, prdPath, next))) return;
+      if (launchAdmission.offerRetry(e, `${project} · pecah jadi backlog`, (next) => startBreakdown(project, prdPath, next))) return;
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
       showToast("gagal mulai breakdown" + (noRepo ? " · project belum punya repoDir/PRD" : ""), "warn", "x-circle");
     }
@@ -1277,10 +1285,10 @@ function AppInner() {
       const { created } = await api.createSpecsBatch({ project, items, prdPath });
       setBacklog((b) => [...created, ...b]);
       setSection("backlog");
-      showToast(`${created.length} backlog dibuat dari breakdown`, "ok", "list-checks");
+      showToast(`${created.length} backlog dibuat dari PRD`, "ok", "list-checks");
       return created.length;
     } catch {
-      showToast("Gagal membuat backlog dari breakdown", "err", "x-circle");
+      showToast("Gagal membuat backlog dari PRD", "err", "x-circle");
       return 0;
     }
   }
@@ -1426,6 +1434,9 @@ function AppInner() {
     }
   }
 
+  // Audit UI/UX 2026-10 · P0 aksi destruktif. Satu-satunya jalur hapus spec di App ini ialah
+  // `onDelete` BacklogScreen, dan konfirmasi (useConfirm, ADR-0127) dipasang DI SANA — fungsi ini
+  // hanya boleh dipanggil setelah pengguna menyetujui. Jangan mengirimkannya ke layar lain tanpa dialog.
   async function deleteSpec(spec: SpecSlim) {
     await api.deleteSpec(spec.id);
     setBacklog((b) => b.filter((s) => s.id !== spec.id));

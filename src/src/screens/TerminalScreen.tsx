@@ -1,8 +1,9 @@
 import React from "react";
 import { subscribeTick } from "../lib/shared-ticker";
-import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Badge, StatusPill,
+import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Badge, StatusPill, Callout,
   ProductStateIllustration, Tabs, OverflowActions, useResponsiveTier, useCoarsePointer, usePopoverFocus,
-  type OverflowItem } from "../ds";
+  useConfirm, useToast, Toast, type OverflowItem } from "../ds";
+import { failureMessage } from "../lib/report-error";
 import { api, ApiError, type TerminalSession, type Phase, type Flow } from "../api/client";
 import { subscribe } from "../api/events";
 import { flowForSource, sameTerminalWorkspace, type SessionHistoryView, type WorktreeCleanupView } from "@hanoman/shared";
@@ -18,7 +19,7 @@ import * as W from "./terminal-workspace";
 import { useTerminalWorkspace } from "./use-terminal-workspace";
 import { useLaunchAdmission } from "./use-launch-admission";
 import { usePersistedState, isStr, isBool, isNum } from "../ui-state";
-import { clampFontSize, inlineActionCount, shouldCollapseToTabs, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
+import { clampFontSize, shouldCollapseToTabs, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
   FONT_MIN, FONT_MAX, MIN_PANE_WIDTH } from "./terminal-chrome";
 import { chipAccessibleName, chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";
 
@@ -89,6 +90,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // tak ada request riwayat maupun elemen tambahan selama operator tak membukanya.
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const launchAdmission = useLaunchAdmission();
+  // Tutup sesi hidup menghentikan agen: selalu lewat dialog aplikasi, bukan confirm native.
+  const { confirm: confirmKill, dialog } = useConfirm();
   const tier = useResponsiveTier();
   const mobile = tier === "mobile";
   const layout = W.activeGroup(ws).layout;
@@ -122,12 +125,23 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   const handledFocus = React.useRef<string | null>(null);
 
   const [sessionsLoaded, setSessionsLoaded] = React.useState(false);
+  // Gagal memuat daftar tampil sebagai galat ber-"Coba lagi", bukan daftar kosong yang menyamar
+  // sebagai "belum ada sesi" (audit UI/UX).
+  const [listError, setListError] = React.useState<string | null>(null);
+  const [listAttempt, setListAttempt] = React.useState(0);
   React.useEffect(() => {
+    let alive = true;
     api.listTerminals().then((current) => {
+      if (!alive) return;
+      setListError(null);
       setSessions(current);
       setSessionsLoaded(true);
-    }).catch(() => {});
-  }, []);
+    }).catch((e: unknown) => {
+      if (alive) setListError(failureMessage("memuat daftar sesi", e));
+    });
+    return () => { alive = false; };
+  }, [listAttempt]);
+  const [toast, showToast] = useToast();
 
   // SPEC-199 · daftar sesi (`exited` + marker "menunggu keputusan") didorong lewat WS siar
   // (ADR-0039), bukan poll 8s. tmux = source of truth di server; snapshot penuh saat connect.
@@ -306,13 +320,34 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
     sessions.filter((s) => s.specId && !s.exited).map((s) => s.specId as string));
   const startable = backlog.filter((s) => s.stage !== "done" && !activeSpecIds.has(s.id));
 
-  // Tutup = kill sesi. Selnya dikosongkan oleh efek rekonsiliasi.
-  // SPEC-742 · ADR-0116 · sel dilepas LEBIH DULU, tak menunggu respons: begitu operator menekan
-  // Tutup, sesi itu selesai baginya. Tak ada risiko menyembunyikan sesi yang sebenarnya selamat —
-  // tmux tetap source of truth dan frame siar `sessions` (1 dtk) mengembalikannya bila DELETE gagal.
-  function close(id: string) {
+  // Tutup = kill sesi. SPEC-742 · ADR-0116 · sel dilepas LEBIH DULU, tak menunggu respons: begitu
+  // operator setuju, sesi itu selesai baginya. tmux tetap source of truth dan frame siar `sessions`
+  // (1 dtk) mengembalikan sel bila DELETE gagal. Gagal itu TIDAK lagi diam: operator diberi tahu.
+  function killSession(id: string) {
     setSessions((s) => s.filter((x) => x.id !== id));
-    void api.deleteTerminal(id).catch(() => {});
+    api.deleteTerminal(id).catch((e: unknown) => {
+      // 404 = sesinya sudah lenyap sendiri; tak ada yang perlu dilaporkan.
+      if (e instanceof ApiError && e.status === 404) return;
+      showToast(failureMessage(`menutup sesi ${id.slice(0, 6)}`, e), "err", "x-circle");
+    });
+  }
+  // Menutup sesi yang masih berjalan = menghentikan agennya, jadi selalu dikonfirmasi (tone danger).
+  // Nama sesi disebut di judul supaya dialog ini tak mungkin menutup sesi lain.
+  async function requestKill(id: string) {
+    const s = byId(id);
+    // Format sama dengan header sel ("label · id6") supaya dua sesi di project yang sama tetap beda.
+    const name = `${s ? cellLabel(s, nameOf, titleOf) : id} · ${id.slice(0, 6)}`;
+    const running = !!s && !s.exited;
+    const ok = await confirmKill({
+      title: `Tutup sesi "${name}"?`,
+      impact: [
+        running ? "Agen yang sedang berjalan di sesi ini akan dihentikan."
+          : "Sesi ini sudah berhenti, jadi tidak ada agen yang perlu dihentikan.",
+        "Worktree sesi ini ikut dibersihkan dari disk.",
+      ],
+      confirmLabel: "Tutup sesi", icon: "square", tone: "danger",
+    });
+    if (ok) killSession(id);
   }
 
   // SPEC-402 · kode keluar dari frame `exit` DISIMPAN, tak lagi dibuang: pane yang mati dengan
@@ -325,19 +360,21 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // SPEC-1267 · handler per-sel yang identitasnya stabil supaya `Cell` (React.memo) tak render ulang
   // tiap render layar. Isinya membaca `latest` saat dipanggil, jadi tak pernah basi.
   const current = {
-    close, detach: (id: string) => { void mutateWorkspace((c) => W.detach(c, id)); }, markExited, setFullId,
+    killSession, requestKill, detach: (id: string) => { void mutateWorkspace((c) => W.detach(c, id)); }, markExited, setFullId,
     props: { onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf },
   };
   const latest = React.useRef(current);
   latest.current = current;
   const cellHandlers = React.useRef(new Map<string, {
-    onClose: () => void; onDetach: () => void; onExit: (code: number) => void; onFullscreen: () => void;
+    onClose: () => void; onForget: () => void; onDetach: () => void; onExit: (code: number) => void;
+    onFullscreen: () => void;
   }>());
   const handlersFor = (id: string) => {
     let h = cellHandlers.current.get(id);
     if (!h) {
       h = {
-        onClose: () => void latest.current.close(id), onDetach: () => latest.current.detach(id),
+        onClose: () => void latest.current.requestKill(id), onForget: () => latest.current.killSession(id),
+        onDetach: () => latest.current.detach(id),
         onExit: (code) => latest.current.markExited(id, code), onFullscreen: () => latest.current.setFullId(id),
       };
       cellHandlers.current.set(id, h);
@@ -475,14 +512,6 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           onClick={() => setPredict((on) => !on)}>{predict ? "Matikan" : "Nyalakan"}</Button>
       </div>
       <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
-          Rekam jalur ketik (diagnostik — merekam setiap tombol)
-        </span>
-        <Button size="sm" variant="secondary" aria-pressed={diag}
-          aria-label={`${diag ? "Matikan" : "Nyalakan"} rekam jalur ketik`}
-          onClick={() => setDiag((on) => !on)}>{diag ? "Matikan" : "Nyalakan"}</Button>
-      </div>
-      <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span id="terminal-reset-grid-hint" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
           Kembalikan grid ke 1 kolom × 1 baris (sesi lain pindah ke "belum di grid")
         </span>
@@ -497,6 +526,21 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           onChange={(e) => setProject(e.target.value)}
           options={projects.map((p) => ({ value: p.id, label: p.name }))} />
       )}
+      {/* Diagnostik menyimpan pengaturan yang hanya dipakai saat menyelidiki masalah ketik. Tertutup
+          supaya kontrol harian tak tercampur dengannya; ia merekam setiap tombol yang ditekan. */}
+      <details style={{ borderTop: "1px solid var(--border-hair)", paddingTop: 8 }}>
+        <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--text-muted)" }}>
+          Diagnostik{diag ? " · perekaman aktif" : ""}
+        </summary>
+        <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+            Rekam jalur ketik — mencatat setiap tombol yang ditekan di pane. Nyalakan hanya saat menyelidiki masalah ketik.
+          </span>
+          <Button size="sm" variant="secondary" aria-pressed={diag}
+            aria-label={`${diag ? "Matikan" : "Nyalakan"} rekam jalur ketik`}
+            onClick={() => setDiag((on) => !on)}>{diag ? "Matikan" : "Nyalakan"}</Button>
+        </div>
+      </details>
     </div>
   );
 
@@ -568,7 +612,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
                 ? "Memuat layout server…"
                 : workspaceStatus === "recovering"
                   ? <><span>Layout server belum tersambung</span>{" "}
-                      <button type="button" onClick={() => void refreshWorkspace()}>Retry</button></>
+                      <button type="button" onClick={() => void refreshWorkspace()}>Coba lagi</button></>
                   : workspaceMessage ?? "Layout berubah di perangkat lain"}
             </span>
           )}
@@ -585,19 +629,20 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
             <>
               <Select size="sm" value={project} onChange={(e) => setProject(e.target.value)}
                 options={projects.map((p) => ({ value: p.id, label: p.name }))} />
-              <Button size="sm" variant="secondary" leftIcon="inbox"
+              <Button size="sm" variant="ghost" leftIcon="inbox"
                 onClick={() => { setPickError(null); setPicking(true); }}>Ambil backlog</Button>
-              <Button size="sm" variant="secondary" leftIcon="history"
+              <Button size="sm" variant="ghost" leftIcon="history"
                 title="Riwayat sesi yang sudah berlalu — buka kembali atau baca transkripnya"
                 onClick={() => setHistoryOpen(true)}>Riwayat</Button>
-              <Button size="sm" variant="secondary" leftIcon="terminal"
+              <Button size="sm" variant="ghost" leftIcon="terminal"
                 title="Buka shell tmux tanpa Claude di project terpilih — jalankan command di project"
                 onClick={() => void openShell()}>Terminal biasa</Button>
             </>
           )}
           {/* SPEC-517 · membuka form runtime dulu (agen · model · effort); sesinya lahir saat
               "Buka sesi" ditekan, dengan pilihan itu sebagai argv pane tmux. */}
-          <Button size="sm" leftIcon="plus" onClick={() => setNewOpen(true)}>Sesi baru</Button>
+          <Button size="sm" leftIcon="plus" title="Pilih runtime lalu buka sesi agen di direktori project. Agen berjalan dengan izin penuh (claude --dangerously-skip-permissions)."
+            onClick={() => setNewOpen(true)}>Sesi baru</Button>
           {/* SPEC-800 · di mobile & tablet-collapse aksi sekunder pindah ke satu panel supaya pane
               mendapat ruang layar terbesar; di grid penuh panel ini hanya memuat kontrol tampilan. */}
           <OverflowActions label={singlePane ? "Aksi terminal lain" : "Tampilan terminal"}
@@ -607,6 +652,14 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
             aria-pressed={maxed} onClick={() => setMaxed((m) => !m)} />
         </div>
       </div>
+
+      {listError && (
+        <Callout tone="err" title="Daftar sesi belum bisa dimuat" style={{ marginBottom: 8 }}>
+          <span>{listError} </span>
+          <button type="button" className="hn-terminal-action hn-terminal-action--text"
+            onClick={() => setListAttempt((n) => n + 1)}>Coba lagi</button>
+        </Callout>
+      )}
 
       {unplaced.length > 0 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -623,7 +676,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
                 {s.specId ?? nameOf(s.projectId)} · {s.id.slice(0, 6)}
               </button>
               <button type="button" className="hn-terminal-action" aria-label={`Tutup sesi ${s.id}`}
-                onClick={() => void close(s.id)}>×</button>
+                onClick={() => void requestKill(s.id)}>×</button>
             </span>
           ))}
         </div>
@@ -639,10 +692,12 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
       )}
 
       {showEmpty ? (
-        // Tanpa `action`: toolbar di atas sudah menawarkan "Sesi baru" — tombol kedua
-        // dengan label identik hanya duplikasi, bukan affordance tambahan.
-        <StateBlock kind="empty" icon="terminal" title="Belum ada sesi terminal"
-          hint="Pilih project lalu buka sesi — 'Sesi baru' menjalankan claude --dangerously-skip-permissions di direktori project; 'Terminal biasa' membuka shell tmux polos untuk menjalankan command." />
+        // Saat daftar gagal dimuat, "Belum ada sesi" akan berbohong: galat di atas yang bicara.
+        // Tanpa `action`: toolbar di atas sudah menawarkan "Sesi baru".
+        listError ? null : (
+          <StateBlock kind="empty" icon="terminal" title="Belum ada sesi terminal"
+            hint="Tekan Sesi baru untuk memulai agen di project terpilih, atau Terminal biasa untuk shell." />
+        )
       ) : (
         <div ref={gridRef} data-testid="terminal-grid" style={{
           flex: 1, minHeight: 0, display: "grid", gap: 8,
@@ -737,6 +792,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
           onClose={() => setFullId(null)} />
       )}
+      {dialog}
+      <Toast toast={toast} />
     </div>
   );
 }
@@ -848,27 +905,25 @@ function GroupTabs({ ws, compact = false, writable, onSelect, onAdd, onRename, o
   const [editing, setEditing] = React.useState<string | null>(null);
   const active = W.activeGroup(ws);
   const only = ws.groups.length === 1;
+  // Audit UI/UX Terminal · target sentuh kontrol grup: 24px pointer halus, 44px pointer kasar.
+  const coarse = useCoarsePointer();
+  const box = coarse ? 44 : 24;
+  const controlStyle: React.CSSProperties = { minWidth: box, minHeight: box, display: "inline-grid",
+    placeItems: "center", border: 0, padding: 0, background: "transparent", cursor: "pointer",
+    color: "var(--text-subtle)", fontSize: 12, font: "inherit" };
 
   return (
-    <div role="tablist" aria-label="Grup terminal"
-      style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap",
-        // Baris digabung → garis bawah tabbar akan memotong baris chrome di tengah.
-        ...(compact ? {} : { borderBottom: "1px solid var(--border-hair)", paddingBottom: 4 }) }}>
-      {ws.groups.map((g, index) => {
-        const isActive = g.id === active.id;
-        if (editing === g.id)
-          return <RenameInput key={g.id} initial={g.name}
-            onCommit={(name) => { if (name.trim()) onRename(g.id, name.trim()); setEditing(null); }}
-            onCancel={() => setEditing(null)} />;
-        return (
-          <span key={g.id} style={{
-            display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 6px",
-            borderRadius: "var(--radius-sm)", fontSize: 12,
-            background: isActive ? "var(--bone-200)" : "transparent",
-            border: `1px solid ${isActive ? "var(--border-hair)" : "transparent"}`,
-          }}>
-            <button className="hn-terminal-group-control" role="tab" aria-selected={isActive} tabIndex={isActive ? 0 : -1}
-              onClick={() => onSelect(g.id)}
+    <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap",
+      // Baris digabung → garis bawah tabbar akan memotong baris chrome di tengah.
+      ...(compact ? {} : { borderBottom: "1px solid var(--border-hair)", paddingBottom: 4 }) }}>
+      {/* Hanya tab di dalam tablist: ARIA mengharapkan anak tablist berupa tab saja. Kontrol ubah,
+          hapus, dan grup baru duduk di luarnya. */}
+      <div role="tablist" aria-label="Grup terminal" style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+        {ws.groups.map((g, index) => {
+          const isActive = g.id === active.id;
+          return (
+            <button key={g.id} type="button" role="tab" aria-selected={isActive} tabIndex={isActive ? 0 : -1}
+              className="hn-terminal-group-control" onClick={() => onSelect(g.id)}
               onKeyDown={(event) => {
                 let next: number | null = null;
                 if (event.key === "ArrowRight") next = (index + 1) % ws.groups.length;
@@ -881,27 +936,33 @@ function GroupTabs({ ws, compact = false, writable, onSelect, onAdd, onRename, o
                 event.currentTarget.closest('[role="tablist"]')
                   ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
               }}
-              style={{ border: 0, padding: 0, background: "transparent", font: "inherit", cursor: "pointer", color: isActive ? "var(--text-strong)" : "var(--text-muted)" }}>
+              style={{ minHeight: box, padding: "3px 6px", borderRadius: "var(--radius-sm)", fontSize: 12,
+                font: "inherit", cursor: "pointer", background: isActive ? "var(--bone-200)" : "transparent",
+                border: `1px solid ${isActive ? "var(--border-hair)" : "transparent"}`,
+                color: isActive ? "var(--text-strong)" : "var(--text-muted)" }}>
               {g.name}
             </button>
-            {isActive && writable && (
-              <>
-                <button className="hn-terminal-group-control" aria-label={`Ganti nama grup ${g.name}`} title="Ganti nama"
-                  onClick={() => setEditing(g.id)}
-                  style={{ border: 0, padding: 0, background: "transparent", cursor: "pointer", color: "var(--text-subtle)", fontSize: 10 }}>✎</button>
-                <button className="hn-terminal-group-control" aria-label={`Hapus grup ${g.name}`}
-                  title={only ? "Grup terakhir tak bisa dihapus" : "Hapus grup (sesi tetap hidup)"}
-                  disabled={only} onClick={() => onRemove(g.id)}
-                  style={{ border: 0, padding: 0, background: "transparent", cursor: only ? "not-allowed" : "pointer",
-                    color: "var(--text-subtle)", opacity: only ? 0.35 : 1 }}>×</button>
-              </>
-            )}
+          );
+        })}
+      </div>
+      {writable && (editing === active.id
+        ? <RenameInput key={active.id} initial={active.name}
+            onCommit={(name) => { if (name.trim()) onRename(active.id, name.trim()); setEditing(null); }}
+            onCancel={() => setEditing(null)} />
+        : (
+          <span role="group" aria-label={`Kelola grup ${active.name}`} style={{ display: "inline-flex", alignItems: "center" }}>
+            <button type="button" className="hn-terminal-group-control" aria-label={`Ganti nama grup ${active.name}`}
+              title="Ganti nama" onClick={() => setEditing(active.id)}
+              style={{ ...controlStyle, color: "var(--text-subtle)" }}>✎</button>
+            <button type="button" className="hn-terminal-group-control" aria-label={`Hapus grup ${active.name}`}
+              title={only ? "Grup terakhir tak bisa dihapus" : "Hapus grup (sesi tetap hidup)"}
+              disabled={only} onClick={() => onRemove(active.id)}
+              style={{ ...controlStyle, cursor: only ? "not-allowed" : "pointer", opacity: only ? 0.35 : 1 }}>×</button>
           </span>
-        );
-      })}
-      <button className="hn-terminal-group-control" aria-label="Grup baru" title="Grup baru"
+        ))}
+      <button type="button" className="hn-terminal-group-control" aria-label="Grup baru" title="Grup baru"
         disabled={!writable} onClick={onAdd}
-        style={{ border: 0, background: "transparent", cursor: "pointer", padding: "3px 8px", color: "var(--text-subtle)", fontSize: 12 }}>+</button>
+        style={{ ...controlStyle, padding: "0 8px", minWidth: box, opacity: writable ? 1 : 0.5 }}>+</button>
     </div>
   );
 }
@@ -1114,9 +1175,9 @@ export function PhaseStrip({ phases, compact = false, now }: {
 
 const Cell = React.memo(CellImpl);
 
-function CellImpl({ session, nameOf, onClose, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen, paneHidden }: {
+function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen, paneHidden }: {
   session: TerminalSession; nameOf: (pid: string) => string;
-  onClose: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
+  onClose: () => void; onForget: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
   onReview?: (specId: string) => void;
   onSessionReview?: (sessionId: string, title: string) => void;
   titleOf?: (specId: string) => string | undefined;
@@ -1129,19 +1190,17 @@ function CellImpl({ session, nameOf, onClose, canArrange, onDetach, onExit, onRe
   fullscreen: boolean; onFullscreen: () => void; paneHidden?: boolean;
 }) {
   const [phases, setPhases] = React.useState<Phase[] | null>(null);
-  // SPEC-800 · yang menentukan bukan lebar viewport melainkan lebar SEL: grid 4 kolom di desktop
-  // 1440px memberi tiap sel ~340px, lebih sempit daripada satu pane di ponsel 390px. Selnya
-  // `overflow: hidden`, jadi aksi yang tak muat bukan cuma tak terbaca — ia tak bisa diklik.
-  const headerRef = React.useRef<HTMLDivElement>(null);
-  const [headerWidth, setHeaderWidth] = React.useState(Number.POSITIVE_INFINITY);
-  const coarse = useCoarsePointer();
+  // SPEC-800 · yang menentukan strip fase ringkas adalah lebar SEL, bukan viewport: sel sempit
+  // (grid 4 kolom di desktop) butuh chip ringkas agar tak terpotong `overflow: hidden`.
+  const bodyRef = React.useRef<HTMLDivElement>(null);
+  const [bodyWidth, setBodyWidth] = React.useState(Number.POSITIVE_INFINITY);
   React.useEffect(() => {
-    const el = headerRef.current;
-    // jsdom tak punya ResizeObserver; lebar yang tak terukur = semua aksi inline (perilaku lama).
+    const el = bodyRef.current;
+    // jsdom tak punya ResizeObserver; lebar yang tak terukur = tampilan lengkap (perilaku lama).
     if (!el || typeof ResizeObserver !== "function") return;
     const ro = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width ?? el.getBoundingClientRect().width;
-      if (width > 0) setHeaderWidth(width);
+      if (width > 0) setBodyWidth(width);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -1180,101 +1239,46 @@ function CellImpl({ session, nameOf, onClose, canArrange, onDetach, onExit, onRe
   const stateIllustration = failed ? null
     : session.exited || finished ? "PST-005"
       : attention ? "PST-004" : "PST-003";
-  // Aksi yang boleh runtuh; `Layar penuh` + `Tutup` sengaja di luar daftar ini karena keduanya
-  // jalan keluar, bukan aksi tambahan. `render` = bentuk inline-nya, sisanya kontrak overflow.
-  const collapsible: (OverflowItem & { render: React.ReactNode })[] = [
+  // Aksi sekunder dikumpulkan di satu menu ⋯ dengan label teks (audit UI/UX). Ikon-saja di header sel
+  // yang sempit tak terbaca, dan tak punya nama bagi pembaca layar. "Tutup" tetap di luar menu: ia
+  // satu-satunya aksi yang menghentikan agen, jadi ia berdiri sendiri dan dikonfirmasi.
+  const menuItems: OverflowItem[] = [
     ...(session.specId ? [{
       key: "docs", label: "Lihat dokumen", icon: "file-text",
       title: "Lihat dokumen (audit/spec/plan)", onSelect: () => setDocs(true),
-      render: (
-        <button type="button" key="docs" className="hn-terminal-action" onClick={() => setDocs(true)}
-          aria-label={`Lihat dokumen sesi ${session.id}`} title="Lihat dokumen (audit/spec/plan)">
-          <Icon name="file-text" size={12} />
-        </button>
-      ),
     }] : []),
     ...(session.specId && onReview ? [{
       key: "review", label: "Review perubahan", icon: "git-compare",
       title: "Review perubahan (diff worktree)", onSelect: () => onReview(session.specId!),
-      render: (
-        <button type="button" key="review" className="hn-terminal-action" onClick={() => onReview(session.specId!)}
-          aria-label={`Review sesi ${session.id}`} title="Review perubahan (diff worktree)">
-          <Icon name="git-compare" size={12} />
-        </button>
-      ),
     }] : []),
     // SPEC-230 · review diff worktree sesi project-level (PRD, tanpa Spec).
     ...(branchSession && onSessionReview ? [{
       key: "review-session", label: "Review perubahan", icon: "git-compare",
       title: "Review perubahan (diff worktree sesi)", onSelect: () => onSessionReview(session.id, label),
-      render: (
-        <button type="button" key="review-session" className="hn-terminal-action"
-          onClick={() => onSessionReview(session.id, label)}
-          aria-label={`Review sesi ${session.id}`} title="Review perubahan (diff worktree sesi)">
-          <Icon name="git-compare" size={12} />
-        </button>
-      ),
     }] : []),
     // SPEC-175 · rebase/merge branch hasil spec (muncul hanya bila spec-nya dikenal).
     ...(spec && onIntegrate ? [{
       key: "integrate", label: "Rebase / Merge branch", icon: "git-merge",
       title: "Rebase / Merge branch spec", onSelect: () => setIntegrate(true),
-      render: (
-        <button type="button" key="integrate" className="hn-terminal-action" onClick={() => setIntegrate(true)}
-          aria-label={`Integrasikan sesi ${session.id}`} title="Rebase / Merge branch spec">
-          <Icon name="git-merge" size={12} />
-        </button>
-      ),
     }] : []),
     // SPEC-230 · rebase/merge branch sesi project-level (PRD prd/<slug>).
     ...(branchSession && onIntegrateSession ? [{
       key: "integrate-session", label: "Rebase / Merge branch", icon: "git-merge",
       title: "Rebase / Merge branch sesi", onSelect: () => setSessIntegrate(true),
-      render: (
-        <button type="button" key="integrate-session" className="hn-terminal-action"
-          onClick={() => setSessIntegrate(true)}
-          aria-label={`Integrasikan sesi ${session.id}`} title="Rebase / Merge branch sesi">
-          <Icon name="git-merge" size={12} />
-        </button>
-      ),
     }] : []),
     {
       key: "detach", label: "Lepas dari grid", icon: "unlink", disabled: !canArrange,
       title: "Lepas dari grid (sesi tetap hidup)", onSelect: onDetach,
-      render: (
-        <button type="button" key="detach" className="hn-terminal-action hn-terminal-action--text"
-          onClick={onDetach} disabled={!canArrange}
-          title="Lepas dari grid (sesi tetap hidup)">lepas</button>
-      ),
     },
     // SPEC-232 · lihat SATU terminal ini secara penuh dalam modal.
     {
       key: "fullscreen", label: "Layar penuh", icon: "fullscreen",
       title: "Layar penuh — fokus 1 terminal", onSelect: onFullscreen,
-      render: (
-        <button type="button" key="fullscreen" className="hn-terminal-action" onClick={onFullscreen}
-          title="Layar penuh — fokus 1 terminal" aria-label={`Layar penuh sesi ${session.id}`}>
-          <Icon name="fullscreen" size={12} />
-        </button>
-      ),
-    },
-    {
-      key: "close", label: "Tutup", icon: "x", title: "Tutup sesi", onSelect: onClose,
-      render: (
-        <button type="button" key="close" className="hn-terminal-action" aria-label={`Tutup sesi ${session.id}`}
-          onClick={onClose}>×</button>
-      ),
     },
   ];
-  // Chip orchestrator, pil status, dan tombol teks `lepas` melebihi slot ikon; tanpa reserve ini
-  // aksinya terpotong `overflow: hidden` sel alih-alih runtuh ke menu overflow.
-  const reservePx = 40 + (session.orchestrated && session.model ? 110 : 0)
-    + (session.exited || finished ? 110 : 0) + (deciding || (awaiting && !finished) ? 130 : 0);
-  const inline = inlineActionCount(headerWidth, collapsible.length, coarse ? 44 : 28, reservePx);
-  const hidden = collapsible.slice(inline);
   return (
     <>
-      <div ref={headerRef} className="hn-terminal-cell-header" style={{
+      <div className="hn-terminal-cell-header" style={{
         display: "flex", alignItems: "center", gap: 8, padding: "4px 8px", flex: "0 0 auto",
         background: failed ? "var(--status-err-tint)"
           : session.exited || finished ? "var(--status-ok-tint)"
@@ -1307,15 +1311,14 @@ function CellImpl({ session, nameOf, onClose, canArrange, onDetach, onExit, onRe
             ADR-0074), jadi membiarkan `awaiting` menang mengulang bug ini untuk separuh agen. */}
         {deciding && !finished && <StatusPill status="running" size="sm">Lead memutuskan</StatusPill>}
         {awaiting && !deciding && !finished && <StatusPill status="awaiting" size="sm" />}
-        {/* Aksi sel duduk di klaster ber-gap sendiri (lebih rapat dari gap header): tombolnya
-            sudah punya target sentuh 28/44px, jadi jarak antar-tombol tak perlu selebar jarak
-            label↔status. Angkanya dicerminkan `ACTION_GAP` supaya aritmetika kolaps ikut. */}
-        <span className="hn-terminal-actions">
-          {collapsible.slice(0, inline).map((action) => action.render)}
-          {hidden.length > 0 && (
-            <OverflowActions label={`Aksi lain sesi ${session.id}`}
-              items={hidden.map(({ render: _render, ...item }) => item)} />
-          )}
+        {/* Aksi sel: satu menu ⋯ untuk aksi sekunder, lalu "Tutup" yang berdiri sendiri. Tutup
+            menghentikan agen, jadi ia selalu lewat konfirmasi (`onClose` = requestKill). */}
+        <span className="hn-terminal-actions" style={{ display: "inline-flex", alignItems: "center", gap: 2, flex: "0 0 auto" }}>
+          <OverflowActions label={`Aksi sesi ${session.id}`} items={menuItems} />
+          <button type="button" className="hn-terminal-action" aria-label={`Tutup sesi ${session.id}`}
+            title="Tutup sesi (dikonfirmasi dulu)" onClick={onClose}>
+            <Icon name="x" size={12} />
+          </button>
         </span>
       </div>
       {/* Sesi berakhir (SPEC-188): badan diredupkan agar terbaca beku; header + badge
@@ -1323,9 +1326,9 @@ function CellImpl({ session, nameOf, onClose, canArrange, onDetach, onExit, onRe
           ADR-0164 review 2 · `position: relative` di sini (bukan di wrapper `phase-strip`) jadi
           containing block panel detail fase: tinggi = strip + pane, selalu definit dan selalu
           di dalam sel (yang `overflow: hidden`), jadi panel tak bisa lagi meluber ke luar sel. */}
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0,
-        position: "relative", opacity: session.exited ? 0.6 : 1 }}>
-        <PhaseStrip phases={phases} compact={headerWidth < 480} />
+      <div ref={bodyRef} style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, position: "relative" }}>
+        {session.exited && <SessionEndedBanner />}
+        <PhaseStrip phases={phases} compact={bodyWidth < 480} />
         {/* key = identitas sesi: pindah antar sel memindah subtree, bukan me-remount WebSocket.
             SPEC-232 · saat sel ini sedang layar-penuh, pane-nya dilepas (placeholder) supaya
             hanya modal yang meng-attach tmux — jaga invariant satu sesi = satu attach. */}
@@ -1336,7 +1339,8 @@ function CellImpl({ session, nameOf, onClose, canArrange, onDetach, onExit, onRe
                 Terbuka di layar penuh
               </div>
             : <TerminalPane key={session.id} sessionId={session.id} onExit={onExit} onPhases={onPhases}
-                fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} hidden={paneHidden} />}
+                fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} hidden={paneHidden}
+                onForget={onForget} />}
         </div>
       </div>
       {docs && session.specId && <SpecDocsModal specId={session.specId} onClose={() => setDocs(false)} />}
@@ -1355,6 +1359,24 @@ function CellImpl({ session, nameOf, onClose, canArrange, onDetach, onExit, onRe
   );
 }
 
+// Sesi berakhir (SPEC-188). Dulu seluruh badan diredupkan `opacity: .6`, yang menurunkan kontras
+// teks output di bawah ambang yang terbaca (audit UI/UX). Sekarang badan tetap penuh kontras dan
+// keadaan "berakhir" disampaikan lewat banner sendiri; pill "Selesai"/"Gagal" di header tetap ada.
+function SessionEndedBanner() {
+  return (
+    <div role="status" data-testid="terminal-ended" style={{
+      display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto", padding: "4px 8px",
+      background: "var(--bone-200)", borderBottom: "1px solid var(--border-hair)",
+      fontSize: 11, color: "var(--text-strong)",
+    }}>
+      <strong style={{ fontWeight: 600 }}>Berakhir</strong>
+      <span style={{ color: "var(--text-body)" }}>
+        Agen sudah berhenti. Output tetap bisa dibaca; tutup sel bila tak diperlukan lagi.
+      </span>
+    </div>
+  );
+}
+
 // SPEC-232 · fullscreen SATU terminal sebagai modal. Pane-nya hidup di sini; sel asalnya
 // menampilkan placeholder (lihat Cell) supaya tmux tetap satu attach. closeOnEscape=false:
 // Escape tombol tersibuk TUI Claude Code — keluar via × / backdrop saja (sejalan maximize-grid,
@@ -1365,8 +1387,8 @@ function FullscreenTerminal({ session, label, fontSize, showKeys, predict, diag,
 }) {
   return (
     <Modal open icon="terminal" title={label} onClose={onClose} closeOnEscape={false} width={1600}>
-      <div style={{ height: "min(72vh, calc(100dvh - 180px))", minHeight: 0, display: "flex", flexDirection: "column",
-        opacity: session.exited ? 0.6 : 1 }}>
+      <div style={{ height: "min(72vh, calc(100dvh - 180px))", minHeight: 0, display: "flex", flexDirection: "column" }}>
+        {session.exited && <SessionEndedBanner />}
         <TerminalPane key={session.id} sessionId={session.id} onExit={() => {}}
           fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} />
       </div>

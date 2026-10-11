@@ -7,9 +7,9 @@ import { isTerminalResponse, paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { useInstance, useWsTarget } from "../api/instance";
-import { useCoarsePointer } from "../ds";
+import { useCoarsePointer, useConfirm } from "../ds";
 import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
-import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
+import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, isFocusEscape, TERMINAL_KEYS } from "./terminal-chrome";
 import * as P from "./terminal-predict";
 import * as D from "./terminal-diag";
 import { TerminalComposer } from "./TerminalComposer";
@@ -52,7 +52,7 @@ type LinkState =
 export const TerminalPane = React.memo(TerminalPaneImpl);
 
 function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
-  predict = true, diag = false, mode = "local", hidden = false }: {
+  predict = true, diag = false, mode = "local", hidden = false, onForget }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
@@ -73,6 +73,9 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   // SPEC-1267 · pane display:none tak mem-parse keluaran: ditahan di ring 256 KB dan diputar ulang
   // (atau digambar ulang tmux bila ring meluap) saat tampil kembali.
   hidden?: boolean;
+  // Sesi sudah lenyap dari tmux (status "gone"): pemilik sel boleh melepasnya. Tanpa prop ini strip
+  // hanya menyatakan keadaan, dan sel tak punya jalan keluar selain tombol header.
+  onForget?: () => void;
 }) {
   const wsTarget = useWsTarget(`terminal:${sessionId}`);
   const instance = useInstance();
@@ -95,7 +98,13 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   coarseRef.current = coarse;
   const ring = React.useRef(createHiddenRing());
   const resync = React.useRef<() => void>(() => {});
-  const view = React.useRef<{ term: Terminal; fit: FitAddon; sendSize: (force?: boolean) => void } | null>(null);
+  const view = React.useRef<{ term: Terminal; fit: FitAddon; sendSize: (force?: boolean) => void;
+    leave: () => void } | null>(null);
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  // Fokus xterm di dalam pane: hanya untuk memunculkan jalan keluar yang terlihat (tombol di bawah).
+  const [inTerminal, setInTerminal] = React.useState(false);
+  // Buang ketikan tertahan wajib dikonfirmasi: teks yang dibuang tak bisa dipulihkan.
+  const { confirm: confirmDiscard, dialog } = useConfirm();
   // onExit boleh berubah tiap render; menaruhnya di ref menjaga effect ini
   // hanya bergantung pada sessionId — remount = sesi yang benar-benar berbeda.
   const exitRef = React.useRef(onExit);
@@ -149,7 +158,23 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       // selamanya false, dan wiring salin SPEC-289 tak pernah punya apa pun untuk disalin.
       // Mematikan `mouse on` bukan alternatif: TUI claude menyalakan mode yang sama sendiri.
       macOptionClickForcesSelection: true,
-      theme: { background: token("--term-bg", "#1c1810"), foreground: token("--term-fg", "#e9e0cd") },
+      // Audit UI/UX Terminal · minimum kontras WCAG AA (4.5): xterm menaikkan warna ANSI yang terlalu
+      // redup di atas latar gelap, dan warna yang sudah cukup terbaca tak disentuh.
+      minimumContrastRatio: 4.5,
+      // ANSI diambil dari palet token, bukan default xterm yang tak ikut tema hanoman. Palet ini tak
+      // punya warna cyan/magenta khusus, jadi dua slot dipinjam dari token terdekat.
+      theme: {
+        background: token("--term-bg", "#1c1810"), foreground: token("--term-fg", "#e9e0cd"),
+        cursor: token("--term-fg", "#e9e0cd"),
+        black: token("--ink-900", "#17130c"), red: token("--clay-500", "#bd4a3a"),
+        green: token("--leaf-500", "#5f8340"), yellow: token("--amber-500", "#cf8f28"),
+        blue: token("--wind-600", "#3f6e7a"), magenta: token("--brass-400", "#cf9d55"),
+        cyan: token("--wind-500", "#517f8c"), white: token("--bone-300", "#e8dfcc"),
+        brightBlack: token("--ink-400", "#90826c"), brightRed: token("--clay-500", "#bd4a3a"),
+        brightGreen: token("--leaf-500", "#5f8340"), brightYellow: token("--amber-500", "#cf8f28"),
+        brightBlue: token("--wind-500", "#517f8c"), brightMagenta: token("--brass-300", "#e3c988"),
+        brightCyan: token("--wind-500", "#517f8c"), brightWhite: token("--bone-000", "#fffdf8"),
+      },
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
@@ -189,7 +214,9 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       lastSentSize = size;
       send({ t: "resize", cols: term.cols, rows: term.rows });
     };
-    view.current = { term, fit, sendSize };
+    // Fokus pindah ke akar pane (bisa difokus lewat kode, tak masuk urutan Tab): dari sana Tab
+    // melanjutkan ke kontrol berikutnya di DOM, bukan kembali ke xterm.
+    view.current = { term, fit, sendSize, leave: () => { term.textarea?.blur(); rootRef.current?.focus(); } };
     // Perekam diagnostik. Selalu DIBUAT, tapi `rec` diam total selama sakelarnya mati — dengan
     // begitu menyalakannya tak perlu melahirkan socket baru, sama seperti sakelar prediksi.
     const diagRec = D.createDiagRecorder({
@@ -483,7 +510,14 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       clearTimeout(clipErrTimer);
       clipErrTimer = setTimeout(() => setClipErr(null), 2600);
     };
+    // Jalan keluar keyboard (audit UI/UX Terminal · keyboard trap): xterm menelan Tab dan Esc sebagai
+    // input pty, jadi tanpa ini fokus tak bisa pindah ke luar pane memakai keyboard. Hanya kombinasi
+    // ini yang tak dikirim ke pty; Esc polos tetap sampai ke agen.
     term.attachCustomKeyEventHandler((e) => {
+      if (isFocusEscape(e)) {
+        if (e.type === "keydown") view.current?.leave();
+        return false;
+      }
       const intent = clipboardIntent(e, term.hasSelection());
       if (intent === "copy") {
         void navigator.clipboard?.writeText(term.getSelection())
@@ -791,8 +825,18 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     current.sendSize(true);
   }, [showKeys, mode, showComposer, voice.supported]);
 
+  // Buang = membuang teks yang belum pernah sampai ke agen. Tak bisa dipulihkan, jadi dikonfirmasi.
+  const discardHeld = async () => {
+    const ok = await confirmDiscard({
+      title: `Buang ${queue.n} ketikan yang tertahan?`,
+      impact: ["Teks itu belum dikirim ke sesi dan tidak bisa diambil lagi."],
+      confirmLabel: "Buang ketikan", icon: "trash-2", tone: "danger",
+    });
+    if (ok) dropHeld.current();
+  };
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+    <div ref={rootRef} tabIndex={-1} style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, outline: "none" }}>
       {/* Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya.
           SPEC-878 · strip juga bicara saat sambungan sehat: antrean yang ditahan karena memuat
           Enter adalah keputusan yang menunggu operator, bukan keadaan koneksi. */}
@@ -805,7 +849,13 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
           color: "var(--text-body)",
         }}>
           {link.state === "retrying" && <span>menyambung ulang… ({link.attempt}/{RECONNECT_MAX})</span>}
-          {link.state === "gone" && <span>sesi tidak ditemukan di tmux</span>}
+          {link.state === "gone" && <>
+            <span>sesi sudah tidak ada di tmux dan tak bisa disambung ulang</span>
+            {onForget && (
+              <button type="button" className="hn-terminal-action hn-terminal-action--text"
+                onClick={onForget}>Hapus sel</button>
+            )}
+          </>}
           {link.state === "lost" && <>
             <span>terputus</span>
             <button type="button" className="hn-terminal-action hn-terminal-action--text"
@@ -819,16 +869,28 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
             <button type="button" className="hn-terminal-action hn-terminal-action--text"
               onClick={() => sendHeld.current()}>Kirim</button>
             <button type="button" className="hn-terminal-action hn-terminal-action--text"
-              onClick={() => dropHeld.current()}>Buang</button>
+              onClick={() => void discardHeld()}>Buang</button>
           </>}
           {queue.full && <span data-testid="terminal-queue-full">antrean penuh</span>}
           {clipErr && <span data-testid="terminal-clip-error">{clipErr}</span>}
         </div>
       )}
-      <div style={{ position: "relative", display: "flex", flex: 1, minHeight: 0 }}>
+      {/* Jalan keluar terlihat hanya saat fokus ada di dalam terminal — tempat ia dibutuhkan. Fokus
+          yang berpindah ke tombol itu sendiri tetap "di dalam", jadi klik tak memadamkannya di tengah jalan. */}
+      <div style={{ position: "relative", display: "flex", flex: 1, minHeight: 0 }}
+        onFocus={() => setInTerminal(true)}
+        onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setInTerminal(false); }}>
         <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",
           background: "var(--term-bg)", padding: 8, borderRadius: "var(--radius-sm)",
           touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />
+        {inTerminal && (
+          <button type="button" className="hn-terminal-action hn-terminal-action--text"
+            onClick={() => view.current?.leave()}
+            title="Pindahkan fokus keluar dari terminal. Tab dan Esc tetap diteruskan ke sesi selama fokus di sini."
+            style={{ position: "absolute", top: 6, right: 6, zIndex: 2, background: "var(--surface-card)" }}>
+            Keluar fokus terminal · Ctrl+Shift+Esc
+          </button>
+        )}
         {/* Long-press mobile: satu-satunya jalan salin log/error tanpa Cmd/Ctrl+C keyboard fisik.
             `role="status"` di badge mengumumkan perubahan mode ke pembaca layar — gestur sentuh
             yang memicunya tak pernah lewat fokus/keyboard, jadi tanpa ini AT tak tahu apa-apa. */}
@@ -849,6 +911,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
         external={composerDrain} linkState={link.state} queue={queue}
         voiceAppend={voiceAppend} onDraft={setDraft} />}
       {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
+      {dialog}
     </div>
   );
 }

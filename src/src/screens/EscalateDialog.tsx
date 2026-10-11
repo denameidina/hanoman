@@ -2,6 +2,7 @@ import React from "react";
 import { ESCALATE_SOURCES, type EscalateSource, type EscalateTaskInput, type TaskView } from "@hanoman/shared";
 import { Button, Field, Modal, Select } from "../ds";
 import { api } from "../api/client";
+import { failureMessage } from "../lib/report-error";
 import { PRIO_OPTS, sourceMeta } from "./source-meta";
 import type { ProjectVM } from "./types";
 
@@ -48,9 +49,9 @@ export function EscalateDialog({ task, projects, onClose, onDone, onToast }: {
       onToast(r.created ? `Dieskalasi jadi ${r.spec.id}` : `Sudah tertaut ke ${r.spec.id}`, "ok", "link");
       onDone(r.task);
       onClose();
-    } catch {
+    } catch (e) {
       // Dialog TETAP terbuka: isian operator tak boleh hilang gara-gara jaringan.
-      onToast("Gagal mengeskalasi kartu", "err", "x-circle");
+      onToast(failureMessage("mengeskalasi kartu", e), "err", "x-circle");
     } finally {
       setBusy(false);
     }
@@ -84,7 +85,7 @@ export function EscalateDialog({ task, projects, onClose, onDone, onToast }: {
         </Field>
       )}
 
-      <Field label="Source">
+      <Field label="Source" hint="Jenis item backlog yang lahir dari kartu ini, mis. feature brief atau Finding QA.">
         <Select aria-label="Source" value={source} style={{ width: "100%" }}
           onChange={(e) => setSource(e.target.value as EscalateSource)} options={SOURCE_OPTS} />
       </Field>

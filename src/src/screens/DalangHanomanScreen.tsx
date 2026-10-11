@@ -3,12 +3,15 @@
    bertema gelap penuh — dibenarkan oleh peran warna DS "dark terminal = kerja aktif": seluruh
    layar ini adalah panggung kerja aktif sang dalang. Sumber hidup = `sessions` WS (cermin
    DalangStage; `ProjectView.session` basi sejak login). Murni presentasi, nol fetch baru.
-   Semua warna lewat kelas `.hn-dlg-*` di app.css / token — dikunci test kontrak. */
+   Semua warna lewat kelas `.hn-dlg-*` di app.css / token — dikunci test kontrak.
+   Performa: jam (1 dtk), ticker (26 ms) dan count-up KPI hidup di komponen kecil sendiri, jadi
+   tiap tik hanya me-render komponen itu — bukan seluruh layar. */
 import React from "react";
 import { Icon } from "../ds";
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, SpecSlim } from "./types";
-import { isToday } from "./DalangStage";
+import { isToday, STAGE_LABEL, FLOW_LABEL } from "./DalangStage";
+import { useEventsStatus } from "../api/live";
 // Hero dirakit dari 5 bagian ber-sendi (rig sheet Codex): badan + 4 lengan berputar
 // di cakram pivot bahunya masing-masing — animasi jauh lebih hidup dari satu gambar statis.
 import rigBodyUrl from "../../../internal/assets/dalang/hnm-hero-rig-body-v01.webp?url";
@@ -39,7 +42,7 @@ function useReducedMotion(): boolean {
   );
 }
 
-/* Jam hidup — satu interval, dibersihkan saat unmount. */
+/* Jam hidup — satu interval, dibersihkan saat unmount. Dipakai HANYA oleh DalangClock. */
 function useClock(): Date {
   const [now, setNow] = React.useState(() => new Date());
   React.useEffect(() => {
@@ -49,13 +52,33 @@ function useClock(): Date {
   return now;
 }
 
+/* Jam di kepala layar. Tik tiap detik hanya me-render dua chip ini. */
+function DalangClock() {
+  const now = useClock();
+  return (
+    <>
+      <span className="hn-dlg-chip"><Icon name="calendar" size={13} />{now.getDate()} {BULAN[now.getMonth()]} {now.getFullYear()}</span>
+      <span className="hn-dlg-chip"><Icon name="clock" size={13} />{pad(now.getHours())}:{pad(now.getMinutes())}:{pad(now.getSeconds())}</span>
+    </>
+  );
+}
+
 /* Ticker boot ala JARVIS: mengetik satu baris, jeda, lanjut baris berikut. Reduced-motion →
-   baris pertama statis. Baris dibangun dari DATA NYATA oleh pemanggil. */
+   baris pertama statis. Baris dibangun dari DATA NYATA oleh pemanggil. Tab tersembunyi →
+   tak ada timer sama sekali (dihidupkan lagi saat tab kembali terlihat). */
 function useTicker(lines: string[], reduced: boolean): string {
   const [text, setText] = React.useState("");
+  const [visible, setVisible] = React.useState(() => typeof document === "undefined" || !document.hidden);
   const key = lines.join("|");
   React.useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVis = () => setVisible(!document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+  React.useEffect(() => {
     if (reduced || lines.length === 0) { setText(lines[0] ?? ""); return; }
+    if (!visible) return;
     let idx = 0; let i = 0; let timer: ReturnType<typeof setInterval> | null = null;
     let hold: ReturnType<typeof setTimeout> | null = null;
     const type = () => {
@@ -73,8 +96,14 @@ function useTicker(lines: string[], reduced: boolean): string {
     type();
     return () => { if (timer) clearInterval(timer); if (hold) clearTimeout(hold); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, reduced]);
+  }, [key, reduced, visible]);
   return text;
+}
+
+/* Baris ticker: satu-satunya yang re-render tiap 26 ms. */
+function BootTicker({ lines, reduced }: { lines: string[]; reduced: boolean }) {
+  const text = useTicker(lines, reduced);
+  return <p className="hn-dlg-boot">{text}</p>;
 }
 
 /* Count-up angka KPI sekali saat mount; reduced-motion langsung ke nilai akhir. */
@@ -95,6 +124,10 @@ function useCountUp(target: number, reduced: boolean): number {
   return v;
 }
 
+function CountUp({ to, reduced }: { to: number; reduced: boolean }) {
+  return <>{useCountUp(to, reduced)}</>;
+}
+
 function Kpi({ icon, tone, label, value, sub }: {
   icon: string; tone: string; label: string; value: React.ReactNode; sub: string;
 }) {
@@ -110,20 +143,24 @@ function Kpi({ icon, tone, label, value, sub }: {
   );
 }
 
-export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession, onOpenProject, onGoto, onExit }: {
+export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession, onOpenProject, onGoto, onExit, previous }: {
   projects: ProjectVM[]; backlog: SpecSlim[]; sessions: TerminalSession[];
   onOpenSession: (id: string) => void; onOpenProject: (p: ProjectVM) => void;
   onGoto: (s: string) => void; onExit: () => void;
+  /** Halaman sebelumnya yang dituju tombol keluar (opsional). Tanpa ini keluar = `onExit`. */
+  previous?: { label: string; onBack: () => void };
 }) {
   const reduced = useReducedMotion();
-  const now = useClock();
-
-  // Layar penuh (takeover): Escape = keluar, cermin kebiasaan fullscreen Terminal.
+  const events = useEventsStatus();
+  // Jalan keluar utama = tombol di layar; Escape hanya pintasan yang menuju tujuan yang sama.
+  const leave = previous ? previous.onBack : onExit;
+  const leaveRef = React.useRef(leave);
+  leaveRef.current = leave;
   React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onExit(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") leaveRef.current(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onExit]);
+  }, []);
 
   const live = sessions.filter((s) => !s.exited).sort((a, b) => a.id.localeCompare(b.id));
   const liveProjects = new Set(live.map((s) => s.projectId));
@@ -131,17 +168,16 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
   const waitingN = live.filter((s) => !!s.decision && !s.deciding).length;
   const startedToday = backlog.filter((s) => isToday(s.startedAt)).length;
 
-  const kProyek = useCountUp(projects.length, reduced);
-  const kToday = useCountUp(startedToday, reduced);
-  const kLive = useCountUp(live.length, reduced);
-  const kWait = useCountUp(waitingN, reduced);
-
-  const ticker = useTicker([
-    live.length > 0 ? `HANOMAN ONLINE · ${live.length} SESI HIDUP` : "HANOMAN ONLINE · KELIR SUNYI",
+  // Ticker dari data nyata. Status koneksi = kondisi socket sungguhan (useEventsStatus), bukan teks tetap.
+  const linkLine = events.connected
+    ? `HANOMAN TERHUBUNG · ${live.length > 0 ? `${live.length} SESI HIDUP` : "KELIR SUNYI"}`
+    : events.paused ? "JEDA · TAB TERSEMBUNYI" : "KONEKSI TERPUTUS · MENYAMBUNG ULANG";
+  const tickerLines = [
+    linkLine,
     `${startedToday} TASK DIKERJAKAN HARI INI`,
-    waitingN > 0 ? `${waitingN} SESI MENUNGGU JAWABANMU` : "SEMUA SISTEM NORMAL",
+    waitingN > 0 ? `${waitingN} SESI MENUNGGU JAWABANMU` : "TIDAK ADA KEPUTUSAN TERTUNDA",
     `${projects.length} PROYEK DALAM PANTAUAN`,
-  ], reduced);
+  ];
 
   // Distribusi backlog per stage — data nyata untuk donut (r=15.9 → keliling ≈ 100 unit).
   // Kosakata zStage: brainstorming/objective/spec-ready/planned/executing/done — dirangkum
@@ -155,10 +191,10 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
   }
   const total = backlog.length;
   const segs: { key: keyof typeof stageN; cls: string; label: string }[] = [
-    { key: "executing", cls: "wind", label: "Execute" },
-    { key: "done", cls: "leaf", label: "Done" },
-    { key: "planned", cls: "amber", label: "Plan" },
-    { key: "spec", cls: "brass", label: "Spec" },
+    { key: "executing", cls: "wind", label: "Dikerjakan" },
+    { key: "done", cls: "leaf", label: "Selesai" },
+    { key: "planned", cls: "amber", label: "Rencana" },
+    { key: "spec", cls: "brass", label: "Spek" },
   ];
   let acc = 0;
   const donut = segs.map((g) => {
@@ -168,7 +204,9 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
     return seg;
   });
 
-  // Produktivitas 7 hari: berapa item mulai dikerjakan per hari LOKAL.
+  // Produktivitas 7 hari: berapa item mulai dikerjakan per hari LOKAL. Dihitung saat render —
+  // layar ini tak lagi di-render tiap detik, jadi tak ada jam yang memaksa hitungannya ulang.
+  const now = new Date();
   const days: { label: string; n: number }[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
@@ -248,23 +286,25 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
             data-lit={live.length > 0 || undefined} />
           <div style={{ minWidth: 0 }}>
             <h2 className="hn-dlg-title">Dalang Hanoman</h2>
-            <p className="hn-dlg-boot" aria-live="off">{ticker}</p>
+            <BootTicker lines={tickerLines} reduced={reduced} />
           </div>
         </div>
         <div className="hn-dlg-chips">
-          <span className="hn-dlg-chip"><Icon name="calendar" size={13} />{now.getDate()} {BULAN[now.getMonth()]} {now.getFullYear()}</span>
-          <span className="hn-dlg-chip"><Icon name="clock" size={13} />{pad(now.getHours())}:{pad(now.getMinutes())}:{pad(now.getSeconds())}</span>
-          <button type="button" className="hn-dlg-exit" onClick={onExit} aria-label="Keluar dari panggung (Esc)">
-            <Icon name="x" size={14} />
-          </button>
+          <DalangClock />
         </div>
+        {/* Jalan keluar DI LUAR `.hn-dlg-chips` — wadah chip disembunyikan di mobile, tombol ini tidak. */}
+        <button type="button" className="hn-dlg-exit" onClick={leave}
+          aria-label={previous ? `Kembali ke ${previous.label}` : "Keluar dari panggung (Esc)"}
+          title={previous ? `Kembali ke ${previous.label}` : "Keluar dari panggung (Esc)"}>
+          <Icon name={previous ? "arrow-left" : "x"} size={14} />
+        </button>
       </div>
 
       <div className="hn-dlg-kpis">
-        <Kpi icon="layout-grid" tone="wind" label="TOTAL PROYEK" value={kProyek} sub="dalam pantauan" />
-        <Kpi icon="check-circle-2" tone="leaf" label="TASK HARI INI" value={kToday} sub="mulai dikerjakan" />
-        <Kpi icon="activity" tone="brass" label="SESI BERJALAN" value={kLive} sub="wayang dimainkan" />
-        <Kpi icon="hand" tone="amber" label="MENUNGGU KAMU" value={kWait} sub="butuh keputusan" />
+        <Kpi icon="layout-grid" tone="wind" label="TOTAL PROYEK" value={<CountUp to={projects.length} reduced={reduced} />} sub="dalam pantauan" />
+        <Kpi icon="check-circle-2" tone="leaf" label="TASK HARI INI" value={<CountUp to={startedToday} reduced={reduced} />} sub="mulai dikerjakan" />
+        <Kpi icon="activity" tone="brass" label="SESI BERJALAN" value={<CountUp to={live.length} reduced={reduced} />} sub="wayang dimainkan" />
+        <Kpi icon="hand" tone="amber" label="MENUNGGU KAMU" value={<CountUp to={waitingN} reduced={reduced} />} sub="butuh keputusan" />
       </div>
 
       <div className="hn-dlg-grid hn-grid-mobile">
@@ -296,40 +336,44 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
               <span className="hn-dlg-hand" data-hand="mr" />
             </div>
             {(live.length > 0 || parked.length > 0) ? (
-              <div className="hn-dlg-cards" role="list" aria-label="Wayang project">
+              <ul className="hn-dlg-cards" aria-label="Wayang project" style={{ listStyle: "none", margin: 0 }}>
                 {live.map((s, i) => {
                   const name = projects.find((p) => p.id === s.projectId)?.name ?? s.projectId;
                   const spec = s.specId ? backlog.find((x) => x.id === s.specId) : undefined;
                   const waiting = !!s.decision && !s.deciding;
                   const sub = waiting ? "menunggu jawabanmu"
-                    : spec ? `${spec.id} · ${spec.stage}` : (s.flow ?? "sesi terminal");
+                    : spec ? `${spec.id} · ${STAGE_LABEL[spec.stage] ?? spec.stage}` : (FLOW_LABEL[s.flow ?? ""] ?? "sesi terminal");
                   return (
-                    <button key={s.id} type="button" className="hn-dlg-prj" data-puppet
-                      data-waiting={waiting || undefined}
-                      onClick={() => onOpenSession(s.id)}
-                      aria-label={`Buka terminal — ${name}, ${sub}`}>
-                      <span className={waiting ? "hn-dlg-puppet hn-dlg-puppet--still" : "hn-dlg-puppet"}
-                        style={{ animationDelay: `${(i % 6) * 0.6}s` }}>
-                        <img src={wayangFor(s.projectId)} alt="" aria-hidden="true" />
-                      </span>
-                      <span className="hn-dlg-prj-name">{name}</span>
-                      <span className={waiting ? "hn-dlg-prj-sub hn-dlg-prj-sub--amber" : "hn-dlg-prj-sub"}>{sub}</span>
-                    </button>
+                    <li key={s.id} style={{ listStyle: "none" }}>
+                      <button type="button" className="hn-dlg-prj" data-puppet
+                        data-waiting={waiting || undefined}
+                        onClick={() => onOpenSession(s.id)}
+                        aria-label={`Buka terminal — ${name}, ${sub}`}>
+                        <span className={waiting ? "hn-dlg-puppet hn-dlg-puppet--still" : "hn-dlg-puppet"}
+                          style={{ animationDelay: `${(i % 6) * 0.6}s` }}>
+                          <img src={wayangFor(s.projectId)} alt="" aria-hidden="true" />
+                        </span>
+                        <span className="hn-dlg-prj-name">{name}</span>
+                        <span className={waiting ? "hn-dlg-prj-sub hn-dlg-prj-sub--amber" : "hn-dlg-prj-sub"}>{sub}</span>
+                      </button>
+                    </li>
                   );
                 })}
                 {/* Semua project tampil — yang tanpa sesi hidup jadi wayang redup tersandar. */}
                 {parked.map((p) => (
-                  <button key={p.id} type="button" className="hn-dlg-prj hn-dlg-prj--off"
-                    onClick={() => onOpenProject(p)}
-                    aria-label={`Buka project ${p.name}`}>
-                    <span className="hn-dlg-puppet hn-dlg-puppet--still">
-                      <img src={wayangFor(p.id)} alt="" aria-hidden="true" />
-                    </span>
-                    <span className="hn-dlg-prj-name">{p.name}</span>
-                    <span className="hn-dlg-prj-sub hn-dlg-prj-sub--off">tersandar di debog</span>
-                  </button>
+                  <li key={p.id} style={{ listStyle: "none" }}>
+                    <button type="button" className="hn-dlg-prj hn-dlg-prj--off"
+                      onClick={() => onOpenProject(p)}
+                      aria-label={`Buka project ${p.name}`}>
+                      <span className="hn-dlg-puppet hn-dlg-puppet--still">
+                        <img src={wayangFor(p.id)} alt="" aria-hidden="true" />
+                      </span>
+                      <span className="hn-dlg-prj-name">{p.name}</span>
+                      <span className="hn-dlg-prj-sub hn-dlg-prj-sub--off">tersandar di debog</span>
+                    </button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : (
               <div className="hn-dlg-empty">
                 <div>Panggung sunyi — belum ada project di workspace.</div>
@@ -351,12 +395,14 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
             <div className="hn-dlg-rt">AKTIVITAS TERAKHIR</div>
             {activity.length === 0
               ? <div className="hn-dlg-mut">Belum ada project.</div>
-              : activity.map((a) => (
-                <div key={a.id} className="hn-dlg-act">
-                  <span className={a.live ? "hn-dlg-dot hn-dlg-dot--on" : "hn-dlg-dot"} />
-                  <span className="hn-dlg-act-x"><b>{a.name}</b> {a.text}</span>
-                </div>
-              ))}
+              : <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                  {activity.map((a) => (
+                    <li key={a.id} className="hn-dlg-act">
+                      <span className={a.live ? "hn-dlg-dot hn-dlg-dot--on" : "hn-dlg-dot"} aria-hidden="true" />
+                      <span className="hn-dlg-act-x" title={a.text}><b>{a.name}</b> {a.text}{a.live ? " · sedang berjalan" : ""}</span>
+                    </li>
+                  ))}
+                </ul>}
           </div>
 
           <div className="hn-dlg-card">
@@ -398,8 +444,6 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
           </div>
         </aside>
       </div>
-
-      <div className="hn-dlg-foot">◈&nbsp;&nbsp;HANOMAN · ORKESTRASI CERDAS · EKSEKUSI SEMPURNA&nbsp;&nbsp;◈</div>
     </div>
   );
 }

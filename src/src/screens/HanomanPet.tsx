@@ -110,6 +110,22 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
   // Satu gelembung pada satu waktu; yang baru menggantikan yang lama beserta timer-nya.
   const [speech, setSpeech] = React.useState<(PetSpeech & { id: number }) | null>(null);
   const reduced = usePrefersReducedMotion();
+  // Pet bukan bagian dari first paint: ia dipasang saat browser sudah sempat menggambar layar
+  // (idle), supaya atlas sprite — ±1 MB — tak bersaing dengan konten utama dan tak diunduh sebelum
+  // pet benar-benar tampil.
+  const [mountReady, setMountReady] = React.useState(false);
+  React.useEffect(() => {
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(() => setMountReady(true), { timeout: 1500 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = window.setTimeout(() => setMountReady(true), 1);
+    return () => window.clearTimeout(t);
+  }, []);
   const tier = useResponsiveTier();
   const documentHidden = useDocumentHidden();
   const laneWidth = useLaneWidth();
@@ -400,6 +416,7 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
     zIndex: 80, pointerEvents: "none",
   };
 
+  if (!mountReady) return null;
   if (hidden) {
     return (
       <div data-testid="pet-root" ref={rootRef} style={root}>
@@ -407,8 +424,8 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
           pointerEvents: "auto", position: "absolute", width: 44, height: 44, padding: 0,
           right: "max(22px, var(--safe-right))", bottom: 22,
           display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-          border: "1px solid var(--border-hair)", borderRadius: "var(--radius-pill)",
-          background: "var(--surface-card)", opacity: 0.55, boxShadow: "var(--shadow-sm)",
+          border: "1px solid var(--text-muted)", borderRadius: "var(--radius-pill)",
+          background: "var(--surface-card)", color: "var(--text-strong)", boxShadow: "var(--shadow-sm)",
         }}>
           <Mark id="buntut" size={15} />
         </button>
@@ -526,7 +543,8 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
           transition: reduced || move.durationMs === 0
             ? "none"
             : `transform ${move.durationMs}ms ${PET_EASE_CSS[move.ease]}`,
-          willChange: "transform",
+          // will-change hanya selama bergerak — permanen di setiap pet memakan lapisan GPU saat diam.
+          willChange: !reduced && move.durationMs > 0 ? "transform" : undefined,
         }}>
         {speech && !open && (
           // SPEC-899 · gelembung `waiting` menumbuhkan satu aksi, dan elemen di dalam `aria-hidden`
@@ -564,12 +582,13 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
         )}
         {/* Live region membungkus kalimat status + panggung; atlas berisi 80 frame sehingga tak bisa
             diberi alt bermakna — kalimatnya hidup di span visually-hidden, satu sumber. */}
-        <div data-testid="pet-stage" role="status" aria-live="polite"
+        <div data-testid="pet-stage"
           className="hn-pet-stage" data-reduced-motion={reduced ? "true" : undefined} style={{
             position: "relative", width: cellW, height: cellH,
             animation: reduced ? "none" : "hn-pet-reveal var(--dur-slow) var(--ease-out) both",
           }}>
-          <span className="hn-sr-only" data-testid="pet-status">{status}</span>
+          {/* Satu-satunya region live: hanya TEKS statusnya, bukan seluruh panggung (atlas, lencana, tombol). */}
+          <span className="hn-sr-only" role="status" aria-live="polite" data-testid="pet-status">{status}</span>
           {view.count > 1 && (
             <span data-testid="pet-badge" aria-hidden="true" title={`${view.count} ${KIND_NOUN[view.kind]}`}
               style={{
@@ -633,7 +652,7 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
                   }}
                   style={{
                     display: "block", width: cellW * columns, height: cellH * rows.length,
-                    animation: frames, willChange: "transform",
+                    animation: frames,
                   }} />
               </div>
             </div>

@@ -1,6 +1,7 @@
 import React from "react";
 import { Modal, Input, Select, Button, Badge, Callout, StateBlock, Icon, Pager, serverPage } from "../ds";
 import { api } from "../api/client";
+import { failureMessage } from "../lib/report-error";
 import { SESSION_KINDS, SESSION_KIND_LABEL, restartableKind, sessionOutcome, type SessionHistoryView } from "@hanoman/shared";
 
 const PAGE = 20;
@@ -55,6 +56,9 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
   const [q, setQ] = React.useState("");
   const [dq, setDq] = React.useState("");
   const [selected, setSelected] = React.useState<SessionHistoryView | null>(null);
+  // Galat memuat daftar TAMPIL sebagai galat, bukan sebagai "Belum ada riwayat sesi" (audit UI/UX).
+  const [listError, setListError] = React.useState<string | null>(null);
+  const [reloadKey, setReloadKey] = React.useState(0);
 
   React.useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
   // AC-15 · ganti penyaring = kembali ke halaman 1. Halaman 5 dari filter lama menjawab daftar
@@ -69,15 +73,20 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
     })
       .then((r) => {
         if (!alive) return;
+        setListError(null);
         setTotal(r.total);
         // SPEC-523 · halaman MENGGANTI isi. Muat-lebih (append) dicabut demi satu pola paginasi
         // yang sama dengan backlog/project/tiket — objective SPEC-523.
         setItems(r.items);
       })
-      .catch(() => { if (alive) { setItems([]); setTotal(0); } })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setItems([]); setTotal(0);
+        setListError(failureMessage("memuat riwayat sesi", e));
+      })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [project, kind, dq, page]);
+  }, [project, kind, dq, page, reloadKey]);
 
   const sp = serverPage(total, page, PAGE);
 
@@ -96,7 +105,10 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
             SESSION_KINDS.map((k) => ({ value: k, label: SESSION_KIND_LABEL[k] })))} />
       </div>
 
-      {items.length === 0 && !loading ? (
+      {listError ? (
+        <StateBlock kind="error" icon="history" title="Riwayat belum bisa dimuat" hint={listError}
+          action={() => setReloadKey((k) => k + 1)} actionLabel="Coba lagi" />
+      ) : items.length === 0 && !loading ? (
         <StateBlock kind="empty" icon="history" title="Belum ada riwayat sesi"
           hint="Riwayat terisi sendiri saat sesi terminal dibuka lalu ditutup — termasuk sesi backlog, terminal biasa, dan sesi project-level." />
       ) : (
@@ -157,6 +169,17 @@ function SessionHistoryDetail({ row, projectName, onBack, onRestart }: {
 }) {
   const [text, setText] = React.useState<string | null>(null);
   const [state, setState] = React.useState<"idle" | "loading" | "none" | "error">("idle");
+  // Hasil salin transkrip: sukses dan gagal sama-sama diumumkan, tak lagi tombol yang diam.
+  const [copyNote, setCopyNote] = React.useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  async function copyTranscript(t: string) {
+    try {
+      if (!navigator.clipboard) throw new Error("clipboard tidak tersedia di browser ini");
+      await navigator.clipboard.writeText(t);
+      setCopyNote({ tone: "ok", text: "Transkrip disalin." });
+    } catch (e) {
+      setCopyNote({ tone: "err", text: failureMessage("menyalin transkrip", e) });
+    }
+  }
 
   React.useEffect(() => {
     // Baris tanpa transkrip tak perlu request — 404-nya sudah bisa diprediksi dari metadata.
@@ -195,7 +218,7 @@ function SessionHistoryDetail({ row, projectName, onBack, onRestart }: {
         <div style={{ flex: 1 }} />
         {text && (
           <Button size="sm" variant="secondary" leftIcon="copy"
-            onClick={() => void navigator.clipboard?.writeText(text)}>Salin transkrip</Button>
+            onClick={() => void copyTranscript(text)}>Salin transkrip</Button>
         )}
         {/* Sesi lama tak pernah "hidup lagi" — tmux sudah membunuhnya. Ini men-spawn sesi BARU
             dengan konteks yang sama, dan hanya untuk kind yang konteksnya bisa dibangun ulang. */}
@@ -231,6 +254,10 @@ function SessionHistoryDetail({ row, projectName, onBack, onRestart }: {
             ? "Tanpa transkrip — panenya sudah lenyap sebelum hanoman sempat mengambilnya."
             : "Tanpa transkrip — sesi ini ditutup sebelum fitur riwayat ada, atau panenya tak menyisakan keluaran."}
         </div>
+      )}
+      {copyNote && (
+        <div role="status" style={{ fontSize: 12, marginBottom: 8,
+          color: copyNote.tone === "err" ? "var(--clay-600)" : "var(--text-muted)" }}>{copyNote.text}</div>
       )}
       {state === "error" && (
         <div style={{ fontSize: 12, color: "var(--clay-600)" }}>Transkrip tak terbaca lagi di server.</div>

@@ -3,7 +3,7 @@
 import { eventsStub } from "./helpers/events-stub";
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
 import { Shell } from "../src/ds";
 import { uiKey, readUiState } from "../src/ui-state";
 
@@ -53,8 +53,8 @@ describe("scroll halaman", () => {
     fake(main);
     main.scrollTop = 720;
     fireEvent.scroll(main);
-    await frame();
-    expect(readUiState(uiKey("page@backlog", "scroll"), 0)).toBe(720);
+    // Tulisan storage di-throttle (Audit UI/UX 2026-10): tunggu jeda, bukan satu frame.
+    await waitFor(() => expect(readUiState(uiKey("page@backlog", "scroll"), 0)).toBe(720));
 
     cleanup();
     render(<Shell active="backlog" title="Backlog">isi</Shell>);

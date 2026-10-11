@@ -85,7 +85,176 @@ describe("SkillsWorkspace (/skills)", () => {
     render(<SkillsWorkspace />);
     expect(await screen.findByText("shared-a")).toBeTruthy();
     expect(screen.queryByText("plug-3")).toBeNull();
-    fireEvent.change(screen.getByPlaceholderText("Cari skill…"), { target: { value: "plug-3" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Cari skill" }), { target: { value: "plug-3" } });
     expect(await screen.findByText("plug-3")).toBeTruthy();
+  });
+
+  it("pencarian tanpa hasil menampilkan pesan khusus, bukan 'Belum ada skill'", async () => {
+    mockFetch();
+    render(<SkillsWorkspace />);
+    await screen.findByText("shared-a");
+    fireEvent.change(screen.getByRole("textbox", { name: "Cari skill" }), { target: { value: "zzz-tidak-ada" } });
+    expect(await screen.findByText("Tak ada skill cocok pencarian")).toBeTruthy();
+    expect(screen.queryByText("Belum ada skill")).toBeNull();
+  });
+
+  it("baris terpilih ditandai aria-current", async () => {
+    mockFetch();
+    render(<SkillsWorkspace />);
+    fireEvent.click(await screen.findByText("shared-a"));
+    await screen.findByText("references/");
+    const rows = [...document.querySelectorAll(".hn-skill-row")];
+    expect(rows.filter((r) => r.getAttribute("aria-current") === "true").map((r) => r.textContent)).toEqual(["shared-a"]);
+  });
+
+  it("grup yang berisi skill terpilih tetap bisa dilipat", async () => {
+    mockFetch();
+    render(<SkillsWorkspace />);
+    fireEvent.click(await screen.findByText("shared-a"));
+    await screen.findByText("references/");
+    fireEvent.click(screen.getByRole("button", { name: /^Hanoman \(1\)/ }));
+    expect(document.querySelector(".hn-skill-row.is-selected")).toBeNull();
+    expect(screen.getByRole("button", { name: /^Hanoman \(1\)/ }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("gagal memuat berkas menampilkan galat + Coba lagi, bukan spinner abadi", async () => {
+    let fail = true;
+    mockFetch((u) => u.includes("/file?") && fail ? json({ error: "disk penuh" }, 500) : null);
+    render(<SkillsWorkspace />);
+    fireEvent.click(await screen.findByText("shared-a"));
+    expect(await screen.findByText("Gagal memuat berkas")).toBeTruthy();
+    expect(screen.getByText("disk penuh")).toBeTruthy();
+    fail = false;
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    expect(await screen.findByRole("heading", { name: "isi" })).toBeTruthy();
+  });
+
+  it("gagal memuat daftar skill menampilkan galat dan Coba lagi", async () => {
+    let fail = true;
+    mockFetch((u) => u.includes("/api/skills?scope=all") && fail ? json({ error: "db terkunci" }, 500) : null);
+    render(<SkillsWorkspace />);
+    expect(await screen.findByText("Gagal memuat skill")).toBeTruthy();
+    fail = false;
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    expect(await screen.findByText("shared-a")).toBeTruthy();
+  });
+
+  it("Simpan tetap terlihat di Pratinjau saat draft kotor", async () => {
+    mockFetch();
+    render(<SkillsWorkspace />);
+    fireEvent.click(await screen.findByText("shared-a"));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: /isi berkas/i }), { target: { value: "# baru" } });
+    fireEvent.click(screen.getByRole("button", { name: "Pratinjau" }));
+    expect((screen.getByRole("button", { name: "Simpan" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByText("belum disimpan")).toBeTruthy();
+  });
+
+  async function dirtyEditor() {
+    fireEvent.click(await screen.findByText("shared-a"));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    fireEvent.change(await screen.findByRole("textbox", { name: /isi berkas/i }), { target: { value: "# draf saya" } });
+  }
+
+  it("pindah skill saat draft kotor meminta konfirmasi; batal mempertahankan draft", async () => {
+    mockFetch();
+    render(<SkillsWorkspace />);
+    await dirtyEditor();
+    fireEvent.click(screen.getByText("deploy"));
+    expect(await screen.findByText("Buang perubahan?")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Tetap mengedit" }));
+    await waitFor(() => expect(screen.queryByText("Buang perubahan?")).toBeNull());
+    expect((screen.getByRole("textbox", { name: /isi berkas/i }) as HTMLTextAreaElement).value).toBe("# draf saya");
+  });
+
+  it("pindah skill saat draft kotor: konfirmasi membuang draft dan berpindah", async () => {
+    mockFetch();
+    render(<SkillsWorkspace />);
+    await dirtyEditor();
+    fireEvent.click(screen.getByText("deploy"));
+    fireEvent.click(await screen.findByRole("button", { name: "Buang perubahan" }));
+    await waitFor(() => expect(screen.getByText("deploy/")).toBeTruthy());
+  });
+
+  it("pindah skill tanpa perubahan tidak meminta konfirmasi", async () => {
+    mockFetch();
+    render(<SkillsWorkspace />);
+    fireEvent.click(await screen.findByText("shared-a"));
+    await screen.findByText("references/");
+    fireEvent.click(screen.getByText("deploy"));
+    await waitFor(() => expect(screen.getByText("deploy/")).toBeTruthy());
+    expect(screen.queryByText("Buang perubahan?")).toBeNull();
+  });
+
+  describe("Timpa", () => {
+    it("meminta konfirmasi dengan dampak, lalu menulis di atas hash terbaru", async () => {
+      const put = vi.fn();
+      let reads = 0;
+      mockFetch((u, init) => {
+        if (init?.method === "PUT") {
+          const body = JSON.parse(String(init.body));
+          put(body);
+          return body.baseHash === "h-fresh" ? json({ hash: "h3" }) : json({ error: "berubah" }, 409);
+        }
+        if (!u.includes("/file?")) return null;
+        reads++;
+        return json({ path: "SKILL.md", size: 10, hash: reads > 1 ? "h-fresh" : "h1", content: "---\nname: shared-a\ndescription: Use when x\n---\n# isi", binary: false, tooLarge: false });
+      });
+      render(<SkillsWorkspace />);
+      await dirtyEditor();
+      fireEvent.click(screen.getByRole("button", { name: "Simpan" }));
+      await screen.findByText(/berubah di tempat lain/);
+      fireEvent.click(screen.getByRole("button", { name: "Timpa" }));
+      expect(await screen.findByText("Timpa SKILL.md?")).toBeTruthy();
+      expect(screen.getByText(/hilang/)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Timpa berkas" }));
+      await waitFor(() => expect(screen.queryByText(/berubah di tempat lain/)).toBeNull());
+      expect(put).toHaveBeenLastCalledWith(expect.objectContaining({ baseHash: "h-fresh", content: "# draf saya" }));
+      expect(screen.queryByText("belum disimpan")).toBeNull();
+    });
+
+    it("gagal menimpa menampilkan galat inline dan mempertahankan draft", async () => {
+      mockFetch((u, init) => init?.method === "PUT" ? json({ error: "disk penuh" }, 500) : null);
+      render(<SkillsWorkspace />);
+      await dirtyEditor();
+      fireEvent.click(screen.getByRole("button", { name: "Simpan" }));
+      await screen.findByText(/Gagal menyimpan berkas: disk penuh/);
+      fireEvent.click(screen.getByRole("button", { name: "Timpa" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Timpa berkas" }));
+      expect(await screen.findByText(/Gagal menimpa berkas: disk penuh/)).toBeTruthy();
+      expect((screen.getByRole("textbox", { name: /isi berkas/i }) as HTMLTextAreaElement).value).toBe("# draf saya");
+    });
+  });
+
+  describe("berkas baru", () => {
+    it("memakai Modal DS dengan validasi, bukan window.prompt", async () => {
+      const prompt = vi.spyOn(window, "prompt");
+      const post = vi.fn();
+      mockFetch((u, init) => {
+        if (init?.method === "POST" && u.endsWith("/entry")) { post(JSON.parse(String(init.body))); return json({}); }
+        return null;
+      });
+      render(<SkillsWorkspace />);
+      fireEvent.click(await screen.findByText("shared-a"));
+      await screen.findByText("references/");
+      fireEvent.click(screen.getByRole("button", { name: "Berkas" }));
+      const input = await screen.findByRole("textbox", { name: "Path berkas" });
+      const submit = screen.getByRole("button", { name: "Buat" }) as HTMLButtonElement;
+      expect(submit.disabled).toBe(true);
+      fireEvent.change(input, { target: { value: "a\\b.md" } });
+      expect(input.getAttribute("aria-invalid")).toBe("true");
+      expect(screen.getByText(/bukan \\/)).toBeTruthy();
+      expect(submit.disabled).toBe(true);
+      fireEvent.change(input, { target: { value: "../x.md" } });
+      expect(submit.disabled).toBe(true);
+      fireEvent.change(input, { target: { value: "SKILL.md" } });
+      expect(screen.getByText(/sudah ada/)).toBeTruthy();
+      fireEvent.change(input, { target: { value: "references/baru.md" } });
+      expect(input.getAttribute("aria-invalid")).toBeNull();
+      expect(submit.disabled).toBe(false);
+      fireEvent.click(submit);
+      await waitFor(() => expect(post).toHaveBeenCalled());
+      expect(prompt).not.toHaveBeenCalled();
+    });
   });
 });

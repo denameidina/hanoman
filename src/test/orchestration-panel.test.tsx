@@ -1,0 +1,31 @@
+import { render, screen, within } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
+import { OrchestrationPanel } from "../src/screens/OrchestrationPanel";
+
+// Audit UI/UX 2026-10 · 1G · matriks orkestrasi: kontrol flow yang dimatikan benar-benar `disabled`
+// (bukan hanya diredupkan), dan tabel yang lebih lebar dari layar digulir di wadah LocalOverflow.
+
+describe("OrchestrationPanel · flow nonaktif", () => {
+  it("kontrol flow yang dimatikan benar-benar disabled", () => {
+    const orch = { ...ORCHESTRATION_DEFAULTS, feature: { ...ORCHESTRATION_DEFAULTS.feature, enabled: false } };
+    render(<OrchestrationPanel orchestration={orch} onChange={vi.fn()} />);
+    const selects = within(screen.getByTestId("orch-flow-feature")).getAllByRole("combobox");
+    expect(selects.length).toBeGreaterThan(0);
+    for (const s of selects) expect(s).toBeDisabled();
+  });
+
+  it("flow yang aktif kontrolnya tetap bisa dipakai", () => {
+    const orch = { ...ORCHESTRATION_DEFAULTS, feature: { ...ORCHESTRATION_DEFAULTS.feature, enabled: true } };
+    render(<OrchestrationPanel orchestration={orch} onChange={vi.fn()} />);
+    const selects = within(screen.getByTestId("orch-flow-feature")).getAllByRole("combobox");
+    expect(selects.length).toBeGreaterThan(0);
+    for (const s of selects) expect(s).toBeEnabled();
+  });
+
+  it("tabel matriks dibungkus LocalOverflow, bukan div overflow-x biasa", () => {
+    render(<OrchestrationPanel orchestration={ORCHESTRATION_DEFAULTS} onChange={vi.fn()} />);
+    const table = within(screen.getByTestId("orch-flow-feature")).getByRole("table");
+    expect(table.closest(".hn-local-overflow")).not.toBeNull();
+  });
+});

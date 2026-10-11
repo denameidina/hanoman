@@ -47,7 +47,8 @@ describe("ClientPortal (SPEC-617)", () => {
     const row = title.closest("button");
     expect(row).not.toBeNull();
     expect(row).toHaveClass("hn-portal-row");
-    expect(row).toHaveTextContent("SPEC-1");
+    expect(row).toHaveTextContent("Checkout gagal");
+    expect(row).not.toHaveTextContent("SPEC-1");
     expect(row).toHaveTextContent("Sedang dikerjakan");
     expect(row).toHaveTextContent("tinggi");
     expect(screen.getByTestId("portal-root")).toHaveStyle({ height: "100dvh" });
@@ -57,7 +58,7 @@ describe("ClientPortal (SPEC-617)", () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     expect(await screen.findByText("Toko Mekar")).toBeTruthy();
     expect(await screen.findByText("Checkout gagal")).toBeTruthy();
-    fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /laporan/i }));
     expect(await screen.findByText("Tombol bayar mati")).toBeTruthy();
     expect(screen.getByText("Sedang dikerjakan")).toBeTruthy();
   });
@@ -104,7 +105,7 @@ describe("ClientPortal (SPEC-617)", () => {
   it("badge tiket berwarna sama di baris daftar dan di modal detail", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     await screen.findByText("Toko Mekar");
-    fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /laporan/i }));
     const row = await screen.findByText("Tombol bayar mati");
     const rowPill = within(row.closest("button") as HTMLElement)
       .getByText("Sedang dikerjakan");
@@ -211,7 +212,7 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
     expect(rows()).toHaveLength(TOTAL - PAGE);         // halaman terakhir: 5 baris
     expect(screen.queryByText("Pekerjaan 1")).toBeNull();
     // Tab & project tak bergeser — perpindahan halaman mempertahankan konteks lain.
-    expect(screen.getByRole("tab", { name: /pekerjaan/i }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: /progres/i }).getAttribute("aria-selected")).toBe("true");
   });
 
   it("halaman terakhir tak menyisakan tombol Berikutnya yang aktif", async () => {
@@ -226,10 +227,10 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
   it("angka di tab adalah TOTAL, bukan jumlah baris satu halaman", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     await screen.findByText("Pekerjaan 1");
-    expect(screen.getByRole("tab", { name: /pekerjaan/i }).textContent).toContain(String(TOTAL));
+    expect(screen.getByRole("tab", { name: /progres/i }).textContent).toContain(String(TOTAL));
     fireEvent.click(screen.getByRole("button", { name: "Halaman 2" }));
     await screen.findByText("Pekerjaan 21");
-    expect(screen.getByRole("tab", { name: /pekerjaan/i }).textContent).toContain(String(TOTAL));
+    expect(screen.getByRole("tab", { name: /progres/i }).textContent).toContain(String(TOTAL));
   });
 
   it("ganti tab kembali ke halaman 1", async () => {
@@ -237,7 +238,7 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
     await screen.findByText("Pekerjaan 1");
     fireEvent.click(screen.getByRole("button", { name: "Halaman 2" }));
     await screen.findByText("Pekerjaan 21");
-    fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /laporan/i }));
     expect(await screen.findByText("Keluhan 1")).toBeTruthy();
     await waitFor(() => expect(portalApi.listBacklog).toHaveBeenLastCalledWith("p1", { page: 1, limit: PAGE }));
   });
@@ -267,7 +268,7 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
     (portalApi.createTicket as any).mockResolvedValue(ticketOf(99));
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     await screen.findByText("Pekerjaan 1");
-    fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /laporan/i }));
     await screen.findByText("Keluhan 1");
     fireEvent.click(screen.getByRole("button", { name: "Halaman 2" }));
     await screen.findByText("Keluhan 21");

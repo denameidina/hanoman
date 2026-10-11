@@ -20,19 +20,27 @@ const screenWith = (onMarkDone: any, backlog: Spec[] = [spec], detailId?: string
     projectFilter="all" onProjectFilter={() => {}} onMarkDone={onMarkDone}
     initialDetailId={detailId} />);
 
+// Tandai selesai kini aksi sekunder: buka menu ⋯ item (SPEC-804 · ADR-0120 → menu), lalu pilih itu.
+const openMarkDoneFromMenu = () => {
+  fireEvent.click(screen.getAllByRole("button", { name: "Aksi lain SPEC-804" })[0]!);
+  fireEvent.click(screen.getByRole("button", { name: "Tandai selesai" }));
+};
+
 describe("SPEC-804 · tandai selesai dari dashboard", () => {
-  it("aksi ada di baris daftar untuk item belum selesai, hilang untuk item done", () => {
+  it("aksi ada di menu item belum selesai, hilang untuk item done", () => {
     const { unmount } = screenWith(vi.fn());
-    expect(screen.getAllByLabelText("Tandai selesai").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "Aksi lain SPEC-804" })[0]!);
+    expect(screen.getByRole("button", { name: "Tandai selesai" })).toBeTruthy();
     unmount();
     screenWith(vi.fn(), [{ ...spec, stage: "done" } as Spec]);
-    expect(screen.queryByLabelText("Tandai selesai")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Aksi lain SPEC-804" }));
+    expect(screen.queryByRole("button", { name: "Tandai selesai" })).toBeNull();
   });
 
   it("dialog meminta konfirmasi dan mengirim alasan", async () => {
     const onMarkDone = vi.fn().mockResolvedValue({ ...spec, stage: "done" });
     screenWith(onMarkDone);
-    fireEvent.click(screen.getAllByLabelText("Tandai selesai")[0]!);
+    openMarkDoneFromMenu();
     const dialog = within(screen.getByRole("dialog"));
     fireEvent.change(dialog.getByLabelText("Alasan singkat (opsional)"),
       { target: { value: "sudah ter-merge lewat PR #12" } });
@@ -46,7 +54,7 @@ describe("SPEC-804 · tandai selesai dari dashboard", () => {
       .mockResolvedValueOnce({ needConfirm: true, sessionId: "spec-804" })
       .mockResolvedValueOnce({ ...spec, stage: "done" });
     screenWith(onMarkDone);
-    fireEvent.click(screen.getAllByLabelText("Tandai selesai")[0]!);
+    openMarkDoneFromMenu();
     const dialog = within(screen.getByRole("dialog"));
     fireEvent.click(dialog.getByRole("button", { name: "Tandai selesai" }));
     expect(await screen.findByTestId("mark-done-live")).toBeTruthy();

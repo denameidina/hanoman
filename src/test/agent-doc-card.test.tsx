@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AgentDocCard } from "../src/screens/AgentDocCard";
 
@@ -10,6 +10,8 @@ const notFound = { ok: false, status: 404, text: async () => "{}" };
 beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => ok(MD)));
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("AgentDocCard", () => {
   it("menampilkan URL absolut yang bisa disalin agen", () => {
@@ -24,6 +26,35 @@ describe("AgentDocCard", () => {
     fireEvent.click(screen.getByRole("button", { name: /buka/i }));
     await waitFor(() => expect(screen.getByText("0. Apa itu hanoman")).toBeTruthy());
     expect(fetch).toHaveBeenCalledWith("/api/agent-integration.md", expect.anything());
+  });
+
+  it("tautan GitHub adalah satu elemen <a>, tanpa <button> bersarang", () => {
+    render(<AgentDocCard />);
+    const link = screen.getByRole("link", { name: /lihat di github/i });
+    expect(link.querySelector("button")).toBeNull();
+    expect(link.closest("a")!.getAttribute("target")).toBe("_blank");
+  });
+
+  it("salin tautan menunggu clipboard sebelum melapor sukses", async () => {
+    let resolve!: () => void;
+    const writeText = vi.fn(() => new Promise<void>((r) => { resolve = r; }));
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const onToast = vi.fn();
+    render(<AgentDocCard onToast={onToast} />);
+    fireEvent.click(screen.getByRole("button", { name: /salin tautan/i }));
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/api/agent-integration.md`);
+    expect(onToast).not.toHaveBeenCalled();
+    resolve();
+    await waitFor(() => expect(onToast).toHaveBeenCalledWith("Tautan disalin", "ok", "copy"));
+  });
+
+  it("salin tautan yang ditolak clipboard melapor galat, bukan sukses", async () => {
+    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn(async () => { throw new Error("izin ditolak"); }) } });
+    const onToast = vi.fn();
+    render(<AgentDocCard onToast={onToast} />);
+    fireEvent.click(screen.getByRole("button", { name: /salin tautan/i }));
+    await waitFor(() => expect(onToast).toHaveBeenCalledWith("Gagal menyalin link: izin ditolak", "err"));
+    expect(onToast).not.toHaveBeenCalledWith("Tautan disalin", "ok", "copy");
   });
 
   it("endpoint gagal → pesan galat, bukan modal kosong", async () => {

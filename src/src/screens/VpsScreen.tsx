@@ -4,6 +4,7 @@
 import React from "react";
 import { Button, Modal, Field, Input, StateBlock, StatusPill, Icon, useConfirm } from "../ds";
 import { api } from "../api/client";
+import { errorMessage, failureMessage } from "../lib/report-error";
 import { subscribe } from "../api/events";
 import type { VpsView } from "@hanoman/shared";
 import { VpsChecklistModal } from "./VpsChecklist";
@@ -18,10 +19,16 @@ export const hardenedLabel = (v: VpsView): "hardened" | "belum" | "unknown" =>
 
 // Kosakata status StatusPill yang ada: ok (hijau) · broken (merah) · idle (abu).
 const HARDENED_PILL = {
-  hardened: { status: "ok", label: "hardened" },
-  belum: { status: "broken", label: "belum hardened" },
+  hardened: { status: "ok", label: "diperkuat" },
+  belum: { status: "broken", label: "belum diperkuat" },
   unknown: { status: "idle", label: "belum diaudit" },
 } as const;
+// Keterjangkauan: VPS yang belum pernah terhubung itu keadaan NETRAL ("belum terhubung"), bukan
+// kegagalan. Merah hanya untuk VPS yang pernah terhubung lalu tak terjangkau lagi.
+export const reachPill = (v: VpsView, now: number = Date.now()): { status: string; label: string } =>
+  !v.lastSeenAt ? { status: "idle", label: "belum terhubung" }
+    : isReachable(v, now) ? { status: "ok", label: "terhubung" }
+    : { status: "broken", label: "tidak terjangkau" };
 
 export type VpsForm = { name: string; host: string; user: string; port: string; keyPath: string; password: string };
 
@@ -77,7 +84,10 @@ export function VpsScreen({ onToast, onGotoTerminal }:
   { onToast: (msg: string, kind?: string, icon?: string) => void; onGotoTerminal: (sessionId: string) => void }) {
   const [list, setList] = React.useState<VpsView[]>([]);
   const [status, setStatus] = React.useState<"loading" | "ready" | "error">("loading");
+  const [loadErr, setLoadErr] = React.useState("");
   const [busy, setBusy] = React.useState<string | null>(null); // "<aksi>:<id>"
+  // Menu ⋯ per baris: aksi jarang (tes, console, sesi, edit, hapus) tak ikut memadati baris.
+  const [menuFor, setMenuFor] = React.useState<string | null>(null);
   // null = tertutup · "new" = daftar · VpsView = edit
   const [modal, setModal] = React.useState<null | "new" | VpsView>(null);
   // VPS yang detail+checklist-nya sedang dibuka di modal (null = tertutup). UI 2026-07-18 ·
@@ -90,8 +100,17 @@ export function VpsScreen({ onToast, onGotoTerminal }:
 
   const load = React.useCallback(() => {
     api.listVps().then((l) => { setList(l); setStatus("ready"); })
-      .catch(() => setStatus("error"));
+      .catch((e) => { setLoadErr(errorMessage(e, "tak diketahui")); setStatus("error"); });
   }, []);
+  // Menu ⋯ tertutup saat klik di luarnya.
+  React.useEffect(() => {
+    if (!menuFor) return;
+    const close = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest?.("[data-vps-menu]")) setMenuFor(null);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menuFor]);
   // SPEC-199 · daftar VPS didorong lewat WS siar (grup "vps"), bukan poll 30s. `load()` awal
   // tetap untuk paint pertama; snapshot penuh saat connect menyusul.
   React.useEffect(() => {
@@ -102,13 +121,14 @@ export function VpsScreen({ onToast, onGotoTerminal }:
   // SPEC-847 · ADR-0127 · konfirmasi mutasi VPS memakai dialog aplikasi.
   const { confirm, dialog } = useConfirm();
 
-  async function run(label: string, id: string, fn: () => Promise<unknown>, okMsg: string) {
-    setBusy(`${label}:${id}`);
+  // Galat selalu membawa alasannya (`failureMessage`): "Gagal tes koneksi: <out dari server>".
+  async function run(key: string, id: string, fn: () => Promise<unknown>, okMsg: string, failAction: string) {
+    setBusy(`${key}:${id}`);
     try { await fn(); load(); onToast(okMsg, "ok", "server"); }
-    catch { onToast(`Gagal ${label}`, "err", "x-circle"); }
+    catch (e) { onToast(failureMessage(failAction, e), "err", "x-circle"); }
     finally { setBusy(null); }
   }
-  const audit = (v: VpsView) => run("audit", v.id, () => api.auditVps(v.id), `${v.name} · audit selesai`);
+  const audit = (v: VpsView) => run("audit", v.id, () => api.auditVps(v.id), `${v.name} · audit selesai`, "menjalankan audit");
   async function harden(v: VpsView) {
     if (!await confirm({
       title: `Harden "${v.name}"?`,
@@ -122,17 +142,17 @@ export function VpsScreen({ onToast, onGotoTerminal }:
       confirmLabel: "Harden",
       icon: "shield",
     })) return;
-    void run("harden", v.id, () => api.hardenVps(v.id), `${v.name} · harden selesai`);
+    void run("harden", v.id, () => api.hardenVps(v.id), `${v.name} · harden selesai`, "menjalankan harden");
   }
   const session = (v: VpsView) =>
-    run("sesi", v.id, async () => { const { id } = await api.vpsSession(v.id); onGotoTerminal(id); }, `${v.name} · sesi Claude dibuka`);
+    run("sesi", v.id, async () => { const { id } = await api.vpsSession(v.id); onGotoTerminal(id); }, `${v.name} · sesi Claude dibuka`, "membuka sesi Claude");
   // SPEC-211 · test connection (transien, tak sentuh state) & open console (shell ssh di tmux).
   const testConn = (v: VpsView) => run("test", v.id, async () => {
     const r = await api.testVps(v.id);
     if (!r.ok) throw new Error(r.out);
-  }, `${v.name} · koneksi ok`);
+  }, `${v.name} · koneksi ok`, "tes koneksi");
   const openConsole = (v: VpsView) =>
-    run("console", v.id, async () => { const { id } = await api.vpsConsole(v.id); onGotoTerminal(id); }, `${v.name} · console dibuka`);
+    run("console", v.id, async () => { const { id } = await api.vpsConsole(v.id); onGotoTerminal(id); }, `${v.name} · console dibuka`, "membuka console");
   async function remove(v: VpsView) {
     try {
       if (!await confirm({
@@ -142,7 +162,8 @@ export function VpsScreen({ onToast, onGotoTerminal }:
         run: () => api.deleteVps(v.id),
       })) return;
       load();
-    } catch { onToast("Gagal hapus", "err", "x-circle"); }
+      onToast(`${v.name} dihapus dari daftar`, "ok", "check");
+    } catch (e) { onToast(failureMessage("menghapus registrasi VPS", e), "err", "x-circle"); }
   }
 
   async function create(f: VpsForm) {
@@ -165,7 +186,7 @@ export function VpsScreen({ onToast, onGotoTerminal }:
 
   if (status === "loading") return <StateBlock kind="loading" title="Memuat daftar VPS…" />;
   if (status === "error") return <StateBlock kind="error" title="Gagal memuat daftar VPS"
-    hint="Pastikan server hanoman berjalan." action={load} />;
+    hint={`Alasan: ${loadErr}. Pastikan server hanoman berjalan.`} action={load} />;
   if (list.length === 0) return (
     <>
       <StateBlock kind="empty" icon="server" title="Belum ada VPS"
@@ -183,6 +204,9 @@ export function VpsScreen({ onToast, onGotoTerminal }:
         </div>
         {list.map((v) => {
           const h = HARDENED_PILL[hardenedLabel(v)];
+          const reach = reachPill(v);
+          const menuOpen = menuFor === v.id;
+          const closeAnd = (fn: () => void) => () => { setMenuFor(null); fn(); };
           return (
             <div key={v.id} className="hn-vps-row"
               onClick={() => setDetailVps(v)}
@@ -209,28 +233,43 @@ export function VpsScreen({ onToast, onGotoTerminal }:
                   </span>
                 </button>
                 <div className="hn-vps-pills" style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
-                  <StatusPill size="sm" status={isReachable(v) ? "ok" : "broken"}>
-                    {isReachable(v) ? "reachable" : "unreachable"}</StatusPill>
+                  <StatusPill size="sm" status={reach.status}>{reach.label}</StatusPill>
                   <StatusPill size="sm" status={h.status}>{h.label}</StatusPill>
                 </div>
-                <div className="hn-vps-actions">
-                  <Button size="sm" variant="ghost" leftIcon="plug-zap" loading={busy === `test:${v.id}`}
-                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); void testConn(v); }}>Test</Button>
-                  <Button size="sm" variant="ghost" leftIcon="terminal-square" loading={busy === `console:${v.id}`}
-                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); void openConsole(v); }}>Console</Button>
-                  <Button size="sm" variant="ghost" leftIcon="terminal" loading={busy === `sesi:${v.id}`}
-                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); void session(v); }}>Sesi Claude</Button>
-                  <Button size="sm" variant="secondary" leftIcon="radar" loading={busy === `audit:${v.id}`}
+                <div className="hn-vps-actions" style={{ display: "flex", gap: 6, alignItems: "center", position: "relative" }}
+                  data-vps-menu>
+                  {/* Satu aksi primer per baris: audit. Harden berbahaya → selalu lewat konfirmasi. */}
+                  <Button size="sm" leftIcon="radar" loading={busy === `audit:${v.id}`}
                     onClick={(e: React.MouseEvent) => { e.stopPropagation(); void audit(v); }}>Audit</Button>
-                  <Button size="sm" leftIcon="shield" loading={busy === `harden:${v.id}`}
+                  <Button size="sm" variant="danger" leftIcon="shield" loading={busy === `harden:${v.id}`}
                     onClick={(e: React.MouseEvent) => { e.stopPropagation(); void harden(v); }}>Harden</Button>
-                  {/* Pemisah tipis: dua tombol terakhir mengubah/menghapus pendaftaran, bukan
-                      menjalankan sesuatu di mesinnya. */}
-                  <span aria-hidden className="hn-vps-sep" />
-                  <Button size="sm" variant="ghost" leftIcon="pencil" title={`Edit ${v.name}`}
-                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); setModal(v); }} />
-                  <Button size="sm" variant="ghost" leftIcon="trash-2" title={`Hapus ${v.name}`}
-                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); void remove(v); }} />
+                  <Button size="sm" variant="ghost" leftIcon="ellipsis" aria-label={`Aksi lain untuk ${v.name}`}
+                    aria-haspopup="menu" aria-expanded={menuOpen}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); setMenuFor(menuOpen ? null : v.id); }} />
+                  {menuOpen && (
+                    <div role="menu" aria-label={`Aksi lain ${v.name}`} onClick={(e) => e.stopPropagation()}
+                      style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 5, minWidth: 190,
+                        display: "grid", padding: 4, background: "var(--surface-card)",
+                        border: "1px solid var(--border-hair)", borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-md)" }}>
+                      {[
+                        { label: "Tes koneksi", icon: "plug-zap", fn: () => void testConn(v), danger: false },
+                        { label: "Buka console", icon: "terminal-square", fn: () => void openConsole(v), danger: false },
+                        { label: "Sesi Claude", icon: "terminal", fn: () => void session(v), danger: false },
+                        { label: "Edit", icon: "pencil", fn: () => setModal(v), danger: false, title: `Edit ${v.name}` },
+                        { label: "Hapus", icon: "trash-2", fn: () => void remove(v), danger: true, title: `Hapus ${v.name}` },
+                      ].map((it) => (
+                        <button key={it.label} type="button" role="menuitem" title={it.title}
+                          aria-label={it.title ?? it.label}
+                          onClick={closeAnd(it.fn)}
+                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", textAlign: "left",
+                            font: "inherit", fontSize: 13, color: it.danger ? "var(--clay-600)" : "var(--text-strong)",
+                            background: "transparent", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" }}>
+                          <Icon name={it.icon} size={14} />
+                          {it.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               {/* SPEC-883 · penandaan komponen: apa yang benar-benar ada di mesin itu, beserta

@@ -61,11 +61,11 @@ describe("SPEC-763 · baris padat memberi teks lebar minimum di mobile", () => {
   it("memakai aturan itu pada baris yang terukur terjepit", () => {
     const overview = readFileSync(resolve(import.meta.dirname, "../src/screens/OverviewScreen.tsx"), "utf8");
     const from = overview.indexOf("function AttnRow");
-    const attn = overview.slice(from, overview.indexOf(">Buka SoT</Button>", from));
+    const attn = overview.slice(from, overview.indexOf(">Buka dokumen</Button>", from));
     expect(attn).toContain('className="hn-dense-row"');
 
     const crons = readFileSync(resolve(import.meta.dirname, "../src/screens/SchedulerCrons.tsx"), "utf8");
-    const gate = crons.slice(crons.indexOf("belum di-opt-in scheduler") - 900, crons.indexOf("belum di-opt-in scheduler"));
+    const gate = crons.slice(crons.indexOf("belum diizinkan untuk scheduler") - 900, crons.indexOf("belum diizinkan untuk scheduler"));
     expect(gate).toContain('className="hn-dense-row"');
   });
 });

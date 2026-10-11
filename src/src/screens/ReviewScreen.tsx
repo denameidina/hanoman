@@ -17,6 +17,9 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec" }:
   const [errMsg, setErrMsg] = React.useState("");
   const [selected, setSelected] = React.useState("");
   const [file, setFile] = React.useState<ReviewFile | null>(null);
+  // Gagal memuat berkas ≠ "Memuat file…" selamanya: keadaannya dipisah dan bisa dicoba ulang.
+  const [fileState, setFileState] = React.useState<"loading" | "ready" | "error">("loading");
+  const [fileTries, setFileTries] = React.useState(0);
   const [tab, setTab] = React.useState<"diff" | "source">("diff");
   const [tries, setTries] = React.useState(0);
   const [chView, setChView] = React.useState<"list" | "tree">("list");
@@ -42,14 +45,14 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec" }:
   }, [specId, tries]);
 
   React.useEffect(() => {
-    if (!selected) { setFile(null); return; }
+    if (!selected) { setFile(null); setFileState("ready"); return; }
     let alive = true;
-    setFile(null); setPreview(false);
+    setFile(null); setPreview(false); setFileState("loading");
     fetchFile(specId, selected)
-      .then((f) => { if (alive) setFile(f); })
-      .catch(() => { if (alive) setFile(null); });
+      .then((f) => { if (alive) { setFile(f); setFileState("ready"); } })
+      .catch(() => { if (alive) setFileState("error"); });
     return () => { alive = false; };
-  }, [specId, selected]);
+  }, [specId, selected, fileTries]);
 
   const tree = React.useMemo(() => buildFileTree(review?.files ?? []), [review]);
   const changed = review?.changed ?? [];
@@ -82,6 +85,10 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec" }:
           <div className="hn-eyebrow" style={{ padding: "6px 8px", marginTop: 8, borderTop: "1px solid var(--border-hair)" }}>Files</div>
           {tree.map((n) => <TreeRow key={n.path} node={n} selected={selected} onSelect={selectFile} />)}
         </div>
+        {/* Legenda status git — huruf di kanan tiap baris changed/Badge file. */}
+        <div style={{ fontSize: 11, color: "var(--text-subtle)", padding: "6px 12px", borderTop: "1px solid var(--border-hair)" }}>
+          A = baru · M = diubah · D = dihapus
+        </div>
       </Card>
         ) },
 
@@ -98,21 +105,27 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec" }:
           )}
           <div style={{ display: "flex", gap: 2, background: "var(--bone-100)", borderRadius: "var(--radius-pill)", padding: 2 }}>
             {(["diff", "source"] as const).map((t) => (
-              <button key={t} onClick={() => setTab(t)} style={{
+              <button key={t} type="button" aria-pressed={tab === t} onClick={() => setTab(t)} style={{
                 padding: "4px 12px", border: "none", cursor: "pointer", borderRadius: "var(--radius-pill)",
-                fontSize: 12, textTransform: "capitalize",
+                fontSize: 12,
                 background: tab === t ? "var(--surface-card)" : "transparent",
                 color: tab === t ? "var(--text-strong)" : "var(--text-muted)", fontWeight: tab === t ? 600 : 400,
-              }}>{t}</button>
+              }}>{t === "diff" ? "Diff" : "Sumber"}</button>
             ))}
           </div>
         </div>
         <div style={{ maxHeight: 640, overflow: "auto", background: "var(--surface-card)" }}>
           {!selected ? <StateBlock kind="empty" icon="file-text" title="Pilih file" hint="Pilih file dari changed atau tree." />
+            : fileState === "error" ? <StateBlock kind="error" title="Gagal memuat berkas" hint={selected} action={() => setFileTries((n) => n + 1)} />
             : !file ? <StateBlock kind="loading" title="Memuat file…" hint={selected} />
             : file.binary ? <StateBlock kind="empty" icon="file" title="Berkas biner" hint="Tak dapat di-review dari dashboard." />
             : tab === "diff" ? <div style={{ padding: "10px 0" }}><DiffView diff={file.diff ?? ""} emptyHint="File ini bagian dari project tapi tak diubah backlog ini." />
-                {file.truncated && <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-subtle)" }}>… dipotong pada 256 KB.</div>}</div>
+                {file.truncated && (
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, padding: "8px 12px", fontSize: 12, color: "var(--text-muted)" }}>
+                    <span>… dipotong pada 256 KB.</span>
+                    <a href={downloadUrl(specId, selected, "md")} download style={{ color: "var(--brass-700)", fontWeight: 500 }}>Unduh berkas utuh</a>
+                  </div>
+                )}</div>
             : file.content === null ? <StateBlock kind="empty" icon="trash-2" title="File dihapus" hint="Tak ada isi untuk ditampilkan." />
             : <pre style={{ margin: 0, padding: "12px 16px", fontFamily: "var(--font-mono)", fontSize: 12.5,
                 lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", color: "var(--text-body)" }}>{file.content}</pre>}
@@ -121,6 +134,15 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec" }:
         ) },
       ]}
     />
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 12,
+      padding: "10px 12px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-md)", background: "var(--surface-card)" }}>
+      <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+        Selesai meninjau? Merge atau buang perubahan dilakukan dari {kind === "session" ? "terminal" : "backlog"}.
+      </span>
+      <Button size="sm" variant="primary" leftIcon="arrow-left" onClick={onBack}>
+        {kind === "session" ? "Kembali ke terminal" : "Kembali ke backlog"}
+      </Button>
+    </div>
     {preview && canPreview && (
       <DocPreviewModal path={selected} text={file!.content ?? ""} eyebrow={specId}
         download={(f) => downloadUrl(specId, selected, f)} onClose={() => setPreview(false)} />

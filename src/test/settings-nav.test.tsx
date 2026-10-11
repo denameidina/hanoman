@@ -31,7 +31,7 @@ describe("SettingsScreen sidebar", () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
     const picker = await screen.findByRole("combobox", { name: "Bagian pengaturan" });
     expect(Array.from((picker as HTMLSelectElement).options).map((option) => option.text))
-      .toEqual(expect.arrayContaining(["Akun", "Users", "Akses klien", "Konfigurasi", "Webhook", "Model sesi", "Sesi"]));
+      .toEqual(expect.arrayContaining(["Akun", "Pengguna", "Akses klien", "Konfigurasi", "Webhook", "Model sesi", "Sesi"]));
     fireEvent.change(picker, { target: { value: "model" } });
     const effort = await screen.findByLabelText("Effort claude");
     expect(effort).toBeInTheDocument();
@@ -42,12 +42,15 @@ describe("SettingsScreen sidebar", () => {
   it("uses the compact settings rail at the tablet breakpoint", async () => {
     mockViewport(768);
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-    await screen.findByText("Ganti password");
+    await screen.findByText("Sesi & notifikasi");
     expect(document.querySelector(".hn-settings-layout")).toHaveStyle({ gridTemplateColumns: "160px minmax(0, 1fr)" });
   });
-  it("mulai di Akun (form ganti password) lalu pindah tab lewat sidebar", async () => {
+  it("mulai di Sesi (kebiasaan harian), lalu pindah ke Akun dan tab lain lewat sidebar", async () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-    // default tab = Akun
+    // default tab = Sesi; Akun (form ganti password) kini bukan tab awal.
+    expect(await screen.findByText("Sesi & notifikasi")).toBeInTheDocument();
+    expect(screen.queryByText("Ganti password")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Akun" }));
     expect(await screen.findByText("Ganti password")).toBeInTheDocument();
     // pindah ke Model sesi → kartu model muncul, form password hilang
     fireEvent.click(screen.getByText("Model sesi"));

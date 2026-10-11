@@ -18,6 +18,7 @@ import {
 } from "./team-rules";
 import { usePersistedState, ResetViewButton, isStr, oneOf, strList } from "../ui-state";
 import type { ProjectVM } from "./types";
+import { errorMessage } from "../lib/report-error";
 
 /* TeamScreen — papan kerja MANUSIA (SPEC-946 · ADR-0150/ADR-0151). Screen mandiri (pola
    TriageScreen): memuat datanya sendiri, tak lewat `gate` App.
@@ -73,14 +74,19 @@ function ColumnFeed({ status, params, onData, refetch }: {
   return null;
 }
 
-export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }: {
+export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast, onOpenSpec }: {
   projects: ProjectVM[]; projectFilter: string;
   onProjectFilter: (v: string) => void;
   onToast: (msg: string, kind?: string, icon?: string) => void;
+  /** Membuka spec terkait di layar Backlog. Opsional: tanpa ini lencana spec tetap statis. */
+  onOpenSpec?: (specId: string) => void;
 }) {
   const [board, setBoard] = React.useState<Board>(emptyBoard);
   const [totals, setTotals] = React.useState<Totals>(zeroTotals);
   const [members, setMembers] = React.useState<MemberView[]>([]);
+  // Audit 2026-10: daftar anggota yang gagal dimuat harus terlihat, bukan dropdown kosong yang
+  // menyesatkan ("Semua anggota" saja seolah tim tak punya anggota).
+  const [membersError, setMembersError] = React.useState("");
   const [state, setState] = React.useState<"loading" | "ready" | "error">("loading");
   // SPEC-857 · ADR-0131 · saat refetch gagal, papan yang sudah tampil TIDAK boleh berubah jadi
   // layar galat: operator harus tahu ia sedang membaca nilai basi, bukan papan yang menyusut.
@@ -175,7 +181,10 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
 
   const loadMembers = React.useCallback(() => {
     // Papan tetap jalan tanpa nama: kartu jatuh ke "belum ditugaskan", bukan ke layar galat.
-    api.listMembers().then((r) => setMembers(r.items)).catch(() => { /* diam disengaja */ });
+    // Galat memuat anggota tak menghalangi papan, tetapi tampil di baris filter.
+    api.listMembers()
+      .then((r) => { setMembers(r.items); setMembersError(""); })
+      .catch((e: unknown) => setMembersError(errorMessage(e, "tidak diketahui")));
   }, []);
   React.useEffect(() => { loadMembers(); }, [loadMembers]);
 
@@ -242,6 +251,12 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
   }
 
   const empty = columns.every((c) => board[c.key].length === 0);
+  // Hapus semua penyaring sekaligus. Mode lintas project tak punya penyaring project (disabled),
+  // jadi `onProjectFilter` hanya dipanggil di luar mode itu — sama dengan `ResetViewButton`.
+  const clearFilters = () => {
+    if (!cross) onProjectFilter("all");
+    setColFilter("all"); setMemberFilter("all"); setQ("");
+  };
   // Linimasa membaca papan yang SAMA — nol fetch dan nol langganan tambahan (ADR-0151).
   const tasks = React.useMemo(() => columns.flatMap((c) => board[c.key]), [board, columns]);
   const hiddenTasks = columns.reduce(
@@ -268,7 +283,7 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
             <span className="hn-eyebrow" role="status"
               style={stale ? { color: "var(--amber-600)" } : undefined}
               title={stale ? "Server tak menjawab saat menyegarkan — angka ini dari muatan terakhir yang berhasil" : undefined}>
-              {columns.reduce((n, c) => n + (totals[c.key] ?? 0), 0)} tugas{stale ? " · basi" : ""}
+              {columns.reduce((n, c) => n + (totals[c.key] ?? 0), 0)} tugas{stale ? " · data lama" : ""}
             </span>
             <LiveConnectionBadge />
           </div>
@@ -303,9 +318,16 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
             options={[{ value: "all", label: "Semua kolom" },
               ...TEAM_COLUMNS.map((c) => ({ value: c.key, label: c.label }))]} />
           <Select size="sm" aria-label="Filter anggota" value={memberFilter}
+            disabled={!!membersError}
             onChange={(e) => setMemberFilter(e.target.value)}
             options={[{ value: "all", label: "Semua anggota" },
               ...members.map((m) => ({ value: m.id, label: m.name }))]} />
+          {membersError && (
+            <span role="alert" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "var(--text-xs)", color: "var(--text-body)" }}>
+              Anggota gagal dimuat: {membersError}
+              <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={loadMembers}>Coba lagi</Button>
+            </span>
+          )}
           {(timeline || cross) && (
             <Select size="sm" aria-label="Zoom linimasa" value={zoom}
               onChange={(e) => setZoom(e.target.value as TimelineZoom)}
@@ -321,22 +343,32 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
       {state === "loading" ? <StateBlock kind="loading" />
         : state === "error" ? <StateBlock kind="error" hint="Gagal memuat papan tim."
             action={() => load()} actionLabel="Coba lagi" />
-        // Kolom kosong DI BAWAH penyaring tetap dirender sebagai kolom: "Dikerjakan 0" adalah
+        // Kolom kosong DI BAWAH penyaring tetap dirender sebagai kolom: "Menunggu 0" adalah
         // jawaban, sementara StateBlock akan menyembunyikan tiga kolom lain yang mungkin berisi.
         // Yang layak menggantikan papan hanya papan yang benar-benar kosong tanpa penyaring.
         : empty && activeFilters === 0 ? <StateBlock kind="empty" icon="users" title="Papan tim masih kosong"
             hint="Catat pekerjaan manusia di sekitar sesi agen — desain, meeting klien, deploy, nego."
             action={() => { setEditing(null); setTaskOpen(true); }} actionLabel="Tugas baru" actionIcon="plus" />
-        : cross
-          ? <TeamProjectTimeline tasks={tasks} projects={projects} members={members}
-              zoom={zoom} today={today} hidden={hiddenTasks} expanded={expanded}
-              onToggle={toggleProject} onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />
-        : timeline
-          ? <TeamTimeline tasks={tasks} members={members} zoom={zoom} today={today}
-              hidden={hiddenTasks} onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />
-          : <TeamBoard board={board} totals={totals} columns={columns} members={members}
-              onMove={move} onAssign={assign} onEscalate={setEscalating} onUnlink={unlink}
-              onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />}
+        : <>
+            {/* Audit 2026-10: penyaring aktif yang menyaring semua tugas harus dikatakan, dengan jalan
+                keluarnya — bukan papan kosong tanpa sebab. Papan di bawahnya tetap tampil. */}
+            {empty && activeFilters > 0 && (
+              <StateBlock kind="empty" compact icon="filter" title="Tak ada tugas yang cocok dengan filter"
+                hint="Penyaring yang aktif menyembunyikan semua tugas di papan ini."
+                action={clearFilters} actionLabel="Hapus filter" actionIcon="x" />
+            )}
+            {cross
+              ? <TeamProjectTimeline tasks={tasks} projects={projects} members={members}
+                  zoom={zoom} today={today} hidden={hiddenTasks} expanded={expanded}
+                  onToggle={toggleProject} onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />
+              : timeline
+                ? <TeamTimeline tasks={tasks} members={members} zoom={zoom} today={today}
+                    hidden={hiddenTasks} onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />
+                : <TeamBoard board={board} totals={totals} columns={columns} members={members}
+                    projects={projects} onOpenSpec={onOpenSpec}
+                    onMove={move} onAssign={assign} onEscalate={setEscalating} onUnlink={unlink}
+                    onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />}
+          </>}
 
       <TaskModal open={taskOpen} task={editing} projects={projects} members={members}
         defaultProjectId={effectiveProject ?? null}

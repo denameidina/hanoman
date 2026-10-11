@@ -2,10 +2,12 @@
    Ported; spec.project → spec.projectId; window → ds imports. */
 import React from "react";
 import {
-  Card, Badge, Tabs, Select, Button, IconButton, Icon, Checkbox, serverPage, Pager, Modal, StateBlock, Input,
-  Field, HnTextarea, LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE
+  Card, Badge, Tabs, Select, Button, Icon, Checkbox, serverPage, Pager, Modal, StateBlock, Input,
+  Field, HnTextarea, LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE,
+  OverflowActions, useConfirm, type OverflowItem,
 } from "../ds";
 import { api, ApiError, type SourceResetPending } from "../api/client";
+import { failureMessage } from "../lib/report-error";
 import { mergeSlim } from "../lib/specs-digest";
 import { SpecDocsModal } from "./SpecDocsModal";
 import { SpecAttachmentsPanel, type AttachmentToast } from "./SpecAttachments";
@@ -34,11 +36,26 @@ export const B_STAGES = [
   { key: "executing", label: "Execute" }, { key: "done", label: "Done" },
 ];
 const bStageIndex = (k: string) => B_STAGES.findIndex((s) => s.key === k);
-const B_PRIO: Record<string, { tone: any; label: string }> = {
-  tinggi: { tone: "err", label: "prioritas tinggi" },
-  sedang: { tone: "neutral", label: "prioritas sedang" },
-  rendah: { tone: "neutral", label: "prioritas rendah" },
+// Keterangan tiap tahap untuk tooltip & pembaca layar: istilah Objective/Spec/Plan dijelaskan di sini.
+const STAGE_HINT: Record<string, string> = {
+  brainstorming: "Brainstorm: ide digali bersama agen sebelum tujuan dikunci",
+  objective: "Objective: tujuan terukur dikunci sebelum spec ditulis",
+  "spec-ready": "Spec: dokumen spesifikasi ditulis",
+  planned: "Plan: rencana langkah disusun",
+  executing: "Execute: kode dikerjakan di worktree sesi",
+  done: "Done: item selesai",
 };
+// Satu kata kerja untuk memulai/melanjutkan sesi agen. Dipakai kartu DAN detail — dulu detail hanya
+// punya tombol untuk item yang sudah selesai, sehingga item yang belum selesai tak punya jalan agen.
+const startLabel = (stage: string) => (stage === "brainstorming" ? "Mulai" : "Lanjutkan");
+// Satu sumber label prioritas untuk board, grid, list, dan detail. Warnanya aksen (brass), BUKAN
+// `err`: `err` dipesan untuk gagal/terblokir, dan sumber QA sudah memakainya.
+const B_PRIO: Record<string, { tone: "brass" | "neutral"; label: string }> = {
+  tinggi: { tone: "brass", label: "Tinggi" },
+  sedang: { tone: "neutral", label: "Sedang" },
+  rendah: { tone: "neutral", label: "Rendah" },
+};
+const prioMeta = (priority: string) => B_PRIO[priority] ?? B_PRIO.sedang!;
 // SPEC-546 · ADR-0109 · katalog source (lencana, opsi, daftar field per bentuk) pindah ke
 // `source-meta.ts` supaya dialog "Ubah type" memakai katalog yang SAMA — dua katalog pasti
 // berselisih. Re-export menjaga pemakai lama (TerminalScreen, test) tetap tersambung.
@@ -60,14 +77,18 @@ function BlockedBadge({ spec }: { spec: SpecListItem }) {
 function StageBar({ stage }: { stage: string }) {
   const idx = bStageIndex(stage);
   const label = B_STAGES[idx]?.label ?? stage;
+  // role="progressbar": tahap aktif sebagai nilai (0 = Brainstorm … 5 = Done), bukan `div` berlabel
+  // yang tak diumumkan pembaca layar. Nama aksesibel tetap "Status <tahap>" (dipakai test & layar).
   return (
-    <div aria-label={`Status ${label}`} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+    <div role="progressbar" aria-label={`Status ${label}`} aria-valuemin={0}
+      aria-valuemax={B_STAGES.length - 1} aria-valuenow={Math.max(idx, 0)} aria-valuetext={label}
+      style={{ display: "flex", alignItems: "center", gap: 4 }}>
       {B_STAGES.map((s, i) => {
         const done = i < idx || stage === "done";
         const active = i === idx && stage !== "done";
         return (
           <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{
+            <span title={STAGE_HINT[s.key]} style={{
               display: "inline-flex", alignItems: "center", gap: 5,
               padding: active ? "3px 9px" : 0, borderRadius: "var(--radius-pill)",
               background: active ? "var(--brass-100)" : "transparent",
@@ -115,7 +136,7 @@ const isAuditSource = (source: string) => source === "audit";
 // belum dimuat (`null` = memang tak punya payload).
 type DetailSpec = SpecListItem & { payload?: Spec["payload"]; sourceHistory?: Spec["sourceHistory"] };
 
-function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, projectPolicy, allSpecs, onAttachmentToast }:
+function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, projectPolicy, allSpecs, onAttachmentToast, running, onOpenRun }:
   {
     spec: DetailSpec | null; onClose: () => void; onEditBranch?: (s: SpecSlim, b: string | null) => void;
     onRevertStage?: (s: SpecSlim, target: string, confirmDelete?: boolean) => Promise<any>;
@@ -148,6 +169,8 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
     // SPEC-843 · ADR-0124 · hasil unggah/hapus lampiran. Bentuknya `AttachmentToast`, bukan
     // `onToast` layar (yang bersignature toast App); panel lampiran tak perlu tahu ikon.
     onAttachmentToast?: AttachmentToast;
+    // Sesi hidup untuk item ini: CTA berubah jadi "Buka sesi" (sama dengan kartunya).
+    running?: boolean; onOpenRun?: (s: SpecSlim) => void;
   }) {
   // Hook HARUS mendahului early-return `if (!spec)` — rules-of-hooks.
   const [branches, setBranches] = React.useState<string[]>([]);
@@ -261,11 +284,22 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
       icon={sourceMeta(spec.source).icon} onClose={closeDetail}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
         <Badge tone={sourceMeta(spec.source).tone} size="sm">{sourceMeta(spec.source).label}</Badge>
-        <Badge tone={(B_PRIO[spec.priority] || B_PRIO.sedang!).tone} size="sm" variant="outline">
-          {(B_PRIO[spec.priority] || B_PRIO.sedang!).label}
+        <Badge tone={prioMeta(spec.priority).tone} size="sm" variant="outline" title={`Prioritas ${prioMeta(spec.priority).label}`}>
+          {prioMeta(spec.priority).label}
         </Badge>
         <Badge tone="neutral" size="sm">{spec.author}</Badge>
         <span style={{ flex: 1 }} />
+        {/* Aksi utama item yang belum selesai = jalankan agen, sama dengan kartunya (satu kata kerja). */}
+        {spec.stage !== "done" && running && (
+          <Button size="sm" variant="primary" leftIcon="terminal" onClick={() => onOpenRun && onOpenRun(spec)}>
+            Buka sesi
+          </Button>
+        )}
+        {spec.stage !== "done" && !running && onStart && (
+          <Button size="sm" variant="primary" leftIcon="play" onClick={() => onStart(spec)}>
+            {startLabel(spec.stage)}
+          </Button>
+        )}
         {/* SPEC-186 · edit konten selagi item masih di backlog & belum dimulai. */}
         {editable && !editing && (
           <Button size="sm" variant="secondary" leftIcon="pencil" onClick={startEdit}>Edit</Button>
@@ -445,7 +479,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
         <Field label="Judul"><Input value={form.title ?? ""} onChange={setField("title")}
           placeholder="mis. Jadwal invoice berulang" style={{ width: "100%" }} /></Field>
       ) : (
-        <DetailRow label="Objective" value={spec.objective} />
+        <DetailRow label="Tujuan" value={spec.objective} />
       )}
       {/* SPEC-143 · dapat diubah selama item masih di backlog; hanya menentukan basis run berikutnya. */}
       <div style={{ marginBottom: 14 }}>
@@ -518,7 +552,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
         fields.map(([k, label]) => <DetailRow key={k} label={label} value={p[k] ?? ""} />)
       )}
       {confirm && (
-        <Modal open title="Kembalikan stage & hapus artefak" icon="rotate-ccw"
+        <Modal open title="Kembalikan status & hapus dokumen fase" icon="rotate-ccw"
           eyebrow={spec.id + " → " + confirm.target}
           onClose={stageBusy ? undefined : () => setConfirm(null)}>
           <div style={{ fontSize: 13.5, color: "var(--text-strong)", marginBottom: 12 }}>
@@ -533,7 +567,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <Button size="sm" variant="secondary" disabled={stageBusy}
               onClick={() => setConfirm(null)}>Batal</Button>
-            <Button size="sm" variant="primary" leftIcon="trash-2" loading={stageBusy}
+            <Button size="sm" variant="danger" leftIcon="trash-2" loading={stageBusy}
               onClick={confirmRevert}>Hapus & kembalikan</Button>
           </div>
         </Modal>
@@ -559,8 +593,10 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
   );
 }
 
-/* Aksi per-spec. Dipakai grid, list, danZ board — satu-satunya jalan keyboard ke
-   "mulai sesi", jadi board tetap bisa dipakai tanpa drag. */
+/* Aksi per-spec. Dipakai grid, list, dan board. Kartu memegang SATU aksi utama sadar-stage
+   (Mulai / Lanjutkan / Buka sesi); aksi sekunder — review, dokumen, tandai selesai, hapus — ada di
+   menu ⋯. Board tetap bisa dipakai tanpa drag: aksi utama selalu tersedia untuk item yang belum selesai.
+   Dialog-nya hidup DI LUAR menu: menu menutup dirinya lebih dulu, lalu aksinya membuka dialog ini. */
 function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, onMarkDone, running }:
   {
     spec: SpecListItem; onStart?: (s: SpecSlim) => void; onDelete?: (s: SpecSlim) => void;
@@ -571,31 +607,29 @@ function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, onMarkD
   }) {
   const [docs, setDocs] = React.useState(false);
   const [markDone, setMarkDone] = React.useState(false);
+  const open = spec.stage !== "done";
+  // SPEC-171 · review all files + file changed dari worktree; tersedia di semua stage.
+  const items: OverflowItem[] = [
+    ...(onOpenReview ? [{ key: "review", label: "Review perubahan", icon: "git-compare", onSelect: () => onOpenReview(spec) }] : []),
+    { key: "docs", label: "Lihat dokumen", icon: "file-text", onSelect: () => setDocs(true) },
+    // SPEC-804 · ADR-0120 · maju ke `done` tanpa sesi — untuk item yang beres di luar hanoman.
+    ...(open && onMarkDone ? [{ key: "done", label: "Tandai selesai", icon: "circle-check", onSelect: () => setMarkDone(true) }] : []),
+    ...(onDelete ? [{ key: "delete", label: "Hapus spec", icon: "trash-2", onSelect: () => onDelete(spec) }] : []),
+  ];
   return (
     <div className="hn-row-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      {/* SPEC-171 · review all files + file changed dari worktree. Berguna kapan pun
-          worktree ada, jadi tampil di semua stage. */}
-      {onOpenReview && (
-        <Button size="sm" variant="ghost" leftIcon="git-compare" onClick={() => onOpenReview(spec)}>Review</Button>
-      )}
-      {spec.stage !== "done" && running && (
-        <Button size="sm" variant="secondary" leftIcon="terminal" onClick={() => onOpenRun && onOpenRun(spec)}>
+      {open && running && (
+        <Button size="sm" variant="primary" leftIcon="terminal" onClick={() => onOpenRun && onOpenRun(spec)}>
           Buka sesi
         </Button>
       )}
-      {spec.stage !== "done" && !running && (
+      {open && !running && (
         <Button size="sm" variant="primary" leftIcon="play" onClick={() => onStart && onStart(spec)}>
-          {spec.stage === "brainstorming" ? "Mulai" : "Lanjutkan"}
+          {startLabel(spec.stage)}
         </Button>
       )}
-      {spec.stage === "done" && <Badge tone="ok" size="sm" icon="check-circle-2">selesai</Badge>}
-      {/* SPEC-804 · ADR-0120 · maju ke `done` tanpa sesi — untuk item yang beres di luar hanoman. */}
-      {spec.stage !== "done" && onMarkDone && (
-        <IconButton size="sm" variant="ghost" icon="circle-check" label="Tandai selesai"
-          onClick={() => setMarkDone(true)} />
-      )}
-      <IconButton size="sm" variant="ghost" icon="file-text" label="Lihat dokumen" onClick={() => setDocs(true)} />
-      {onDelete && <IconButton size="sm" variant="ghost" icon="trash-2" label="Hapus spec" onClick={() => onDelete(spec)} />}
+      {!open && <Badge tone="ok" size="sm" icon="check-circle-2">selesai</Badge>}
+      <OverflowActions label={`Aksi lain ${spec.id}`} items={items} />
       {markDone && onMarkDone && (
         <MarkDoneDialog spec={spec} onClose={() => setMarkDone(false)} onSubmit={onMarkDone} />
       )}
@@ -646,7 +680,7 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
     onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
     running?: boolean; presenceOn?: string[]
   }) {
-  const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
+  const prio = prioMeta(spec.priority);
   return (
     <Card padding={16} fill style={{ height: "100%" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
@@ -666,7 +700,7 @@ function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDeta
           {/* Ukuran kartu tetap: deskripsi panjang dipotong elipsis (3 baris), bukan memanjangkan kartu. */}
           <div title={spec.objective} style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4, lineHeight: 1.45, ...CLAMP(3) }}>{spec.objective}</div>
         </div>
-        <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"}>{prio.label}</Badge>
+        <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"} title={`Prioritas ${prio.label}`}>{prio.label}</Badge>
       </div>
       <div style={{ marginTop: "auto", paddingTop: 12, borderTop: "1px solid var(--border-hair)" }}>
         <StageBar stage={spec.stage} />
@@ -690,7 +724,7 @@ function SpecRow({ spec, projectName, onStart, onDelete, onOpenRun, onOpenReview
     onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
     running?: boolean; presenceOn?: string[]
   }) {
-  const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
+  const prio = prioMeta(spec.priority);
   return (
     <div className="hn-backlog-row" style={{
       display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px 14px", padding: "12px 16px",
@@ -709,7 +743,7 @@ function SpecRow({ spec, projectName, onStart, onDelete, onOpenRun, onOpenReview
       <Badge tone="neutral" size="sm" icon="folder" data-testid="spec-project">{projectName ?? spec.projectId}</Badge>
       {spec.branchFrom && <Badge tone="neutral" size="sm" icon="git-branch">{spec.branchFrom}</Badge>}
       <BlockedBadge spec={spec} />
-      <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"}>{prio.label}</Badge>
+      <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"} title={`Prioritas ${prio.label}`}>{prio.label}</Badge>
       <CreatedAt spec={spec} />
       {/* SPEC-919 · ADR-0147 · penanda LIVE lintas device — beda dari StageBar yang stage tersimpan. */}
       <PresenceChip names={presenceOn} />
@@ -763,7 +797,7 @@ function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, 
     running?: boolean; presenceOn?: string[];
     onDragStart: () => void; onDragEnd: () => void; dragging: boolean
   }) {
-  const prio = B_PRIO[spec.priority] || B_PRIO.sedang!;
+  const prio = prioMeta(spec.priority);
   const draggable = col === BACKLOG_COL;
   return (
     <div draggable={draggable}
@@ -783,7 +817,7 @@ function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, 
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{spec.id}</span>
         <span style={{ flex: 1 }} />
         <CreatedAt spec={spec} />
-        <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"}>{spec.priority}</Badge>
+        <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"} title={`Prioritas ${prio.label}`}>{prio.label}</Badge>
       </div>
       <TitleButton spec={spec} onOpenDetail={onOpenDetail} size={13} />
       {spec.branchFrom && (
@@ -871,6 +905,13 @@ function Board({ specs, activeSpecs, presenceBySpec, onStart, onOpenRun, onOpenR
   );
 }
 
+// Keterangan sumber dengan istilah teknis (SOURCE_META). Tab tanpa entri tak menampilkan apa pun.
+const TAB_HINT: Record<string, string> = {
+  audit: "Audit: hasil pemeriksaan project. Dari sini bisa dinaikkan jadi Finding QA, feature brief, atau PRD.",
+  goal: "Goal: item dengan tujuan terukur. Dikerjakan dua fase (Goal lalu Verifikasi) tanpa tahap perencanaan.",
+  no_effort: "Tanpa effort: tugas remeh yang dikerjakan satu fase, tanpa perencanaan maupun verifikasi.",
+};
+
 const VIEWS = [
   { value: "grid", label: "Grid", icon: "layout-grid" },
   { value: "list", label: "List", icon: "list" },
@@ -881,7 +922,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   {
     backlog: SpecSlim[]; projects: ProjectVM[]; pageSize?: number;
     onStart?: (s: SpecSlim) => void; activeSpecs?: Set<string>; presenceBySpec?: Map<string, string[]>;
-    onDelete?: (s: SpecSlim) => void; onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void; onNew?: () => void;
+    onDelete?: (s: SpecSlim) => void | Promise<void>; onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void; onNew?: () => void;
     onEditBranch?: (s: SpecSlim, b: string | null) => void;
     onRevertStage?: (s: SpecSlim, target: string, confirmDelete?: boolean) => Promise<any>;
     // SPEC-804 · ADR-0120 · tandai selesai manual; `needConfirm` = server minta konfirmasi karena
@@ -952,6 +993,9 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   // timeout` (change-feed tak berbatas, ADR-0131) membuat sebagian refetch gagal dan sisanya lolos,
   // jadi angkanya berubah-ubah sementara DB-nya sendiri tak pernah kehilangan satu baris pun.
   const [stale, setStale] = React.useState(false);
+  // Refetch yang sedang berjalan (ganti filter/halaman/sumber). Daftar lama TETAP tampil selama
+  // menunggu — indikatornya ringan, tak mengosongkan layar.
+  const [refreshing, setRefreshing] = React.useState(false);
   // Refetch ikut tiap `dataVersion` (tiap frame siar WS), jadi toast digerbangi TRANSISI
   // sehat→gagal lewat ref — bukan setiap kegagalan, yang akan jadi hujan toast saat hub sakit.
   const staleRef = React.useRef(false);
@@ -987,18 +1031,22 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
       page: view === "board" ? undefined : page,
       limit: view === "board" ? undefined : pageSize,
     });
+    // `!!p`: klien tanpa `listSpecs` tak pernah menyelesaikan refetch — jangan biarkan indikator menyala.
+    setRefreshing(!!p);
     p?.then((r) => {
       if (!alive) return;
       setData({ items: r.items, total: r.total });
       staleRef.current = false;
       setStale(false);
+      setRefreshing(false);
     }).catch(() => {
       if (!alive) return;
       if (!staleRef.current) {
         staleRef.current = true;
-        onToast?.("Gagal menyegarkan backlog — jumlah & daftar di layar mungkin basi", "warn");
+        onToast?.("Gagal menyegarkan backlog — data di layar mungkin usang", "warn");
       }
       setStale(true);
+      setRefreshing(false);
     });
     return () => { alive = false; };
   }, [tab, proj, stageFilter, prioFilter, dq, view, page, pageSize, dataVersion, syncNonce, dateField, from, to]);
@@ -1029,6 +1077,25 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     const listed = data.items.find((s) => s.id === detailId);
     return listed ? mergeSlim(listed, slim) : slim ? { objective: "", ...slim } : null;
   }, [detailId, detail, data.items, backlogById]);
+  // Hapus spec = konfirmasi dulu: nama & ID objeknya, dampaknya sebagai daftar, label aksi eksplisit.
+  // Satu dialog untuk kartu, baris, dan menu; dirender sekali di bawah layar (lihat `{dialog}`).
+  const { confirm: confirmDelete, dialog } = useConfirm();
+  const requestDelete = onDelete ? (s: SpecSlim) => {
+    const projectName = projects.find((x) => x.id === s.projectId)?.name ?? s.projectId;
+    confirmDelete({
+      title: `Hapus ${s.id}?`,
+      message: `"${s.title}" dihapus dari backlog ${projectName}.`,
+      impact: [
+        "Tindakan ini tidak bisa dibatalkan.",
+        "Lampiran item ini ikut dihapus dari disk.",
+        "Sesi yang masih berjalan untuk item ini tidak ikut dihentikan.",
+        "Item lain yang menunggu item ini tidak lagi bergantung padanya.",
+        "Kode dan commit di repo tidak disentuh.",
+      ],
+      confirmLabel: "Hapus spec", tone: "danger", icon: "trash-2",
+      run: async () => { await onDelete(s); },
+    }).catch((e: unknown) => onToast?.(failureMessage(`menghapus ${s.id}`, e), "err", "x-circle"));
+  } : undefined;
   const sp = serverPage(data.total, page, pageSize);
   return (
     <div style={LIST_SCREEN_STYLE}>
@@ -1058,10 +1125,21 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
             <span className="hn-eyebrow" role="status"
               style={stale ? { color: "var(--amber-600)" } : undefined}
               title={stale ? "Server tak menjawab saat menyegarkan — angka ini dari muatan terakhir yang berhasil" : undefined}>
-              {data.total} spec{stale ? " · basi" : ""}
+              {data.total} spec{stale ? " · data mungkin usang" : ""}
             </span>
+            {refreshing && (
+              <span data-testid="backlog-refreshing" style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                Memuat…
+              </span>
+            )}
           </div>
         </div>
+        {/* Keterangan sumber yang namanya bukan kata sehari-hari — terlihat, bukan hanya tooltip. */}
+        {TAB_HINT[tab] && (
+          <div data-testid="backlog-tab-hint" style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 10 }}>
+            {TAB_HINT[tab]}
+          </div>
+        )}
         {/* SPEC-178 · baris penyaring: search + project + stage + prioritas. */}
         <div className="hn-backlog-filters" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <Input size="sm" leftIcon="search" placeholder="mis. invoice atau SPEC-412" aria-label="Cari backlog"
@@ -1092,35 +1170,41 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
       {data.total === 0 ? (
         backlog.length === 0
           ? <StateBlock kind="empty" illustration="PST-002" title="Backlog masih kosong"
-            hint="Filekan feature brief atau QA finding — hanoman menjalankannya dari brainstorm sampai execute."
+            hint="Ajukan feature brief atau Finding QA — hanoman menjalankannya dari brainstorm sampai execute."
             action={onNew} actionLabel="Tambah spec" />
           : <StateBlock kind="empty" icon="filter" title="Tidak ada spec untuk filter ini"
             hint={`${backlog.length} spec ada di backlog, tapi tak ada yang cocok dengan filter aktif.`}
             action={() => { setTab("all"); setProj("all"); setQ(""); setStageFilter("all"); setPrioFilter("all"); setDateField("created"); setFrom(""); setTo(""); }} actionLabel="Reset filter" actionIcon="rotate-ccw" />
       ) : view === "board" ? (
         // Board tak dipaginasi: minta set terfilter penuh dari server (fetch tanpa page/limit).
-        <Board specs={items} activeSpecs={activeSpecs} presenceBySpec={presenceBySpec} onMarkDone={onMarkDone}
-          onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onOpenDetail={(x) => setDetailId(x.id)} />
+        <>
+          {/* Hint drag terlihat di layar, bukan hanya `title` — tombol di kartu adalah jalur yang sama. */}
+          <div data-testid="board-drag-hint" style={{ ...FIXED_ROW_STYLE, fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 8 }}>
+            Seret kartu dari kolom Backlog ke Brainstorm untuk memulai sesi. Tombol di kartu melakukan hal yang sama.
+          </div>
+          <Board specs={items} activeSpecs={activeSpecs} presenceBySpec={presenceBySpec} onMarkDone={onMarkDone}
+            onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onOpenDetail={(x) => setDetailId(x.id)} />
+        </>
       ) : (
         <>
           {view === "list" ? (
             // overflowX, bukan `overflow` — `overflow: hidden` akan menimpa overflowY dari spread.
-            <div ref={listRef} data-testid="backlog-scroll" className="hn-backlog-list" style={{
+            <div ref={listRef} data-testid="backlog-scroll" aria-busy={refreshing || undefined} className="hn-backlog-list" style={{
               ...LIST_SCROLL_STYLE, border: "1px solid var(--border-hair)",
               borderRadius: "var(--radius-lg)", overflowX: "hidden"
             }}>
               {items.map((s) => <SpecRow key={s.id} spec={s} projectName={projects.find((x) => x.id === s.projectId)?.name} onStart={onStart}
-                running={activeSpecs?.has(s.id)} presenceOn={presenceBySpec?.get(s.id)} onDelete={onDelete} onOpenRun={onOpenRun}
+                running={activeSpecs?.has(s.id)} presenceOn={presenceBySpec?.get(s.id)} onDelete={requestDelete} onOpenRun={onOpenRun}
                 onOpenReview={onOpenReview} onMarkDone={onMarkDone}
                 onOpenDetail={(x) => setDetailId(x.id)} />)}
             </div>
           ) : (
-            <div ref={listRef} data-testid="backlog-scroll" className="hn-backlog-grid" style={{
+            <div ref={listRef} data-testid="backlog-scroll" aria-busy={refreshing || undefined} className="hn-backlog-grid" style={{
               ...LIST_SCROLL_STYLE, display: "grid", gap: 12,
               gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))", gridAutoRows: "1fr"
             }}>
               {items.map((s) => <SpecCard key={s.id} spec={s} onStart={onStart}
-                running={activeSpecs?.has(s.id)} presenceOn={presenceBySpec?.get(s.id)} onDelete={onDelete} onOpenRun={onOpenRun}
+                running={activeSpecs?.has(s.id)} presenceOn={presenceBySpec?.get(s.id)} onDelete={requestDelete} onOpenRun={onOpenRun}
                 onOpenReview={onOpenReview} onMarkDone={onMarkDone}
                 onOpenDetail={(x) => setDetailId(x.id)} />)}
             </div>
@@ -1131,12 +1215,14 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
         </>
       )}
       <SpecDetail spec={detailSpec} onClose={() => setDetailId(null)}
+        running={!!detailId && !!activeSpecs?.has(detailId)} onOpenRun={onOpenRun}
         onEditBranch={onEditBranch} onRevertStage={onRevertStage} onMarkDone={onMarkDone} onOpenReview={onOpenReview} onStart={onStart} onIntegrate={onIntegrate} onEditSpec={onEditSpec} onPromoteToQa={onPromoteToQa}
         onPromoteToBrief={onPromoteToBrief} onPromoteToPrd={onPromoteToPrd}
         onEditDeps={onEditDeps} onEditAutoMerge={onEditAutoMerge} onChangeSource={onChangeSource}
         projectPolicy={(projects.find((x) => x.id === backlog.find((s) => s.id === detailId)?.projectId) as { autoMerge?: unknown } | undefined)?.autoMerge}
         allSpecs={backlog}
         onAttachmentToast={(m, tone) => onToast?.(m, tone ?? "ok", "paperclip")} />
+      {dialog}
     </div>
   );
 }

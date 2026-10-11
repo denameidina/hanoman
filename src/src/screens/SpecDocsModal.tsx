@@ -8,7 +8,7 @@ import { useApi } from "../api/instance";
 
 const KIND_LABEL: Record<string, string> = {
   audit: "Audit", spec: "Spec", plan: "Plan",
-  objective: "Objective", brainstorm: "Brainstorm", other: "Lainnya",
+  objective: "Tujuan", brainstorm: "Brainstorm", other: "Lainnya",
 };
 
 export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: () => void }) {
@@ -69,7 +69,7 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
             className="hn-workspace-panels"
             style={{ height: "100%" }}
             panels={[
-              { id: "files", label: "Files", className: "hn-panel-flex", content: (
+              { id: "files", label: "Berkas", className: "hn-panel-flex", content: (
             <div style={{ overflow: "auto", borderRight: "1px solid var(--border-hair)", paddingRight: 8 }}>
               {groups.map((grp) => (
                 <div key={grp.kind} style={{ marginBottom: 10 }}>
@@ -97,7 +97,7 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
               ))}
             </div>
               ) },
-              { id: "preview", label: "Preview", className: "hn-panel-flex", content: (
+              { id: "preview", label: "Pratinjau", className: "hn-panel-flex", content: (
             <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
               {/* SPEC-361 · unduh dokumen yang sedang dibuka sebagai evidence untuk tim */}
               <div style={{ display: "flex", justifyContent: "flex-end", paddingBottom: 6,

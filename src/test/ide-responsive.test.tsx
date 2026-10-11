@@ -163,7 +163,7 @@ describe("SPEC-879 · kontrol IDE memakai primitive design system", () => {
     await waitFor(() => {
       // `input { min-width/min-height: var(--touch-target) }` merentangkan checkbox mentah jadi
       // kotak biru 44×44; `Checkbox` DS menaruh kotak 18×18 DI DALAM area sentuh itu.
-      for (const name of ["remote", "tag", "muted merge"]) {
+      for (const name of ["remote", "tag", "redupkan merge"]) {
         expect(screen.getByRole("checkbox", { name })).toBeInTheDocument();
       }
       expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);

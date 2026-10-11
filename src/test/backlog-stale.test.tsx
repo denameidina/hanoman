@@ -28,26 +28,26 @@ beforeEach(() => { vi.mocked(api.listSpecs).mockReset(); });
 // `P1008` sebagian refetch gagal & sisanya lolos → angkanya berubah-ubah dan terbaca sebagai
 // "backlog saya berkurang", padahal tak satu baris pun hilang dari DB.
 describe("kegagalan menyegarkan backlog terlihat (SPEC-857)", () => {
-  it("saat refetch gagal, jumlahnya ditandai basi dan operator ditoast", async () => {
+  it("saat refetch gagal, jumlahnya ditandai data mungkin usang dan operator ditoast", async () => {
     vi.mocked(api.listSpecs).mockRejectedValue(new Error("P1008"));
     const toast = vi.fn();
     backlog(toast);
 
     // Seed prop tetap terpakai — daftarnya tak dikosongkan; yang berubah cuma penandanya.
-    await waitFor(() => expect(screen.getByText(/2 spec · basi/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/2 spec · data mungkin usang/)).toBeTruthy());
     expect(toast).toHaveBeenCalledTimes(1);
-    expect(toast.mock.calls[0]![0]).toMatch(/basi/i);
+    expect(toast.mock.calls[0]![0]).toMatch(/usang/i);
     expect(toast.mock.calls[0]![1]).toBe("warn");
   });
 
-  it("saat refetch berhasil, tak ada penanda basi maupun toast", async () => {
+  it("saat refetch berhasil, tak ada penanda usang maupun toast", async () => {
     vi.mocked(api.listSpecs).mockResolvedValue({ items, total: 2, page: 1, pageSize: 20 });
     const toast = vi.fn();
     backlog(toast);
 
     await waitFor(() => expect(api.listSpecs).toHaveBeenCalled());
     expect(screen.getByText("2 spec")).toBeTruthy();
-    expect(screen.queryByText(/basi/)).toBeNull();
+    expect(screen.queryByText(/usang/)).toBeNull();
     expect(toast).not.toHaveBeenCalled();
   });
 });

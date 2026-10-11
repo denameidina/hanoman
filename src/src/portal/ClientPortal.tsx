@@ -9,6 +9,7 @@ import { portalApi } from "../api/portal";
 import { stagePill, ticketPill } from "./status-pill";
 import { TicketForm } from "./TicketForm";
 import { ChatPanel } from "./ChatPanel";
+import { kategoriLabel, prioritasLabel, jaringanAtauPesan } from "./labels";
 
 // SPEC-617 · ADR-0110 · permukaan klien. SENGAJA tidak memakai <Shell>: sidebar HN_NAV adalah
 // navigasi OPERATOR, dan setiap entrinya adalah 403 yang menunggu diklik. Chrome-nya sendiri,
@@ -57,6 +58,10 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
   const [openSpec, setOpenSpec] = React.useState<PortalSpec | null>(null);
   const [openTicket, setOpenTicket] = React.useState<PortalTicketDetail | null>(null);
   const [failed, setFailed] = React.useState(false);
+  const [projReload, setProjReload] = React.useState(0);
+  // Gagal memuat daftar ≠ daftar kosong: keadaannya dipisah dan bisa dicoba ulang.
+  const [listGagal, setListGagal] = React.useState<string | null>(null);
+  const [bukaGagal, setBukaGagal] = React.useState<string | null>(null);
   const [composing, setComposing] = React.useState(false);
   // SPEC-854 · ADR-0129 · chat portal opt-in. Kehadirannya disimpulkan dari route-nya sendiri,
   // bukan dari knob yang disalin ke klien: Settings adalah permukaan operator dan tak pernah
@@ -64,10 +69,11 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
   const [chatAda, setChatAda] = React.useState(false);
 
   React.useEffect(() => {
+    setProjects(null); setFailed(false);
     portalApi.listProjects()
       .then((r) => { setProjects(r.items); setActive((cur) => cur ?? r.items[0]?.id ?? null); })
       .catch(() => { setProjects([]); setFailed(true); });
-  }, []);
+  }, [projReload]);
 
   // Respons yang datang terlambat tak boleh menimpa halaman yang lebih baru: klik halaman
   // beruntun melahirkan dua permintaan yang tak dijamin selesai berurutan.
@@ -80,8 +86,8 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
       portalApi.listBacklog(id, { page: bp, limit: PORTAL_PAGE }),
       portalApi.listTickets(id, { page: tp, limit: PORTAL_PAGE }),
     ])
-      .then(([b, t]) => { if (seq === seqRef.current) { setBacklog(b); setTickets(t); } })
-      .catch(() => { if (seq === seqRef.current) { setBacklog(EMPTY); setTickets(EMPTY); } });
+      .then(([b, t]) => { if (seq === seqRef.current) { setBacklog(b); setTickets(t); setListGagal(null); } })
+      .catch((e) => { if (seq === seqRef.current) setListGagal(jaringanAtauPesan(e, "Daftar belum bisa dimuat.")); });
   }, []);
 
   React.useEffect(() => { if (active) loadLists(active, bPage, tPage); }, [active, bPage, tPage, reload, loadLists]);
@@ -95,6 +101,18 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
   // Ganti project atau tab = kembali ke halaman 1 (idiom TriageScreen SPEC-523): halaman 5 dari
   // konteks lama menjawab daftar konteks baru yang cuma punya 2 halaman → kosong tanpa sebab.
   React.useEffect(() => { setBPage(1); setTPage(1); }, [active, tab]);
+
+  // Membuka detail gagal → pesan di atas daftar, bukan klik yang diam saja.
+  const openSpecDetail = async (id: string) => {
+    setBukaGagal(null);
+    try { setOpenSpec(await portalApi.getSpec(active!, id)); }
+    catch (e) { setBukaGagal(jaringanAtauPesan(e, "Pekerjaan ini belum bisa dibuka. Coba lagi.")); }
+  };
+  const openTicketDetail = async (id: string) => {
+    setBukaGagal(null);
+    try { setOpenTicket(await portalApi.getTicket(active!, id)); }
+    catch (e) { setBukaGagal(jaringanAtauPesan(e, "Laporan ini belum bisa dibuka. Coba lagi.")); }
+  };
 
   const logout = async () => {
     try { await portalApi.logout(); } catch { /* jaringan gagal — klien tetap dibersihkan */ }
@@ -119,7 +137,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
         <span style={{
           display: "inline-flex", alignItems: "center", justifyContent: "center",
           width: 26, height: 26, borderRadius: "var(--radius-sm)", background: "var(--accent)",
-        }}><Mark id="buntut" size={17} color="#fff" /></span>
+        }}><Mark id="buntut" size={17} color="var(--surface-card)" /></span>
         <span style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--text-strong)" }}>
           Portal klien
         </span>
@@ -130,25 +148,28 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
 
       <main data-testid="portal-scroll" style={LIST_SCROLL_STYLE}>
         <div className="hn-portal-content" style={{ maxWidth: "var(--content-max)", margin: "0 auto", padding: "24px 28px 32px" }}>
+        {bukaGagal && <p role="alert" style={{ margin: "0 0 14px", color: "var(--clay-600)", fontSize: 13 }}>{bukaGagal}</p>}
         {projects === null ? <StateBlock kind="loading" title="Memuat…" />
           : projects.length === 0 ? (
             <StateBlock kind={failed ? "error" : "empty"} icon="folder"
               title={failed ? "Gagal memuat data" : "Belum ada project yang bisa dilihat"}
-              hint={failed ? "Coba muat ulang halaman ini."
-                : "Hubungi tim hanoman untuk meminta akses ke project Anda."} />
+              hint={failed ? "Project Anda belum bisa dimuat. Periksa koneksi, lalu coba lagi."
+                : "Hubungi tim hanoman untuk meminta akses ke project Anda."}
+              action={failed ? () => setProjReload((n) => n + 1) : undefined}
+              actionLabel={failed ? "Coba lagi" : undefined} />
           ) : (
             <>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
                 {projects.map((p) => (
                   <Button key={p.id} size="sm" variant={p.id === active ? "primary" : "ghost"}
-                    onClick={() => setActive(p.id)}>{p.name}</Button>
+                    aria-pressed={p.id === active} onClick={() => setActive(p.id)}>{p.name}</Button>
                 ))}
               </div>
 
               <div className="hn-portal-toolbar" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
                 <Tabs value={tab} onChange={setTab} style={{ flex: 1, minWidth: 0 }} tabs={[
-                  { value: "backlog", label: "Pekerjaan", count: backlog.total },
-                  { value: "tickets", label: "Help desk", count: tickets.total },
+                  { value: "backlog", label: "Progres pekerjaan", count: backlog.total },
+                  { value: "tickets", label: "Laporan & keluhan", count: tickets.total },
                   // SPEC-854 · ADR-0129 · tab hanya lahir kalau chat menyala di Settings; selama
                   // mati, route-nya 404 dan `chatAda` tetap false (tak ada tab yang menipu).
                   ...(chatAda ? [{ value: "chat", label: "Obrolan" }] : []),
@@ -156,7 +177,10 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                 <Button size="sm" leftIcon="send" onClick={() => setComposing(true)}>Kirim keluhan</Button>
               </div>
 
-              {tab === "chat" ? <ChatPanel projectId={active!} /> : tab === "backlog" ? (
+              {tab === "chat" ? <ChatPanel projectId={active!} /> : listGagal ? (
+                <StateBlock kind="error" title="Daftar belum bisa dimuat" hint={listGagal}
+                  action={() => setReload((n) => n + 1)} actionLabel="Coba lagi" />
+              ) : tab === "backlog" ? (
                 backlog.total === 0
                   ? <StateBlock kind="empty" icon="list-checks" title="Belum ada pekerjaan tercatat"
                       hint="Begitu tim mulai mengerjakan sesuatu di project ini, daftarnya muncul di sini." />
@@ -164,12 +188,11 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                       <Card padding={0} data-testid="portal-list">
                         {backlog.items.map((s) => (
                           <button key={s.id} type="button" className="hn-portal-row"
-                            onClick={() => void portalApi.getSpec(active!, s.id).then(setOpenSpec)}
+                            onClick={() => void openSpecDetail(s.id)}
                             style={ROW}>
-                            <span style={{ ...META, fontFamily: "var(--font-mono)", width: 92 }}>{s.id}</span>
-                            <span style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)" }}>{s.title}</span>
+                            <span title={s.title} style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</span>
                             <StatusPill status={stagePill(s.stage)} size="sm">{STAGE_LABEL[s.stage] ?? s.stage}</StatusPill>
-                            <span style={META}>{s.priority}</span>
+                            <span style={META}>{prioritasLabel(s.priority)}</span>
                             <span style={META}>{tanggal(s.doneAt ?? s.startedAt ?? s.createdAt)}</span>
                           </button>
                         ))}
@@ -184,11 +207,11 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                       <Card padding={0} data-testid="portal-list">
                         {tickets.items.map((t) => (
                           <button key={t.id} type="button" className="hn-portal-row"
-                            onClick={() => void portalApi.getTicket(active!, t.id).then(setOpenTicket)}
+                            onClick={() => void openTicketDetail(t.id)}
                             style={ROW}>
                             <span style={{ ...META, fontFamily: "var(--font-mono)", width: 48 }}>#{t.number}</span>
-                            <span style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)" }}>{t.title}</span>
-                            <span style={META}>{t.category}</span>
+                            <span title={t.title} style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
+                            <span style={META}>{kategoriLabel(t.category)}</span>
                             <StatusPill status={ticketPill(t.status)} size="sm">{t.status}</StatusPill>
                             <span style={META}>{tanggal(t.createdAt)}</span>
                           </button>
@@ -217,7 +240,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
           }} />
       )}
 
-      <Modal open={!!openSpec} title={openSpec?.title ?? ""} eyebrow={openSpec?.id}
+      <Modal open={!!openSpec} title={openSpec?.title ?? ""} eyebrow="pekerjaan"
         onClose={() => setOpenSpec(null)}>
         {openSpec && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -225,7 +248,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
               <StatusPill status={stagePill(openSpec.stage)} size="sm">
                 {STAGE_LABEL[openSpec.stage] ?? openSpec.stage}
               </StatusPill>
-              <span style={META}>prioritas {openSpec.priority}</span>
+              <span style={META}>{prioritasLabel(openSpec.priority)}</span>
             </div>
             <p style={{ margin: 0, lineHeight: 1.6 }}>{openSpec.objective}</p>
             <dl style={DL}>
@@ -238,7 +261,7 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
       </Modal>
 
       <Modal open={!!openTicket} title={openTicket?.title ?? ""}
-        eyebrow={openTicket ? `#${openTicket.number} · ${openTicket.category}` : undefined}
+        eyebrow={openTicket ? `#${openTicket.number} · ${kategoriLabel(openTicket.category)}` : undefined}
         onClose={() => setOpenTicket(null)}>
         {openTicket && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

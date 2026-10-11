@@ -21,17 +21,24 @@ for (const [name, def] of Object.entries({
   typescript: langTypescript, javascript: langJavascript, json: langJson, markdown: langMarkdown,
   css: langCss, xml: langXml, bash: langBash, python: langPython, yaml: langYaml, sql: langSql, diff: langDiff,
 })) hljs.registerLanguage(name, def);
-import { Card, Button, Select, Icon, StateBlock, Tabs, Badge, DocDownload, DocPreviewModal, isMarkdownPath, ResponsivePanels, Modal, Input, ConfirmDialog } from "../ds";
+import { Card, Button, Select, Icon, StateBlock, Tabs, Badge, DocDownload, DocPreviewModal, isMarkdownPath, ResponsivePanels, Modal, Input, useConfirm } from "../ds";
 import { api, ApiError, type RepoFile, type ReviewFile, type WorkingStatus, type GitOp, type Remote, type IdeUploadResult } from "../api/client";
 import type { ProjectVM } from "./types";
 import { GitGraph } from "./GitGraph";
 import { BranchesPanel } from "./BranchesPanel";
 import { WorktreesPanel } from "./WorktreesPanel";
-import { buildFileTree, TreeRow, ChangedSection } from "./file-tree";
+import { buildFileTree, TreeRow, TreeRoot, ChangedSection } from "./file-tree";
 import { readDroppedEntries } from "./drop-entries";
 import { DiffView } from "./diff-view";
 import { MarkdownView } from "../ds/markdown";
 import { usePersistedState, scoped, isStr, isBool, oneOf } from "../ui-state";
+import { failureMessage } from "../lib/report-error";
+
+/** Nama berkas/folder dari path relatif: segmen terakhir. */
+const baseName = (p: string) => p.split("/").pop() ?? p;
+/** Path `p` setelah `from` diganti nama ke `to`, bila `p` adalah `from` itu sendiri atau berada di bawahnya. */
+const remapPath = (p: string, from: string, to: string) =>
+  p === from || p.startsWith(from + "/") ? to + p.slice(from.length) : p;
 
 const langOf = (p: string): string => {
   const ext = p.slice(p.lastIndexOf(".") + 1);
@@ -64,23 +71,35 @@ function ForceDialog({ msg, onForce, onCancel }: { msg: string; onForce: () => v
 function RemotesModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
   const [remotes, setRemotes] = React.useState<Remote[]>([]);
   const [name, setName] = React.useState(""); const [url, setUrl] = React.useState("");
-  const reload = React.useCallback(() => { api.ideRemotes(projectId).then(setRemotes).catch(() => setRemotes([])); }, [projectId]);
+  // Galat ditampilkan di dalam modal (bukan ditelan): gagal memuat ≠ "Belum ada remote".
+  const [err, setErr] = React.useState("");
+  const reload = React.useCallback(() => {
+    api.ideRemotes(projectId)
+      .then((rs) => { setRemotes(rs); setErr(""); })
+      .catch((e: unknown) => { setRemotes([]); setErr(failureMessage("memuat remote", e)); });
+  }, [projectId]);
   React.useEffect(() => { reload(); }, [reload]);
   return (
-    <Modal open title="Remotes" onClose={onClose} width={560}>
-        {remotes.length === 0 && <div style={{ fontSize: 12.5, color: "var(--text-subtle)", marginBottom: 10 }}>Belum ada remote.</div>}
+    <Modal open title="Remote" onClose={onClose} width={560}>
+        {err && <div role="alert" style={{ fontSize: 12.5, color: "var(--clay-600)", marginBottom: 10 }}>{err}</div>}
+        {remotes.length === 0 && !err && <div style={{ fontSize: 12.5, color: "var(--text-subtle)", marginBottom: 10 }}>Belum ada remote.</div>}
         {remotes.map((r) => (
           <div key={r.name} className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid var(--border-hair)" }}>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: 600, width: 90 }}>{r.name}</span>
             <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.fetch}</span>
-            <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={() => api.ideDeleteRemote(projectId, r.name).then(setRemotes).catch(() => {})} />
+            <Button size="sm" variant="ghost" leftIcon="trash-2" aria-label={`Hapus remote ${r.name}`}
+              onClick={() => api.ideDeleteRemote(projectId, r.name)
+                .then((rs) => { setRemotes(rs); setErr(""); })
+                .catch((e: unknown) => setErr(failureMessage(`menghapus remote ${r.name}`, e)))} />
           </div>
         ))}
         <div className="hn-stack-mobile" style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <Input size="sm" value={name} aria-label="Nama remote" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="origin" style={{ width: 100 }} />
           <Input size="sm" value={url} aria-label="URL remote" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)} placeholder="https://github.com/org/repo.git" style={{ flex: 1 }} />
           <Button size="sm" leftIcon="plus" disabled={!name || !url}
-            onClick={() => api.ideAddRemote(projectId, name, url).then((rs) => { setRemotes(rs); setName(""); setUrl(""); }).catch(() => {})}>Tambah</Button>
+            onClick={() => api.ideAddRemote(projectId, name, url)
+              .then((rs) => { setRemotes(rs); setName(""); setUrl(""); setErr(""); })
+              .catch((e: unknown) => setErr(failureMessage("menambah remote", e)))}>Tambah</Button>
         </div>
     </Modal>
   );
@@ -134,7 +153,13 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   const [nameDialog, setNameDialog] = React.useState<
     { mode: "file" | "dir" | "rename"; value: string } | null>(null);
   const [conflict, setConflict] = React.useState<{ files: { path: string; file: File }[] } | null>(null);
-  const [pendingDelete, setPendingDelete] = React.useState<{ path: string; kind: "file" | "dir" } | null>(null);
+  // Entri yang DIKLIK di pohon (berkas atau folder) — satu-satunya target Ganti nama & Hapus.
+  // Sengaja bukan berkas yang sedang dibuka: target yang tak kelihatan adalah sumber salah hapus.
+  // Tak persisten, sama seperti dirSel (ADR-0121).
+  const [treeSel, setTreeSel] = React.useState<{ path: string; kind: "file" | "dir" } | null>(null);
+  const { confirm, dialog } = useConfirm();
+  const [viewErr, setViewErr] = React.useState("");   // galat memuat isi berkas/diff yang dibuka
+  const [viewNonce, setViewNonce] = React.useState(0); // naik = muat ulang isi berkas/diff
   const [dropping, setDropping] = React.useState(false);
   const fileInput = React.useRef<HTMLInputElement>(null);
   const dirInput = React.useRef<HTMLInputElement>(null);
@@ -170,27 +195,51 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
 
   React.useEffect(() => { reloadTree(); }, [reloadTree]);
   React.useEffect(() => { reloadStatus(); }, [reloadStatus]);
-  React.useEffect(() => { api.listBranches(projectId).then(setBranches).catch(() => {}); }, [projectId]);
-  // selKind "file" → isi file (editable, honor viewRef). staged/unstaged → diff read-only.
   React.useEffect(() => {
+    api.listBranches(projectId).then(setBranches)
+      .catch((e: unknown) => onToast?.(failureMessage("memuat daftar branch", e), "err", "x-circle"));
+  }, [projectId]);
+  // selKind "file" → isi file (editable, honor viewRef). staged/unstaged → diff read-only.
+  // Galat memuat tampil sebagai error + "Coba lagi" (viewNonce), bukan "Memuat…" selamanya.
+  React.useEffect(() => {
+    setViewErr("");
     if (!selected) { setFile(null); setDiff(null); return; }
     let alive = true;
     setPreview(false); // SPEC-385 · pratinjau selalu mengikuti berkas yang sedang dipilih
     if (selKind === "file") {
       setDiff(null);
       api.ideFile(projectId, selected, viewRef).then((f) => { if (alive) { setFile(f); setMode("view"); setMdView("preview"); } })
-        .catch(() => { if (alive) setFile(null); });
+        .catch((e: unknown) => { if (alive) { setFile(null); setViewErr(failureMessage("membuka berkas", e)); } });
     } else {
       setFile(null); setDiffTab("diff");
       api.ideFileDiff(projectId, selected, selKind === "staged").then((d) => { if (alive) setDiff(d); })
-        .catch(() => { if (alive) setDiff(null); });
+        .catch((e: unknown) => { if (alive) { setDiff(null); setViewErr(failureMessage("memuat diff", e)); } });
     }
     return () => { alive = false; };
-  }, [selected, selKind, projectId, viewRef]);
+  }, [selected, selKind, projectId, viewRef, viewNonce]);
 
-  const selectFile = (p: string) => { setSelKind("file"); setSelected(p); setPanel("viewer"); };
-  const selectStaged = (p: string) => { setSelKind("staged"); setSelected(p); setPanel("viewer"); };
-  const selectChanged = (p: string) => { setSelKind("unstaged"); setSelected(p); setPanel("viewer"); };
+  // Draft kotor = mode edit dengan isi yang berbeda dari berkas. Memilih berkas lain, mengganti
+  // ref, atau membatalkan dari keadaan itu meminta konfirmasi — dulu draft hilang diam-diam.
+  const dirty = mode === "edit" && !!file && draft !== (file.content ?? "");
+  /** Jalankan `run` setelah draft kotor dikonfirmasi dibuang; tanpa draft kotor langsung jalan. */
+  function whenClean(run: () => void) {
+    if (!dirty) { setMode("view"); run(); return; }
+    void confirm({
+      title: "Buang perubahan?", eyebrow: selected || undefined,
+      message: "Isi berkas yang kamu ubah di editor belum disimpan.",
+      impact: ["Perubahan di editor hilang dan tak bisa dikembalikan dari hanoman."],
+      confirmLabel: "Buang perubahan", cancelLabel: "Lanjut mengedit", tone: "danger", icon: "trash-2",
+    }).then((ok) => { if (ok) { setMode("view"); run(); } });
+  }
+  const selectFile = (p: string) => whenClean(() => { setSelKind("file"); setSelected(p); setPanel("viewer"); });
+  const selectStaged = (p: string) => whenClean(() => { setSelKind("staged"); setSelected(p); setPanel("viewer"); });
+  const selectChanged = (p: string) => whenClean(() => { setSelKind("unstaged"); setSelected(p); setPanel("viewer"); });
+  /** Klik berkas di pohon: jadi target Ganti nama/Hapus sekaligus membukanya. */
+  const pickTreeFile = (p: string) => whenClean(() => {
+    setTreeSel({ path: p, kind: "file" }); setSelKind("file"); setSelected(p); setPanel("viewer");
+  });
+  /** Klik folder: tujuan unggah/buat (dirSel) sekaligus target Ganti nama/Hapus. */
+  const pickTreeDir = (p: string) => { setDirSel(p); setTreeSel({ path: p, kind: "dir" }); };
 
   // Semua ref: local + origin (prefix "origin/") untuk dilihat/checkout.
   const refOptions = [
@@ -209,7 +258,12 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
       throw e;
     }
   }
-  async function checkout() { if (viewRef) await runGit({ op: "checkout", ref: viewRef }).catch(() => {}); }
+  // Galat git selalu tampil sebagai toast, kecuali 409 — itu dijawab dialog "Paksa" (pendingForce).
+  const gitFail = (action: string, e: unknown) => {
+    if (e instanceof ApiError && e.status === 409) return;
+    onToast?.(failureMessage(action, e), "err", "x-circle");
+  };
+  async function checkout() { if (viewRef) await runGit({ op: "checkout", ref: viewRef }).catch((e: unknown) => gitFail("checkout", e)); }
   // SPEC-229 · merge via git graph: konflik → pindah Terminal (sesi claude), bersih → toast + reload.
   async function mergeGraph(source: string, opts?: { ff?: "no-ff" | "ff-only"; deleteBranch?: string }) {
     try {
@@ -240,15 +294,24 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     if (!pendingForce) return;
     const op = { ...pendingForce.op, force: true } as GitOp;
     setPendingForce(null);
-    await api.ideGit(projectId, op).then(() => { setViewRef(""); reloadTree(); reloadStatus(); }).catch(() => {});
+    await api.ideGit(projectId, op).then(() => { setViewRef(""); reloadTree(); reloadStatus(); })
+      .catch((e: unknown) => onToast?.(failureMessage("menjalankan operasi paksa", e), "err", "x-circle"));
   }
 
-  function startEdit() { setDraft(file?.content ?? ""); setMode("edit"); }
+  // Edit hanya untuk working tree: isi ref lain tak boleh ditimpa oleh draft-nya (audit P0).
+  function startEdit() { if (!file || file.binary || viewRef) return; setDraft(file.content ?? ""); setMode("edit"); }
   async function save() {
-    await api.putIdeFile(projectId, selected, draft);
-    setFile((f) => (f ? { ...f, content: draft } : f)); setMode("view");
-    reloadStatus(); // menyimpan file mengubah status working tree
+    if (!selected || viewRef) return;
+    try {
+      await api.putIdeFile(projectId, selected, draft);
+      setFile((f) => (f ? { ...f, content: draft } : f)); setMode("view");
+      reloadStatus(); // menyimpan file mengubah status working tree
+    } catch (e) {
+      // Draft dipertahankan dan mode edit tetap: operator bisa mencoba lagi tanpa mengetik ulang.
+      onToast?.(failureMessage("menyimpan berkas", e), "err", "x-circle");
+    }
   }
+  const cancelEdit = () => whenClean(() => undefined);
 
   // ADR-0121 · operasi berkas Explorer.
   const underDir = (p: string) => (dirSel ? `${dirSel}/${p}` : p);
@@ -282,33 +345,54 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     setConflict(bentrok.size ? { files: list.filter((f) => bentrok.has(underDir(f.path))) } : null);
   }
 
-  // Target aksi = berkas yang sedang dibuka bila ada, kalau tidak folder yang dipilih.
-  // Diff dari Staged/Changed BUKAN target: yang ditampilkan di sana bisa berkas yang sudah terhapus.
-  const target = selKind === "file" && selected ? { path: selected, kind: "file" as const }
-    : dirSel ? { path: dirSel, kind: "dir" as const } : null;
-
+  // Target Ganti nama & Hapus = entri yang diklik di pohon (treeSel), BUKAN berkas yang terbuka:
+  // dulu berkas terbuka jadi target diam-diam walau operator mengklik folder lain. Diff dari
+  // Staged/Changed tak pernah jadi target — yang tampil di sana bisa berkas yang sudah terhapus.
   async function renameTarget(to: string) {
-    if (!target || !to.trim()) return;
+    const t = treeSel;
+    if (!t || !to.trim()) return;
+    const from = t.path, dest = to.trim();
     try {
-      await api.ideRenameEntry(projectId, target.path, to.trim());
+      await api.ideRenameEntry(projectId, from, dest);
       afterWrite();
-      if (target.kind === "file") setSelected(to.trim()); else setDirSel(to.trim());
-      onToast?.(`diganti nama · ${to.trim()}`, "ok", "pencil");
+      setTreeSel({ path: dest, kind: t.kind });
+      // Berkas terbuka / folder tujuan yang berada di bawah entri ini ikut pindah namanya.
+      if (selKind === "file" && remapPath(selected, from, dest) !== selected) setSelected(remapPath(selected, from, dest));
+      if (dirSel && remapPath(dirSel, from, dest) !== dirSel) setDirSel(remapPath(dirSel, from, dest));
+      onToast?.(`diganti nama · ${dest}`, "ok", "pencil");
     } catch (e) {
       const code = e instanceof ApiError ? e.status : 0;
-      onToast?.(code === 409 ? "nama tujuan sudah dipakai" : "gagal mengganti nama", "err", "x-circle");
+      onToast?.(code === 409 ? "nama tujuan sudah dipakai" : failureMessage(`mengganti nama ${baseName(from)}`, e), "err", "x-circle");
     }
   }
 
-  async function deleteTarget() {
-    if (!target) return;
-    setPendingDelete(null);
+  /** Hapus entri target lewat dialog DS: nama objeknya disebut, dampak terdaftar, aksi eksplisit. */
+  function requestDelete() {
+    const t = treeSel;
+    if (!t) return;
+    const isDir = t.kind === "dir";
+    void confirm({
+      title: isDir ? "Hapus folder beserta isinya?" : "Hapus berkas?",
+      eyebrow: t.path,
+      impact: isDir
+        ? [`Folder ${baseName(t.path)}/ dan seluruh isinya dihapus dari working tree.`, "Yang belum di-commit tak bisa dikembalikan dari hanoman."]
+        : [`Berkas ${baseName(t.path)} dihapus dari working tree.`, "Yang belum di-commit tak bisa dikembalikan dari hanoman."],
+      confirmLabel: "Hapus", tone: "danger", icon: "trash-2",
+      requireText: isDir ? baseName(t.path) : undefined,
+      run: () => deleteTarget(t),
+    });
+  }
+
+  async function deleteTarget(t: { path: string; kind: "file" | "dir" }) {
     try {
-      await api.ideDeleteEntry(projectId, target.path);
+      await api.ideDeleteEntry(projectId, t.path);
       afterWrite();
-      if (target.kind === "file") { setSelected(""); setFile(null); } else setDirSel("");
-      onToast?.(`dihapus · ${target.path}`, "ok", "trash-2");
-    } catch { onToast?.(`gagal menghapus ${target.path}`, "err", "x-circle"); }
+      setTreeSel(null);
+      // Berkas terbuka di dalam entri yang hilang ikut ditutup; folder tujuan yang hilang dilepas.
+      if (selKind === "file" && remapPath(selected, t.path, "") !== selected) { setSelected(""); setFile(null); setMode("view"); }
+      if (dirSel && remapPath(dirSel, t.path, "") !== dirSel) setDirSel("");
+      onToast?.(`dihapus · ${t.path}`, "ok", "trash-2");
+    } catch (e) { onToast?.(failureMessage(`menghapus ${baseName(t.path)}`, e), "err", "x-circle"); }
   }
 
   const pickedFiles = (input: HTMLInputElement | null) => {
@@ -319,6 +403,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     return list;
   };
 
+  const fileTree = React.useMemo(() => buildFileTree(files, dirs), [files, dirs]);
   const highlighted = React.useMemo(() => {
     if (!file || file.content === null) return "";
     const lang = langOf(selected);
@@ -343,12 +428,17 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
 
   const toolbar = (
     <div className="hn-ide-toolbar">
-      <Select size="sm" value={projectId} onChange={(e) => onProject(e.target.value)}
+      <Select size="sm" aria-label="Proyek" value={projectId} onChange={(e) => onProject(e.target.value)}
         options={projects.map((p) => ({ value: p.id, label: p.name }))} />
-      <Select size="sm" value={viewRef} onChange={(e) => setViewRef(e.target.value)} options={refOptions} />
+      <Select size="sm" aria-label="Ref yang dilihat" value={viewRef}
+        onChange={(e) => { const next = e.target.value; whenClean(() => setViewRef(next)); }} options={refOptions} />
       <Button size="sm" variant="secondary" leftIcon="git-branch" onClick={checkout} disabled={!viewRef}>Checkout</Button>
       {/* SPEC-233 · fetch --all --prune; ref-only → tak digerbang sesi */}
-      <Button size="sm" variant="ghost" leftIcon="download-cloud" onClick={() => { void runGit({ op: "fetch", prune: true }).then(() => api.listBranches(projectId).then(setBranches)).catch(() => {}); }}>Fetch</Button>
+      <Button size="sm" variant="ghost" leftIcon="download-cloud" onClick={() => {
+        void runGit({ op: "fetch", prune: true })
+          .then(() => api.listBranches(projectId).then(setBranches))
+          .catch((e: unknown) => gitFail("fetch", e));
+      }}>Fetch</Button>
       <Button size="sm" variant="ghost" leftIcon="git-branch" onClick={() => setShowRemotes(true)}>Remotes</Button>
     </div>
   );
@@ -375,11 +465,11 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
           onActiveChange={(next) => setPanel(next as "files" | "viewer")}
           masterWidth={300}
           panels={[
-            { id: "files", label: "Files", className: "hn-panel-flex", content: (
+            { id: "files", label: "Berkas", className: "hn-panel-flex", content: (
           /* `fill` menjaga rantai flex Card agar pohon memakai scroller lokal. */
           <Card padding={0} fill>
             <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: "1px solid var(--border-hair)" }}>
-              <span className="hn-eyebrow" style={{ flex: 1 }}>changes{status?.branch ? ` · ${status.branch}` : ""}</span>
+              <span className="hn-eyebrow" style={{ flex: 1 }}>perubahan{status?.branch ? ` · ${status.branch}` : ""}</span>
               {/* Entri terabaikan hanya ada di working tree — sebuah commit tak pernah memuatnya,
                   jadi togglenya mati saat sedang melihat ref, bukan berbohong dengan diam. */}
               <Button size="sm" variant={hidden ? "secondary" : "ghost"} leftIcon={hidden ? "eye" : "eye-off"}
@@ -402,10 +492,13 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                 <Button size="sm" variant="ghost" leftIcon="folder-up"
                   onClick={() => dirInput.current?.click()}>Unggah folder</Button>
               )}
-              <Button size="sm" variant="ghost" leftIcon="pencil" disabled={!target}
-                onClick={() => setNameDialog({ mode: "rename", value: target?.path ?? "" })}>Ganti nama</Button>
-              <Button size="sm" variant="ghost" leftIcon="trash-2" disabled={!target}
-                onClick={() => setPendingDelete(target)}>Hapus</Button>
+              {/* Ganti nama & Hapus memakai entri yang diklik di pohon — labelnya disebut di baris bawah. */}
+              <Button size="sm" variant="ghost" leftIcon="pencil" disabled={!treeSel}
+                onClick={() => setNameDialog({ mode: "rename", value: treeSel?.path ?? "" })}>Ganti nama</Button>
+              {/* Hapus dipisah secara visual dari aksi biasa: ia satu-satunya tombol merah di baris ini. */}
+              <span aria-hidden="true" style={{ width: 1, alignSelf: "stretch", background: "var(--border-hair)", margin: "0 4px" }} />
+              <Button size="sm" variant="ghost" leftIcon="trash-2" disabled={!treeSel}
+                onClick={requestDelete}>Hapus</Button>
               {/* SPEC-879 · label tujuan MENYERAP sisa lebar di baris mana pun ia mendarat, jadi
                   ia terlihat secara konstruksi — bukan sebagai efek samping spacer yang boleh
                   runtuh saat barisnya membungkus. */}
@@ -418,6 +511,14 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                 onChange={() => void runUpload(pickedFiles(fileInput.current))} />
               <input ref={dirInput} type="file" hidden {...{ webkitdirectory: "" }}
                 onChange={() => void runUpload(pickedFiles(dirInput.current))} />
+            </div>
+            {/* Label target ganti nama & hapus — terlihat, bukan tersirat dari berkas yang terbuka. */}
+            <div data-testid="ide-entry-target" style={{ flex: "0 0 auto", padding: "6px 14px", fontSize: 12,
+              color: "var(--text-muted)", borderBottom: "1px solid var(--border-hair)" }}>
+              {treeSel
+                ? <>Target ganti nama &amp; hapus: <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-strong)" }}>
+                    {treeSel.kind === "dir" ? `${treeSel.path}/` : treeSel.path}</span></>
+                : "Klik berkas atau folder di pohon untuk memilih target ganti nama atau hapus."}
             </div>
             <div data-testid="ide-tree-scroll"
               onDragOver={(e) => { e.preventDefault(); setDropping(true); }}
@@ -434,20 +535,24 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                 selected={selKind === "unstaged" ? selected : ""} onSelect={selectChanged}
                 view={changedView} onView={setChangedView} emptyText="Tak ada file berubah." />
               <div className="hn-eyebrow" style={{ padding: "6px 8px", marginTop: 8, borderTop: "1px solid var(--border-hair)" }}>
-                Files · {viewRef || "working tree"}
+                Berkas · {viewRef || "working tree"}
               </div>
               {treeState === "loading" ? <StateBlock kind="loading" compact title="Memuat file…" />
-                : treeState === "error" ? <StateBlock kind="error" compact title="Gagal memuat file" action={reloadTree} />
+                : treeState === "error" ? <StateBlock kind="error" compact title="Gagal memuat file" action={() => reloadTree()} />
                 : files.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Tak ada file" />
-                : buildFileTree(files, dirs).map((n) => (
-                    <TreeRow key={n.path} node={n} selected={selKind === "file" ? selected : ""}
-                      onSelect={selectFile} dirSelected={dirSel} onSelectDir={setDirSel}
-                      ignored={ignored} onExpand={hidden ? expandDir : undefined} />
-                  ))}
+                : (
+                  <TreeRoot label="Pohon berkas" nodes={fileTree}>
+                    {fileTree.map((n) => (
+                      <TreeRow key={n.path} node={n} selected={selKind === "file" ? selected : ""}
+                        onSelect={pickTreeFile} dirSelected={dirSel} onSelectDir={pickTreeDir}
+                        ignored={ignored} onExpand={hidden ? expandDir : undefined} />
+                    ))}
+                  </TreeRoot>
+                )}
             </div>
           </Card>
             ) },
-            { id: "viewer", label: "Viewer", className: "hn-panel-flex", content: (
+            { id: "viewer", label: "Isi", className: "hn-panel-flex", content: (
           <Card padding={0} fill>
             <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border-hair)", flexWrap: "wrap" }}>
               <Icon name="file-text" size={15} color="var(--text-muted)" />
@@ -497,18 +602,23 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                       {/* SPEC-361 · unduh berkas teks yang sedang dibuka (biner tak ditawari) */}
                       <DocDownload href={(f) => api.ideFileDownloadUrl(projectId, selected, viewRef, f)}
                         disabled={!file || file.binary} />
+                      {/* Edit hanya untuk working tree: isi ref lain tak boleh ditimpa draft-nya. */}
                       <Button size="sm" variant="secondary" leftIcon="pencil" onClick={startEdit}
-                        disabled={!file || file.binary}>Edit</Button>
+                        disabled={!file || file.binary || !!viewRef}
+                        title={viewRef ? "Edit hanya di working tree — pilih working tree dulu" : undefined}>Edit</Button>
                     </div>
-                  : <div style={{ display: "flex", gap: 8 }}>
-                      <Button size="sm" variant="ghost" onClick={() => setMode("view")}>Batal</Button>
-                      <Button size="sm" leftIcon="check" onClick={save}>Simpan</Button>
+                  : <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {dirty && <Badge tone="warn" size="sm">belum disimpan</Badge>}
+                      <Button size="sm" variant="ghost" onClick={cancelEdit}>Batal</Button>
+                      <Button size="sm" leftIcon="check" onClick={() => void save()}>Simpan</Button>
                     </div>}
             </div>
             <div data-testid="doc-preview-scroll" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
               {inDiff
                 ? (!selected ? <StateBlock kind="empty" icon="file-text" title="Pilih file dari Staged/Changed" />
-                    : diff === null ? <StateBlock kind="loading" title="Memuat…" hint={selected} />
+                    : diff === null ? (viewErr
+                        ? <StateBlock kind="error" title="Diff belum bisa dibuka" hint={viewErr} action={() => setViewNonce((n) => n + 1)} />
+                        : <StateBlock kind="loading" title="Memuat…" hint={selected} />)
                     : diff.binary ? <StateBlock kind="empty" icon="file" title="Berkas biner" hint={selected} />
                     : diffTab === "diff" ? <div style={{ padding: "10px 0" }}><DiffView diff={diff.diff ?? ""} />
                         {diff.truncated && <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-subtle)" }}>… dipotong pada 256 KB.</div>}</div>
@@ -516,13 +626,19 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                     : <pre style={{ margin: 0, padding: "12px 16px", fontFamily: "var(--font-mono)", fontSize: 12.5,
                         lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", color: "var(--text-body)" }}>{diff.content}</pre>)
                 : (!selected ? <StateBlock kind="empty" icon="file-text" title="Pilih file dari pohon di kiri" />
-                    : file === null ? <StateBlock kind="loading" title="Memuat…" hint={selected} />
+                    : file === null ? (viewErr
+                        ? <StateBlock kind="error" title="Berkas belum bisa dibuka" hint={viewErr} action={() => setViewNonce((n) => n + 1)} />
+                        : <StateBlock kind="loading" title="Memuat…" hint={selected} />)
                     : file.binary ? <StateBlock kind="empty" icon="file" title="File biner" hint={selected} />
                     : mode === "edit"
                       /* placeholder-exempt: isi berkas apa pun bahasanya — tak ada satu contoh yang benar lintas .ts/.json/.sh */
-                      ? <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} style={{
+                      ? <textarea aria-label={`Isi ${baseName(selected)}`} value={draft} spellCheck={false}
+                          onChange={(e) => setDraft(e.target.value)}
+                          onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void save(); } }}
+                          /* Outline fokus TIDAK dihapus: pengguna keyboard harus melihat di mana ia mengetik. */
+                          style={{
                           width: "100%", minHeight: "clamp(240px, 50dvh, 560px)", boxSizing: "border-box", resize: "vertical", border: "none",
-                          outline: "none", padding: "16px 18px", fontFamily: "var(--font-mono)", fontSize: 12.5,
+                          padding: "16px 18px", fontFamily: "var(--font-mono)", fontSize: 12.5,
                           lineHeight: 1.7, color: "var(--text-body)", background: "var(--surface-card)" }} />
                       : isMarkdownPath(selected) && mdView === "preview"
                         ? <div style={{ padding: "16px 20px" }}><MarkdownView text={file.content ?? ""} name={selected} /></div>
@@ -538,7 +654,8 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
       ) : tab === "graph" ? (
         <GitGraph projectId={projectId} onRunGit={runGit} onMerge={mergeGraph}
           onRebase={(onto) => graphIsolated("rebase", onto)} onPull={(src) => graphIsolated("pull", src)} onDrop={(sha) => graphIsolated("drop", sha)}
-          onOpenFile={(p, ref) => { setViewRef(ref); selectFile(p); setTab("explorer"); }} />
+          onToast={onToast}
+          onOpenFile={(p, ref) => whenClean(() => { setViewRef(ref); setSelKind("file"); setSelected(p); setPanel("viewer"); setTab("explorer"); })} />
       ) : tab === "branches" ? (
         /* SPEC-360 · ADR-0077 · bersihkan branch yang sudah ter-merge ke branch utamanya. */
         <BranchesPanel projectId={projectId}
@@ -554,7 +671,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
       )}
       {nameDialog && (
         <Modal open title={nameDialog.mode === "dir" ? "Folder baru" : nameDialog.mode === "file" ? "Berkas baru" : "Ganti nama"}
-          eyebrow={nameDialog.mode === "rename" ? undefined : `→ ${dirSel || "root"}`}
+          eyebrow={nameDialog.mode === "rename" ? `Dari ${treeSel?.path ?? ""}` : `→ ${dirSel || "root"}`}
           onClose={() => setNameDialog(null)} width={460} footer={<>
             <Button size="sm" variant="ghost" onClick={() => setNameDialog(null)}>Batal</Button>
             <Button size="sm" leftIcon="check" disabled={!nameDialog.value.trim()}
@@ -583,17 +700,9 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
           </pre>
         </Modal>
       )}
-      {/* ADR-0121 · folder menuntut nama diketik ulang: penghapusannya rekursif dan yang belum
-          di-commit tak bisa dipulihkan dari mana pun. */}
-      <ConfirmDialog
-        open={!!pendingDelete}
-        title={pendingDelete?.kind === "dir" ? "Hapus folder beserta isinya?" : "Hapus berkas?"}
-        eyebrow={pendingDelete?.path}
-        message={pendingDelete?.kind === "dir"
-          ? "Seluruh isi folder ini hilang. Yang belum di-commit tak bisa dikembalikan."
-          : "Yang belum di-commit tak bisa dikembalikan."}
-        requireText={pendingDelete?.kind === "dir" ? pendingDelete.path.split("/").pop() : undefined}
-        onConfirm={() => void deleteTarget()} onCancel={() => setPendingDelete(null)} />
+      {/* ADR-0121 · folder menuntut nama diketik ulang (requireText): penghapusannya rekursif dan
+          yang belum di-commit tak bisa dipulihkan. Dialog DS lewat useConfirm (requestDelete). */}
+      {dialog}
       {pendingForce && <ForceDialog msg={pendingForce.msg} onForce={confirmForce} onCancel={() => setPendingForce(null)} />}
       {showRemotes && <RemotesModal projectId={projectId} onClose={() => setShowRemotes(false)} />}
     </div>

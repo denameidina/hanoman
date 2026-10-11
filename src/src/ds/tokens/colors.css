@@ -42,9 +42,12 @@
   --leaf-500: #5f8340;
   --leaf-100: #e6eed7;
 
-  --amber-600: #b3771a; /* warning / drift         */
+  --amber-600: #b3771a; /* warning / drift; fill (dot, border) — jangan dipakai untuk teks   */
   --amber-500: #cf8f28;
   --amber-100: #f7e9c9;
+  /* Teks warning. Rasio WCAG: 5,68:1 di kartu #fffdf8, 4,86:1 di panel #f2ebdc,
+     4,80:1 di tint warning #f7e9c9. --amber-600 hanya 3,7:1 di kartu, jadi tak boleh jadi teks. */
+  --amber-700: #8f5a0f;
 
   --clay-600: #a23b2e;  /* danger / broken         */
   --clay-500: #bd4a3a;
@@ -72,15 +75,21 @@
   --text-strong:   var(--ink-900);
   --text-body:     var(--ink-700);
   --text-muted:    var(--ink-500);
-  --text-subtle:   var(--ink-400);
+  /* Teks sekunder. Dulu ink-400 #90826c = 3,69:1 di kartu dan 3,16:1 di panel (gagal AA).
+     #776853 = 5,31:1 di kartu #fffdf8, 5,00:1 di page #faf6ec, 4,55:1 di panel #f2ebdc. */
+  --text-subtle:   #776853;
   --text-on-brass: var(--ink-900);
   --text-on-dark:  var(--term-fg);
   --text-link:     var(--wind-600);
 
   /* Lines & borders */
   --border-hair:   var(--bone-300);
-  --border-strong: var(--bone-400);
-  --border-focus:  var(--brass-500);
+  /* Batas kontrol (input, checkbox, tombol secondary). Dulu bone-400 = 1,51:1 di kartu (WCAG 1.4.11
+     butuh 3:1). ink-400 = 3,69:1 kartu, 3,48:1 page, 3,16:1 panel. */
+  --border-strong: var(--ink-400);
+  /* Fokus. brass-500 = 2,99:1 di page #faf6ec (di bawah 3:1; 3,17:1 di kartu). brass-600 = 4,83:1
+     kartu, 4,55:1 page, 4,14:1 panel, dan 3,60:1 di term-bg untuk fokus di panel Dalang gelap. */
+  --border-focus:  var(--brass-600);
 
   /* Accents */
   --accent:       var(--brass-500);
@@ -92,10 +101,17 @@
   --info:      var(--wind-600);
   --info-tint: var(--wind-100);
 
-  /* Status */
+  /* Alias untuk nama yang dipakai TSX tetapi belum pernah didefinisikan (sebelumnya jatuh ke
+     currentColor / fallback diam-diam). brass-600 dipilih karena dipakai sebagai teks di atas kartu. */
+  --brass:  var(--brass-600);
+  --danger: var(--clay-600);
+  --line:   var(--border-hair);
+
+  /* Status. Warning dipakai sebagai teks, jadi memakai amber-700 (lihat komentar di atas), bukan
+     amber-600 yang juga fill titik status. Tint (fill) tetap amber-100. */
   --status-ok:        var(--leaf-600);
   --status-ok-tint:   var(--leaf-100);
-  --status-warn:      var(--amber-600);
+  --status-warn:      var(--amber-700);
   --status-warn-tint: var(--amber-100);
   --status-err:       var(--clay-600);
   --status-err-tint:  var(--clay-100);

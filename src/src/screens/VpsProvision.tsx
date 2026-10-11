@@ -5,6 +5,7 @@ import React from "react";
 import { Button, Field, Input, Checkbox, Radio, Icon, useConfirm } from "../ds";
 import { api } from "../api/client";
 import { usePersistedState, oneOf } from "../ui-state";
+import { failureMessage } from "../lib/report-error";
 import type {
   ComponentId, ComponentProbe, ProvisionComponent, ProvisionProfile, ProvisionStep,
   VpsComponents, VpsView,
@@ -23,6 +24,13 @@ export function badgeText(id: string, entry: { status: string; detail: string })
   const suffix = entry.status === "ok" && entry.detail ? ` ${entry.detail}` : "";
   return `${id} · ${STATUS_LABEL[entry.status] ?? entry.status}${suffix}`;
 }
+
+// Arti kedua profil bagi operator (sumber: `ProvisionComponent.requires` — lab memasang langsung
+// di host, production memasang ke dalam image agen yang terisolasi).
+const PROFILE_HINT: Record<ProvisionProfile, string> = {
+  lab: "Uji coba: komponen dipasang langsung di host ini.",
+  production: "Produksi: agen dipasang ke dalam image terisolasi; sebagian komponen tak tersedia di profil ini.",
+};
 
 // Satu kosakata untuk dua tampilan: chip di panel detail, dan ringkasan di baris daftar.
 const STATUS_SHORT: Record<string, string> = {
@@ -132,6 +140,7 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
   const [probe, setProbe] = React.useState<{ components: ComponentProbe[]; checkedAt: string } | null>(null);
   const [setup, setSetup] = React.useState<{ url: string; expiresAt: string } | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [copied, setCopied] = React.useState(false);
   const { confirm, dialog } = useConfirm();
 
   React.useEffect(() => {
@@ -143,6 +152,10 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
   const items = [...required];
   const needsDomain = items.some((id) => catalog.find((c) => c.id === id)?.needsDomain);
   const canRun = items.length > 0 && (!needsDomain || domain.trim().length > 0);
+  // Tombol Pratinjau/Pasang yang mati harus bilang kenapa.
+  const blockReason = items.length === 0 ? "Pilih minimal satu komponen."
+    : needsDomain && !domain.trim() ? "Isi domain dulu — komponen yang dipilih membutuhkannya."
+    : null;
 
   function toggle(id: ComponentId) {
     setPicked((prev) => {
@@ -155,14 +168,14 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
   async function doProbe() {
     setBusy("probe");
     try { setProbe(await api.probeVps(vps.id)); onToast("Komponen diperiksa", "ok", "server"); }
-    catch { onToast("Probe gagal", "err", "x-circle"); }
+    catch (e) { onToast(failureMessage("memeriksa komponen", e), "err", "x-circle"); }
     finally { setBusy(null); }
   }
 
   async function doPreview() {
     setBusy("preview");
     try { setSteps((await api.provisionPreview(vps.id, { items, profile, domain: domain || undefined })).steps); }
-    catch { onToast("Pratinjau gagal", "err", "x-circle"); }
+    catch (e) { onToast(failureMessage("membuat pratinjau", e), "err", "x-circle"); }
     finally { setBusy(null); }
   }
 
@@ -180,13 +193,26 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
       setProbe({ components: r.components, checkedAt: r.checkedAt });
       setSetup(r.setup);
       onToast("Provisioning selesai", "ok", "server");
-    } catch { onToast("Provisioning gagal", "err", "x-circle"); }
+    } catch (e) { onToast(failureMessage("memasang komponen", e), "err", "x-circle"); }
     finally { setBusy(null); }
   }
 
   const openConsole = async () => {
     try { const { id } = await api.vpsConsole(vps.id); onGotoTerminal(id); }
-    catch { onToast("Gagal membuka console", "err", "x-circle"); }
+    catch (e) { onToast(failureMessage("membuka console", e), "err", "x-circle"); }
+  };
+
+  // Salin dengan umpan balik: tombol berubah jadi "Tersalin" sebentar; tanpa API clipboard, bilang jujur.
+  const copyUrl = async (url: string) => {
+    if (!navigator.clipboard) {
+      onToast("Salin tak tersedia di browser ini. Pilih tautannya lalu salin manual.", "err", "x-circle");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch (e) { onToast(failureMessage("menyalin tautan", e), "err", "x-circle"); }
   };
 
   const current: VpsComponents | null = probe
@@ -204,11 +230,17 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
         <Button size="sm" variant="ghost" onClick={doProbe} disabled={busy !== null}>Periksa</Button>
       </div>
 
-      <div style={{ display: "flex", gap: 16 }}>
-        {(["lab", "production"] as ProvisionProfile[]).map((p) => (
-          <Radio key={p} aria-label={p} label={p} checked={profile === p} onChange={() => setProfile(p)} />
-        ))}
-      </div>
+      <fieldset style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        <legend style={{ fontSize: 12, fontWeight: 600, color: "var(--text-strong)", marginBottom: 6, padding: 0 }}>Profil</legend>
+        <div style={{ display: "grid", gap: 8 }}>
+          {(["lab", "production"] as ProvisionProfile[]).map((p) => (
+            <div key={p}>
+              <Radio aria-label={p} label={p} checked={profile === p} onChange={() => setProfile(p)} />
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 24, lineHeight: 1.5 }}>{PROFILE_HINT[p]}</div>
+            </div>
+          ))}
+        </div>
+      </fieldset>
 
       <div style={{ display: "grid", gap: 6 }}>
         {visible.map((c) => {
@@ -232,17 +264,21 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
         </Field>
       )}
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <Button variant="ghost" onClick={doPreview} disabled={!canRun || busy !== null}>Pratinjau</Button>
         <Button onClick={doApply} disabled={!canRun || busy !== null}>Pasang</Button>
+        {!canRun && blockReason && <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{blockReason}</span>}
       </div>
 
-      {steps && (
-        <pre style={{ fontSize: 11, fontFamily: "var(--font-mono)", maxHeight: 220, overflow: "auto",
-          background: "var(--surface-sunken)", padding: 8, borderRadius: 4 }}>
-          {steps.map((s) => `${s.item.padEnd(14)} ${s.status.padEnd(6)} ${s.detail}`).join("\n")}
-        </pre>
-      )}
+      {/* Hasil langkah diumumkan ke pembaca layar dan bisa difokus untuk digulir lewat keyboard. */}
+      <div aria-live="polite">
+        {steps && (
+          <pre tabIndex={0} aria-label="Hasil langkah provisioning" style={{ fontSize: 11, fontFamily: "var(--font-mono)", maxHeight: 220, overflow: "auto",
+            background: "var(--surface-sunken)", padding: 8, borderRadius: 4 }}>
+            {steps.map((s) => `${s.item.padEnd(14)} ${s.status.padEnd(6)} ${s.detail}`).join("\n")}
+          </pre>
+        )}
+      </div>
 
       {setup && (
         <div style={{ display: "grid", gap: 4, border: "1px solid var(--border-strong)", borderRadius: 4, padding: 8 }}>
@@ -252,8 +288,7 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
             berlaku sampai {new Date(setup.expiresAt).toLocaleTimeString("id-ID")}
           </span>
           <div>
-            <Button size="sm" variant="ghost"
-              onClick={() => void navigator.clipboard?.writeText(setup.url)}>Salin</Button>
+            <Button size="sm" variant="ghost" onClick={() => void copyUrl(setup.url)}>{copied ? "Tersalin" : "Salin"}</Button>
           </div>
         </div>
       )}

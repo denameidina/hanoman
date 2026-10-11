@@ -1,9 +1,16 @@
-import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Spec } from "@hanoman/shared";
 import { TerminalScreen, PhaseStrip } from "../src/screens/TerminalScreen";
 import { ApiError } from "../src/api/client";
 import { mockViewport, resetViewport } from "./viewport";
+
+// Aksi sekunder header sel kini ada di menu ⋯ ber-label (audit UI/UX): buka menunya, pilih item.
+async function cellAction(sessionId: string, name: string) {
+  fireEvent.click(screen.getByLabelText(`Aksi sesi ${sessionId}`));
+  const menu = await screen.findByRole("dialog", { name: `Aksi sesi ${sessionId}` });
+  fireEvent.click(within(menu).getByRole("button", { name }));
+}
 
 // TerminalPane membuka WebSocket + xterm (butuh canvas). jsdom tak punya keduanya; yang
 // diuji di sini adalah komposisi grid, bukan rendering terminalnya.
@@ -178,7 +185,7 @@ describe("TerminalScreen (grid)", () => {
     expect(putTerminalWorkspace).not.toHaveBeenCalled();
   });
 
-  it("menampilkan recovery, menonaktifkan writer, lalu Retry memulihkan layout", async () => {
+  it("menampilkan recovery, menonaktifkan writer, lalu Coba lagi memulihkan layout", async () => {
     getTerminalWorkspace.mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce({ workspace: null, revision: 0, updatedAt: null });
     listTerminals.mockResolvedValue([]);
@@ -187,7 +194,7 @@ describe("TerminalScreen (grid)", () => {
     expect(await screen.findByTestId("terminal-workspace-status"))
       .toHaveTextContent("Layout server belum tersambung");
     expect(screen.getByRole("button", { name: "+ Kolom" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
     await waitFor(() => expect(screen.queryByTestId("terminal-workspace-status")).toBeNull());
     expect(screen.getByRole("button", { name: "+ Kolom" })).toBeEnabled();
     expect(putTerminalWorkspace).not.toHaveBeenCalled();
@@ -368,31 +375,62 @@ describe("TerminalScreen (grid)", () => {
     listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
     render(<TerminalScreen projects={projects} />);
     await screen.findByTestId("pane");
-    fireEvent.click(screen.getByText("lepas"));
+    await cellAction("aaaa1111", "Lepas dari grid");
     await waitFor(() => expect(screen.queryByTestId("pane")).toBeNull());
     expect(deleteTerminal).not.toHaveBeenCalled();
     // sesi masih ada → muncul kembali sebagai chip tray
     expect(screen.getByTitle("Taruh di sel kosong pertama grup ini")).toBeInTheDocument();
   });
 
-  it("Tutup (×) memanggil deleteTerminal", async () => {
+  it("Tutup (×) meminta konfirmasi yang menyebut sesinya, baru memanggil deleteTerminal", async () => {
     localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 1, cells: ["aaaa1111"] }));
     listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
     render(<TerminalScreen projects={projects} />);
     await screen.findByTestId("pane");
     fireEvent.click(screen.getByLabelText("Tutup sesi aaaa1111"));
+    // Agen yang masih berjalan akan dihentikan: belum ada DELETE sebelum operator menjawab.
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("aaaa11");
+    expect(dialog).toHaveTextContent("Agen yang sedang berjalan di sesi ini akan dihentikan.");
+    expect(deleteTerminal).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Tutup sesi" }));
     await waitFor(() => expect(deleteTerminal).toHaveBeenCalledWith("aaaa1111"));
   });
 
-  it("sesi yang exited menampilkan badge Selesai + badan meredup (bukan suffix berakhir)", async () => {
+  it("membatalkan konfirmasi Tutup tidak mematikan sesi", async () => {
+    localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 1, cells: ["aaaa1111"] }));
+    listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByTestId("pane");
+    fireEvent.click(screen.getByLabelText("Tutup sesi aaaa1111"));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Batal" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(deleteTerminal).not.toHaveBeenCalled();
+    expect(screen.getByTestId("pane")).toBeInTheDocument();
+  });
+
+  it("gagal DELETE ditampilkan sebagai galat, bukan ditelan", async () => {
+    localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 1, cells: ["aaaa1111"] }));
+    listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
+    deleteTerminal.mockRejectedValueOnce(new ApiError(500, "tmux tak merespons"));
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByTestId("pane");
+    fireEvent.click(screen.getByLabelText("Tutup sesi aaaa1111"));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Tutup sesi" }));
+    expect(await screen.findByText(/Gagal menutup sesi aaaa11/)).toBeInTheDocument();
+    expect(screen.getByText(/tmux tak merespons/)).toBeInTheDocument();
+  });
+
+  it("sesi yang exited menampilkan badge Selesai + banner Berakhir, badan tak diredupkan", async () => {
     localStorage.setItem(LKEY, JSON.stringify({ rows: 1, cols: 1, cells: ["done1111"] }));
     listTerminals.mockResolvedValue([{ id: "done1111", projectId: "p1", cwd: "/repo", exited: true }]);
     const { container } = render(<TerminalScreen projects={projects} />);
     await screen.findByTestId("pane");
     expect(screen.getByText("Selesai")).toBeInTheDocument();
     expect(screen.getByTestId("illustration-PST-005")).toHaveAttribute("aria-hidden", "true");
-    expect(screen.queryByText(/berakhir/)).toBeNull();
-    expect(container.querySelector("[style*='opacity: 0.6']")).not.toBeNull();
+    // Keadaan "berakhir" kini banner sendiri; badan tetap penuh kontras (tak lagi opacity .6).
+    expect(screen.getByTestId("terminal-ended")).toHaveTextContent("Berakhir");
+    expect(container.querySelector("[style*='opacity: 0.6']")).toBeNull();
   });
 
   it("sesi yang masih hidup tak menampilkan badge Selesai", async () => {
@@ -706,7 +744,8 @@ describe("TerminalScreen (Ambil backlog)", () => {
     listSpecs.mockResolvedValue({ items: backlog, total: 3, page: 1, pageSize: 20 });
     startSession.mockRejectedValueOnce(new ApiError(409, "409", { error: "Cap penuh", kind: "capacity",
       admission: { enabled: true, liveCount: 6, liveAgentCount: 4, maxConcurrent: 6,
-        loadPerCore: 1.5, maxLoadPerCore: 2.5, loadStatus: "available" },
+        loadPerCore: 1.5, maxLoadPerCore: 2.5, loadStatus: "available",
+        memAvailablePct: 60, minMemAvailablePct: 10, memStatus: "available" },
     })).mockResolvedValueOnce({ id: "spec101sess" });
     render(<TerminalScreen projects={projects} backlog={backlog} />);
     fireEvent.click(await screen.findByRole("button", { name: "Ambil backlog" }));
@@ -1062,7 +1101,7 @@ describe("TerminalScreen · fullscreen 1 terminal (SPEC-232)", () => {
     render(<TerminalScreen projects={projects} />);
     await screen.findByTestId("pane");
 
-    fireEvent.click(screen.getByLabelText("Layar penuh sesi aaaa1111"));
+    await cellAction("aaaa1111", "Layar penuh");
 
     // modal muncul; pane tetap TEPAT SATU (dipindah dari sel ke modal)
     expect(screen.getByLabelText("Tutup")).toBeInTheDocument();
@@ -1075,7 +1114,7 @@ describe("TerminalScreen · fullscreen 1 terminal (SPEC-232)", () => {
     listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
     render(<TerminalScreen projects={projects} />);
     await screen.findByTestId("pane");
-    fireEvent.click(screen.getByLabelText("Layar penuh sesi aaaa1111"));
+    await cellAction("aaaa1111", "Layar penuh");
     expect(screen.getByLabelText("Tutup")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("Tutup"));
@@ -1089,7 +1128,7 @@ describe("TerminalScreen · fullscreen 1 terminal (SPEC-232)", () => {
     listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
     render(<TerminalScreen projects={projects} />);
     await screen.findByTestId("pane");
-    fireEvent.click(screen.getByLabelText("Layar penuh sesi aaaa1111"));
+    await cellAction("aaaa1111", "Layar penuh");
 
     fireEvent.keyDown(window, { key: "Escape" });
 
@@ -1102,7 +1141,7 @@ describe("TerminalScreen · fullscreen 1 terminal (SPEC-232)", () => {
     listTerminals.mockResolvedValue([{ id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false }]);
     render(<TerminalScreen projects={projects} />);
     await screen.findByTestId("pane");
-    fireEvent.click(screen.getByLabelText("Layar penuh sesi aaaa1111"));
+    await cellAction("aaaa1111", "Layar penuh");
     expect(screen.getByLabelText("Tutup")).toBeInTheDocument();
 
     await act(async () => { ev.handler?.({ t: "sessions", sessions: [] }); }); // sesi lenyap
@@ -1123,7 +1162,15 @@ describe("TerminalScreen · integrate (SPEC-175)", () => {
       priority: "sedang", author: "a", objective: "o", payload: {}, branchFrom: null };
     render(<TerminalScreen projects={projects} onIntegrate={() => {}} specOf={() => spec as never} />);
     await waitFor(() => expect(screen.getAllByTestId("pane")).toHaveLength(2));
-    expect(screen.getAllByTitle(/Rebase \/ Merge/i)).toHaveLength(1); // hanya sesi ber-spec
+    // hanya sesi ber-spec yang menawarkan Rebase / Merge di menu aksinya
+    fireEvent.click(screen.getByLabelText("Aksi sesi spec1sess"));
+    const withSpec = await screen.findByRole("dialog", { name: "Aksi sesi spec1sess" });
+    expect(within(withSpec).getByRole("button", { name: "Rebase / Merge branch" })).toBeInTheDocument();
+    fireEvent.click(within(withSpec).getByLabelText("Tutup"));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Aksi sesi spec1sess" })).toBeNull());
+    fireEvent.click(screen.getByLabelText("Aksi sesi plain0000"));
+    const plain = await screen.findByRole("dialog", { name: "Aksi sesi plain0000" });
+    expect(within(plain).queryByRole("button", { name: "Rebase / Merge branch" })).toBeNull();
   });
 });
 
@@ -1165,31 +1212,32 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
     ]);
   };
 
-  it("meruntuhkan aksi header sel ke panel overflow pada sel sempit", async () => {
+  // Audit UI/UX · aksi sekunder selalu di menu ⋯ ber-label teks, di lebar sel berapa pun. Tutup
+  // tetap satu tombol sendiri, jadi ia tak pernah tenggelam ke menu.
+  it("aksi sekunder ada di menu ⋯ berlabel teks, Tutup tetap terpisah, pada sel sempit", async () => {
     stubResizeObserver(240);
     oneSession();
     render(<TerminalScreen projects={projects} onOpenReview={() => {}} />);
     await screen.findByTestId("pane");
 
-    // semua aksi (termasuk layar penuh & tutup) runtuh ke overflow, dan tetap dapat dipilih
-    expect(screen.queryByRole("button", { name: "Layar penuh sesi aaaa1111" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Tutup sesi aaaa1111" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Lihat dokumen sesi aaaa1111" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Aksi lain sesi aaaa1111" }));
-    expect(screen.getByRole("button", { name: "Lihat dokumen" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Review perubahan" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Lepas dari grid" })).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Layar penuh" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("button", { name: "Tutup" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Tutup sesi aaaa1111" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Aksi sesi aaaa1111" }));
+    const menu = await screen.findByRole("dialog", { name: "Aksi sesi aaaa1111" });
+    expect(within(menu).getByRole("button", { name: "Lihat dokumen" })).toBeInTheDocument();
+    expect(within(menu).getByRole("button", { name: "Review perubahan" })).toBeInTheDocument();
+    expect(within(menu).getByRole("button", { name: "Lepas dari grid" })).toBeInTheDocument();
+    expect(within(menu).getByRole("button", { name: "Layar penuh" })).toBeInTheDocument();
   });
 
-  it("membiarkan aksi inline pada sel lebar", async () => {
+  it("aksi sekunder juga di menu pada sel lebar; tak ada yang inline selain Tutup", async () => {
     stubResizeObserver(900);
     oneSession();
     render(<TerminalScreen projects={projects} onOpenReview={() => {}} />);
     await screen.findByTestId("pane");
-    expect(screen.getByRole("button", { name: "Lihat dokumen sesi aaaa1111" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Aksi lain sesi aaaa1111" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Lihat dokumen sesi aaaa1111" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Aksi sesi aaaa1111" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tutup sesi aaaa1111" })).toBeInTheDocument();
   });
 
   it("meringkas toolbar mobile: aksi sekunder pindah ke satu panel", async () => {
@@ -1248,5 +1296,48 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
     ]);
     render(<TerminalScreen projects={projects} onOpenReview={() => {}} />);
     expect(await screen.findByTestId("orchestrator-chip")).toHaveTextContent("orch Opus · high");
+  });
+});
+
+// Audit UI/UX Terminal · kontrol yang berdiri sendiri, galat yang tampil, dan diagnostik tertutup.
+describe("TerminalScreen · audit UI/UX (Terminal)", () => {
+  it("gagal memuat daftar sesi tampil sebagai galat ber-Coba lagi, bukan 'Belum ada sesi'", async () => {
+    listTerminals.mockRejectedValueOnce(new Error("jaringan putus"));
+    listTerminals.mockResolvedValueOnce([]);
+    render(<TerminalScreen projects={projects} />);
+    expect(await screen.findByText(/Gagal memuat daftar sesi: jaringan putus/)).toBeInTheDocument();
+    expect(screen.queryByText("Belum ada sesi terminal")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    expect(await screen.findByText("Belum ada sesi terminal")).toBeInTheDocument();
+  });
+
+  it("tablist hanya memuat tab; ubah nama dan hapus grup ada di luarnya, minimal 24px", async () => {
+    localStorage.setItem(WKEY, JSON.stringify({ active: "g1", groups: [
+      { id: "g1", name: "Utama", layout: { rows: 1, cols: 1, cells: ["aaaa1111"] } },
+      { id: "g2", name: "Rilis", layout: { rows: 1, cols: 1, cells: ["bbbb2222"] } },
+    ] }));
+    listTerminals.mockResolvedValue([
+      { id: "aaaa1111", projectId: "p1", cwd: "/repo", exited: false },
+      { id: "bbbb2222", projectId: "p1", cwd: "/repo", exited: false },
+    ]);
+    render(<TerminalScreen projects={projects} />);
+    const tablist = await screen.findByRole("tablist", { name: "Grup terminal" });
+    expect(within(tablist).getAllByRole("tab")).toHaveLength(2);
+    expect(within(tablist).queryByRole("button", { name: "Hapus grup Utama" })).toBeNull();
+    expect(within(tablist).queryByRole("button", { name: "Ganti nama grup Utama" })).toBeNull();
+    const hapus = screen.getByRole("button", { name: "Hapus grup Utama" });
+    expect(hapus).toHaveStyle({ minHeight: "24px" });
+  });
+
+  it("rekam jalur ketik ada di bagian Diagnostik yang tertutup, bukan di panel harian", async () => {
+    listTerminals.mockResolvedValue([]);
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByRole("button", { name: /Sesi baru/ });
+    fireEvent.click(screen.getByRole("button", { name: "Tampilan terminal" }));
+    const dialog = await screen.findByRole("dialog", { name: "Tampilan terminal" });
+    const diagnostik = dialog.querySelector("details");
+    expect(diagnostik).not.toBeNull();
+    expect(diagnostik!.open).toBe(false);
+    expect(within(diagnostik!).getByRole("button", { name: "Nyalakan rekam jalur ketik" })).toBeInTheDocument();
   });
 });

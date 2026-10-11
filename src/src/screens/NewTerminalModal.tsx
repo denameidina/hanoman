@@ -1,7 +1,8 @@
 import React from "react";
 import { coerceClaudeEffort } from "@hanoman/shared";
-import { Modal, Button, Select, Field } from "../ds";
+import { Modal, Button, Select, Field, Callout } from "../ds";
 import { api } from "../api/client";
+import { failureMessage } from "../lib/report-error";
 import { codexClientTooOld, codexModel, coerceCodexEffort, CODEX_DEFAULTS, type Agent } from "@hanoman/shared";
 import { runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./session-runtime";
 
@@ -25,13 +26,20 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
     codex: { ...CODEX_DEFAULTS },
   });
   const [busy, setBusy] = React.useState(false);
+  // Audit UI/UX Terminal · galat tak lagi ditelan: dua hal berbeda tampil terpisah. Gagal memuat
+  // setelan hanya mengurangi pilihan (form tetap jalan dengan default bawaan); gagal membuka sesi
+  // membuat operator tahu bahwa sesi TIDAK ada, dan modal tetap terbuka untuk dicoba lagi.
+  const [settingsNotice, setSettingsNotice] = React.useState<string | null>(null);
+  const [createError, setCreateError] = React.useState<string | null>(null);
   // SPEC-339 · versi codex CLI terpasang; null = tak terdeteksi (dan itu tak memicu peringatan).
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
-    // Gagal-diam (cermin StartSessionModal): form harus tetap bisa dipakai dengan default bawaan
-    // walau settings tak terbaca — memblokir "Sesi baru" karena satu GET jauh lebih buruk.
+    setSettingsNotice(null);
+    setCreateError(null);
+    // Form harus tetap bisa dipakai dengan default bawaan walau settings tak terbaca — memblokir
+    // "Sesi baru" karena satu GET jauh lebih buruk. Kegagalannya tetap dikatakan, bukan diam.
     api.getSettings().then((s) => {
       const d: RuntimeDefs = {
         claude: { model: s.model, effort: s.effort },
@@ -40,7 +48,9 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
       const a: Agent = s.agent === "codex" ? "codex" : "claude";
       const r = runtimeFor(d, a);
       setDefs(d); setAgent(a); setModel(r.model); setEffort(r.effort);
-    }).catch(() => {});
+    }).catch((e: unknown) => {
+      setSettingsNotice(`${failureMessage("memuat pengaturan", e)} · memakai default bawaan`);
+    });
     api.getCodexVersion().then((v) => setCodexVer(v.version)).catch(() => {});
   }, [open]);
 
@@ -57,13 +67,14 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
 
   async function create() {
     setBusy(true);
+    setCreateError(null);
     try {
       const { id } = await api.createTerminal(projectId, { agent, model, effort });
       onCreated(id);
       onClose();
-    } catch {
-      // Gagal (project tak ter-bind) — biarkan modal terbuka; pesan detailnya sudah muncul di
-      // jalur pembuatan sesi biasa, form ini tak perlu menduplikasinya.
+    } catch (e) {
+      // Modal tetap terbuka supaya pilihan runtime tak hilang; alasannya tampil di sini.
+      setCreateError(failureMessage("membuka sesi", e));
     } finally { setBusy(false); }
   }
 
@@ -73,6 +84,12 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
         <Button variant="ghost" onClick={onClose}>Batal</Button>
         <Button leftIcon="play" disabled={busy} onClick={() => void create()}>Buka sesi</Button>
       </>}>
+      {settingsNotice && (
+        <Callout tone="warn" title="Pengaturan belum terbaca" style={{ marginBottom: 12 }}>{settingsNotice}</Callout>
+      )}
+      {createError && (
+        <Callout tone="err" title="Sesi belum terbuka" style={{ marginBottom: 12 }}>{createError}</Callout>
+      )}
       <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
         Runtime untuk sesi ini. Default dari setelan global; ubah bila perlu. Sesi lahir dengan
         pilihan ini untuk seluruh hidupnya — <code>/model</code> di terminal tetap bisa mengubahnya.

@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QaWorkspace } from "./QaWorkspace";
 
@@ -68,7 +68,7 @@ describe("QaWorkspace", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Temuan/ }));
     expect(await screen.findByText("F-01")).toBeTruthy();
     expect(screen.getByText("Tombol mati")).toBeTruthy();
-    expect(screen.getByText("major")).toBeTruthy();
+    expect(screen.getByText("Fitur terganggu")).toBeTruthy();
     expect(screen.getByText("P1")).toBeTruthy();
   });
 
@@ -83,7 +83,7 @@ describe("QaWorkspace", () => {
     });
     renderWs();
     fireEvent.click(await screen.findByText("Smoke 0.9"));
-    const input = await screen.findByLabelText("Judul test case baru");
+    const input = await screen.findByLabelText("Nama pengujian baru");
     fireEvent.change(input, { target: { value: "Checkout" } });
     fireEvent.click(screen.getByText("Tambah"));
     expect(await screen.findByDisplayValue("Checkout")).toBeTruthy();
@@ -120,6 +120,7 @@ describe("QaWorkspace", () => {
     expect(screen.queryByText("Kirim ke backlog")).toBeNull();
     expect(toast).toHaveBeenCalledWith(expect.stringMatching(/F-01 → SPEC-212 dibuat/));
     expect((screen.getByText(/SPEC-212 · brainstorming/).closest("a") as HTMLAnchorElement).getAttribute("href")).toBe("/backlog/SPEC-212");
+    expect(screen.getByText("Sudah di backlog")).toBeTruthy();   // label status, bukan "sent" mentah
   });
 
   it("laporan closed tetap menampilkan Kirim ke backlog (pengecualian read-only); tautan putus ditandai", async () => {
@@ -146,6 +147,12 @@ describe("QaWorkspace", () => {
     fireEvent.click(await screen.findByText("Smoke 0.9"));
     fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
     fireEvent.click(await screen.findByText("Kirim semua ke backlog (1)"));
+    // Dampaknya disebut dulu: tak ada item backlog sebelum dikonfirmasi.
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Membuat 1 item backlog.")).toBeTruthy();
+    expect(within(dialog).getByText("F-01 · Tombol mati")).toBeTruthy();
+    expect(posted).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Kirim 1 temuan" }));
     await waitFor(() => expect(posted).toHaveLength(1));
     expect(toast).toHaveBeenCalledWith(expect.stringMatching(/1 temuan dikirim/));
   });
@@ -195,6 +202,7 @@ describe("QaWorkspace", () => {
     fireEvent.click(await screen.findByText("Smoke 0.9"));
     fireEvent.click(await screen.findByText("Ajukan laporan"));
     expect(await screen.findByRole("alert")).toHaveTextContent("Pilih keputusan hasil pengujian");
+    expect(screen.getByLabelText("Keputusan")).toHaveAttribute("aria-invalid", "true");
     expect(toast).not.toHaveBeenCalled();
   });
 });
@@ -206,9 +214,9 @@ it("mengimpor Excel bersama lampiran sebagai multipart dan membuka laporan hasil
     return null;
   });
   renderWs();
-  fireEvent.click(await screen.findByText("Impor Excel / ZIP"));
-  fireEvent.change(screen.getByLabelText("Berkas impor laporan"), { target: { files: [new File(["excel"], "report.xlsx")] } });
-  fireEvent.change(screen.getByLabelText("Berkas lampiran impor"), { target: { files: [new File(["png"], "layar.png")] } });
+  fireEvent.click(await screen.findByText("Impor Excel, ZIP, atau .md"));
+  fireEvent.change(screen.getByLabelText("Berkas laporan (wajib)"), { target: { files: [new File(["excel"], "report.xlsx")] } });
+  fireEvent.change(screen.getByLabelText("Berkas lampiran (opsional)"), { target: { files: [new File(["png"], "layar.png")] } });
   fireEvent.click(screen.getByText("Impor laporan"));
   expect(await screen.findByDisplayValue("Smoke 0.9")).toBeTruthy();
   expect((body!.get("file") as File).name).toBe("report.xlsx");
@@ -237,7 +245,7 @@ it("menyimpan langkah pengujian ketika keluar dari textarea", async () => {
     return null;
   });
   renderWs(); fireEvent.click(await screen.findByText("Smoke 0.9"));
-  const input = await screen.findByLabelText("Langkah TC-01");
+  const input = await screen.findByLabelText("Langkah pengujian TC-01");
   fireEvent.change(input, { target: { value: "Buka halaman login" } }); fireEvent.blur(input);
   await waitFor(() => expect(saved).toEqual({ steps: "Buka halaman login" }));
 });
@@ -265,4 +273,132 @@ it("sync QA refreshes open report and reports configuration or network errors", 
   await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("konfigurasi")));
   fireEvent.click(screen.getByRole("button", { name: "Sinkronkan QA" }));
   await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("QA disinkronkan")));
+});
+
+describe("QaWorkspace · konfirmasi, galat yang tampil, dan info laporan (Fase 1H)", () => {
+  it("Kirim semua: hasil gagal sebagian tampil persisten dengan daftar dan alasan, bukan hanya toast", async () => {
+    const f2 = { ...detail.findings[0]!, id: "f2", code: "F-02", title: "Gambar rusak", backlogId: null, spec: null, status: "open" };
+    const twoFindings = { ...detail, findings: [detail.findings[0]!, f2] };
+    mockFetch((u, init) => {
+      if (u.endsWith("/qa/reports/r1") && (!init?.method || init.method === "GET")) return json(twoFindings);
+      if (u.endsWith("/qa/reports/r1/backlog") && init?.method === "POST") {
+        return json({
+          results: [
+            { findingId: "f1", code: "F-01", created: true, spec: { id: "SPEC-5", stage: "brainstorming", priority: "tinggi" }, attachments: { saved: 0, rejected: [] } },
+            { findingId: "f2", code: "F-02", created: false, spec: null, attachments: { saved: 0, rejected: [] }, error: "backlog penuh" },
+          ],
+          sent: 1, report: twoFindings,
+        }, 201);
+      }
+      return null;
+    });
+    renderWs({ onToast: vi.fn() });
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
+    fireEvent.click(await screen.findByText("Kirim semua ke backlog (2)"));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Membuat 2 item backlog.")).toBeTruthy();
+    expect(within(dialog).getByText("F-02 · Gambar rusak")).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Kirim 2 temuan" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("1 temuan gagal dikirim ke backlog");
+    expect(alert).toHaveTextContent("F-02 · Gambar rusak: backlog penuh");
+  });
+
+  it("Kembali dengan isian yang belum disimpan meminta konfirmasi; Batal tetap di editor", async () => {
+    mockFetch();
+    renderWs();
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    fireEvent.change(await screen.findByDisplayValue("Smoke 0.9"), { target: { value: "Smoke 1.0" } });
+    fireEvent.click(screen.getByText("Kembali"));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Perubahan pada informasi laporan belum disimpan/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Batal" }));
+    expect(screen.getByDisplayValue("Smoke 1.0")).toBeTruthy();
+    fireEvent.click(screen.getByText("Kembali"));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Buang perubahan" }));
+    expect(await screen.findByText("Smoke 0.9")).toBeTruthy();   // kembali ke daftar
+  });
+
+  it("hapus test case: konfirmasi dulu, baru DELETE ke server", async () => {
+    const calls: string[] = [];
+    mockFetch((u, init) => {
+      if (init?.method === "DELETE") { calls.push(u); return json({ ...detail, cases: [] }); }
+      return null;
+    });
+    renderWs();
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    fireEvent.click(await screen.findByRole("button", { name: "Hapus TC-01" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Lampiran milik test case ini ikut terhapus.")).toBeTruthy();
+    expect(calls).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Hapus" }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toContain("/qa/reports/r1/cases/c1");
+  });
+
+  it("simpan langkah yang gagal tampil sebagai galat di kartu; simpan ulang yang berhasil menampilkan Tersimpan", async () => {
+    let fail = true;
+    mockFetch((u, init) => {
+      if (u.endsWith("/cases/c1") && init?.method === "PATCH") {
+        if (fail) return json({ error: "langkah melebihi batas" }, 400);
+        return json({ ...detail, cases: [{ ...detail.cases[0]!, steps: "Buka" }] });
+      }
+      return null;
+    });
+    renderWs();
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    const steps = await screen.findByLabelText("Langkah pengujian TC-01");
+    fireEvent.change(steps, { target: { value: "Buka" } });
+    fireEvent.blur(steps);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Gagal menyimpan test case: langkah melebihi batas");
+    fail = false;
+    fireEvent.blur(steps);
+    expect(await screen.findByText("Tersimpan")).toBeTruthy();
+  });
+
+  it("laporan yang sudah ada mulai dengan Info laporan terlipat; laporan baru terbuka", async () => {
+    mockFetch((u, init) => {
+      if (u.endsWith("/api/projects/p1/qa/reports") && init?.method === "POST") {
+        return json({ ...detail, id: "r9", code: "QA-009", title: "Regresi besar" }, 201);
+      }
+      return null;
+    });
+    renderWs();
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    await screen.findByDisplayValue("Smoke 0.9");
+    expect((screen.getByText("Info laporan").closest("details") as HTMLDetailsElement).open).toBe(false);
+    fireEvent.click(screen.getByText("Kembali"));
+    fireEvent.click(await screen.findByText("Laporan baru"));
+    fireEvent.change(screen.getByLabelText("Judul"), { target: { value: "Regresi besar" } });
+    fireEvent.click(screen.getByText("Buat"));
+    await screen.findByDisplayValue("Regresi besar");
+    expect((screen.getByText("Info laporan").closest("details") as HTMLDetailsElement).open).toBe(true);
+  });
+
+  it("peringatan lampiran impor bisa ditutup", async () => {
+    mockFetch((u) => (u.endsWith("/qa/import")
+      ? json({ reportId: "r1", created: true, cases: 1, findings: 1, attachments: { saved: 0, rejected: [{ filename: "log.exe", reason: "type" }] } })
+      : null));
+    renderWs();
+    fireEvent.click(await screen.findByText("Impor Excel, ZIP, atau .md"));
+    fireEvent.change(screen.getByLabelText("Berkas laporan (wajib)"), { target: { files: [new File(["excel"], "report.xlsx")] } });
+    fireEvent.click(screen.getByText("Impor laporan"));
+    expect(await screen.findByText(/Beberapa lampiran perlu ditambahkan/)).toBeTruthy();
+    expect(screen.getByText(/log\.exe: Tipe berkas tidak didukung\./)).toBeTruthy();
+    fireEvent.click(screen.getByText("Tutup"));
+    expect(screen.queryByText(/Beberapa lampiran perlu ditambahkan/)).toBeNull();
+  });
+});
+
+describe("QaField · label dan hint", () => {
+  it("hint terhubung lewat aria-describedby, tak masuk nama aksesibel kontrol", async () => {
+    mockFetch();
+    renderWs();
+    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    const summary = await screen.findByLabelText("Ringkasan hasil");
+    expect(summary.getAttribute("aria-describedby")).toBeTruthy();
+    expect(document.getElementById(summary.getAttribute("aria-describedby")!)).toHaveTextContent("Boleh diisi setelah langkah uji");
+    expect(summary.getAttribute("aria-label")).toBeNull();
+  });
 });

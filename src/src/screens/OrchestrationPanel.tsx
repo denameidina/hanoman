@@ -1,5 +1,5 @@
 import React from "react";
-import { Card, Select, Switch } from "../ds";
+import { Card, LocalOverflow, Select, Switch } from "../ds";
 import {
   EXECUTE_MODE_FLOWS, FLOW_PHASES, ORCHESTRATION_DEFAULTS, ORCHESTRATION_FLOWS, coerceClaudeEffort, coerceCodexEffort,
   type Agent, type FlowOrchestration, type Orchestration, type OrchestrationFlow, type PhaseCell,
@@ -10,7 +10,8 @@ import { runtimeEfforts, runtimeSubagentModels } from "./session-runtime";
 // ini, jadi menulis dari snapshot mount aman (berbeda dari baca-ulang lead/telegram).
 // Katalog dibaca lewat `session-runtime.ts` — sumber yang sama dengan picker Start.
 
-const FLOW_LABEL: Record<OrchestrationFlow, string> = {
+// Diekspor: layar Scheduler memakai nama flow yang sama dengan matriks ini (satu istilah baku).
+export const FLOW_LABEL: Record<OrchestrationFlow, string> = {
   feature: "Brief (feature)", qa: "QA", scaffold: "Scaffold", reverse: "Reverse docs", prd: "PRD",
   audit: "Audit", breakdown: "Breakdown PRD", goal: "Goal", no_effort: "No effort",
 };
@@ -20,13 +21,13 @@ const RUNTIMES: { id: Agent; label: string }[] = [
 // Amandemen ADR-0170 P2 · cara fase Execute/Goal (sesi Claude) mengerjakan plan.
 const EXECUTE_MODE_OPTIONS = [
   { value: "inline", label: "Inline — agen fase mengerjakan task sendiri (cepat)" },
-  { value: "subagent", label: "Subagent per task — implementer + review tiap task (lebih lambat)" },
+  { value: "subagent", label: "Subagen per task — implementer + review tiap task (lebih lambat)" },
 ];
 const EMPTY_CELL: PhaseCell = { model: null, effort: null };
 const CELL: React.CSSProperties = { padding: "6px 8px", borderTop: "1px solid var(--border-hair)", verticalAlign: "top" };
 
-function CellPicker({ flow, phase, runtime, cell, onPick }: {
-  flow: OrchestrationFlow; phase: string; runtime: Agent; cell: PhaseCell;
+function CellPicker({ flow, phase, runtime, cell, disabled, onPick }: {
+  flow: OrchestrationFlow; phase: string; runtime: Agent; cell: PhaseCell; disabled: boolean;
   onPick: (next: PhaseCell, msg: string) => void;
 }) {
   const models = runtimeSubagentModels(runtime);
@@ -46,7 +47,7 @@ function CellPicker({ flow, phase, runtime, cell, onPick }: {
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
       <Select size="sm" aria-label={`Model ${flow} ${phase} ${runtime}`} value={cell.model ?? ""}
-        style={{ minWidth: 150 }} options={modelOptions}
+        style={{ minWidth: 150 }} options={modelOptions} disabled={disabled}
         onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
           const model = e.target.value || null;
           // Cermin picker Start: menukar model menurunkan effort yang tak didukung model baru SEKARANG.
@@ -54,7 +55,7 @@ function CellPicker({ flow, phase, runtime, cell, onPick }: {
             `${phase} (${runtime}) → ${model ?? "warisi"}`);
         }} />
       <Select size="sm" aria-label={`Effort ${flow} ${phase} ${runtime}`} value={cell.effort ?? ""}
-        style={{ minWidth: 96 }} options={effortOptions}
+        style={{ minWidth: 96 }} options={effortOptions} disabled={disabled}
         onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
           onPick({ ...cell, effort: e.target.value || null }, `${phase} (${runtime}) effort → ${e.target.value || "warisi"}`)} />
     </div>
@@ -71,12 +72,12 @@ export function OrchestrationPanel({ orchestration, onChange }: {
     onChange({ ...orch, [flow]: next }, msg);
   return (
     <>
-      <Card eyebrow="orkestrasi" title="Orkestrasi subagent per fase">
-        <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
-          Sesi utama menjadi <b>orchestrator</b>; setiap fase dikerjakan subagent dengan model &amp; effort di
-          bawah. <b>Warisi</b> memakai model/effort orchestrator yang dipilih saat <b>Start</b>. Subagent selalu
-          berjalan di runtime orchestrator: sesi claude memakai kolom Claude Code, sesi codex kolom Codex CLI.
-          Flow yang dimatikan berjalan sebagai sesi tunggal seperti sebelumnya.
+      <Card eyebrow="orkestrasi" title="Orkestrasi subagen per fase">
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", lineHeight: 1.5 }}>
+          Sesi utama berperan sebagai <b>pengatur</b>; setiap fase dikerjakan subagen dengan model &amp; effort di
+          bawah. <b>Warisi</b> memakai pengaturan sesi utama yang dipilih saat <b>Start</b>. Subagen selalu berjalan di
+          runtime yang sama dengan sesi utama: sesi Claude memakai kolom Claude Code, sesi Codex kolom Codex CLI.
+          Flow yang dimatikan berjalan sebagai satu sesi biasa seperti sebelumnya.
         </div>
       </Card>
       {ORCHESTRATION_FLOWS.map((flow) => {
@@ -85,28 +86,30 @@ export function OrchestrationPanel({ orchestration, onChange }: {
           <div key={flow} data-testid={`orch-flow-${flow}`}>
             <Card eyebrow="flow" title={FLOW_LABEL[flow]}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-                <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-                  {f.enabled ? "Fase dikerjakan subagent" : "Sesi tunggal (orkestrasi mati)"}
+                <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
+                  {f.enabled ? "Fase dikerjakan subagen" : "Satu sesi biasa (subagen nonaktif)"}
                 </span>
                 <Switch checked={f.enabled} aria-label={`Orkestrasi ${flow}`}
                   onChange={(v: boolean) => putFlow(flow, { ...f, enabled: v },
                     `Orkestrasi ${FLOW_LABEL[flow]} · ${v ? "aktif" : "nonaktif"}`)} />
               </div>
               {EXECUTE_MODE_FLOWS.has(flow) && (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10, opacity: f.enabled ? 1 : 0.55 }}>
-                  <span style={{ fontSize: 12.5, color: "var(--text-strong)", fontWeight: 600 }}>Mode Execute</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+                  <span style={{ fontSize: "var(--text-sm)", color: "var(--text-strong)", fontWeight: 600 }}>Cara mengerjakan rencana</span>
                   <Select size="sm" aria-label={`Mode Execute ${flow}`} value={f.executeMode ?? "inline"}
-                    style={{ minWidth: 260, maxWidth: "100%" }} options={EXECUTE_MODE_OPTIONS}
+                    style={{ minWidth: 260, maxWidth: "100%" }} options={EXECUTE_MODE_OPTIONS} disabled={!f.enabled}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                       const mode = e.target.value === "subagent" ? "subagent" : "inline";
                       putFlow(flow, { ...f, executeMode: mode },
-                        `Mode Execute ${FLOW_LABEL[flow]} · ${mode === "subagent" ? "subagent per task" : "inline"}`);
+                        `Mode Execute ${FLOW_LABEL[flow]} · ${mode === "subagent" ? "subagen per task" : "inline"}`);
                     }} />
-                  <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>khusus sesi Claude · Codex selalu inline</span>
+                  <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>khusus sesi Claude · Codex selalu inline</span>
                 </div>
               )}
-              <div style={{ overflowX: "auto", opacity: f.enabled ? 1 : 0.55 }}>
-                <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse", fontSize: 12.5 }}>
+              {/* Kontrol flow yang dimatikan benar-benar `disabled` (tak bisa difokus atau diubah), bukan
+                  hanya diredupkan; kolom tabel yang lebih lebar dari layar digulir di dalam wadahnya. */}
+              <LocalOverflow>
+                <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
                   <thead>
                     <tr>
                       <th style={{ ...CELL, borderTop: "none", textAlign: "left" }}>Fase</th>
@@ -122,6 +125,7 @@ export function OrchestrationPanel({ orchestration, onChange }: {
                         {RUNTIMES.map((rt) => (
                           <td key={rt.id} style={CELL}>
                             <CellPicker flow={flow} phase={phase} runtime={rt.id} cell={f[rt.id][phase] ?? EMPTY_CELL}
+                              disabled={!f.enabled}
                               onPick={(cell, msg) => putFlow(flow, { ...f, [rt.id]: { ...f[rt.id], [phase]: cell } }, msg)} />
                           </td>
                         ))}
@@ -129,7 +133,7 @@ export function OrchestrationPanel({ orchestration, onChange }: {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </LocalOverflow>
             </Card>
           </div>
         );

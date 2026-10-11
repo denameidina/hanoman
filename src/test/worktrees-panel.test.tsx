@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 
 describe("WorktreesPanel", () => {
-  it("pemungutan yatim meminta konfirmasi dan tidak menghapus branch", async () => {
+  it("pembersihan sesi terputus meminta konfirmasi dan tidak menghapus branch", async () => {
     const r = report();
     r.worktrees[2]!.orphan = { historyId: "h1", sessionId: "old" };
     vi.mocked(api.worktrees).mockResolvedValue(r);
@@ -40,14 +40,14 @@ describe("WorktreesPanel", () => {
       results: [{ name: "wt-b", ok: true, cleanup: "wt-b.abc" }],
     });
     render(<WorktreesPanel projectId="p1" />);
-    expect(await screen.findByText("sesi yatim")).toBeInTheDocument();
+    expect(await screen.findByText("sesi terputus")).toBeInTheDocument();
     pick("with-branch");
-    fireEvent.click(screen.getByRole("button", { name: /Pungut yatim/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Bersihkan sesi terputus/ }));
     expect(await screen.findByText(/termasuk berkas ignored/)).toBeInTheDocument();
     expect(del).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /batal/i }));
     expect(del).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Pungut yatim/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Bersihkan sesi terputus/ }));
     await confirm();
     await waitFor(() => expect(del).toHaveBeenCalledWith("p1", { names: ["wt-b"], orphanOnly: true }));
   });

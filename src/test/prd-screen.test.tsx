@@ -26,6 +26,7 @@ vi.mock("../src/api/client", () => ({
 }));
 import { PrdScreen } from "../src/screens/PrdScreen";
 import { api } from "../src/api/client";
+import { uiKey, writeUiState } from "../src/ui-state";
 
 const projects = [{ id: "p1", name: "P1" }, { id: "p2", name: "Proyek B" }] as any;
 // SPEC-273 · prop breakdown wajib; default no-op untuk test yang tak memakainya.
@@ -144,14 +145,15 @@ describe("PrdScreen", () => {
 
   // SPEC-520 · status PRD terlihat di daftar, dan kata "draft" tak lagi dipakai lencana live.
   // Assertion di-scope ke <aside aria-label="Daftar PRD">: Select filter merender
-  // <option>draft</option> dkk, jadi getByText polos akan cocok GANDA.
+  // <option>Draf</option> dkk, jadi getByText polos akan cocok GANDA.
+  // Audit 2026-10: label status berbahasa Indonesia (bukan enum mentah).
   it("lencana status muncul dengan hitungan turunannya", async () => {
     render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
     await waitFor(() => expect(screen.getByText("Jadwal Invoice")).toBeTruthy());
     const list = within(screen.getByLabelText("Daftar PRD"));
-    expect(list.getByText("draft")).toBeTruthy();          // specCount 0 → tanpa hitungan
-    expect(list.getByText("dieskalasi 1/3")).toBeTruthy();
-    expect(list.getByText("terwujud 2/2")).toBeTruthy();
+    expect(list.getByText("Draf")).toBeTruthy();          // specCount 0 → tanpa hitungan
+    expect(list.getByText("Dieskalasi 1/3")).toBeTruthy();
+    expect(list.getByText("Terwujud 2/2")).toBeTruthy();
   });
 
   it("lencana sesi hidup tak lagi berbunyi 'draft hidup'", async () => {
@@ -217,5 +219,46 @@ describe("PRD → backlog: brief atau goal (SPEC-407)", () => {
     const onTake = vi.fn();
     await openPreview(onTake);
     expect(onTake).not.toHaveBeenCalled();
+  });
+});
+
+// Audit UI/UX 2026-10 · PRD: seleksi tersimpan, galat dibedakan dari kosong, breakdown ikut
+// dataVersion, dan "Buat brief" yang nonaktif disertai alasannya.
+describe("PrdScreen · audit 2026-10", () => {
+  beforeEach(() => localStorage.clear());
+  it("seleksi tersimpan bertahan saat halaman dibuka (tak dibuang saat mount)", async () => {
+    writeUiState(uiKey("prd", "sel"), "jadwal-invoice");
+    render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
+    await waitFor(() => expect(api.getPrd).toHaveBeenCalledWith("p1", "docs/prd/jadwal-invoice.md"));
+    expect(await screen.findByRole("heading", { level: 2, name: "Jadwal Invoice" })).toBeInTheDocument();
+  });
+
+  it("galat memuat daftar tampil sebagai error dengan Coba lagi, bukan 'Belum ada PRD'", async () => {
+    vi.mocked(api.listPrds).mockRejectedValueOnce(new Error("GET /prds → 500"));
+    render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
+    expect(await screen.findByText("Gagal memuat daftar PRD")).toBeInTheDocument();
+    expect(screen.queryByText("Belum ada PRD")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    expect(await screen.findByText("Jadwal Invoice")).toBeInTheDocument();
+  });
+
+  it("usulan breakdown dimuat ulang saat dataVersion berubah", async () => {
+    const { rerender } = render(<PrdScreen projects={projects} {...base} projectFilter="p1" dataVersion={0}
+      onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
+    fireEvent.click(await screen.findByText("Jadwal Invoice"));
+    await waitFor(() => expect(api.getBreakdown).toHaveBeenCalledTimes(1));
+    rerender(<PrdScreen projects={projects} {...base} projectFilter="p1" dataVersion={1}
+      onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
+    await waitFor(() => expect(api.getBreakdown).toHaveBeenCalledTimes(2));
+  });
+
+  it("'Buat brief' nonaktif tanpa judul, dan hint menyebut sebabnya", async () => {
+    render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
+    fireEvent.click(await screen.findByRole("button", { name: /prd baru/i }));
+    const submit = screen.getByRole("button", { name: /brainstorm prd/i });
+    expect(submit).toBeDisabled();
+    expect(screen.getByText(/Wajib diisi — tanpa judul/)).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("mis. Jadwal Invoice Berulang"), { target: { value: "Jadwal" } });
+    expect(submit).toBeEnabled();
   });
 });

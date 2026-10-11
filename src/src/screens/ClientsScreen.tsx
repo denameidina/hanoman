@@ -7,10 +7,13 @@ import { LogsPanel } from "./LogsPanel";
 import { RemoteInstanceView } from "./RemoteInstanceView";
 import type { PresenceDeviceView, PresenceSessionView, PresenceView } from "@hanoman/shared";
 
-/* SPEC-919 · ADR-0147 · halaman "Klien": device yang sinkron ke hub ini, dan pekerjaan yang
+/* SPEC-919 · ADR-0147 · halaman "Klien": perangkat yang sinkron ke server ini, dan pekerjaan yang
    sedang berjalan di masing-masing.
-   SPEC-1218 · ADR-0165 §11 · mirror terminal/dokumen/IDE klien kini ADA lewat tombol "Buka" →
-   `RemoteInstanceView`, baca-saja; menempel untuk MENGETIK di sesi klien tetap di luar lingkup. */
+   SPEC-1218 · ADR-0165 §11 · mirror terminal/dokumen/IDE perangkat kini ADA lewat tombol "Buka" →
+   `RemoteInstanceView`, baca-saja; menempel untuk MENGETIK di sesi perangkat tetap di luar lingkup.
+
+   Audit UI/UX 2026-10: daftar kosong tak boleh menyamar sebagai kegagalan muat, dan tombol yang
+   mati harus menyebut alasannya sebagai teks, bukan hanya lewat `title`. */
 
 const STATUS: Record<PresenceSessionView["status"], { label: string; tone: "ok" | "warn" | "neutral" }> = {
   working: { label: "bekerja", tone: "ok" },
@@ -28,6 +31,15 @@ export function sinceLabel(iso: string, now: number): string {
   if (m < 60) return `${m} mnt`;
   const h = Math.floor(m / 60);
   return h < 24 ? `${h} jam ${m % 60} mnt` : `${Math.floor(h / 24)} hari`;
+}
+
+/** Alasan tombol "Buka" mati, dalam bahasa biasa. `null` = tombol boleh dipakai. Murni, supaya
+    tiap cabangnya bisa diuji tanpa merender kartu. */
+export function openBlockReason(d: PresenceDeviceView): string | null {
+  if (!d.online) return "Perangkat sedang offline — kendali jarak jauh tak bisa dibuka.";
+  if (d.control?.state === "protocol-mismatch") return "Versi protokol perangkat tak cocok dengan server ini.";
+  if (!d.control) return "Kendali jarak jauh belum diizinkan di perangkat ini.";
+  return null;
 }
 
 function SessionRow({ s, title, onOpenSpec, now }:
@@ -69,7 +81,8 @@ function SessionRow({ s, title, onOpenSpec, now }:
 function DeviceCard({ d, specTitles, onOpenSpec, now, onOpenRemote }:
   { d: PresenceDeviceView; specTitles: Record<string, string>;
     onOpenSpec: (specId: string) => void; now: number; onOpenRemote: (d: PresenceDeviceView) => void }) {
-  const mismatch = d.control?.state === "protocol-mismatch";
+  const reasonId = React.useId();
+  const reason = openBlockReason(d);
   return (
     <Card>
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
@@ -77,7 +90,7 @@ function DeviceCard({ d, specTitles, onOpenSpec, now, onOpenRemote }:
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 500, color: "var(--text-strong)" }}>
           {d.name}
         </span>
-        {d.local && <Badge tone="neutral" size="sm">hub ini</Badge>}
+        {d.local && <Badge tone="neutral" size="sm">perangkat ini</Badge>}
         <Badge data-testid={`device-state-${d.deviceId}`} size="sm" tone={d.online ? "ok" : "neutral"}>
           {d.online ? "online" : "offline"}
         </Badge>
@@ -86,12 +99,18 @@ function DeviceCard({ d, specTitles, onOpenSpec, now, onOpenRemote }:
           terakhir terlihat {d.lastSeenAt ? sinceLabel(d.lastSeenAt, now) + " lalu" : "—"}
         </span>
         {!d.local && (
-          <Button size="sm" disabled={mismatch || !d.control} onClick={() => onOpenRemote(d)}
-            title={mismatch ? "Versi protokol tak cocok" : !d.control ? "Kendali jarak jauh tak menyala di klien ini" : undefined}>
+          <Button size="sm" disabled={!!reason} onClick={() => onOpenRemote(d)}
+            aria-describedby={reason ? reasonId : undefined}>
             Buka
           </Button>
         )}
       </div>
+      {!d.local && reason && (
+        <div id={reasonId} data-testid={`device-open-reason-${d.deviceId}`}
+          style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
+          {reason}
+        </div>
+      )}
       {d.sessions.length === 0
         ? (
           <div data-testid={`device-empty-${d.deviceId}`}
@@ -114,50 +133,71 @@ export function ClientsScreen({ view, specTitles, onOpenSpec }:
      jadi refresh saat sedang membuka layar ini mendaratkan kita di sini SEBELUM socket sempat
      mengantar frame pertamanya — dan `App` sengaja tak menariknya di `load()` (satu panggilan `api`
      di sana mematahkan 20 test ber-mock parsial, kelas jebakan SPEC-884). Ia berhenti begitu frame
-     tiba; tak ada polling. */
+     tiba; tak ada polling.
+     Audit UI/UX 2026-10: selama menunggu muatan awal tampil "Memuat…", dan kalau gagal tampil
+     galat dengan "Coba lagi" — bukan "Belum ada perangkat" yang seolah-olah jawaban yang sah. */
   const [fallback, setFallback] = React.useState<PresenceView | null>(null);
+  const [fetchState, setFetchState] = React.useState<"loading" | "ready" | "error">("loading");
+  const [attempt, setAttempt] = React.useState(0);
   const empty = view.devices.length === 0;
   React.useEffect(() => {
     if (!empty) return;
     let alive = true;
-    api.presence().then((v) => { if (alive) setFallback(v); })
-      .catch(() => { /* server lama: layar tetap pada keadaan kosongnya */ });
+    setFetchState("loading");
+    api.presence()
+      .then((v) => { if (alive) { setFallback(v); setFetchState("ready"); } })
+      .catch(() => { if (alive) setFetchState("error"); });
     return () => { alive = false; };
-  }, [empty]);
+  }, [empty, attempt]);
 
   const shown = empty && fallback ? fallback : view;
   // Satu stempel per render: dua baris yang lahir dari render yang sama tak boleh menghitung
   // "sudah berapa lama" dari dua titik waktu berbeda.
   const now = Date.now();
-  // SPEC-1217 · D6/AC-S8 · tab "Device"|"Log", default "Device" — layar Klien lama tetap terlihat
-  // sama persis di tab default, log terpusat (LogsPanel) hidup di tab kedua.
+  // SPEC-1217 · D6/AC-S8 · tab "Perangkat"|"Log", default "Perangkat" — log terpusat (LogsPanel)
+  // hidup di tab kedua.
   const [tab, setTab] = React.useState<"device" | "log">("device");
-  const [openDevice, setOpenDevice] = React.useState<PresenceDeviceView | null>(null);
+  // Perangkat yang dibuka dicari ulang dari `shown` setiap render, jadi status online/kendalinya
+  // selalu segar. Sesi dipilih lewat id; sesi yang sudah lenyap jatuh ke sesi pertama.
+  const [openId, setOpenId] = React.useState<string | null>(null);
+  const [pickedSession, setPickedSession] = React.useState<string | null>(null);
+  const openDevice = openId ? shown.devices.find((d) => d.deviceId === openId) ?? null : null;
+  const session = openDevice
+    ? openDevice.sessions.find((s) => s.sessionId === pickedSession) ?? openDevice.sessions[0]
+    : undefined;
+
+  const deviceList = () => {
+    if (shown.devices.length > 0) {
+      return (
+        <div style={{ display: "grid", gap: 12 }}>
+          {shown.devices.map((d) => (
+            <DeviceCard key={d.deviceId} d={d} specTitles={specTitles} onOpenSpec={onOpenSpec}
+              now={now} onOpenRemote={(dev) => { setOpenId(dev.deviceId); setPickedSession(null); }} />
+          ))}
+        </div>
+      );
+    }
+    if (fetchState === "error") {
+      return <StateBlock kind="error" title="Gagal memuat daftar perangkat"
+        hint="Periksa koneksi ke server ini, lalu coba lagi." action={() => setAttempt((n) => n + 1)} />;
+    }
+    if (fetchState === "loading") return <StateBlock kind="loading" compact title="Memuat perangkat…" />;
+    return <StateBlock kind="empty" icon="monitor" title="Belum ada perangkat"
+      hint="Perangkat muncul di sini setelah hanoman di perangkat itu terhubung ke server ini dengan token perangkat." />;
+  };
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
       {openDevice ? (
         <RemoteInstanceView device={openDevice} hubVersion={shown.hubVersion}
-          sessionId={openDevice.sessions[0]?.sessionId} onClose={() => setOpenDevice(null)} />
+          sessionId={session?.sessionId} projectId={session?.projectId}
+          onPickSession={(id) => setPickedSession(id)} onClose={() => setOpenId(null)} />
       ) : (
         <>
           <Tabs variant="pill"
-            tabs={[{ value: "device", label: "Device" }, { value: "log", label: "Log" }]}
+            tabs={[{ value: "device", label: "Perangkat" }, { value: "log", label: "Log" }]}
             value={tab} onChange={(v) => setTab(v as "device" | "log")} />
-          {tab === "device" ? (
-            shown.devices.length === 0 ? (
-              <StateBlock kind="empty" icon="monitor" title="Belum ada device"
-                hint="Device muncul di sini sesudah sebuah instance hanoman menerbitkan device token dan menyinkron ke hub ini." />
-            ) : (
-              <div style={{ display: "grid", gap: 12 }}>
-                {shown.devices.map((d) => (
-                  <DeviceCard key={d.deviceId} d={d} specTitles={specTitles} onOpenSpec={onOpenSpec}
-                    now={now} onOpenRemote={setOpenDevice} />
-                ))}
-              </div>
-            )
-          ) : (
-            <LogsPanel />
-          )}
+          {tab === "device" ? deviceList() : <LogsPanel />}
         </>
       )}
     </div>

@@ -1,14 +1,18 @@
-/* OverviewScreen — workspace dashboard. Pekerjaan yang berjalan adalah sesi claude di
-   tmux, bukan baris Run (SPEC-162): tak ada progress %, tak ada estimasi biaya. */
+/* OverviewScreen — ringkasan workspace. Pekerjaan yang berjalan adalah sesi claude di
+   tmux, bukan baris Run (SPEC-162): tak ada progress %, tak ada estimasi biaya.
+   Setiap angka hanya tampil di satu tempat (judul/eyebrow kartu); tak ada KPI yang
+   mengulang kartu di bawahnya (audit 2026-10, Overview: duplikasi). */
 import React from "react";
-import { Card, StatusPill, Badge, ProgressBar, Icon, Button, StateBlock } from "../ds";
+import { Card, StatusPill, Badge, ProgressBar, Icon, Button, StateBlock, Tabs } from "../ds";
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, SpecSlim } from "./types";
 import { LimitWindows } from "./LimitIndicator";
-import { DalangStage } from "./DalangStage";
+import { DalangStage, FLOW_LABEL, STAGE_LABEL } from "./DalangStage";
 import { useLimits } from "../api/limits";
 import { useCodexLimits } from "../api/codex-limits";
 
+// Satu sumber untuk kata status dokumen — dipakai pill, badge, dan judul baris.
+const DOC_LABEL: Record<string, string> = { ok: "Sesuai standar", drift: "Tidak sinkron", broken: "Belum sesuai" };
 function oCovTone(s: string) { return s === "broken" ? "err" : s === "drift" ? "warn" : "ok"; }
 // Sesi tak punya status "failed" yang terbaca dari luar — yang gagal terlihat di terminalnya.
 function oAttention(p: ProjectVM): "high" | "low" | "none" {
@@ -16,84 +20,74 @@ function oAttention(p: ProjectVM): "high" | "low" | "none" {
   if (p.docStatus === "drift") return "low";
   return "none";
 }
-const O_ATT: Record<string, { bar: string; tint: string; text: string; label: string }> = {
-  high: { bar: "var(--clay-500)", tint: "var(--clay-100)", text: "var(--clay-600)", label: "perlu perhatian" },
-  low: { bar: "var(--amber-500)", tint: "var(--amber-100)", text: "var(--amber-600)", label: "docs drift" },
+const O_ATT: Record<string, { bar: string; tint: string; text: string; label: string; reason: string }> = {
+  high: { bar: "var(--clay-500)", tint: "var(--clay-100)", text: "var(--clay-600)", label: "Dokumentasi belum sesuai",
+    reason: "Dokumen belum memenuhi standar" },
+  low: { bar: "var(--amber-500)", tint: "var(--amber-100)", text: "var(--amber-600)", label: "Dokumentasi tidak sinkron",
+    reason: "Sebagian kategori dokumen belum ter-index" },
 };
 
-function KpiStrip({ items }: { items: { label: string; value: React.ReactNode; sub?: string; dot: string }[] }) {
-  return (
-    <div className="hn-stat-grid" style={{
-      display: "grid", gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: 1,
-      background: "var(--border-hair)", border: "1px solid var(--border-hair)",
-      borderRadius: "var(--radius-lg)", overflow: "hidden", marginBottom: 20,
-    }}>
-      {items.map((s) => (
-        <div key={s.label} style={{ background: "var(--surface-card)", padding: "16px 18px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.dot }} />
-            <span style={{ fontFamily: "var(--font-display)", fontSize: 27, fontWeight: 600, color: "var(--text-strong)", lineHeight: 1 }}>{s.value}</span>
-          </div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>{s.label}</div>
-          {s.sub && <div style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--text-subtle)", marginTop: 3 }}>{s.sub}</div>}
-        </div>
-      ))}
-    </div>
-  );
+// Urutan sesi hidup: yang sudah lebih lama mulai di atas; sesi tanpa waktu mulai di bawah, lalu per id.
+function sortLive(live: TerminalSession[], backlog: SpecSlim[]): TerminalSession[] {
+  const startedById = new Map(backlog.map((x) => [x.id, x.startedAt] as const));
+  const startOf = (s: TerminalSession) => {
+    const ms = s.specId && startedById.get(s.specId) ? Date.parse(startedById.get(s.specId)!) : NaN;
+    return Number.isNaN(ms) ? Number.POSITIVE_INFINITY : ms;
+  };
+  return [...live].sort((a, b) => (startOf(a) - startOf(b)) || a.id.localeCompare(b.id));
 }
 
 function AttnRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }) {
   const att = oAttention(p);
   const meta = O_ATT[att]!;
-  const reason = p.docStatus === "broken" ? "Docs off-convention"
-    : "Docs drift — sebagian kategori belum ter-index";
   return (
-    // SPEC-763 · tanpa `hn-dense-row` tombol "Buka SoT" menahan lebarnya di 390px dan menyisakan
+    // SPEC-763 · tanpa `hn-dense-row` tombol "Buka dokumen" menahan lebarnya di 390px dan menyisakan
     // ~67px untuk nama project — terukur: `crm-tumbuh-ai` pecah jadi 3 baris (4 karakter/baris).
     <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 4px", borderBottom: "1px solid var(--border-hair)", borderLeft: `3px solid ${meta.bar}`, paddingLeft: 12 }}>
       <div style={{ minWidth: 0, flex: 1 }}>
         <div className="hn-wrap-mobile" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Icon name="box" size={13} color="var(--text-muted)" />
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)" }}>{p.name}</span>
+          <span title={p.name} style={{ fontFamily: "var(--font-mono)", fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)" }}>{p.name}</span>
           <Badge tone={att === "high" ? "err" : "warn"} size="sm">{meta.label}</Badge>
         </div>
-        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{reason} · {p.coverage}% ter-index</div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{meta.reason} · {p.coverage}% ter-index</div>
       </div>
-      <Button size="sm" variant="secondary" leftIcon="book-open" onClick={() => onOpen(p)}>Buka SoT</Button>
+      <Button size="sm" variant="secondary" leftIcon="book-open" onClick={() => onOpen(p)}>Buka dokumen</Button>
     </div>
   );
 }
 
-/* Baris = sesi tmux HIDUP dari siaran WS, bukan `ProjectView.session` yang hanya dimuat saat
-   login. Sub-label memakai `Spec.stage` (overlay live) — fase sesi tak ada di wire ini. */
-function LiveSessionRow({ s, projects, backlog, onOpenSession }: {
-  s: TerminalSession; projects: ProjectVM[]; backlog: SpecSlim[]; onOpenSession: (id: string) => void;
+/* Baris sesi = sesi tmux HIDUP dari siaran WS, bukan `ProjectView.session` yang hanya dimuat saat
+   login. Label tahap memakai `Spec.stage` (overlay live) — fase sesi tak ada di wire ini. Baris
+   memakai <button> asli: klik dan Enter/Spasi datang gratis, dan konsisten dengan baris lain. */
+function LiveSessionRow({ s, name, stage, onOpenSession }: {
+  s: TerminalSession; name: string; stage: string | null; onOpenSession: (id: string) => void;
 }) {
-  const name = projects.find((p) => p.id === s.projectId)?.name ?? s.projectId;
-  const spec = s.specId ? backlog.find((x) => x.id === s.specId) : undefined;
-  const open = () => onOpenSession(s.id);
   return (
-    <div className="hn-dense-row" role="button" tabIndex={0} onClick={open}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}
-      style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 4px", borderBottom: "1px solid var(--border-hair)", cursor: "pointer" }}>
-      <StatusPill status="running" size="sm">{spec?.stage ?? (s.flow ?? "sesi")}</StatusPill>
-      <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+    <button type="button" className="hn-dense-row" onClick={() => onOpenSession(s.id)} style={rowBtn}>
+      <StatusPill status="running" size="sm">{stage ?? FLOW_LABEL[s.flow ?? ""] ?? "Sesi"}</StatusPill>
+      <span title={name} style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{s.specId ?? ""}</span>
-    </div>
+    </button>
   );
 }
+
+const rowBtn: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "12px 4px",
+  background: "none", border: 0, borderBottom: "1px solid var(--border-hair)", cursor: "pointer",
+  textAlign: "left", font: "inherit", color: "inherit",
+};
 
 function CoverageRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }) {
   return (
-    <div className="hn-grid-mobile" role="button" tabIndex={0} onClick={() => onOpen(p)}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(p); } }}
-      style={{ display: "grid", gridTemplateColumns: "92px minmax(0, 1fr) 120px", alignItems: "center", gap: 12, padding: "9px 4px", cursor: "pointer", borderBottom: "1px solid var(--border-hair)" }}>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+    <button type="button" className="hn-grid-mobile" onClick={() => onOpen(p)}
+      style={{ ...rowBtn, display: "grid", gridTemplateColumns: "92px minmax(0, 1fr) 136px", alignItems: "center", gap: 12, padding: "9px 4px" }}>
+      <span title={p.name} style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
       <ProgressBar value={p.coverage} tone={oCovTone(p.docStatus)} size="sm" />
-      {/* kolom 120px muat label terpanjang "Off convention" (~107px); justifySelf:end bikin
+      {/* kolom 136px memuat "Sesuai standar" (~121px dengan dot & padding); justifySelf:end bikin
           pill seukuran konten & rata kanan — bukan stretch yang bikin teks tumpah dari pill. */}
-      <StatusPill status={p.docStatus} size="sm" style={{ justifySelf: "end" }} />
-    </div>
+      <StatusPill status={p.docStatus} size="sm" style={{ justifySelf: "end" }}>{DOC_LABEL[p.docStatus] ?? p.docStatus}</StatusPill>
+    </button>
   );
 }
 
@@ -117,101 +111,111 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
     onOpenSession: (id: string) => void }) {
   const limits = useLimits();
   const codexLimits = useCodexLimits();   // SPEC-338 · kartu limit codex (grup siar terpisah)
+  const [limitTab, setLimitTab] = React.useState<"claude" | "codex">("claude");
+
   // Sesi hidup dari siaran WS `t:"sessions"` — `ProjectView.session` basi sejak login.
-  const live = sessions.filter((s) => !s.exited).sort((a, b) => a.id.localeCompare(b.id));
+  const live = sortLive(sessions.filter((s) => !s.exited), backlog);
+  const liveProjects = new Set(live.map((s) => s.projectId));
   const attention = projects.filter((p) => oAttention(p) !== "none")
     .sort((a, b) => (oAttention(a) === "high" ? 0 : 1) - (oAttention(b) === "high" ? 0 : 1));
-  const onConv = projects.filter((p) => p.docStatus === "ok").length;
-  const highAtt = projects.filter((p) => oAttention(p) === "high").length;
-  const coverageAvg = projects.length ? Math.round(projects.reduce((n, p) => n + p.coverage, 0) / projects.length) : 0;
-
+  const coverageSorted = [...projects].sort((a, b) => a.coverage - b.coverage);
   const briefN = backlog.filter((s) => s.source === "brief").length;
   const qaN = backlog.filter((s) => s.source === "qa").length;
-  const auditN = backlog.filter((s) => s.source === "audit").length;
   const hiPrio = backlog.filter((s) => s.priority === "tinggi").length;
 
-  const coverageSorted = [...projects].sort((a, b) => a.coverage - b.coverage);
-  const activity = projects.map((p) => ({ project: p.name, status: p.session.status, text: p.activity, commit: p.commit }));
+  // Tanpa project tak ada yang bisa diringkas: tampilkan jalan masuk, bukan kartu kosong "0/0".
+  if (projects.length === 0) {
+    return (
+      <Card eyebrow="mulai di sini" title="Selamat datang di hanoman">
+        <StateBlock kind="empty" illustration="PST-001" illustrationDecorative
+          title="Buat project pertama"
+          hint="hanoman mengerjakan backlog di dalam sebuah project. Tambahkan project (folder repo) dulu; dokumen, backlog, dan sesi Claude Code-nya akan tampil di sini."
+          action={() => onGoto("projects")} actionLabel="Buat project pertama" />
+      </Card>
+    );
+  }
 
-  const kpis = [
-    { label: "Sesi aktif", value: live.length, dot: "var(--brass-500)" },
-    { label: "Perlu perhatian", value: highAtt, dot: "var(--clay-600)" },
-    { label: "Docs on-convention", value: onConv + "/" + projects.length, sub: "rata-rata " + coverageAvg + "%", dot: "var(--leaf-600)" },
-    { label: "SpecSlim di backlog", value: backlog.length, sub: briefN + " brief · " + qaN + " QA · " + auditN + " audit", dot: "var(--wind-600)" },
-  ];
+  // Limit: satu kartu. Bila codex pernah melapor kuota, tab Claude/Codex; eyebrow mengikuti tab.
+  // Codex sengaja "tercatat" (angka dari sesi terakhir), Claude "langsung" (siaran realtime).
+  const codexOn = codexLimits.status !== "unavailable";
+  const tab = codexOn ? limitTab : "claude";
+  const limitEyebrow = tab === "codex"
+    ? `tercatat · Codex${codexLimits.plan ? ` · ${codexLimits.plan}` : ""}`
+    : "langsung · Claude";
+
+  const activity = projects.map((p) => ({ project: p, text: p.activity, commit: p.commit, live: liveProjects.has(p.id) }));
+  const stageOf = (s: TerminalSession) => {
+    const spec = s.specId ? backlog.find((x) => x.id === s.specId) : undefined;
+    return spec ? (STAGE_LABEL[spec.stage] ?? spec.stage) : null;
+  };
 
   return (
     <div>
       <DalangStage projects={projects} backlog={backlog} sessions={sessions}
         onOpenSession={onOpenSession} onOpenProject={onOpenProject} />
-      <KpiStrip items={kpis} />
-      <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 20, alignItems: "start" }}>
+      <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 20, alignItems: "start", marginTop: 20 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <Card eyebrow={"needs attention · " + attention.length} title="Perlu perhatian"
+          <Card eyebrow={`dokumen · ${attention.length} project`} title="Perlu perhatian"
             actions={<Button size="sm" variant="ghost" leftIcon="layout-grid" onClick={() => onGoto("projects")}>Semua project</Button>}>
             {attention.length === 0
-              ? <StateBlock kind="empty" compact illustration="PST-005" illustrationDecorative
-                  title="Semua project on-convention"
-                  hint="Source of Truth utuh — tidak ada yang perlu perhatian." />
+              ? <StateBlock kind="empty" compact icon="book-open" title="Dokumen sudah sesuai standar"
+                  hint="Semua project tidak punya masalah dokumen yang perlu ditindak." />
               : <div style={{ marginTop: 4 }}>{attention.map((p) => <AttnRow key={p.id} p={p} onOpen={onOpenProject} />)}</div>}
           </Card>
-          <Card eyebrow={"live · " + live.length + " berjalan"} title="Claude Code sedang jalan"
+          <Card eyebrow={`sesi · ${live.length} berjalan`} title="Claude Code sedang jalan"
             actions={<Button size="sm" variant="ghost" leftIcon="terminal" onClick={() => onGoto("terminal")}>Buka Terminal</Button>}>
             {live.length === 0
               ? <StateBlock kind="empty" compact icon="terminal" title="Tidak ada sesi aktif"
                   hint="Mulai sebuah backlog item untuk membuka sesi Claude Code interaktif." />
-              : <div style={{ marginTop: 4 }}>{live.map((s) => <LiveSessionRow key={s.id} s={s}
-                  projects={projects} backlog={backlog} onOpenSession={onOpenSession} />)}</div>}
+              : <ul data-testid="live-list" style={{ listStyle: "none", margin: "4px 0 0", padding: 0 }}>
+                  {live.map((s) => {
+                    const name = projects.find((p) => p.id === s.projectId)?.name ?? s.projectId;
+                    return <li key={s.id}><LiveSessionRow s={s} name={name} stage={stageOf(s)} onOpenSession={onOpenSession} /></li>;
+                  })}
+                </ul>}
           </Card>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <Card eyebrow="realtime · Claude" title="Limit langganan">
-            <LimitWindows dto={limits} />
+          <Card eyebrow={limitEyebrow} title="Limit langganan">
+            {codexOn && (
+              <Tabs aria-label="Sumber limit" value={tab}
+                tabs={[{ value: "claude", label: "Claude" }, { value: "codex", label: "Codex" }]}
+                onChange={(v) => setLimitTab(v === "codex" ? "codex" : "claude")} />
+            )}
+            <div style={{ marginTop: 10 }}>
+              <LimitWindows dto={tab === "codex" ? codexLimits : limits} />
+            </div>
           </Card>
-          {/* SPEC-338 · ADR-0074 · kartu kedua, muncul hanya bila codex pernah melaporkan kuota.
-              Eyebrow-nya sengaja "snapshot", bukan "realtime": angkanya dari sesi codex terakhir. */}
-          {codexLimits.status !== "unavailable" && (
-            <Card eyebrow={`snapshot · Codex${codexLimits.plan ? ` · ${codexLimits.plan}` : ""}`}
-              title="Limit langganan">
-              <LimitWindows dto={codexLimits} />
-            </Card>
-          )}
-          <Card eyebrow="Source of Truth" title="Docs coverage"
-            actions={<Button size="sm" variant="ghost" leftIcon="book-open" onClick={() => onGoto("docs")}>Docs</Button>}>
-            {coverageSorted.length === 0
-              ? <StateBlock kind="empty" compact icon="book-open" title="Belum ada project"
-                  hint="Coverage Source of Truth muncul setelah project pertama ditambahkan." />
-              : <div style={{ marginTop: 4 }}>{coverageSorted.map((p) => <CoverageRow key={p.id} p={p} onOpen={onOpenProject} />)}</div>}
+          <Card eyebrow="dokumen" title="Cakupan dokumen"
+            actions={<Button size="sm" variant="ghost" leftIcon="book-open" onClick={() => onGoto("docs")}>Dokumen</Button>}>
+            <div style={{ marginTop: 4 }}>{coverageSorted.map((p) => <CoverageRow key={p.id} p={p} onOpen={onOpenProject} />)}</div>
           </Card>
-          <Card eyebrow="brainstorm → execute" title="Backlog"
+          <Card eyebrow="dari brief sampai eksekusi" title="Backlog"
             actions={<Button size="sm" variant="ghost" leftIcon="list-checks" onClick={() => onGoto("backlog")}>Buka</Button>}>
             <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 6 }}>
               <MiniStat icon="lightbulb" label="dari brief" value={briefN} tone="var(--brass-600)" />
               <MiniStat icon="bug" label="dari QA" value={qaN} tone="var(--clay-500)" />
               <MiniStat icon="flame" label="prioritas tinggi" value={hiPrio} tone="var(--clay-500)" />
-              <MiniStat icon="layers" label="total spec" value={backlog.length} tone="var(--wind-600)" />
             </div>
           </Card>
         </div>
       </div>
       <div style={{ marginTop: 20 }}>
-        <Card eyebrow="workspace" title="Aktivitas terbaru">
-          {activity.length === 0
-            ? <StateBlock kind="empty" compact icon="history" title="Belum ada aktivitas"
-                hint="Sesi dan branch terakhir tiap project akan tampil di sini." />
-            : <div style={{ marginTop: 4 }}>
-            {activity.map((a, i) => {
-              const dot = a.status === "running" ? "var(--brass-500)" : "var(--bone-400)";
-              return (
-                <div key={i} className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 4px", borderBottom: "1px solid var(--border-hair)" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot, flex: "0 0 auto" }} />
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", width: 120, flex: "0 0 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.project}</span>
-                  <span style={{ fontSize: 12.5, color: "var(--text-body)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.text}</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>{a.commit}</span>
-                </div>
-              );
-            })}
-          </div>}
+        <Card eyebrow="per project" title="Aktivitas terbaru">
+          {/* Daftar semantik: tiap baris membuka project-nya, sama seperti baris cakupan & perhatian. */}
+          <ul data-testid="activity-list" style={{ listStyle: "none", margin: "4px 0 0", padding: 0 }}>
+            {activity.map((a) => (
+              <li key={a.project.id}>
+                <button type="button" className="hn-dense-row" onClick={() => onOpenProject(a.project)}
+                  style={{ ...rowBtn, alignItems: "center", gap: 12, padding: "9px 4px" }}>
+                  <StatusPill status={a.live ? "running" : "idle"} size="sm">{a.live ? "Berjalan" : "Diam"}</StatusPill>
+                  <span title={a.project.name} style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", width: 120, flex: "0 0 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.project.name}</span>
+                  <span title={a.text} style={{ fontSize: 12.5, color: "var(--text-body)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.text}</span>
+                  <span title={a.commit} style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>{a.commit}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </Card>
       </div>
     </div>

@@ -2,8 +2,9 @@
    Seksi collapse/expand (default collapsed agar mudah di-track), search + filter existing,
    aksi N/A/attest/remediasi selektif. Data dari GET /vps/:id/checklist (server menghidrasi penuh). */
 import React from "react";
-import { Button, Modal, StateBlock, Icon, useConfirm } from "../ds";
+import { Button, Modal, StateBlock, Icon, Tabs, useConfirm } from "../ds";
 import { api } from "../api/client";
+import { errorMessage, failureMessage } from "../lib/report-error";
 import type { ChecklistView, ChecklistSection, ChecklistItem, VpsItemStatus, VpsMode, VpsSeverity, RemediateStep, VpsHealth } from "@hanoman/shared";
 
 const STATUS_ICON: Record<VpsItemStatus, string> = {
@@ -15,6 +16,12 @@ const MODE_COLOR: Record<VpsMode, string> = {
   AUTO: "var(--brass-700)", AUDIT: "var(--amber-600)", INFO: "var(--text-subtle)" };
 const SEV_COLOR: Record<VpsSeverity, string> = {
   critical: "var(--clay-600)", high: "var(--amber-600)", medium: "var(--text-subtle)", low: "var(--text-subtle)" };
+
+// Target sentuh ≥44px pada pointer kasar (audit VPS): checkbox & select tak boleh 13–20px di ponsel.
+const VPS_TOUCH_CSS = `@media (pointer: coarse) {
+  .vps-touch { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  .vps-touch-select { min-height: 44px; }
+}`;
 
 export function Badge({ text, color }: { text: string; color: string }) {
   return <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.04em",
@@ -38,17 +45,19 @@ function ItemRow({ item, busy, selected, onToggle, onNa, onAttest }: {
   onToggle: (item: ChecklistItem) => void;
   onNa: (item: ChecklistItem, na: boolean) => void; onAttest: (item: ChecklistItem) => void }) {
   const selectable = item.mode === "AUTO" && !item.na;
+  // Lencana hanya untuk item bermasalah; mode & severity item lain tetap terbaca di tooltip baris.
+  const problem = item.status === "fail" || item.status === "warn" || !!item.drifted;
   return (
-    <div data-testid={`item-${item.id}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0",
-      borderBottom: "1px solid var(--border-hair)", fontSize: 13, opacity: item.na ? 0.55 : 1 }}>
+    <div data-testid={`item-${item.id}`} title={`${item.mode} · severity ${item.severity}`}
+      style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, padding: "5px 0",
+        borderBottom: "1px solid var(--border-hair)", fontSize: 13, opacity: item.na ? 0.55 : 1 }}>
       {selectable
-        ? <input type="checkbox" aria-label={`pilih ${item.id}`} checked={selected} onChange={() => onToggle(item)} />
+        ? <span className="vps-touch"><input type="checkbox" aria-label={`Pilih ${item.title}`} checked={selected} onChange={() => onToggle(item)} /></span>
         : <span style={{ display: "inline-block", width: 13 }} />}
       <Icon name={STATUS_ICON[item.status]} size={14} color={STATUS_COLOR[item.status]} />
-      <span style={{ flex: 1, minWidth: 0 }}>{item.title}</span>
+      <span style={{ flex: "1 1 180px", minWidth: 0 }}>{item.title}</span>
       {item.drifted && <Badge text="drift" color="var(--clay-600)" />}
-      <Badge text={item.mode} color={MODE_COLOR[item.mode]} />
-      <Badge text={item.severity} color={SEV_COLOR[item.severity]} />
+      {problem && <Badge text={item.severity} color={SEV_COLOR[item.severity]} />}
       {item.mode === "INFO" && !item.attested && (
         <Button size="sm" variant="ghost" leftIcon="check-circle" loading={busy}
           onClick={() => onAttest(item)}>Attest</Button>
@@ -65,7 +74,7 @@ const BLANK_FILTER: Filter = { section: "", mode: "", status: "", severity: "" }
 function Select({ value, onChange, options, label }: {
   value: string; onChange: (v: string) => void; options: [string, string][]; label: string }) {
   return (
-    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}
+    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className="vps-touch-select"
       style={{ fontSize: 12, padding: "3px 6px", border: "1px solid var(--border-hair)",
         borderRadius: "var(--radius-sm)", background: "var(--bone-50)", color: "var(--text)" }}>
       <option value="">{label}: semua</option>
@@ -136,6 +145,8 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, provisi
     onClose: () => void; onToast: (msg: string, kind?: string, icon?: string) => void }) {
   const [view, setView] = React.useState<ChecklistView | null>(null);
   const [status, setStatus] = React.useState<"loading" | "ready" | "error">("loading");
+  const [loadErr, setLoadErr] = React.useState("");
+  const [tab, setTab] = React.useState<"checklist" | "provisioning">("checklist");
   const [filter, setFilter] = React.useState<Filter>(BLANK_FILTER);
   const [search, setSearch] = React.useState("");
   const [expandedManual, setExpandedManual] = React.useState<Set<string>>(new Set());
@@ -146,7 +157,8 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, provisi
 
   const load = React.useCallback(() => {
     setStatus("loading");
-    api.vpsChecklist(vpsId).then((v) => { setView(v); setStatus("ready"); }).catch(() => setStatus("error"));
+    api.vpsChecklist(vpsId).then((v) => { setView(v); setStatus("ready"); })
+      .catch((e) => { setLoadErr(errorMessage(e, "tak diketahui")); setStatus("error"); });
   }, [vpsId]);
   React.useEffect(() => {
     load();
@@ -154,8 +166,13 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, provisi
     setExpandedManual(new Set()); setSearch(""); setFilter(BLANK_FILTER);
   }, [load]);
 
-  const toggleItem = (item: ChecklistItem) => setSelected((s) => {
-    const n = new Set(s); n.has(item.id) ? n.delete(item.id) : n.add(item.id); return n; });
+  // Mengubah pilihan membatalkan pratinjau lama: pratinjau menggambarkan SET yang sudah tak berlaku.
+  const toggleItem = (item: ChecklistItem) => {
+    setPreview(null);
+    setSelected((s) => {
+      const n = new Set(s); n.has(item.id) ? n.delete(item.id) : n.add(item.id); return n;
+    });
+  };
   const clearSel = () => { setSelected(new Set()); setPreview(null); };
   const toggleSection = (id: string) => setExpandedManual((e) => {
     const n = new Set(e); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -166,26 +183,33 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, provisi
   async function doPreview() {
     setAction("preview");
     try { setPreview((await api.remediatePreview(vpsId, [...selected])).steps); }
-    catch { onToast("Preview remediasi gagal", "err", "x-circle"); }
+    catch (e) { onToast(failureMessage("membuat pratinjau remediasi", e), "err", "x-circle"); }
     finally { setAction(""); }
   }
   async function doApply() {
+    // Konfirmasi menyebut PERSIS item yang akan dijalankan, bukan hitungan saja.
+    const all = view?.sections.flatMap((s) => s.items) ?? [];
+    const picked = all.filter((i) => selected.has(i.id));
     if (!await confirm({
       title: `Terapkan ${selected.size} item AUTO ke VPS ini?`,
       message: "Remediasi dijalankan langsung di server yang terdaftar.",
-      impact: ["Langkahnya idempoten dan anti-lockout.", "Checklist diaudit ulang setelah selesai."],
+      impact: [
+        ...picked.map((i) => `${i.id} · ${i.title}`),
+        "Langkahnya idempoten dan anti-lockout.",
+        "Checklist diaudit ulang setelah selesai.",
+      ],
       confirmLabel: "Terapkan",
       icon: "shield",
     })) return;
     setAction("apply");
     try { await api.remediate(vpsId, [...selected]); clearSel(); load(); onToast("Remediasi diterapkan · audit ulang", "ok", "shield"); }
-    catch { onToast("Remediasi gagal", "err", "x-circle"); }
+    catch (e) { onToast(failureMessage("menerapkan remediasi", e), "err", "x-circle"); }
     finally { setAction(""); }
   }
   async function act(item: ChecklistItem, fn: () => Promise<unknown>, msg: string) {
     setBusy(item.id);
     try { await fn(); load(); onToast(msg, "ok", "shield"); }
-    catch { onToast(`Gagal memperbarui ${item.id}`, "err", "x-circle"); }
+    catch (e) { onToast(failureMessage(`memperbarui ${item.id}`, e), "err", "x-circle"); }
     finally { setBusy(null); }
   }
   const onNa = (item: ChecklistItem, na: boolean) =>
@@ -205,7 +229,7 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, provisi
     try {
       await api.markNaBulk(vpsId, ids, true, "app-layer: stack tak terdeteksi");
       load(); onToast(`Seksi ${section.title} ditandai N/A`, "ok", "shield");
-    } catch { onToast("Gagal tandai seksi N/A", "err", "x-circle"); }
+    } catch (e) { onToast(failureMessage(`menandai seksi ${section.title} sebagai N/A`, e), "err", "x-circle"); }
     finally { setBusy(null); }
   }
 
@@ -223,7 +247,7 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, provisi
 
   function body() {
     if (status === "loading") return <StateBlock kind="loading" compact title="Memuat checklist…" />;
-    if (status === "error" || !view) return <StateBlock kind="error" compact title="Gagal memuat checklist" action={load} />;
+    if (status === "error" || !view) return <StateBlock kind="error" compact title="Gagal memuat checklist" hint={loadErr} action={load} />;
 
     const driftCount = view.sections.reduce((a, s) => a + s.items.filter((i) => i.drifted).length, 0);
     const rows = view.sections
@@ -304,11 +328,17 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, provisi
         {lastAuditAt ? `Audit terakhir ${new Date(lastAuditAt).toLocaleString()}` : "Belum pernah diaudit"}
         {health && ` · disk ${health.disk} · mem ${health.mem} · load ${health.load}`}
       </div>
-      {provisioning && (
-        <div data-testid="vps-provisioning" style={{ marginBottom: 12, paddingBottom: 10,
-          borderBottom: "1px solid var(--border-hair)" }}>{provisioning}</div>
-      )}
-      {body()}
+      {/* Checklist dan provisioning dipisah tab: keduanya tugas berbeda, tak perlu bertumpuk. */}
+      {provisioning ? (
+        <>
+          <Tabs aria-label="Bagian detail VPS" value={tab} style={{ marginBottom: 12 }}
+            tabs={[{ value: "checklist", label: "Checklist" }, { value: "provisioning", label: "Provisioning" }]}
+            onChange={(v) => setTab(v === "provisioning" ? "provisioning" : "checklist")} />
+          <div data-testid="vps-provisioning" hidden={tab !== "provisioning"}>{provisioning}</div>
+          <div hidden={tab !== "checklist"}>{body()}</div>
+        </>
+      ) : body()}
+      <style>{VPS_TOUCH_CSS}</style>
       {dialog}
     </Modal>
   );

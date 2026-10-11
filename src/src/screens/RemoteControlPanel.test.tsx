@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RemoteControlView } from "@hanoman/shared";
 import { RemoteControlPanel } from "./RemoteControlPanel";
@@ -54,13 +54,40 @@ describe("RemoteControlPanel (SPEC-1215 · ADR-0165 §4)", () => {
     ]));
   });
 
-  it("menyalakan Mulai sesi selalu menyertakan Lihat", async () => {
+  // Izin berisiko: menyalakannya meminta konfirmasi dulu, dan baru menyimpan setelah diizinkan.
+  it("menyalakan Mulai sesi meminta konfirmasi, lalu selalu menyertakan Lihat", async () => {
     const puts = mockApi({ ...base, control: { enabled: true, capabilities: ["sessions:read", "backlog:read", "ide:read"] } });
     render(<RemoteControlPanel />);
     fireEvent.click(await screen.findByRole("switch", { name: "Mulai sesi" }));
+    expect(puts).toEqual([]);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Server pusat boleh membuka sesi agen baru/i)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Izinkan" }));
     await waitFor(() => expect(puts.at(-1)).toEqual({
       control: { enabled: true, capabilities: ["sessions:read", "backlog:read", "ide:read", "sessions:spawn"] },
     }));
+  });
+
+  it("membatalkan konfirmasi Tulis terminal tidak menyimpan apa pun", async () => {
+    const puts = mockApi({ ...base, control: { enabled: true, capabilities: ["sessions:read", "backlog:read", "ide:read"] } });
+    render(<RemoteControlPanel />);
+    fireEvent.click(await screen.findByRole("switch", { name: "Tulis terminal" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Batal" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(puts).toEqual([]);
+  });
+
+  // Mematikan "Lihat" membuang semua izin (lihat `save(enabled, [])`), jadi dialognya harus menyebutnya.
+  it("mematikan Lihat memperingatkan bahwa semua izin ikut dicabut", async () => {
+    const puts = mockApi({ ...base, control: { enabled: true, capabilities: ["sessions:read", "backlog:read", "ide:read", "sessions:spawn"] } });
+    render(<RemoteControlPanel />);
+    fireEvent.click(await screen.findByRole("switch", { name: "Lihat" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Izin lain yang ikut dicabut: Mulai sesi/)).toBeInTheDocument();
+    expect(puts).toEqual([]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Matikan dan cabut izin" }));
+    await waitFor(() => expect(puts).toEqual([{ control: { enabled: true, capabilities: [] } }]));
   });
 
   it("status relay dan audit aksi hub ditampilkan", async () => {
@@ -86,13 +113,13 @@ describe("RemoteControlPanel lajur log (SPEC-1217 AC-D1)", () => {
   it("lajur event ditampilkan menyala secara default", async () => {
     mockApi(base);
     render(<RemoteControlPanel />);
-    expect(await screen.findByRole("switch", { name: /event/i })).toHaveAttribute("aria-checked", "true");
+    expect(await screen.findByRole("switch", { name: /kejadian/i })).toHaveAttribute("aria-checked", "true");
   });
 
   it("mengetuk toggle server memanggil putRemoteControl dengan logs.server berubah", async () => {
     const puts = mockApi(base);
     render(<RemoteControlPanel />);
-    fireEvent.click(await screen.findByRole("switch", { name: /^server$/i }));
+    fireEvent.click(await screen.findByRole("switch", { name: /^log server$/i }));
     await waitFor(() => expect(puts).toEqual([
       expect.objectContaining({ logs: expect.objectContaining({ server: expect.any(Boolean) }) }),
     ]));

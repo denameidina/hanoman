@@ -2,27 +2,6 @@
 // engine: jsdom tak mengukur apa pun, jadi yang bisa dijaga test adalah keputusannya, bukan
 // pikselnya. Komponen hanya menyuplai lebar hasil ResizeObserver.
 
-/** Lebar minimum label sesi di header sel; di bawah ini label tak lagi bisa dibaca. */
-export const HEADER_LABEL_MIN = 96;
-/** Ilustrasi state (34px) + gap header di kedua sisinya (ilustrasi↔label, label↔klaster aksi). */
-export const HEADER_MEDIA_PX = 50;
-/** Jarak antar tombol aksi di dalam klaster `.hn-terminal-actions` — bukan gap header (8px). */
-export const ACTION_GAP = 2;
-/** Semua aksi (termasuk `Layar penuh` + `Tutup`) boleh runtuh ke overflow; tombol overflow-nya yang tak pernah hilang. */
-export const ALWAYS_INLINE = 0;
-
-/** Berapa aksi yang boleh tetap inline pada header selebar `width`. Sisanya milik overflow.
- *  `actionPx` mengikuti pointer: 28 (halus) / 44 (kasar), mencermin app.css. `reservePx` =
- *  lebar chip/pil status + kelebihan tombol teks, yang ikut berebut ruang dengan klaster aksi. */
-export function inlineActionCount(width: number, total: number, actionPx: number, reservePx = 0): number {
-  if (!Number.isFinite(width) || width <= 0) return total;
-  const slot = actionPx + ACTION_GAP;
-  const room = Math.floor((width - HEADER_LABEL_MIN - HEADER_MEDIA_PX - reservePx - ALWAYS_INLINE * slot) / slot);
-  if (room >= total) return total;
-  // Satu slot dibayarkan untuk tombol overflow itu sendiri.
-  return Math.max(0, room - 1);
-}
-
 // SPEC-452 · dialog AskUserQuestion adalah daftar Ink: satu digit sebagai keystroke tersendiri
 // LANGSUNG memilih baris bernomor itu, sedangkan burst >1 karakter ditelan bulat-bulat. Footer
 // dialognya (`Enter to select · ↑/↓ to navigate · Esc to cancel`) dipakai sebagai gerbang supaya
@@ -50,7 +29,7 @@ export const MIN_PANE_WIDTH = 360;
 
 /** Grid tablet melebihi lebar kontainer yang tersedia bila tiap kolom dipaksa muat `minPaneWidth`
  *  — turunkan ke mode Tabs single-pane yang sama dengan mobile. `containerWidth` tak terukur
- *  (jsdom, belum di-observe) = jangan collapse, cermin fallback `inlineActionCount`. */
+ *  (jsdom, belum di-observe) = jangan collapse. */
 export function shouldCollapseToTabs(cols: number, containerWidth: number, minPaneWidth = MIN_PANE_WIDTH): boolean {
   if (!Number.isFinite(containerWidth) || containerWidth <= 0) return false;
   return cols * minPaneWidth > containerWidth;
@@ -72,3 +51,10 @@ export const TERMINAL_KEYS = [
   { id: "right", label: "→", seq: "\x1b[C", aria: "Kirim panah kanan ke terminal" },
   { id: "enter", label: "Enter", seq: "\r", aria: "Kirim Enter ke terminal" },
 ] as const;
+
+/** Jalan keluar keyboard dari xterm: Ctrl+Shift+Esc. Dipilih karena tak dipakai TUI agen (Esc polos
+ *  adalah tombol tersibuknya, lihat CellImpl) dan tak punya urutan byte di xterm, jadi tak pernah
+ *  ikut terkirim ke pty ketika ia memang dipakai untuk keluar. */
+export function isFocusEscape(e: Pick<KeyboardEvent, "key" | "ctrlKey" | "shiftKey" | "altKey" | "metaKey">): boolean {
+  return e.key === "Escape" && e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey;
+}

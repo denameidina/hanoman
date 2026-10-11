@@ -56,42 +56,82 @@ const ELLIPSIS: React.CSSProperties = {
 function Bar({ spec }: { spec: TimelineBarSpec }) {
   const g = spec.geometry;
   const tone = TONE[spec.tone];
-  return (
-    <button type="button" data-testid={`timeline-bar-${spec.key}`}
-      // SPEC-949 · nada dipancarkan sebagai atribut karena warnanya lahir dari `TONE` di sini, bukan
-      // dari geometri: amplop yang jatuh ke nada task selesai (`muted`) lolos dari SETIAP assertion
-      // berbasis `data-invalid`, terukur.
-      data-tone={spec.tone}
-      data-invalid={g.invalid ? "true" : "false"}
-      data-clipped-start={g.clippedStart ? "true" : "false"}
-      data-clipped-end={g.clippedEnd ? "true" : "false"}
-      title={spec.title} aria-label={spec.title} onClick={spec.onClick}
-      style={{
-        position: "absolute", top: BAR_INSET, height: ROW_H - BAR_INSET * 2,
-        left: `${g.left}%`, width: `${g.width}%`,
-        // Minimum PIKSEL, bukan persen: memaksanya ke persen membuat batang satu hari di zoom
-        // bulan tampak lebih panjang dari waktunya.
-        minWidth: 3,
-        // `minHeight` WAJIB dinyatakan: di `pointer: coarse` dan di bawah 768 px, `app.css`
-        // menaikkan setiap `button` ke `min-height: var(--touch-target)` (44 px). Batang 44 px di
-        // baris 34 px meluber menimpa baris berikutnya, dan jsdom tak memuat stylesheet — nol
-        // test akan merah. Inline menang atas selector mana pun; pola yang sama sudah dipakai
-        // `SessionHistoryModal.tsx`, `TerminalScreen.tsx`, `GitGraph.tsx`, `VpsScreen.tsx`.
-        minHeight: ROW_H - BAR_INSET * 2,
-        display: "flex", alignItems: "center", padding: 0, overflow: "hidden",
-        background: tone.bg, border: `1px solid ${tone.border}`,
-        // Sudut SIKU di sisi yang terpotong — batang terpotong yang tak mengaku terpotong
-        // berbohong tentang tenggat.
-        borderTopLeftRadius: g.clippedStart ? 0 : "var(--radius-sm)",
-        borderBottomLeftRadius: g.clippedStart ? 0 : "var(--radius-sm)",
-        borderTopRightRadius: g.clippedEnd ? 0 : "var(--radius-sm)",
-        borderBottomRightRadius: g.clippedEnd ? 0 : "var(--radius-sm)",
-        cursor: spec.onClick ? "pointer" : "default",
-      }}>
+  const interactive = !!spec.onClick;
+  // Audit 2026-10: batang tanpa aksi (amplop project) bukan tombol — ia gambar, bukan kontrol.
+  // Hanya batang yang membuka tugas yang berupa <button>, sehingga klik batang punya satu arti.
+  const props = {
+    "data-testid": `timeline-bar-${spec.key}`,
+    // SPEC-949 · nada dipancarkan sebagai atribut karena warnanya lahir dari `TONE` di sini, bukan
+    // dari geometri: amplop yang jatuh ke nada task selesai (`muted`) lolos dari SETIAP assertion
+    // berbasis `data-invalid`, terukur.
+    "data-tone": spec.tone,
+    "data-invalid": g.invalid ? "true" : "false",
+    "data-clipped-start": g.clippedStart ? "true" : "false",
+    "data-clipped-end": g.clippedEnd ? "true" : "false",
+    title: spec.title, "aria-label": spec.title,
+    onClick: spec.onClick,
+    style: {
+      position: "absolute" as const, top: BAR_INSET, height: ROW_H - BAR_INSET * 2,
+      left: `${g.left}%`, width: `${g.width}%`,
+      // Minimum PIKSEL, bukan persen: memaksanya ke persen membuat batang satu hari di zoom
+      // bulan tampak lebih panjang dari waktunya.
+      minWidth: 3,
+      // `minHeight` WAJIB dinyatakan untuk tombol: di `pointer: coarse` dan di bawah 768 px,
+      // `app.css` menaikkan setiap `button` ke `min-height: var(--touch-target)` (44 px). Batang
+      // 44 px di baris 34 px meluber menimpa baris berikutnya, dan jsdom tak memuat stylesheet.
+      // Inline menang atas selector mana pun.
+      minHeight: ROW_H - BAR_INSET * 2,
+      display: "flex", alignItems: "center", padding: 0, overflow: "hidden",
+      background: tone.bg, border: `1px solid ${tone.border}`,
+      // Sudut SIKU di sisi yang terpotong — batang terpotong yang tak mengaku terpotong
+      // berbohong tentang tenggat.
+      borderTopLeftRadius: g.clippedStart ? 0 : "var(--radius-sm)",
+      borderBottomLeftRadius: g.clippedStart ? 0 : "var(--radius-sm)",
+      borderTopRightRadius: g.clippedEnd ? 0 : "var(--radius-sm)",
+      borderBottomRightRadius: g.clippedEnd ? 0 : "var(--radius-sm)",
+      cursor: interactive ? "pointer" : "default",
+    },
+  };
+  const body = (
+    <>
+      {/* Tenggat mendahului mulai: warna saja tak cukup (WCAG 1.4.1) — ikon + legenda menyebutnya. */}
+      {g.invalid && <Icon name="triangle-alert" size={11} color={tone.border} />}
       {g.clippedStart && <Icon name="chevron-left" size={11} color={tone.border} />}
       <span style={{ flex: 1 }} />
       {g.clippedEnd && <Icon name="chevron-right" size={11} color={tone.border} />}
-    </button>
+    </>
+  );
+  return interactive
+    ? <button type="button" {...props}>{body}</button>
+    : <div role="img" {...props}>{body}</div>;
+}
+
+/* Legenda warna + ikon. Dipakai kedua mode; "Rentang project" hanya di mode lintas project. */
+function TimelineLegend({ envelope = false }: { envelope?: boolean }) {
+  const swatch = (tone: TimelineBarSpec["tone"]) => (
+    <span aria-hidden="true" style={{
+      display: "inline-block", width: 14, height: 9, borderRadius: 2,
+      background: TONE[tone].bg, border: `1px solid ${TONE[tone].border}`,
+    }} />
+  );
+  return (
+    <ul aria-label="Legenda linimasa" style={{
+      display: "flex", flexWrap: "wrap", gap: "4px 14px", listStyle: "none", margin: "0 0 8px", padding: 0,
+      fontSize: "var(--text-xs)", color: "var(--text-muted)",
+    }}>
+      <li style={{ display: "flex", alignItems: "center", gap: 6 }}>{swatch("brass")}Rencana</li>
+      <li style={{ display: "flex", alignItems: "center", gap: 6 }}>{swatch("muted")}Selesai</li>
+      <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {swatch("err")}
+        <Icon name="triangle-alert" size={11} color="var(--status-err)" />
+        Tenggat mendahului mulai
+      </li>
+      {envelope && (
+        <li style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {swatch("envelope")}Rentang project (buka lewat namanya)
+        </li>
+      )}
+    </ul>
   );
 }
 
@@ -259,6 +299,7 @@ export function TeamTimeline({ tasks, members, zoom, today, hidden, onOpen }: {
 
   return (
     <>
+      <TimelineLegend />
       <TimelineCanvas window={win} rows={rowSpecs} today={today}
         emptyHint="Belum ada tugas bertanggal — isi mulai atau tenggat di kartunya." />
       {hidden > 0 && (
@@ -377,7 +418,8 @@ export function TeamProjectTimeline({
           key: `span:${key}`, geometry: g.geometry,
           tone: g.geometry.invalid ? "err" : "envelope",
           title: `${label} · ${meta ?? ""}`.trim(),
-          onClick: () => onToggle(key),
+          // Tanpa onClick: amplop hanya gambar. Membuka baris dilakukan lewat nama project di
+          // kolom kiri (ExpandLabel); dengan begitu satu klik batang tak pernah punya dua arti.
         });
         // Segmen tetap dirender saat baris DIBUKA: baris ringkas yang berubah arti tergantung
         // apakah ia sedang dibuka lebih sulit dibaca daripada sedikit pengulangan.
@@ -422,6 +464,7 @@ export function TeamProjectTimeline({
 
   return (
     <>
+      <TimelineLegend envelope />
       <TimelineCanvas window={win} rows={rows} today={today}
         testId="team-projects" labelHead="Project"
         emptyHint="Belum ada project bertanggal — isi mulai atau tenggat di kartunya." />

@@ -1,8 +1,9 @@
 /* SettingsScreen — workspace settings. Ported; persistence moved from
    localStorage to the API (GET/PUT /settings). Model per pipeline step. */
 import React from "react";
-import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, ConfirmDialog, useConfirm, useResponsiveTier, Modal } from "../ds";
+import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, useConfirm, useResponsiveTier, Modal } from "../ds";
 import { api, ApiError } from "../api/client";
+import { failureMessage } from "../lib/report-error";
 import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS, BUILTIN_RUNTIME_DEFAULTS, REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry, modelSelectOptions } from "@hanoman/shared";
 import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus, SetupStatus } from "@hanoman/shared";
 import type { ShowToast } from "../ds";
@@ -105,12 +106,55 @@ function SettingRow({ title, desc, children, last }: { title: string; desc?: str
   );
 }
 
+/** Teks petunjuk untuk tab yang menyimpan otomatis: satu kalimat, supaya tak ada yang menunggu tombol Simpan. */
+const AUTOSAVE_NOTE: React.CSSProperties = { fontSize: 12, color: "var(--text-subtle)", lineHeight: 1.5 };
+/** Jeda diam setelah mengetik sebelum kondisi goal ikut tersimpan (selain saat kolom ditinggalkan). */
+const GOAL_COMMIT_IDLE_MS = 1200;
+
+/** Alasan tombol tak bisa dipakai, ditulis sebagai teks. Tombol yang diredupkan tanpa penjelasan
+    memaksa orang menebak apa yang kurang (audit UI/UX 2026-10). Tak merender apa pun bila `text` kosong. */
+function BlockedHint({ id, text }: { id: string; text: string | null }) {
+  if (!text) return null;
+  return <div id={id} style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, lineHeight: 1.5 }}>{text}</div>;
+}
+
+/** Textarea kondisi mode goal: disimpan saat kolom ditinggalkan atau setelah jeda mengetik — bukan
+    per ketikan, yang dulu memicu PUT settings penuh tiap huruf (audit P0). Nilai dari server ikut
+    masuk selama tak ada suntingan yang belum tersimpan. `onBlur` ditaruh di pembungkus karena
+    HnTextarea menimpa `onBlur` dari propsnya sendiri. */
+function GoalConditionField({ value, onCommit }: { value: string; onCommit: (next: string) => void }) {
+  const [draft, setDraft] = React.useState(value);
+  const [dirty, setDirty] = React.useState(false);
+  const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => { if (!dirty) setDraft(value); }, [value, dirty]);
+  React.useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  const commit = (next: string) => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    setDirty(false);
+    if (next !== value) onCommit(next);
+  };
+  return (
+    <div onBlur={() => commit(draft)}>
+      <HnTextarea value={draft} rows={4} mono aria-label="Kondisi mode goal"
+        placeholder="mis. semua fase tercatat & plan tanpa - [ ]"
+        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+          const next = e.target.value;
+          setDraft(next); setDirty(true);
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(() => commit(next), GOAL_COMMIT_IDLE_MS);
+        }} />
+    </div>
+  );
+}
+
 // SPEC-169 · Akun: email, logout, ganti password sendiri.
 function AccountPanel({ me, onLoggedOut, onToast }: { me: UserView; onLoggedOut: () => void; onToast?: ShowToast }) {
   const [cur, setCur] = React.useState("");
   const [next, setNext] = React.useState("");
   const [busy, setBusy] = React.useState(false);
-  const canChange = cur.length >= 1 && next.length >= 8 && !busy;
+  const hintId = React.useId();
+  const blocked = !cur ? "Isi password lama dulu." : next.length < 8 ? "Password baru minimal 8 karakter." : null;
+  const canChange = !blocked && !busy;
   async function changePw() {
     if (!canChange) return;
     setBusy(true);
@@ -119,7 +163,7 @@ function AccountPanel({ me, onLoggedOut, onToast }: { me: UserView; onLoggedOut:
       setCur(""); setNext("");
       onToast?.("Password diganti · perangkat lain ter-logout", "ok", "key-round");
     } catch (e) {
-      onToast?.(e instanceof ApiError && e.status === 400 ? "Password lama salah" : "Gagal ganti password", "err", "x-circle");
+      onToast?.(e instanceof ApiError && e.status === 400 ? "Password lama salah" : failureMessage("mengganti password", e), "err", "x-circle");
     } finally { setBusy(false); }
   }
   async function logout() { try { await api.logout(); } finally { onLoggedOut(); } }
@@ -131,24 +175,30 @@ function AccountPanel({ me, onLoggedOut, onToast }: { me: UserView; onLoggedOut:
       </SettingRow>
       <div style={{ paddingTop: 14 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)", marginBottom: 10 }}>Ganti password</div>
-        <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
-          <Field label="Password lama"><Input type="password" autoComplete="current-password" placeholder="••••••••" value={cur}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCur(e.target.value)} style={{ width: "100%" }} /></Field>
-          <Field label={<>Password baru <span style={{ fontWeight: 400, color: "var(--text-subtle)" }}>· min 8</span></>}>
-            <Input type="password" autoComplete="new-password" placeholder="minimal 8 karakter" value={next}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNext(e.target.value)} style={{ width: "100%" }} /></Field>
-          {/* marginBottom = Field.marginBottom (kit.tsx). alignItems:end mendasarkan tombol
-              ke dasar baris, tapi margin bawah Field mengangkat input 14px dari sana; tanpa
-              ini tombol jatuh 14px di bawah input. */}
-          <Button size="sm" leftIcon="key-round" disabled={!canChange} onClick={changePw}
-            style={{ marginBottom: 14 }}>Ganti</Button>
-        </div>
+        {/* <form>: Enter di kolom mana pun mengirim, sama dengan menekan Ganti. */}
+        <form onSubmit={(ev) => { ev.preventDefault(); void changePw(); }}>
+          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
+            <Field label="Password lama"><Input type="password" autoComplete="current-password" placeholder="••••••••" value={cur}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCur(e.target.value)} style={{ width: "100%" }} /></Field>
+            <Field label={<>Password baru <span style={{ fontWeight: 400, color: "var(--text-subtle)" }}>· min 8</span></>}>
+              <Input type="password" autoComplete="new-password" placeholder="minimal 8 karakter" value={next}
+                aria-invalid={next.length > 0 && next.length < 8 ? true : undefined}
+                invalid={next.length > 0 && next.length < 8}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNext(e.target.value)} style={{ width: "100%" }} /></Field>
+            {/* marginBottom = Field.marginBottom (kit.tsx). alignItems:end mendasarkan tombol
+                ke dasar baris, tapi margin bawah Field mengangkat input 14px dari sana; tanpa
+                ini tombol jatuh 14px di bawah input. */}
+            <Button size="sm" type="submit" leftIcon="key-round" disabled={!canChange}
+              aria-describedby={blocked ? hintId : undefined} style={{ marginBottom: 14 }}>Ganti</Button>
+          </div>
+          <BlockedHint id={hintId} text={blocked} />
+        </form>
       </div>
     </Card>
   );
 }
 
-// SPEC-169 · Users: daftar, invite (set password langsung), hapus. Tanpa RBAC — semua setara.
+// SPEC-169 · Pengguna: daftar, undang (set password langsung), hapus. Tanpa RBAC — semua setara.
 function UsersPanel({ me, onToast }: { me: UserView; onToast?: ShowToast }) {
   // SPEC-847 · ADR-0127 · konfirmasi destruktif memakai dialog aplikasi, bukan window.confirm.
   const { confirm, dialog } = useConfirm();
@@ -156,80 +206,92 @@ function UsersPanel({ me, onToast }: { me: UserView; onToast?: ShowToast }) {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const hintId = React.useId();
   const load = React.useCallback(() => { api.listUsers().then(setUsers).catch(() => setUsers([])); }, []);
   React.useEffect(() => { load(); }, [load]);
-  const canInvite = /\S+@\S+\.\S+/.test(email) && password.length >= 8 && !busy;
+  const emailBad = email.length > 0 && !/\S+@\S+\.\S+/.test(email);
+  const blocked = !email ? "Isi email pengguna dulu."
+    : emailBad ? "Format email belum benar."
+    : password.length < 8 ? "Password minimal 8 karakter."
+    : null;
+  const canInvite = !blocked && !busy;
   async function invite() {
     if (!canInvite) return;
     setBusy(true);
     try {
       await api.inviteUser({ email, password });
       setEmail(""); setPassword(""); load();
-      onToast?.("User " + email + " diundang", "ok", "user-plus");
+      onToast?.("Pengguna " + email + " diundang", "ok", "user-plus");
     } catch (e) {
-      onToast?.(e instanceof ApiError && e.status === 409 ? "Email sudah dipakai" : "Gagal mengundang user", "err", "x-circle");
+      onToast?.(e instanceof ApiError && e.status === 409 ? "Email sudah dipakai" : failureMessage("mengundang pengguna", e), "err", "x-circle");
     } finally { setBusy(false); }
   }
   async function remove(u: UserView) {
     try {
       if (!await confirm({
-        title: `Hapus user "${u.email}"?`,
-        message: "User ini kehilangan akses ke dashboard seketika.",
+        title: `Hapus pengguna "${u.email}"?`,
+        message: "Pengguna ini kehilangan akses ke dashboard seketika.",
         impact: ["Semua sesi login miliknya ikut dicabut.", "Tindakan ini tak bisa dibatalkan."],
-        confirmLabel: "Hapus user",
+        confirmLabel: "Hapus pengguna",
         run: () => api.deleteUser(u.id),
       })) return;
-      load(); onToast?.("User " + u.email + " dihapus", "warn", "trash-2");
+      load(); onToast?.("Pengguna " + u.email + " dihapus", "warn", "trash-2");
     }
-    catch (e) { onToast?.(e instanceof ApiError && e.status === 400 ? "Tak bisa hapus user terakhir" : "Gagal hapus user", "err", "x-circle"); }
+    catch (e) { onToast?.(e instanceof ApiError && e.status === 400 ? "Tak bisa hapus pengguna terakhir" : failureMessage("menghapus pengguna", e), "err", "x-circle"); }
   }
   return (
-    <Card eyebrow="users" title="Users">
+    <Card eyebrow="users" title="Pengguna">
       <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
-        Undang user lain dengan menetapkan password-nya langsung — tanpa email undangan.
+        Undang pengguna lain dengan menetapkan password-nya langsung — tanpa email undangan.
       </div>
-      {users === null ? <StateBlock kind="loading" compact title="Memuat users…" /> : users.map((u, i) => (
+      {users === null ? <StateBlock kind="loading" compact title="Memuat pengguna…" /> : users.map((u, i) => (
         <SettingRow key={u.id} title={u.email} last={i === users.length - 1}
           desc={"dibuat " + new Date(u.createdAt).toLocaleDateString("id-ID") + (u.id === me.id ? " · kamu" : "")}>
           <Button size="sm" variant="ghost" leftIcon="trash-2" disabled={users.length <= 1} onClick={() => remove(u)}>Hapus</Button>
         </SettingRow>
       ))}
       <div style={{ paddingTop: 14 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)", marginBottom: 10 }}>Invite user</div>
-        <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
-          <Field label="Email"><Input type="email" value={email} placeholder="user@nafanesia.id"
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} style={{ width: "100%" }} /></Field>
-          <Field label={<>Password <span style={{ fontWeight: 400, color: "var(--text-subtle)" }}>· min 8</span></>}>
-            <Input type="password" autoComplete="new-password" placeholder="minimal 8 karakter" value={password}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} style={{ width: "100%" }} /></Field>
-          {/* marginBottom = Field.marginBottom — sejajarkan dasar tombol dengan dasar input (lihat AccountPanel). */}
-          <Button size="sm" leftIcon="user-plus" disabled={!canInvite} onClick={invite}
-            style={{ marginBottom: 14 }}>Invite</Button>
-        </div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-strong)", marginBottom: 10 }}>Undang pengguna</div>
+        <form onSubmit={(ev) => { ev.preventDefault(); void invite(); }}>
+          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
+            <Field label="Email"><Input type="email" value={email} placeholder="user@nafanesia.id"
+              aria-invalid={emailBad ? true : undefined} invalid={emailBad}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} style={{ width: "100%" }} /></Field>
+            <Field label={<>Password <span style={{ fontWeight: 400, color: "var(--text-subtle)" }}>· min 8</span></>}>
+              <Input type="password" autoComplete="new-password" placeholder="minimal 8 karakter" value={password}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)} style={{ width: "100%" }} /></Field>
+            {/* marginBottom = Field.marginBottom — sejajarkan dasar tombol dengan dasar input (lihat AccountPanel). */}
+            <Button size="sm" type="submit" leftIcon="user-plus" disabled={!canInvite}
+              aria-describedby={blocked ? hintId : undefined} style={{ marginBottom: 14 }}>Undang</Button>
+          </div>
+          <BlockedHint id={hintId} text={blocked} />
+        </form>
       </div>
       {dialog}
     </Card>
   );
 }
 
-// SPEC-213 · Perangkat: device token per-device untuk auth sync ke hub. Token plaintext hanya
-// ditampilkan SEKALI saat dibuat (server simpan hash). Revoke = cabut satu device, yang lain aman.
+// SPEC-213 · Token perangkat: token per-perangkat untuk auth sync ke server pusat. Token plaintext hanya
+// ditampilkan SEKALI saat dibuat (server simpan hash). Cabut = cabut satu perangkat, yang lain aman.
 export function DeviceTokensPanel({ onToast }: { onToast?: ShowToast }) {
   const { confirm, dialog } = useConfirm();
   const [tokens, setTokens] = React.useState<DeviceTokenView[] | null>(null);
   const [name, setName] = React.useState("");
   const [fresh, setFresh] = React.useState<{ name: string; token: string } | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const hintId = React.useId();
   const load = React.useCallback(() => { api.listDeviceTokens().then(setTokens).catch(() => setTokens([])); }, []);
   React.useEffect(() => { load(); }, [load]);
+  const blocked = name.trim().length < 1 ? "Isi nama perangkat dulu." : null;
   async function create() {
-    if (name.trim().length < 1 || busy) return;
+    if (blocked || busy) return;
     setBusy(true);
     try {
       const t = await api.createDeviceToken({ name: name.trim() });
       setFresh({ name: t.name, token: t.token }); setName(""); load();
       onToast?.("Token perangkat dibuat — salin sekarang", "ok", "key-round");
-    } catch { onToast?.("Gagal membuat token", "err", "x-circle"); }
+    } catch (e) { onToast?.(failureMessage("membuat token perangkat", e), "err", "x-circle"); }
     finally { setBusy(false); }
   }
   async function revoke(t: DeviceTokenView) {
@@ -237,20 +299,21 @@ export function DeviceTokensPanel({ onToast }: { onToast?: ShowToast }) {
       if (!await confirm({
         title: `Cabut token perangkat "${t.name}"?`,
         message: "Perangkat itu tak bisa sync lagi sampai token baru dibuat.",
+        impact: ["Perangkat berhenti menyinkronkan data ke server pusat.", "Tindakan ini tak bisa dibatalkan."],
         confirmLabel: "Cabut token",
         icon: "key-round",
         run: () => api.revokeDeviceToken(t.id),
       })) return;
       load(); onToast?.("Token dicabut", "warn", "trash-2");
     }
-    catch { onToast?.("Gagal mencabut token", "err", "x-circle"); }
+    catch (e) { onToast?.(failureMessage("mencabut token", e), "err", "x-circle"); }
   }
   const active = (tokens ?? []).filter((t) => !t.revokedAt);
   return (
-    <Card eyebrow="perangkat" title="Device tokens">
+    <Card eyebrow="perangkat" title="Token perangkat">
       <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
-        Token per-perangkat untuk menyinkronkan instance lokal ke hub (Bearer). Tempel di
-        <code style={{ margin: "0 4px" }}>SYNC_DEVICE_TOKEN</code> pada instance client. Plaintext hanya tampil sekali.
+        Token per perangkat untuk menyinkronkan hanoman di perangkat itu ke server pusat. Tempelkan di kolom
+        <code style={{ margin: "0 4px" }}>SYNC_DEVICE_TOKEN</code> pada instance perangkat. Teks token hanya tampil sekali.
       </div>
       {fresh && (
         <div style={{ padding: 12, marginBottom: 12, border: "1px solid var(--brass-300)", borderRadius: "var(--radius-sm)", background: "var(--brass-100)" }}>
@@ -270,31 +333,37 @@ export function DeviceTokensPanel({ onToast }: { onToast?: ShowToast }) {
             <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={() => revoke(t)}>Cabut</Button>
           </SettingRow>
         ))}
-      <div className="hn-grid-mobile" style={{ paddingTop: 14, display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end" }}>
-        <Field label="Nama perangkat"><Input value={name} placeholder="laptop-dena"
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} style={{ width: "100%" }} /></Field>
-        <Button size="sm" leftIcon="plus" disabled={name.trim().length < 1 || busy} onClick={create} style={{ marginBottom: 14 }}>Buat token</Button>
-      </div>
+      <form onSubmit={(ev) => { ev.preventDefault(); void create(); }}>
+        <div className="hn-grid-mobile" style={{ paddingTop: 14, display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end" }}>
+          <Field label="Nama perangkat"><Input value={name} placeholder="laptop-dena"
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} style={{ width: "100%" }} /></Field>
+          <Button size="sm" type="submit" leftIcon="plus" disabled={!!blocked || busy}
+            aria-describedby={blocked ? hintId : undefined} style={{ marginBottom: 14 }}>Buat token</Button>
+        </div>
+        <BlockedHint id={hintId} text={blocked} />
+      </form>
       {dialog}
     </Card>
   );
 }
 
-// SPEC-213 · Aktivitas: activity log ringkasan hasil sesi (append-only, disync dari semua device).
+// SPEC-213 · Log aktivitas: ringkasan hasil sesi lintas perangkat (append-only, disync dari semua perangkat).
 function ActivityPanel({ onToast }: { onToast?: ShowToast }) {
   const { confirm, dialog } = useConfirm();
   const [projectId, setProjectId] = React.useState("");
   const [rows, setRows] = React.useState<SessionResultView[] | null>(null);
+  const hintId = React.useId();
   const load = React.useCallback(() => { api.listSessionResults(projectId || undefined).then(setRows).catch(() => setRows([])); }, [projectId]);
   React.useEffect(() => { load(); }, [load]);
+  const blocked = projectId ? null : "Isi nama project dulu untuk menghapus log satu project.";
   async function purge() {
-    if (!projectId) { onToast?.("Isi project id untuk purge", "warn", "alert-triangle"); return; }
+    if (blocked) return;
     try {
       if (!await confirm({
-        title: `Purge activity log project "${projectId}"?`,
-        message: "Seluruh entri hasil sesi project ini dihapus dari device ini.",
-        impact: ["Log bersifat append-only — entri yang dihapus tak bisa dipulihkan."],
-        confirmLabel: "Purge",
+        title: `Hapus log aktivitas project "${projectId}"?`,
+        message: "Seluruh entri hasil sesi project ini dihapus dari perangkat ini.",
+        impact: ["Log aktivitas hanya bisa ditambah, jadi entri yang dihapus tak bisa dipulihkan."],
+        confirmLabel: "Hapus log",
         run: async () => {
           const r = await api.purgeSessionResults(projectId);
           onToast?.(`${r.purged} entri dihapus`, "warn", "trash-2");
@@ -302,18 +371,20 @@ function ActivityPanel({ onToast }: { onToast?: ShowToast }) {
       })) return;
       load();
     }
-    catch { onToast?.("Gagal purge", "err", "x-circle"); }
+    catch (e) { onToast?.(failureMessage("menghapus log aktivitas", e), "err", "x-circle"); }
   }
   return (
-    <Card eyebrow="aktivitas" title="Activity log">
+    <Card eyebrow="aktivitas" title="Log aktivitas">
       <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
-        Ringkasan hasil sesi lintas device (transisi stage, commit, PR) — append-only. Filter per project.
+        Ringkasan hasil sesi dari semua perangkat (perpindahan tahap, commit, PR). Hanya bisa ditambah. Saring per project.
       </div>
       <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "end", marginBottom: 12 }}>
-        <Field label="Project id (opsional)"><Input value={projectId} placeholder="mis. hanoman — kosong = semua project"
+        <Field label="Project (opsional)"><Input value={projectId} placeholder="mis. hanoman — kosong = semua project"
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProjectId(e.target.value)} style={{ width: "100%" }} /></Field>
-        <Button size="sm" variant="ghost" leftIcon="trash-2" disabled={!projectId} onClick={purge} style={{ marginBottom: 14 }}>Purge</Button>
+        <Button size="sm" variant="secondary" leftIcon="trash-2" disabled={!!blocked}
+          aria-describedby={blocked ? hintId : undefined} onClick={purge} style={{ marginBottom: 14, color: "var(--clay-600)" }}>Hapus log</Button>
       </div>
+      <BlockedHint id={hintId} text={blocked} />
       {rows === null ? <StateBlock kind="loading" compact title="Memuat aktivitas…" />
         : rows.length === 0 ? <div style={{ fontSize: 13, color: "var(--text-subtle)", padding: "8px 0" }}>Belum ada aktivitas.</div>
         : rows.map((r, i) => (
@@ -332,7 +403,18 @@ function ActivityPanel({ onToast }: { onToast?: ShowToast }) {
 const GROUP_LABEL: Record<string, string> = {
   sync: "Sync", claude: "Claude", vps: "VPS", runtime: "Runtime", bootstrap: "Bootstrap (read-only)",
 };
+// Jargon `source · apply` diterjemahkan: dari mana nilainya, dan kapan ia berlaku.
+const SOURCE_WORD: Record<ConfigEntryView["source"], string> = {
+  db: "tersimpan di database", env: "dari .env", default: "bawaan",
+};
+const APPLY_WORD: Record<ConfigEntryView["apply"], string> = {
+  live: "langsung berlaku", "new-session": "untuk sesi baru", restart: "perlu restart",
+};
+const APPLY_NOTE: Record<ConfigEntryView["apply"], string> = {
+  live: "Berlaku langsung.", "new-session": "Berlaku untuk sesi baru.", restart: "Berlaku setelah server di-restart.",
+};
 function ConfigPanel({ onToast }: { onToast?: ShowToast }) {
+  const { confirm, dialog } = useConfirm();
   const [data, setData] = React.useState<ConfigResponse | null>(null);
   const [drafts, setDrafts] = React.useState<Record<string, string>>({});
   const load = React.useCallback(() => { api.getConfig().then(setData).catch(() => setData(null)); }, []);
@@ -344,21 +426,40 @@ function ConfigPanel({ onToast }: { onToast?: ShowToast }) {
     const v = drafts[e.key] ?? "";
     try { await api.putConfig(e.key, v); clearDraft(e.key); load();
       onToast?.(`${e.label} disimpan`, "ok", "check-circle-2"); }
-    catch { onToast?.(`Gagal menyimpan ${e.label}`, "err", "x-circle"); }
+    catch (err) { onToast?.(failureMessage(`menyimpan ${e.label}`, err), "err", "x-circle"); }
   };
+  // Reset menghapus nilai override di database: yang berlaku kembali nilai .env atau bawaan.
   const reset = async (e: ConfigEntryView) => {
-    try { await api.deleteConfig(e.key); clearDraft(e.key); load(); onToast?.(`${e.label} direset`, "warn", "rotate-ccw"); }
-    catch { onToast?.("Gagal reset", "err", "x-circle"); }
+    const secret = e.kind === "secret";
+    try {
+      if (!await confirm({
+        title: secret ? `Hapus nilai "${e.label}"?` : `Reset "${e.label}" ke bawaan?`,
+        message: secret ? "Nilai rahasia ini hilang dari database." : "Nilai yang Anda atur untuk setelan ini dihapus.",
+        impact: [
+          "Yang berlaku kembali nilai dari .env atau nilai bawaan aplikasi.",
+          APPLY_NOTE[e.apply],
+          "Tindakan ini tak bisa dibatalkan — nilai lama tidak disimpan sebagai cadangan.",
+        ],
+        confirmLabel: secret ? "Hapus nilai" : "Reset",
+        tone: "danger",
+        icon: secret ? "trash-2" : "rotate-ccw",
+        run: () => api.deleteConfig(e.key),
+      })) return;
+      clearDraft(e.key); load(); onToast?.(`${e.label} direset`, "warn", "rotate-ccw");
+    } catch (err) { onToast?.(failureMessage(`mereset ${e.label}`, err), "err", "x-circle"); }
   };
 
   const groups = [...new Set(data.entries.map((e) => e.group))];
   return (
     <>
+      <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
+        Setiap baris disimpan lewat tombolnya sendiri. Nilai bawaan tak berubah sampai Anda mereset setelan itu.
+      </div>
       {groups.map((g) => (
         <Card key={g} eyebrow={g} title={GROUP_LABEL[g] ?? g}>
           {g === "sync" && (
             <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 8 }}>
-              {data.sync.running ? (data.sync.connected ? "● Tersambung ke hub" : "◐ Sync aktif, menyambung…") : "○ Tidak sync (HUB murni)"}
+              {data.sync.running ? (data.sync.connected ? "● Tersambung ke server pusat" : "◐ Sinkron aktif, menyambung…") : "○ Tidak sinkron (instance ini adalah server pusat)"}
             </div>
           )}
           {data.entries.filter((e) => e.group === g).map((e) => (
@@ -370,6 +471,7 @@ function ConfigPanel({ onToast }: { onToast?: ShowToast }) {
           ))}
         </Card>
       ))}
+      {dialog}
     </>
   );
 }
@@ -377,36 +479,42 @@ function ConfigPanel({ onToast }: { onToast?: ShowToast }) {
 function ConfigField({ entry, draft, onDraft, onSave, onReset }: {
   entry: ConfigEntryView; draft?: string; onDraft: (v: string) => void; onSave: () => void; onReset: () => void;
 }) {
-  const badge = <span style={{ fontSize: 10.5, fontFamily: "var(--font-mono)", color: "var(--text-subtle)", marginRight: 8 }}>{entry.source} · {entry.apply}</span>;
+  const badge = <span title={APPLY_NOTE[entry.apply]} style={{ fontSize: 11.5, color: "var(--text-subtle)", marginRight: 8 }}>{SOURCE_WORD[entry.source]} · {APPLY_WORD[entry.apply]}</span>;
   if (!entry.editable) { // bootstrap read-only
     return <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{badge}
       <code style={{ fontSize: 12 }}>{entry.masked ?? entry.value ?? "—"}</code></div>;
   }
+  // <form>: Enter di kolom mengirim, sama dengan menekan Simpan.
+  const submit = (ev: React.FormEvent) => { ev.preventDefault(); onSave(); };
   if (entry.kind === "secret") {
-    return <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{badge}
+    return <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{badge}
       {entry.hasValue && draft === undefined
         ? <><code style={{ fontSize: 12 }}>{entry.masked}</code>
             <Button size="sm" variant="ghost" leftIcon="pencil" onClick={() => onDraft("")}>Ganti</Button>
-            <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={onReset}>Hapus</Button></>
-        : <><Input aria-label={entry.label} type="password"
+            <Button size="sm" variant="secondary" leftIcon="trash-2" onClick={onReset}
+              style={{ color: "var(--clay-600)" }}>Hapus</Button></>
+        : <form onSubmit={submit} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <Input aria-label={entry.label} type="password"
               placeholder={entry.hasValue ? "biarkan kosong = pertahankan" : (configEntry(entry.key)?.example ?? "tempel token…")}
               value={draft ?? ""} onChange={(ev: React.ChangeEvent<HTMLInputElement>) => onDraft(ev.target.value)} style={{ width: 240 }} />
-            <Button size="sm" leftIcon="save" onClick={onSave}>Simpan</Button></>}
+            <Button size="sm" type="submit" leftIcon="save">Simpan</Button>
+          </form>}
     </div>;
   }
   if (entry.kind === "bool") {
     const on = (draft ?? entry.value) === "1";
     return <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{badge}
-      <Switch checked={on} onChange={(v: boolean) => { onDraft(v ? "1" : "0"); }} />
+      <Switch checked={on} aria-label={entry.label} onChange={(v: boolean) => { onDraft(v ? "1" : "0"); }} />
       {draft !== undefined && <Button size="sm" leftIcon="save" onClick={onSave}>Simpan</Button>}</div>;
   }
   // url | int | string | path
-  return <div style={{ display: "flex", alignItems: "center", gap: 8 }}>{badge}
+  return <form onSubmit={submit} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>{badge}
     <Input aria-label={entry.label} type={entry.kind === "int" ? "number" : "text"}
       placeholder={configEntry(entry.key)?.example}
       value={draft ?? entry.value ?? ""} onChange={(ev: React.ChangeEvent<HTMLInputElement>) => onDraft(ev.target.value)} style={{ width: 240 }} />
-    <Button size="sm" leftIcon="save" onClick={onSave}>Simpan</Button>
-    {entry.source === "db" && <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={onReset}>Reset</Button>}</div>;
+    <Button size="sm" type="submit" leftIcon="save">Simpan</Button>
+    {entry.source === "db" && <Button size="sm" variant="secondary" leftIcon="rotate-ccw" onClick={onReset}
+      style={{ color: "var(--clay-600)" }}>Reset</Button>}</form>;
 }
 
 // ADR-0155 · token yang HAKNYA MENYEMPIT saat empat capability berbahaya dipecah dari `:write`.
@@ -449,6 +557,7 @@ function CheckAll({ ids, picked, onToggle, ariaLabel, label }: {
 // SPEC-257 · ADR-0065 · Akses AI Agent: master switch + agent token + capability per-domain.
 export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
   const { confirm, dialog } = useConfirm();
+  const mobile = useResponsiveTier() === "mobile";
   const [caps, setCaps] = React.useState<CapabilityInfo[]>([]);
   const [items, setItems] = React.useState<AgentTokenView[] | null>(null);
   const [setting, setSetting] = React.useState<Setting | null>(null);
@@ -456,6 +565,8 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
   const [picked, setPicked] = React.useState<string[]>([]);
   const [fresh, setFresh] = React.useState<{ name: string; token: string } | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const hintId = React.useId();
+  const nameBlock = name.trim().length < 1 ? "Isi nama token dulu." : null;
   const load = React.useCallback(() => { api.listAgentTokens().then((r) => setItems(r.items)).catch(() => setItems([])); }, []);
   React.useEffect(() => {
     api.getSettings().then(setSetting).catch(() => {});
@@ -482,7 +593,7 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
     ? Array.from(new Set([...p, ...ids]))
     : p.filter((x) => !ids.includes(x)));
   async function create() {
-    if (name.trim().length < 1 || busy) return;
+    if (nameBlock || busy) return;
     setBusy(true);
     try {
       const t = await api.createAgentToken({
@@ -498,6 +609,7 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
       if (!await confirm({
         title: `Cabut agent token "${t.name}"?`,
         message: "Agen yang memakainya langsung kehilangan akses.",
+        impact: [`Token "${t.name}" tak bisa dipakai lagi untuk masuk lewat API.`, "Tindakan ini tak bisa dibatalkan."],
         confirmLabel: "Cabut token",
         icon: "key-round",
         run: () => api.revokeAgentToken(t.id),
@@ -516,6 +628,14 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
   const idsOf = (access: string) => caps.filter((c) => c.access === access).map((c) => c.id);
   const allIds = caps.map((c) => c.id);
   const active = (items ?? []).filter((t) => !t.revokedAt);
+  // Sel capability: pembaca layar mendengar labelnya ("Sesi — tulis"), bukan id mentah ("sessions:write").
+  // Di mobile grid jadi satu kolom, jadi kata tingkatnya ikut tampil di sel itu.
+  const capCell = (c: CapabilityInfo | undefined, word: string) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+      {c && mobile && <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{word}</span>}
+      {c && <input type="checkbox" aria-label={c.label} checked={picked.includes(c.id)} onChange={() => toggleCap(c.id)} />}
+    </div>
+  );
 
   return (
     <>
@@ -562,7 +682,7 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
             </SettingRow>
           ))}
 
-        <div style={{ paddingTop: 14 }}>
+        <form style={{ paddingTop: 14 }} onSubmit={(ev) => { ev.preventDefault(); void create(); }}>
           <Field label="Nama token"><Input value={name} placeholder="mis. agent-ci"
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} style={{ width: "100%" }} /></Field>
           <div style={{ marginTop: 12, fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)" }}>Capability</div>
@@ -594,17 +714,19 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
                     {meta?.desc && <div style={{ fontSize: 11.5, color: "var(--text-subtle)", lineHeight: 1.4, marginTop: 1 }}>{meta.desc}</div>}
                     {x && <div style={{ fontSize: 11.5, color: "var(--status-err)", lineHeight: 1.4, marginTop: 2 }}>{x.label.replace(/^[^—]+—\s*/, "berbahaya: ")} — {x.desc}</div>}
                   </div>
-                  <div style={{ textAlign: "center" }}>{r && <input type="checkbox" aria-label={r.id} checked={picked.includes(r.id)} onChange={() => toggleCap(r.id)} />}</div>
-                  <div style={{ textAlign: "center" }}>{w && <input type="checkbox" aria-label={w.id} checked={picked.includes(w.id)} onChange={() => toggleCap(w.id)} />}</div>
-                  <div style={{ textAlign: "center" }}>{x && <input type="checkbox" aria-label={x.id} checked={picked.includes(x.id)} onChange={() => toggleCap(x.id)} />}</div>
+                  {capCell(r, "baca")}
+                  {capCell(w, "tulis")}
+                  {capCell(x, "berbahaya")}
                 </React.Fragment>
               );
             })}
           </div>
           <div style={{ marginTop: 14 }}>
-            <Button size="sm" leftIcon="plus" disabled={name.trim().length < 1 || busy} onClick={() => void create()}>Buat token</Button>
+            <Button size="sm" type="submit" leftIcon="plus" disabled={!!nameBlock || busy}
+              aria-describedby={nameBlock ? hintId : undefined}>Buat token</Button>
           </div>
-        </div>
+          <BlockedHint id={hintId} text={nameBlock} />
+        </form>
         {dialog}
       </Card>
 
@@ -645,35 +767,40 @@ function SetupPanel() {
   );
 }
 
+// Urutan = kebiasaan harian dulu (Sesi, Umum, Model), lalu akses & sistem. Akun tak lagi jadi tab awal:
+// hanya dipakai sesekali untuk ganti password. Label Inggris diterjemahkan; "Custom agent" tetap karena
+// itu nama fitur yang dipakai di seluruh aplikasi (ProjectDetail, Help Center).
 const S_SECTIONS = [
+  { key: "sesi", label: "Sesi", icon: "bell" },
+  { key: "umum", label: "Umum", icon: "sliders-horizontal" },
+  { key: "model", label: "Model sesi", icon: "cpu" },
+  { key: "orkestrasi", label: "Orkestrasi", icon: "layers" },   // ADR-0164 · model/effort per fase
   { key: "akun", label: "Akun", icon: "user-round" },
-  { key: "users", label: "Users", icon: "users" },
+  { key: "users", label: "Pengguna", icon: "users" },
   { key: "akses-klien", label: "Akses klien", icon: "user-check" }, // SPEC-617 · ADR-0110 · portal klien
-  { key: "perangkat", label: "Perangkat", icon: "key-round" },   // SPEC-213 · device tokens
-  { key: "kendali-jarak-jauh", label: "Kendali jarak jauh", icon: "shield" }, // SPEC-1215 · ADR-0165 · grant hub → mesin ini
+  { key: "perangkat", label: "Perangkat", icon: "key-round" },   // SPEC-213 · token perangkat
+  { key: "kendali-jarak-jauh", label: "Kendali jarak jauh", icon: "shield" }, // SPEC-1215 · ADR-0165 · izin hub → perangkat ini
   { key: "agent", label: "Akses AI Agent", icon: "bot" },        // SPEC-257 · agent token + capability
   { key: "custom-agent", label: "Custom agent", icon: "bot" },   // SPEC-450 · ADR-0094 · katalog agen global
-  { key: "aktivitas", label: "Aktivitas", icon: "activity" },    // SPEC-213 · activity log
+  { key: "aktivitas", label: "Aktivitas", icon: "activity" },    // SPEC-213 · log aktivitas
   { key: "konfigurasi", label: "Konfigurasi", icon: "sliders" }, // SPEC-215 · env runtime
   { key: "setup", label: "Setup awal", icon: "shield" },         // SPEC-884 · ADR-0139 · profil & hardening
   { key: "telegram", label: "Telegram", icon: "send" },          // SPEC-476 · operator gateway
   { key: "webhook", label: "Webhook", icon: "webhook" },         // SPEC-481 · ADR-0100 · webhook keluar
-  { key: "umum", label: "Umum", icon: "sliders-horizontal" },
-  { key: "model", label: "Model sesi", icon: "cpu" },
-  { key: "orkestrasi", label: "Orkestrasi", icon: "layers" },   // ADR-0164 · model/effort per fase
-  { key: "sesi", label: "Sesi", icon: "bell" },
 ] as const;
 
 export function SettingsScreen({ onToast, me, onLoggedOut }:
   { onToast?: ShowToast; me: UserView; onLoggedOut: () => void }) {
   const modelCatalog = useModelCatalog();
+  // Konfirmasi destruktif satu dialog untuk seluruh halaman (reset default, hapus kredensial Telegram).
+  const { confirm, dialog } = useConfirm();
   const [s, setS] = React.useState<Setting | null>(null);
   const [failed, setFailed] = React.useState(false);
   // S5 · antrean simpan: tiap simpan = GET segar → rebase → PUT, berurutan, supaya simpan kedua tak
   // me-rebase di atas DB yang belum memuat simpan pertama (klik beruntun, ketikan kondisi goal).
   const saveQueue = React.useRef<Promise<unknown>>(Promise.resolve());
   // SPEC-740 · ADR-0115 · sub-tab aktif bertahan; refresh tak melempar balik ke Akun.
-  const [tab, setTab] = usePersistedState<string>("settings", "tab", "akun", isStr);
+  const [tab, setTab] = usePersistedState<string>("settings", "tab", "sesi", isStr);
   const tier = useResponsiveTier();
   const mobile = tier === "mobile";
   // SPEC-481 · halaman dokumentasi webhook hidup DI DALAM tab-nya (bukan modal): brief
@@ -714,7 +841,6 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
   const [tgCreds, setTgCreds] = React.useState<TelegramCredentialsView | null>(null);
   const [tgDraft, setTgDraft] = React.useState<Record<string, string>>({});
   const [tgTest, setTgTest] = React.useState<TelegramTestResult | "sending" | null>(null);
-  const [tgConfirm, setTgConfirm] = React.useState(false);
   const loadTgCreds = React.useCallback(() => {
     api.getTelegramCredentials().then((v) => { setTgCreds(v); setTgDraft({}); }).catch(() => setTgCreds(null));
   }, []);
@@ -729,17 +855,46 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
     // terbaru dengan hanya bagian yang benar-benar diubah (rebaseEdits): tab yang terbuka melewati
     // update/seed tak lagi membalik model/sel orkestrasi seed baru ke id lama dan menguncinya `user`
     // lewat provenance server. GET gagal → `next` apa adanya (perilaku lama).
+    // Jujur soal hasilnya (audit P0): toast sukses hanya muncul SETELAH PUT berhasil. Kegagalan
+    // membalik kunci yang disimpan simpan ini saja — simpan lain yang sudah berhasil tak ikut terbalik.
     const persist = (next: Setting, msg?: string, tone?: string, icon?: string) => {
       const base = s;
+      const changed = (Object.keys(next) as (keyof Setting)[])
+        .filter((k) => JSON.stringify(next[k]) !== JSON.stringify(base[k]));
       setS(next);
-      saveQueue.current = saveQueue.current.then(async () => {
+      const write = saveQueue.current.then(async () => {
         const fresh = await api.getSettings().catch(() => undefined);
         await api.putSettings(rebaseEdits(base, next, fresh));
-      }).catch(() => {});
-      if (msg && onToast) onToast(msg, tone || "ok", icon || "check-circle-2");
+      });
+      saveQueue.current = write.catch(() => {});
+      write.then(
+        () => { if (msg && onToast) onToast(msg, tone || "ok", icon || "check-circle-2"); },
+        (e: unknown) => {
+          setS((p) => (p ? { ...p, ...Object.fromEntries(changed.map((k) => [k, base[k]])) } as Setting : p));
+          onToast?.(failureMessage("menyimpan pengaturan", e), "err", "alert-triangle");
+        },
+      );
     };
     const save = (patch: Partial<Setting>, msg: string) => persist({ ...s, ...patch }, msg);
     const sw = (k: keyof Setting, msg: string) => (v: boolean) => save({ [k]: v } as Partial<Setting>, msg + (v ? " · aktif" : " · nonaktif"));
+    // Reset menyentuh SEMUA Setting, termasuk kendali jarak jauh & log yang punya halamannya sendiri —
+    // dialognya harus menyebut itu, bukan membiarkan reset diam-diam mematikannya.
+    const resetDefaults = async () => {
+      if (!await confirm({
+        title: "Kembalikan semua setelan ke default?",
+        message: "Setelan di seluruh halaman ini kembali ke nilai default hanoman.",
+        impact: [
+          "Sesi, model, notifikasi, mode goal, scope verifikasi, metode, konflik, lead, Telegram, dan obrolan portal kembali ke default.",
+          "Orkestrasi (model dan effort per fase) dan penanda suntingan agen bawaan ikut kembali ke default.",
+          "Kendali jarak jauh, pengiriman log, dan retensi log ikut kembali ke default (mati).",
+          "Nilai yang sudah Anda atur tidak disimpan sebagai cadangan.",
+        ],
+        confirmLabel: "Kembalikan ke default",
+        tone: "danger",
+        icon: "rotate-ccw",
+      })) return;
+      persist(JSON.parse(JSON.stringify(S_DEFAULTS)), "Pengaturan dikembalikan ke default", "warn", "rotate-ccw");
+    };
     // SPEC-739 · ADR-0114 · pemasangan lewat SESI TERMINAL (ADR-0056). Yang dikirim hanya metode
     // + agen; perintahnya diturunkan SERVER dari katalog, jadi UI tak pernah memegang literalnya.
     const installMethod = async (m: MethodSkillStatus) => {
@@ -765,6 +920,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
         src === "db" ? <Badge tone="ok">tersimpan</Badge>
           : src === "env" ? <Badge tone="warn">dari .env · deprecated</Badge>
             : <Badge>belum diisi</Badge>;
+      // Kredensial hanya ditulis saat "Simpan kredensial" ditekan, bukan saat tiap ketikan.
       const saveCreds = () => {
         const patch = Object.fromEntries(Object.entries(tgDraft).filter(([, v]) => v !== ""));
         if (!Object.keys(patch).length) { onToast?.("Tak ada perubahan", "info", "info"); return; }
@@ -774,7 +930,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             onToast?.("Kredensial Telegram disimpan", "ok", "check-circle-2");
             loadTelegram();
           })
-          .catch((e: Error) => onToast?.(e.message || "Gagal menyimpan", "err", "alert-triangle"));
+          .catch((e: unknown) => onToast?.(failureMessage("menyimpan kredensial Telegram", e), "err", "alert-triangle"));
       };
       const runTest = () => {
         setTgTest("sending");
@@ -784,14 +940,28 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             inbound: { ok: false, reason: "Status jalur masuk tak terbaca — server tak menjawab.", missingCapabilities: [], polling: false },
           }));
       };
-      const removeCreds = () => {
-        setTgConfirm(false);
-        api.deleteTelegramCredentials().then((r) => {
-          onToast?.(r.envFallback.length
-            ? `Kredensial dihapus — ${r.envFallback.length} nilai masih datang dari .env`
+      // Hapus lewat dialog aplikasi dengan daftar dampak; pesan sukses menunggu sampai penghapusan benar-benar berhasil.
+      const removeCreds = async () => {
+        let result = null as null | { envFallback: string[] };
+        try {
+          const done = await confirm({
+            title: "Hapus kredensial Telegram?",
+            message: "Gateway berhenti kecuali nilai .env lama masih tersedia.",
+            impact: ["Keempat nilai dihapus dari database.", "Gateway berhenti menerima pesan sampai kredensial diisi lagi."],
+            confirmLabel: "Hapus kredensial",
+            tone: "danger",
+            icon: "trash-2",
+            run: async () => { result = await api.deleteTelegramCredentials(); },
+          });
+          if (!done) return;
+          const left = result?.envFallback.length ?? 0;
+          onToast?.(left
+            ? `Kredensial dihapus — ${left} nilai masih datang dari .env`
             : "Kredensial Telegram dihapus", "ok", "check-circle-2");
           setTgTest(null); loadTgCreds(); loadTelegram();
-        }).catch((e: Error) => onToast?.(e.message || "Gagal menghapus", "err", "alert-triangle"));
+        } catch (e) {
+          onToast?.(failureMessage("menghapus kredensial Telegram", e), "err", "alert-triangle");
+        }
       };
       return (
         <>
@@ -799,32 +969,35 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
               Disimpan terenkripsi di database dan berlaku langsung — tanpa mengedit <code>.env</code>,
               tanpa restart. Nilai <code>.env</code> lama tetap dipakai selama field-nya masih kosong.
+              Perubahan baru tersimpan saat tombol <b>Simpan kredensial</b> ditekan.
             </div>
             {!tgCreds ? <StateBlock kind="loading" compact title="Memuat kredensial…" />
-              : <>
-                {tgCreds.fields.map((f, i) => (
-                  <SettingRow key={f.key} title={f.label} desc={f.help} last={i === tgCreds.fields.length - 1}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {sourceBadge(f.source)}
-                      <Input
-                        aria-label={f.label}
-                        mono
-                        type={f.kind === "secret" ? "password" : "text"}
-                        placeholder={f.kind === "secret"
-                          ? (f.masked ?? configEntry(f.key)?.example ?? "belum diisi")
-                          : (configEntry(f.key)?.example ?? "belum diisi")}
-                        value={tgDraft[f.key] ?? (f.kind === "secret" ? "" : (f.value ?? ""))}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setTgDraft((d) => ({ ...d, [f.key]: e.target.value }))}
-                        style={{ width: 300 }}
-                      />
-                    </div>
-                  </SettingRow>
-                ))}
-                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                  <Button size="sm" leftIcon="save" onClick={saveCreds}>Simpan kredensial</Button>
-                </div>
-              </>}
+              : (
+                <form onSubmit={(ev) => { ev.preventDefault(); saveCreds(); }}>
+                  {tgCreds.fields.map((f, i) => (
+                    <SettingRow key={f.key} title={f.label} desc={f.help} last={i === tgCreds.fields.length - 1}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {sourceBadge(f.source)}
+                        <Input
+                          aria-label={f.label}
+                          mono
+                          type={f.kind === "secret" ? "password" : "text"}
+                          placeholder={f.kind === "secret"
+                            ? (f.masked ?? configEntry(f.key)?.example ?? "belum diisi")
+                            : (configEntry(f.key)?.example ?? "belum diisi")}
+                          value={tgDraft[f.key] ?? (f.kind === "secret" ? "" : (f.value ?? ""))}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            setTgDraft((d) => ({ ...d, [f.key]: e.target.value }))}
+                          style={{ width: 300 }}
+                        />
+                      </div>
+                    </SettingRow>
+                  ))}
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <Button size="sm" type="submit" leftIcon="save">Simpan kredensial</Button>
+                  </div>
+                </form>
+              )}
           </Card>
 
           <Card eyebrow="uji" title="Uji koneksi & hapus"
@@ -835,15 +1008,16 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             </SettingRow>
             {tgTest && tgTest !== "sending" && (
               <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                {/* Hasil uji diumumkan ke pembaca layar: sukses sebagai status, galat sebagai alert. */}
                 {tgTest.ok
-                  ? <Callout tone="ok">Berhasil — bot @{tgTest.botUsername ?? "?"} mengirim ke chat {tgTest.chatId}.</Callout>
-                  : <Callout tone="err">{tgTest.error}</Callout>}
+                  ? <Callout tone="ok" role="status">Berhasil — bot @{tgTest.botUsername ?? "?"} mengirim ke chat {tgTest.chatId}.</Callout>
+                  : <Callout tone="err" role="alert">{tgTest.error}</Callout>}
                 {/* SPEC-491 · uji di atas hanya jalur KELUAR (bot token). Hijau di sana pernah
                     berdampingan dengan jalur masuk yang mati total — itulah keluhan "diam
                     total": pesan tak pernah tertangkap dan tak ada balasan sama sekali. */}
                 {tgTest.inbound?.ok
-                  ? <Callout tone="ok">Jalur masuk siap — gateway sedang long polling dan AgentToken-nya sah.</Callout>
-                  : <Callout tone="warn">
+                  ? <Callout tone="ok" role="status">Jalur masuk siap — gateway sedang long polling dan token agen (AgentToken)-nya sah.</Callout>
+                  : <Callout tone="warn" role="alert">
                       Jalur masuk BELUM siap: {tgTest.inbound?.reason ?? "status tak terbaca."}
                       {!!tgTest.inbound?.missingCapabilities.length && (
                         <> Capability yang kurang: <code>{tgTest.inbound.missingCapabilities.join(", ")}</code>.</>
@@ -854,16 +1028,8 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             )}
             <SettingRow title="Hapus kredensial" last
               desc="Menghapus keempat nilai dari database. Bila .env lama masih terisi, nilainya kembali dipakai.">
-              <Button size="sm" variant="danger" leftIcon="trash-2" onClick={() => setTgConfirm(true)}>Hapus kredensial</Button>
+              <Button size="sm" variant="danger" leftIcon="trash-2" onClick={() => void removeCreds()}>Hapus kredensial</Button>
             </SettingRow>
-            <ConfirmDialog
-              open={tgConfirm}
-              title="Hapus kredensial Telegram?"
-              message="Gateway berhenti kecuali nilai .env lama masih tersedia."
-              confirmLabel="Hapus"
-              onConfirm={removeCreds}
-              onCancel={() => setTgConfirm(false)}
-            />
           </Card>
 
           <Card eyebrow="gateway" title="Gateway Telegram"
@@ -904,8 +1070,8 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
               <b>Onboarding</b>
               <ol style={{ margin: "8px 0 0", paddingLeft: 20 }}>
                 <li>Buat satu bot private-chat lewat BotFather, salin token-nya.</li>
-                <li>Di Akses AI Agent, aktifkan master switch dan buat AgentToken dengan capability yang ditampilkan status.</li>
-                <li>Isi keempat field di kartu Kredensial lalu Simpan.</li>
+                <li>Di Akses AI Agent, aktifkan master switch dan buat <b>token agen (AgentToken)</b> dengan capability yang ditampilkan status.</li>
+                <li>Isi keempat field di kartu Kredensial lalu tekan Simpan kredensial.</li>
                 <li>Tekan Test Connection sampai hijau.</li>
                 <li>Nyalakan gateway di atas dan kirim <code>/status</code> dari Telegram.</li>
               </ol>
@@ -917,13 +1083,14 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
 
     if (tab === "umum") return (
       <>
+        <div style={AUTOSAVE_NOTE}>Perubahan di halaman ini tersimpan otomatis begitu diubah.</div>
         <Card eyebrow="general" title="Umum">
           <SettingRow title="Full-auto sebagai default"
             desc="Run baru jalan sendiri sampai selesai. Manusia tetap bisa steer / interupsi kapan pun.">
             <Switch checked={s.autoDefault} onChange={sw("autoDefault", "Full-auto default")} />
           </SettingRow>
           <SettingRow title="Auto-scaffold doc index" last
-            desc="Project from-scratch otomatis di-scaffold doc index-nya setelah objective terkunci.">
+            desc="Project yang dibuat dari nol otomatis disiapkan indeks dokumennya setelah tujuannya terkunci.">
             <Switch checked={s.autoScaffold} onChange={sw("autoScaffold", "Auto-scaffold")} />
           </SettingRow>
         </Card>
@@ -931,7 +1098,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "4px 2px", color: "var(--text-subtle)", fontSize: 12, fontFamily: "var(--font-mono)" }}>
           <span>hanoman · nafanesia.id</span>
           <Button size="sm" variant="ghost" leftIcon="rotate-ccw"
-            onClick={() => persist(JSON.parse(JSON.stringify(S_DEFAULTS)), "Pengaturan dikembalikan ke default", "warn", "rotate-ccw")}>
+            onClick={() => void resetDefaults()}>
             Reset ke default
           </Button>
         </div>
@@ -1032,9 +1199,22 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
       const portalChat = s.portalChat ?? PORTAL_CHAT_DEFAULTS;
       const savePortalChat = (patch: Partial<Setting["portalChat"]>, msg: string) =>
         save({ portalChat: { ...portalChat, ...patch } }, msg);
-      const jatah = (nilai: string, fallback: number) => {
-        const n = Math.floor(Number(nilai));
-        return Number.isFinite(n) && n >= 0 ? n : fallback;
+      // Jatah diperiksa saat kolomnya ditinggalkan. Isian kosong/negatif ditolak dan nilai lama
+      // dikembalikan (dulu diam-diam dipaksa tanpa kabar); di atas batas dipotong dan diberi tahu.
+      const jatahBlur = (el: HTMLInputElement, fallback: number, min: number, max: number, label: string,
+        save: (n: number) => void) => {
+        const n = el.value.trim() === "" ? NaN : Math.floor(Number(el.value));
+        if (!Number.isFinite(n) || n < min) {
+          onToast?.(`${label}: isi angka ${min} atau lebih. Nilai sebelumnya dipertahankan.`, "warn", "alert-triangle");
+          el.value = String(fallback);
+          return;
+        }
+        const capped = Math.min(n, max);
+        if (capped !== n) {
+          onToast?.(`${label} dibatasi ke ${max}.`, "warn", "alert-triangle");
+          el.value = String(capped);
+        }
+        if (capped !== fallback) save(capped);
       };
       return (
       <>
@@ -1042,6 +1222,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
           (backlog, reverse, prd, scaffold, breakdown, terminal); backlog masih bisa di-override
           saat Start. SPEC-383 · katalog model/effort kedua agen pindah ke kartu di bawah, supaya
           kartu ini menjawab satu pertanyaan saja: agen mana yang dipakai. */}
+      <div style={AUTOSAVE_NOTE}>Perubahan di tab ini tersimpan otomatis begitu diubah. Kartu portal menyimpan jatah saat kolomnya ditinggalkan.</div>
       <Card eyebrow="agen" title="Agen sesi">
         <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
           Mesin yang menjalankan sesi baru. Perilaku sesi identik — worktree terisolasi, fase, stage,
@@ -1295,7 +1476,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
           Permukaan obrolan di portal klien: klien memilih <b>Brainstorming</b> (digali sampai jelas,
           keluarannya PRD draft untuk Anda review) atau <b>Bertanya</b> (dijawab langsung dari dokumen
           project). Jatah berlaku <b>per project</b> dan dihitung bulanan; brainstorming dan
-          pertanyaan punya jatah masing-masing. Mati = tab Obrolan tak muncul di portal.
+          pertanyaan punya jatah masing-masing. Jatah disimpan saat kolomnya ditinggalkan. Mati = tab Obrolan tak muncul di portal.
         </div>
         <SettingRow title="Aktifkan obrolan"
           desc="Mati = klien hanya punya Pekerjaan & Help desk, persis seperti sebelumnya.">
@@ -1308,16 +1489,14 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
             <SettingRow title="Jatah brainstorming" desc="Berapa sesi brainstorming per project tiap bulan. 0 = tertutup.">
               <Input aria-label="Jatah brainstorming" type="number" min={0} max={1000} placeholder="mis. 3"
                 style={{ width: 110 }} defaultValue={portalChat.brainstormPerMonth}
-                onBlur={(e: React.FocusEvent<HTMLInputElement>) => savePortalChat(
-                  { brainstormPerMonth: jatah(e.target.value, portalChat.brainstormPerMonth) },
-                  "Jatah brainstorming → " + e.target.value)} />
+                onBlur={(e: React.FocusEvent<HTMLInputElement>) => jatahBlur(e.currentTarget, portalChat.brainstormPerMonth,
+                  0, 1000, "Jatah brainstorming", (n) => savePortalChat({ brainstormPerMonth: n }, "Jatah brainstorming → " + n))} />
             </SettingRow>
             <SettingRow title="Jatah pertanyaan" desc="Berapa sesi tanya-jawab per project tiap bulan. 0 = tertutup.">
               <Input aria-label="Jatah pertanyaan" type="number" min={0} max={10000} placeholder="mis. 30"
                 style={{ width: 110 }} defaultValue={portalChat.askPerMonth}
-                onBlur={(e: React.FocusEvent<HTMLInputElement>) => savePortalChat(
-                  { askPerMonth: jatah(e.target.value, portalChat.askPerMonth) },
-                  "Jatah pertanyaan → " + e.target.value)} />
+                onBlur={(e: React.FocusEvent<HTMLInputElement>) => jatahBlur(e.currentTarget, portalChat.askPerMonth,
+                  0, 10000, "Jatah pertanyaan", (n) => savePortalChat({ askPerMonth: n }, "Jatah pertanyaan → " + n))} />
             </SettingRow>
             <SettingRow title="Model" desc="Mesin obrolan selalu Claude — gerbang tool yang menjaganya tak ada di runtime lain.">
               <Select size="sm" aria-label="Model obrolan portal" value={portalChat.model}
@@ -1335,9 +1514,8 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
               desc="Detik. Lewat dari ini klien menerima kalimat 'coba lagi sebentar', bukan layar menggantung.">
               <Input aria-label="Batas waktu obrolan portal" type="number" min={10} max={900} placeholder="mis. 120"
                 style={{ width: 110 }} defaultValue={portalChat.timeoutSec}
-                onBlur={(e: React.FocusEvent<HTMLInputElement>) => savePortalChat(
-                  { timeoutSec: jatah(e.target.value, portalChat.timeoutSec) },
-                  "Batas waktu obrolan → " + e.target.value)} />
+                onBlur={(e: React.FocusEvent<HTMLInputElement>) => jatahBlur(e.currentTarget, portalChat.timeoutSec,
+                  10, 900, "Batas waktu obrolan", (n) => savePortalChat({ timeoutSec: n }, "Batas waktu obrolan → " + n))} />
             </SettingRow>
           </>
         )}
@@ -1347,6 +1525,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
     }
     return ( // sesi
       <>
+      <div style={AUTOSAVE_NOTE}>Perubahan di tab ini tersimpan otomatis begitu diubah. Kolom teks tersimpan saat kolomnya ditinggalkan.</div>
       <Card eyebrow="sesi" title="Sesi & notifikasi">
         <SettingRow title="Notifikasi backlog selesai"
           desc="Toast + sound saat sebuah backlog mencapai stage done. Daftar lonceng tetap terisi meski dimatikan.">
@@ -1397,9 +1576,8 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
           <div style={{ width: 320 }}>
             {/* SPEC-490 · `SettingRow` bukan <label>, jadi textarea ini tak punya nama yang bisa
                 dipegang pembaca layar maupun test — placeholder bukan penggantinya. */}
-            <HnTextarea value={s.goal.condition} rows={4} mono aria-label="Kondisi mode goal"
-              placeholder="Kosong = kondisi bawaan hanoman · mis. semua fase tercatat & plan tanpa - [ ]"
-              onChange={(e) => persist({ ...s, goal: { ...s.goal, condition: e.target.value } })} />
+            <GoalConditionField value={s.goal.condition}
+              onCommit={(condition) => persist({ ...s, goal: { ...s.goal, condition } }, "Kondisi mode goal disimpan")} />
           </div>
         </SettingRow>
       </Card>
@@ -1408,10 +1586,10 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
           hook yang menolak perintah (ADR-0037 utuh). */}
       <Card eyebrow="verifikasi" title="Scope verifikasi — sesi backlog">
         <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
-          Beberapa sesi berjalan bersamaan di mesin ini. <b>Hanya yang berubah</b> menyuruh sesi menguji
-          berkas yang benar-benar ia sentuh (<code>vitest --changed</code>, typecheck per paket, lint per
-          berkas) alih-alih seluruh project — RAM & CPU tetap tersisa untuk sesi lain. Suite penuh, lint
-          penuh, dan build penuh tetap dijalankan manusia sebelum merge.
+          Beberapa sesi berjalan bersamaan di perangkat ini. <b>Hanya yang berubah</b> menyuruh sesi menguji
+          hanya berkas yang ia ubah — misalnya dengan <code>vitest --changed</code> (uji) dan typecheck per
+          paket — alih-alih seluruh project. Dengan begitu RAM dan CPU tetap tersisa untuk sesi lain. Uji
+          penuh, lint penuh, dan build penuh tetap dijalankan manusia sebelum merge.
         </div>
         <SettingRow title="Scope default" last
           desc="Sesi backlog baru lahir dengan scope ini. Masih bisa diubah per sesi saat Start.">
@@ -1488,7 +1666,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
   const content = tab === "setup" ? <SetupPanel />
     : tab === "akun" ? <AccountPanel me={me} onLoggedOut={onLoggedOut} onToast={onToast} />
     : tab === "users" ? <UsersPanel me={me} onToast={onToast} />
-    : tab === "akses-klien" ? <ClientAccessPanel />
+    : tab === "akses-klien" ? <ClientAccessPanel onToast={onToast} />
     : tab === "perangkat" ? <DeviceTokensPanel onToast={onToast} />
     : tab === "kendali-jarak-jauh" ? <RemoteControlPanel onToast={onToast} />
     : tab === "agent" ? <AgentAccessPanel onToast={onToast} />
@@ -1535,6 +1713,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
         })}
       </nav>}
       <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>{content}</div>
+      {dialog}
     </div>
   );
 }

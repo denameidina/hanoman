@@ -135,10 +135,23 @@ function HnSidebarItem({ item, active, onNavigate }: { item: NavItem; active?: s
    pernah menampilkan halaman yang tak bisa ia isi. */
 export const NavGate = React.createContext<Record<string, boolean>>({});
 
+// Audit UI/UX 2026-10 · skip link. Tak ada kelas `:focus` untuk ini di DS, jadi gayanya berpindah
+// lewat state fokus: tersembunyi secara visual (tetap terbaca pembaca layar), muncul saat menerima fokus.
+const SKIP_LINK_HIDDEN: React.CSSProperties = {
+  position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap",
+};
+const SKIP_LINK_SHOWN: React.CSSProperties = {
+  position: "fixed", left: 12, top: 12, zIndex: 300, padding: "8px 12px",
+  borderRadius: "var(--radius-sm)", background: "var(--surface-card)", color: "var(--text-strong)",
+  border: "1px solid var(--border-hair)", boxShadow: "var(--shadow-md)",
+  fontFamily: "var(--font-ui)", fontSize: 13, textDecoration: "none",
+};
+
 export function Shell({ active, title, breadcrumb, actions, showSearch = false, searchValue = "", onSearchChange, onNavigate, wide = false, children }:
   { active?: string; title?: React.ReactNode; breadcrumb?: React.ReactNode; actions?: React.ReactNode;
     showSearch?: boolean; searchValue?: string; onSearchChange?: (v: string) => void;
     onNavigate?: (key: string) => void; wide?: boolean; children?: React.ReactNode }) {
+  const [skipShown, setSkipShown] = React.useState(false);
   // SPEC-740 · ADR-0115 · scroll tingkat-halaman dipulihkan dari SATU titik: tiap layar —
   // termasuk yang belum ada — ikut dapat perilakunya tanpa menyentuh kodenya. Kunci per
   // `active` supaya posisi Backlog tak terbawa ke Triase.
@@ -206,6 +219,9 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
 
   return (
     <div className="hn-shell" data-layout={tier} data-nav-open={navOpen ? "true" : "false"}>
+      {/* Elemen fokusable pertama di halaman: melompati navigasi langsung ke <main>. */}
+      <a href="#main-content" onFocus={() => setSkipShown(true)} onBlur={() => setSkipShown(false)}
+        style={skipShown ? SKIP_LINK_SHOWN : SKIP_LINK_HIDDEN}>Lewati ke konten</a>
       {mobile && navOpen && (
         <button className="hn-shell-backdrop" type="button" aria-label="Tutup navigasi" onClick={() => closeNavigation()} />
       )}
@@ -247,16 +263,17 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
                 {breadcrumb}
               </div>
             )}
-            <div style={{
-              fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600,
+            {/* h1: judul layar adalah heading utama halaman. `margin: 0` menimpa base.css. */}
+            <h1 style={{
+              margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600,
               letterSpacing: "-0.02em", color: "var(--text-strong)", lineHeight: 1.1,
             }}>
               {title}
-            </div>
+            </h1>
           </div>
           <div className="hn-shell-tools">
             {showSearch && (
-              <Input className="hn-shell-search" placeholder="mis. hanoman atau erp" leftIcon="search" size="sm"
+              <Input className="hn-shell-search" aria-label="Cari" placeholder="mis. hanoman atau erp" leftIcon="search" size="sm"
                 value={searchValue}
                 onChange={onSearchChange ? (e: React.ChangeEvent<HTMLInputElement>) => onSearchChange(e.target.value) : undefined}
                 readOnly={!onSearchChange} />
@@ -277,7 +294,7 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             rantai ini dengan LIST_SCREEN_STYLE di root-nya; sisanya berperilaku seperti dulu.
             `border-box` wajib: tanpa itu padding menambah tinggi di atas 100% dan menciptakan
             scrollbar kedua. */}
-        <main ref={mainRef} data-testid="shell-main" className="hn-shell-main">
+        <main ref={mainRef} id="main-content" tabIndex={-1} data-testid="shell-main" className="hn-shell-main">
           <div className="hn-shell-content" style={{ maxWidth: wide ? "none" : "var(--content-max)" }}>
             {children}
           </div>

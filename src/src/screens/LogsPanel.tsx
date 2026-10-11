@@ -87,9 +87,9 @@ export function LogsPanel() {
           <option value="warn">warn</option>
           <option value="error">error</option>
         </select>
-        <input type="text" aria-label="kind" placeholder="kind" value={query.kind ?? ""}
+        <input type="text" aria-label="kind" placeholder="mis. launch.rejected" value={query.kind ?? ""}
           onChange={(e) => setQuery((q) => ({ ...q, kind: e.target.value || undefined }))} />
-        <input type="search" aria-label="Cari" placeholder="cari…" value={query.q ?? ""}
+        <input type="search" aria-label="Cari" placeholder="mis. celah log" value={query.q ?? ""}
           onChange={(e) => setQuery((q) => ({ ...q, q: e.target.value || undefined }))} />
         <button type="submit">Cari</button>
       </form>
@@ -136,22 +136,22 @@ export function LogsPanel() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <label>
               event (hari)
-              <input type="number" value={retention.eventDays}
+              <input type="number" placeholder="mis. 90" value={retention.eventDays}
                 onChange={(e) => setRetention({ ...retention, eventDays: Number(e.target.value) })} />
             </label>
             <label>
               server (hari)
-              <input type="number" value={retention.serverDays}
+              <input type="number" placeholder="mis. 7" value={retention.serverDays}
                 onChange={(e) => setRetention({ ...retention, serverDays: Number(e.target.value) })} />
             </label>
             <label>
               transcript (hari)
-              <input type="number" value={retention.transcriptDays}
+              <input type="number" placeholder="mis. 30" value={retention.transcriptDays}
                 onChange={(e) => setRetention({ ...retention, transcriptDays: Number(e.target.value) })} />
             </label>
             <label>
               maxBytes
-              <input type="number" value={retention.maxBytes}
+              <input type="number" placeholder="mis. 268435456" value={retention.maxBytes}
                 onChange={(e) => setRetention({ ...retention, maxBytes: Number(e.target.value) })} />
             </label>
           </div>

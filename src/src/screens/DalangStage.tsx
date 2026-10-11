@@ -16,6 +16,21 @@ import dalangUrl from "../../../internal/assets/dalang/hnm-dalang-six-arms-v01.w
 import wayangUrl from "../../../internal/assets/dalang/hnm-wayang-project-v01.webp?url";
 import blencongUrl from "../../../internal/assets/dalang/hnm-blencong-v01.webp?url";
 
+// Label stage yang terbaca operator (audit 2026-10: enum mentah dilarang tampil). Satu tempat
+// untuk Overview dan panggung dalang; nilai tak dikenal jatuh ke teks aslinya.
+export const STAGE_LABEL: Record<string, string> = {
+  brainstorming: "Brainstorm",
+  objective: "Tujuan",
+  "spec-ready": "Spek siap",
+  planned: "Rencana siap",
+  executing: "Dikerjakan",
+  done: "Selesai",
+};
+export const FLOW_LABEL: Record<string, string> = {
+  feature: "Fitur", qa: "QA", scaffold: "Scaffold", reverse: "Reverse", prd: "PRD", audit: "Audit",
+  breakdown: "Pecah tugas", goal: "Goal", no_effort: "Tanpa usaha",
+};
+
 // Batas hari LOKAL, komponen-per-komponen — `new Date("YYYY-MM-DD")` adalah tengah malam UTC
 // dan menggeser hari di WIB (gotcha ADR-0090/0105). Dipakai juga DalangHanomanScreen.
 export function isToday(iso: string | null | undefined): boolean {
@@ -77,7 +92,7 @@ function LivePuppet({ s, projects, backlog, index, onOpenSession }: {
   // manusia — wayang-nya "menoleh" (goyangan berhenti) supaya yang minta tolong terbaca beda.
   const waiting = !!s.decision && !s.deciding;
   const sub = waiting ? "menunggu jawabanmu"
-    : spec ? `${spec.id} · ${spec.stage}` : (s.flow ?? "sesi terminal");
+    : spec ? `${spec.id} · ${STAGE_LABEL[spec.stage] ?? spec.stage}` : (FLOW_LABEL[s.flow ?? ""] ?? "sesi terminal");
   return (
     <button
       type="button"
@@ -123,7 +138,8 @@ export function DalangStage({ projects, backlog, sessions, onOpenSession, onOpen
   const parked = projects.filter((p) => !liveProjects.has(p.id));
   const startedToday = backlog.filter((s) => isToday(s.startedAt)).length;
   const doneN = backlog.filter((s) => s.stage === "done").length;
-  const waitingN = backlog.filter((s) => !s.startedAt && s.stage !== "done").length;
+  // "antre" = belum dimulai (bukan "menunggu" — kata itu dipakai untuk sesi yang menunggu JAWABANMU).
+  const queuedN = backlog.filter((s) => !s.startedAt && s.stage !== "done").length;
 
   // Benang gapit: kurva dari kipas tangan sang dalang ke tiap kartu wayang, DIUKUR dari layout
   // nyata (kartu wrap & lebar berubah-ubah) — bukan koordinat tebakan. jsdom memberi rect 0
@@ -176,8 +192,7 @@ export function DalangStage({ projects, backlog, sessions, onOpenSession, onOpen
         </div>
         <div className="hn-dalang-stats">
           <Stat value={startedToday} label="dikerjakan hari ini" dot="var(--brass-500)" />
-          <Stat value={live.length} label="sesi berjalan" dot="var(--leaf-500)" />
-          <Stat value={waitingN} label="menunggu di backlog" dot="var(--wind-500)" />
+          <Stat value={queuedN} label="antre di backlog" dot="var(--wind-500)" />
           <Stat value={doneN} label="total selesai" dot="var(--bone-400)" />
         </div>
       </div>

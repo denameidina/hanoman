@@ -65,7 +65,8 @@ describe("Riwayat di Terminal (SPEC-362)", () => {
     const start = kind === "spec" ? startSession : createTerminalFlow;
     start.mockRejectedValueOnce(new ApiError(409, "409", { error: "Host sibuk", kind: "host-load",
       admission: { enabled: true, liveCount: 3, liveAgentCount: 2, maxConcurrent: 6,
-        loadPerCore: 3.75, maxLoadPerCore: 2.5, loadStatus: "available" },
+        loadPerCore: 3.75, maxLoadPerCore: 2.5, loadStatus: "available",
+      memAvailablePct: 60, minMemAvailablePct: 10, memStatus: "available" },
     })).mockResolvedValueOnce({ id: "retry-session" });
     listSessionHistory.mockResolvedValue({ items: [row({ kind, ...(kind === "reverse" ? { specId: null, flow: "reverse" } : {}) })],
       total: 1, page: 1, pageSize: 20 });

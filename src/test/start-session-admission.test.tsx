@@ -14,8 +14,10 @@ vi.mock("../src/api/client", async (importOriginal) => {
 });
 
 const spec = { id: "SPEC-1108", source: "qa", projectId: "p1" } as Spec;
+// ADR-0170 · field memori wajib di zLaunchStatus; tanpanya penolakan gagal diparse dan alert tak tampil.
 const admission = { enabled: true, liveCount: 6, liveAgentCount: 4, maxConcurrent: 6,
-  loadPerCore: 3.75, maxLoadPerCore: 2.5, loadStatus: "available" };
+  loadPerCore: 3.75, maxLoadPerCore: 2.5, loadStatus: "available",
+  memAvailablePct: 50, minMemAvailablePct: 15, memStatus: "available" };
 const rejection = (overrides = {}) => new ApiError(409, "409", {
   error: "Host menolak peluncuran", kind: "capacity", admission: { ...admission, ...overrides },
 });

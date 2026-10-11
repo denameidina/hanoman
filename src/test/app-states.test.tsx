@@ -31,9 +31,11 @@ describe("app load states", () => {
 
     failNext = false;
     retry.click();
-    // overview with zero projects: every panel falls back to its empty state
-    await waitFor(() => expect(screen.getByText("Belum ada project")).toBeInTheDocument());
+    // Overview tanpa project: kartu onboarding "Selamat datang" dengan ajakan "Buat project pertama"
+    // (audit UI/UX 2026-10). Menggantikan empty state lama yang berderet "Belum ada project".
+    await waitFor(() => expect(screen.getByRole("button", { name: "Buat project pertama" })).toBeInTheDocument());
+    expect(screen.getByText("Selamat datang di hanoman")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByTestId("illustration-PST-005")).toBeInTheDocument();
+    expect(screen.getByTestId("illustration-PST-001")).toBeInTheDocument();
   });
 });

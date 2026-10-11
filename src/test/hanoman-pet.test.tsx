@@ -81,6 +81,9 @@ const HOME = homeX(window.innerWidth, CELL_W);
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  // Pet dipasang setelah idle (lihat HanomanPet). Di test, idle dijalankan langsung agar render
+  // tetap sinkron seperti sebelumnya; mount yang tertunda dikunci di test pet-mount.
+  window.requestIdleCallback = ((cb: () => void) => { cb(); return 0; }) as unknown as typeof window.requestIdleCallback;
   localStorage.clear();
   mockMatchMedia(() => false);
   h.status = { connected: true, since: 0, paused: false };

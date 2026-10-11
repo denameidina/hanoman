@@ -96,7 +96,7 @@ describe("DalangStage — panggung dalang di Overview", () => {
     ]} onOpenSession={noop} onOpenProject={noop} />);
     const started = screen.getByText("dikerjakan hari ini").parentElement!;
     expect(started.textContent).toContain("1");
-    const waiting = screen.getByText("menunggu di backlog").parentElement!;
+    const waiting = screen.getByText("antre di backlog").parentElement!;
     expect(waiting.textContent).toContain("1"); // hanya s3 — s1/s2 sudah mulai, s4 sudah done
     const done = screen.getByText("total selesai").parentElement!;
     expect(done.textContent).toContain("1");

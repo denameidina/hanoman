@@ -3,8 +3,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { NotificationBell } from "../src/notifications/NotificationBell";
 import { NotificationsContext } from "../src/notifications/NotificationsContext";
 
-function Harness({ items, onOpen }: { items: any[]; onOpen?: (n: any) => void }) {
-  const ctx = { items, unread: items.filter((n) => !n.readAt).length, total: items.length, markAllRead: () => {}, clear: () => {}, onOpen };
+function Harness({ items, onOpen, markAllRead = () => {} }: { items: any[]; onOpen?: (n: any) => void; markAllRead?: () => void }) {
+  const ctx = { items, unread: items.filter((n) => !n.readAt).length, total: items.length, markAllRead, clear: () => {}, onOpen };
   return <NotificationsContext.Provider value={ctx}><NotificationBell /></NotificationsContext.Provider>;
 }
 const now = () => new Date().toISOString();
@@ -30,6 +30,27 @@ describe("NotificationBell", () => {
     fireEvent.click(screen.getByText("Buka terminal"));
     expect(onOpen).toHaveBeenCalledWith(n);
   });
+  // Audit UI/UX 2026-10 · membuka bell tak lagi menandai semua terbaca diam-diam: badge tetap
+  // menunjukkan yang belum dilihat sampai pengguna menekan "Tandai semua dibaca" sendiri.
+  it("membuka bell tak memanggil markAllRead dan badge tetap menghitung yang belum dibaca", () => {
+    const markAllRead = vi.fn();
+    const n = { id: "4", type: "done", specId: "SPEC-4", sessionId: "s4", title: "x", projectId: "p", createdAt: now(), readAt: null };
+    render(<Harness items={[n]} markAllRead={markAllRead} />);
+    fireEvent.click(screen.getByLabelText("Notifikasi"));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(markAllRead).not.toHaveBeenCalled();
+    expect(screen.getByText("1")).toBeInTheDocument();
+  });
+
+  it("Tandai semua dibaca memanggil markAllRead sekali", () => {
+    const markAllRead = vi.fn();
+    const n = { id: "5", type: "done", specId: "SPEC-5", sessionId: "s5", title: "x", projectId: "p", createdAt: now(), readAt: null };
+    render(<Harness items={[n]} markAllRead={markAllRead} />);
+    fireEvent.click(screen.getByLabelText("Notifikasi"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Tandai semua dibaca" }));
+    expect(markAllRead).toHaveBeenCalledTimes(1);
+  });
+
   it("memberi semantik menu, fokus masuk, dan Escape mengembalikan fokus", () => {
     const n = { id: "3", type: "done", specId: "SPEC-3", sessionId: "s3", title: "x", projectId: "p", createdAt: now(), readAt: null };
     render(<Harness items={[n]} onOpen={() => {}} />);

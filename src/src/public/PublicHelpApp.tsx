@@ -7,8 +7,8 @@ import React from "react";
 import { Card, Button, Select, StateBlock, Badge } from "../ds";
 import { helpApi } from "../api/help";
 import type { HelpInfo, PublicTicketStatus } from "@hanoman/shared";
+import { kategoriLabel, jaringanAtauPesan } from "../portal/labels";
 
-const CAT_LABEL: Record<string, string> = { bug: "Bug", fitur: "Permintaan fitur", pertanyaan: "Pertanyaan", lainnya: "Lainnya" };
 const MAX_FILES = 3;
 
 // Parse /help/<slug>[/status/<key>].
@@ -43,13 +43,13 @@ function StatusView({ slug, statusKey }: { slug: string; statusKey: string }) {
     <Layout>
       <Card eyebrow="status keluhan" title={st ? `Tiket #${st.number}` : "Status tiket"}>
         {state === "loading" ? <StateBlock kind="loading" />
-          : state === "error" || !st ? <StateBlock kind="error" title="Tiket tidak ditemukan" hint="Periksa kembali link status Anda." action={load} actionLabel="Coba lagi" />
+          : state === "error" || !st ? <StateBlock kind="error" title="Status belum bisa dimuat" hint="Periksa kembali link status Anda, lalu coba lagi." action={load} actionLabel="Coba lagi" />
           : <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Status</span>
                 <Badge tone="ok">{st.status}</Badge>
               </div>
-              <div><span className="hn-eyebrow">Kategori</span><div>{CAT_LABEL[st.category] ?? st.category}</div></div>
+              <div><span className="hn-eyebrow">Kategori</span><div>{kategoriLabel(st.category)}</div></div>
               <div><span className="hn-eyebrow">Judul</span><div style={{ color: "var(--text-body)" }}>{st.title}</div></div>
               <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>Dilaporkan {new Date(st.createdAt).toLocaleString("id-ID")}</div>
             </div>}
@@ -70,18 +70,30 @@ function ReportForm({ slug }: { slug: string }) {
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
   const [done, setDone] = React.useState<{ number: number; statusUrl: string } | null>(null);
+  const [copied, setCopied] = React.useState(false);
 
   const load = React.useCallback(() => {
+    setState("loading");
     helpApi.getInfo(slug).then((d) => { setInfo(d); setCategory(d.categories[0] ?? "bug"); setState("ready"); }).catch(() => setState("error"));
   }, [slug]);
   React.useEffect(() => { load(); }, [load]);
 
-  // Rute cek status: user menempel link → arahkan.
+  // Rute cek status: user menempel link atau kode → arahkan.
   const [checkKey, setCheckKey] = React.useState("");
-  function goCheck() {
+  function goCheck(e: React.FormEvent) {
+    e.preventDefault();
     const key = checkKey.trim().split("/").pop() ?? checkKey.trim();
     if (key) window.location.href = `/help/${encodeURIComponent(slug)}/status/${encodeURIComponent(key)}`;
   }
+
+  const copyLink = async (url: string) => {
+    if (!navigator.clipboard) { setErr("Salin tak tersedia di browser ini. Pilih linknya lalu salin manual."); return; }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch (e) { setErr(jaringanAtauPesan(e, "Link belum bisa disalin. Pilih linknya lalu salin manual.")); }
+  };
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -94,12 +106,12 @@ function ReportForm({ slug }: { slug: string }) {
       const r = await helpApi.submit(slug, form);
       const statusUrl = `${window.location.origin}${r.statusPath}`;
       setDone({ number: r.number, statusUrl });
-    } catch (e) { setErr((e as Error).message); }
+    } catch (e) { setErr(jaringanAtauPesan(e, "Keluhan belum terkirim. Coba lagi sebentar.")); }
     finally { setBusy(false); }
   }
 
   if (state === "loading") return <Layout><StateBlock kind="loading" /></Layout>;
-  if (state === "error" || !info) return <Layout><Card title="Help Center"><StateBlock kind="error" title="Tidak tersedia" hint="Help Center untuk project ini tidak aktif." /></Card></Layout>;
+  if (state === "error" || !info) return <Layout><Card title="Help Center"><StateBlock kind="error" title="Belum bisa dibuka" hint="Coba lagi sebentar. Jika tetap gagal, Help Center untuk project ini mungkin tidak aktif." action={load} actionLabel="Coba lagi" /></Card></Layout>;
 
   if (done) return (
     <Layout>
@@ -110,7 +122,7 @@ function ReportForm({ slug }: { slug: string }) {
         <div style={{ padding: 12, border: "1px solid var(--brass-300)", borderRadius: "var(--radius-sm)", background: "var(--brass-100)" }}>
           <code style={{ display: "block", wordBreak: "break-all", fontSize: 12.5 }}>{done.statusUrl}</code>
           <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-            <Button size="sm" leftIcon="copy" onClick={() => void navigator.clipboard?.writeText(done.statusUrl)}>Salin link</Button>
+            <Button size="sm" leftIcon="copy" onClick={() => void copyLink(done.statusUrl)}>{copied ? "Tersalin" : "Salin link"}</Button>
             <Button size="sm" variant="ghost" onClick={() => window.location.assign(done.statusUrl)}>Buka status</Button>
           </div>
         </div>
@@ -125,7 +137,7 @@ function ReportForm({ slug }: { slug: string }) {
           <div>
             <label htmlFor="hc-cat" className="hn-eyebrow">Kategori</label>
             <Select id="hc-cat" value={category} onChange={(e) => setCategory(e.target.value)}
-              options={info.categories.map((c) => ({ value: c, label: CAT_LABEL[c] ?? c }))} />
+              options={info.categories.map((c) => ({ value: c, label: kategoriLabel(c) }))} />
           </div>
           <div>
             <label htmlFor="hc-title" className="hn-eyebrow">Judul</label>
@@ -156,16 +168,19 @@ function ReportForm({ slug }: { slug: string }) {
           {/* placeholder-exempt: honeypot SPEC-352 — sengaja tak terlihat manusia; placeholder justru memandu bot */}
           <input tabIndex={-1} autoComplete="new-password" aria-hidden value={trap} onChange={(e) => setTrap(e.target.value)}
             name="hc_trap" style={{ position: "absolute", left: "-9999px", width: 1, height: 1 }} />
-          {err && <div style={{ color: "var(--clay-600)", fontSize: 13 }}>{err}</div>}
+          {err && <div role="alert" style={{ color: "var(--clay-600)", fontSize: 13 }}>{err}</div>}
           <Button type="submit" disabled={busy} leftIcon="send">Kirim keluhan</Button>
         </form>
       </Card>
       <Card eyebrow="sudah pernah lapor?" title="Cek status tiket">
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input value={checkKey} onChange={(e) => setCheckKey(e.target.value)} placeholder="mis. a1b2c3d4e5f6 — atau tempel link statusnya"
-            style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
-          <Button variant="secondary" onClick={goCheck}>Cek</Button>
-        </div>
+        <form onSubmit={goCheck} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <label htmlFor="hc-check" className="hn-eyebrow">Kode status atau link</label>
+            <input id="hc-check" value={checkKey} onChange={(e) => setCheckKey(e.target.value)}
+              placeholder="mis. a1b2c3d4e5f6, atau tempel link statusnya" style={inputStyle} />
+          </div>
+          <Button type="submit" variant="secondary" disabled={!checkKey.trim()}>Cek status</Button>
+        </form>
       </Card>
     </Layout>
   );
@@ -174,7 +189,7 @@ function ReportForm({ slug }: { slug: string }) {
 const inputStyle: React.CSSProperties = {
   display: "block", width: "100%", minHeight: "var(--touch-target)", boxSizing: "border-box", marginTop: 4, padding: "8px 10px",
   border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)",
-  background: "var(--surface-card)", color: "var(--text-body)", fontSize: 14, fontFamily: "var(--font-ui)",
+  background: "var(--surface-card)", color: "var(--text-body)", fontSize: 16, fontFamily: "var(--font-ui)",
 };
 
 export function PublicHelpApp() {

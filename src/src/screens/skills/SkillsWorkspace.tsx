@@ -6,7 +6,7 @@ import type { SkillEntry, SkillLibraryView, SkillTreeView } from "@hanoman/share
 import { Button, Card, Field, Input, Modal, ResponsivePanels, Select, StateBlock, useConfirm } from "../../ds";
 import { useApi } from "../../api/instance";
 import { SkillsList } from "./SkillsList";
-import { SkillFileEditor, SkillStructure, errMessage } from "./SkillEditor";
+import { SkillFileEditor, SkillStructure, skillFailure } from "./SkillEditor";
 
 type NewSkill = { layer: "hanoman" | "user" | "project"; source: string; name: string; description: string };
 
@@ -15,21 +15,23 @@ export function SkillsWorkspace({ projectId, projectName, onToast }:
   const api = useApi();
   const { confirm, dialog } = useConfirm();
   const [library, setLibrary] = React.useState<SkillLibraryView | null>(null);
-  const [error, setError] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const [skill, setSkill] = React.useState<SkillEntry | null>(null);
   const [tree, setTree] = React.useState<SkillTreeView | null>(null);
   const [path, setPath] = React.useState("SKILL.md");
   const [panel, setPanel] = React.useState<"list" | "detail">("list");
   const [creating, setCreating] = React.useState<NewSkill | null>(null);
+  const dirtyRef = React.useRef(false);
+  const onDirtyChange = React.useCallback((dirty: boolean) => { dirtyRef.current = dirty; }, []);
 
   const reload = React.useCallback(async () => {
-    setError(false);
+    setError(null);
     try {
       if (!projectId) { setLibrary(await api.listAllSkills()); return; }
       const rows = await api.listSkills(projectId);
       const project = rows.filter((s) => s.layer === "project");
       setLibrary({ global: rows.filter((s) => s.layer !== "project"), projects: [{ projectId, name: projectName ?? "Project ini", skills: project }] });
-    } catch { setError(true); }
+    } catch (e) { setError(skillFailure("memuat skill", e)); }
   }, [api, projectId, projectName]);
   React.useEffect(() => { void reload(); }, [reload]);
 
@@ -37,30 +39,43 @@ export function SkillsWorkspace({ projectId, projectName, onToast }:
     setTree(null);
     api.skillTree(s.key).then(setTree).catch(() => setTree({ files: [], dirs: [] }));
   }, [api]);
-  const select = (s: SkillEntry) => { setSkill(s); setPath("SKILL.md"); loadTree(s); setPanel("detail"); };
+  // Pindah skill/berkas memuat ulang editor dan membuang draft; draft kotor tak boleh hilang diam-diam.
+  const discardOk = async () => !dirtyRef.current || confirm({
+    title: "Buang perubahan?", eyebrow: skill?.name, tone: "danger", confirmLabel: "Buang perubahan", cancelLabel: "Tetap mengedit",
+    message: "Berkas yang sedang diedit punya perubahan yang belum disimpan.",
+    impact: ["Perubahan yang belum disimpan hilang."],
+  });
+  const select = async (s: SkillEntry) => {
+    if (!(await discardOk())) return;
+    setSkill(s); setPath("SKILL.md"); loadTree(s); setPanel("detail");
+  };
+  const selectPath = async (p: string) => { if (p !== path && await discardOk()) setPath(p); };
 
   const fork = async () => {
     if (!skill) return;
     try {
       const made = await api.forkSkill(skill.key, projectId ? { layer: "project", projectId } : { layer: "hanoman" });
       onToast?.(`Di-fork ke ${made.layer === "project" ? "project" : "global hanoman"}`);
-      await reload(); select(made);
-    } catch (e) { onToast?.(errMessage(e)); }
+      await reload(); await select(made);
+    } catch (e) { onToast?.(skillFailure("mem-fork skill", e)); }
   };
   const remove = async () => {
-    if (!skill || !(await confirm({ title: `Hapus skill ${skill.name}?`, message: skill.dir, tone: "danger", confirmLabel: "Hapus" }))) return;
-    try { await api.deleteSkill(skill.key); setSkill(null); setPanel("list"); await reload(); }
-    catch (e) { onToast?.(errMessage(e)); }
+    if (!skill || !(await confirm({
+      title: `Hapus skill ${skill.name}?`, message: skill.dir, tone: "danger", confirmLabel: "Hapus skill",
+      impact: ["Seluruh berkas di folder skill ini dihapus.", "Sesi yang memuat skill ini kehilangan akses ke sana."],
+    }))) return;
+    try { await api.deleteSkill(skill.key); dirtyRef.current = false; setSkill(null); setPanel("list"); await reload(); }
+    catch (e) { onToast?.(skillFailure("menghapus skill", e)); }
   };
   const create = async () => {
     if (!creating) return;
     try {
       const made = await api.createSkill({ ...creating, ...(creating.layer === "project" ? { projectId } : {}), source: creating.layer === "hanoman" ? undefined : creating.source });
-      setCreating(null); await reload(); select(made);
-    } catch (e) { onToast?.(errMessage(e)); }
+      setCreating(null); await reload(); await select(made);
+    } catch (e) { onToast?.(skillFailure("membuat skill", e)); }
   };
 
-  if (error) return <StateBlock kind="error" title="Gagal memuat skill" action={() => void reload()} actionLabel="Coba lagi" />;
+  if (error !== null) return <StateBlock kind="error" title="Gagal memuat skill" hint={error} action={() => void reload()} actionLabel="Coba lagi" />;
   if (!library) return <StateBlock kind="loading" title="Memuat skill…" />;
 
   return (
@@ -74,15 +89,15 @@ export function SkillsWorkspace({ projectId, projectName, onToast }:
       <ResponsivePanels ariaLabel="Skills" active={panel} onActiveChange={(n) => setPanel(n as typeof panel)} masterWidth={320}
         panels={[
           { id: "list", label: "Skill", className: "hn-panel-flex", content: (
-            <Card padding={0} fill><SkillsList library={library} selected={skill?.key} onSelect={select} projectFirst={!!projectId} /></Card>
+            <Card padding={0} fill><SkillsList library={library} selected={skill?.key} onSelect={(s) => void select(s)} projectFirst={!!projectId} /></Card>
           ) },
           { id: "detail", label: skill ? skill.name : "Detail", className: "hn-panel-flex", content: skill ? (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, flex: "1 1 auto", minHeight: 0, alignItems: "stretch" }}>
               <div style={{ flex: "0 1 260px", minWidth: 220, minHeight: 220, display: "flex" }}>
-                <SkillStructure skill={skill} tree={tree} selected={path} onSelect={setPath} onChanged={() => loadTree(skill)} onToast={onToast} />
+                <SkillStructure skill={skill} tree={tree} selected={path} onSelect={(p) => void selectPath(p)} onChanged={() => loadTree(skill)} />
               </div>
               <div style={{ flex: "1 1 420px", minWidth: 0, minHeight: 320, display: "flex" }}>
-                <SkillFileEditor skill={skill} path={path} onFork={fork} onToast={onToast} />
+                <SkillFileEditor skill={skill} path={path} onFork={fork} onToast={onToast} onDirtyChange={onDirtyChange} />
               </div>
             </div>
           ) : <StateBlock kind="empty" compact icon="file-text" title="Pilih skill untuk melihat struktur & isinya" /> },
@@ -111,8 +126,8 @@ export function SkillsWorkspace({ projectId, projectName, onToast }:
                   ]} />
               </Field>
             )}
-            <Field label="Nama" hint="kebab-case, maks 64"><Input value={creating.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreating({ ...creating, name: e.target.value })} mono /></Field>
-            <Field label="Deskripsi" hint="diawali kapan skill dipakai, mis. “Use when …”"><Input value={creating.description} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreating({ ...creating, description: e.target.value })} /></Field>
+            <Field label="Nama" hint="kebab-case, maks 64"><Input value={creating.name} placeholder="mis. deploy-staging" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreating({ ...creating, name: e.target.value })} mono /></Field>
+            <Field label="Deskripsi" hint="diawali kapan skill dipakai, mis. “Use when …”"><Input value={creating.description} placeholder="mis. Use when deploying to staging" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCreating({ ...creating, description: e.target.value })} /></Field>
           </>
         )}
       </Modal>

@@ -7,6 +7,7 @@ import { Card, Button, StateBlock, DocPreviewModal } from "../ds";
 import type { ShowToast } from "../ds";
 import { paths } from "@hanoman/shared";
 import { api } from "../api/client";
+import { failureMessage } from "../lib/report-error";
 
 const GITHUB = "https://github.com/denameidina/hanoman/blob/main/docs/agent-integration.md";
 
@@ -28,6 +29,14 @@ export function AgentDocCard({ onToast }: { onToast?: ShowToast }) {
     finally { setBusy(false); }
   }
 
+  async function salin() {
+    try {
+      if (!navigator.clipboard) throw new Error("Clipboard tidak tersedia di browser ini");
+      await navigator.clipboard.writeText(url);
+      onToast?.("Tautan disalin", "ok", "copy");
+    } catch (e) { onToast?.(failureMessage("menyalin link", e), "err"); }
+  }
+
   return (
     <>
       <Card eyebrow="dokumentasi" title="Dokumentasi AI Agent">
@@ -38,14 +47,12 @@ export function AgentDocCard({ onToast }: { onToast?: ShowToast }) {
         </div>
         <code style={{ display: "block", wordBreak: "break-all", fontSize: 12, marginBottom: 10 }}>{url}</code>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <Button size="sm" leftIcon="copy" onClick={() => {
-            void navigator.clipboard?.writeText(url); onToast?.("Tautan disalin", "ok", "copy");
-          }}>Salin tautan</Button>
+          <Button size="sm" leftIcon="copy" onClick={() => void salin()}>Salin tautan</Button>
           <Button size="sm" variant="ghost" leftIcon="book-open" disabled={busy}
             onClick={() => void buka()}>{busy ? "Memuat…" : "Buka"}</Button>
-          <a href={GITHUB} target="_blank" rel="noreferrer">
-            <Button size="sm" variant="ghost" leftIcon="external-link">Lihat di GitHub</Button>
-          </a>
+          <Button as="a" size="sm" variant="ghost" leftIcon="external-link" href={GITHUB} target="_blank" rel="noreferrer">
+            Lihat di GitHub
+          </Button>
         </div>
         {err && (
           <div style={{ marginTop: 12 }}>

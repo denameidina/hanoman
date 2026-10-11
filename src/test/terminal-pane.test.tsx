@@ -1,4 +1,4 @@
-import { render, cleanup, act, screen, fireEvent } from "@testing-library/react";
+import { render, cleanup, act, screen, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { api } from "../src/api/client";
 import { TerminalPane } from "../src/screens/TerminalPane";
@@ -961,7 +961,7 @@ describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", (
     expect(container.querySelector('[data-testid="terminal-held"]')).toBeNull();
   });
 
-  it("membuang antrean tertahan saat operator memilih Buang", async () => {
+  it("membuang antrean tertahan setelah dikonfirmasi", async () => {
     const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
     act(() => { sockets[0]!.onopen?.(); });
@@ -969,8 +969,44 @@ describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", (
     act(() => { xt.dataHandler?.("\r"); });
     await reconnect();
     act(() => { fireEvent.click(screen.getByRole("button", { name: "Buang" })); });
+    // Teks yang dibuang tak bisa dipulihkan, jadi dialog konfirmasi wajib menjawab dulu.
+    fireEvent.click(await screen.findByRole("button", { name: "Buang ketikan" }));
+    await vi.waitFor(() => expect(container.querySelector('[data-testid="terminal-held"]')).toBeNull());
     expect(inputsOf(sockets[1])).toEqual([]);
-    expect(container.querySelector('[data-testid="terminal-held"]')).toBeNull();
+  });
+
+  it("Batal pada konfirmasi Buang mempertahankan ketikan tertahan", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    act(() => { xt.dataHandler?.("\r"); });
+    await reconnect();
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Buang" })); });
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Batal" }));
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(container.querySelector('[data-testid="terminal-held"]')).not.toBeNull();
+  });
+
+  // Jalan keluar keyboard: xterm menelan Tab/Esc, jadi Ctrl+Shift+Esc harus keluar TANPA mengirim
+  // apa pun ke pty, sedangkan Esc polos tetap diproses terminal (dan karenanya sampai ke agen).
+  it("Ctrl+Shift+Esc tak diteruskan ke pty; Esc polos tetap diproses terminal", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    expect(xt.keyHandler?.(new KeyboardEvent("keydown", { key: "Escape" }))).toBe(true);
+    expect(xt.keyHandler?.(new KeyboardEvent("keydown", { key: "Escape", ctrlKey: true, shiftKey: true })))
+      .toBe(false);
+  });
+
+  it("tombol keluar fokus terlihat saat terminal berfokus dan memindahkan fokus ke akar pane", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    expect(screen.queryByRole("button", { name: /Keluar fokus terminal/ })).toBeNull();
+    fireEvent.focusIn(screen.getByTestId("terminal-host"));
+    const exit = screen.getByRole("button", { name: /Keluar fokus terminal · Ctrl\+Shift\+Esc/ });
+    fireEvent.click(exit);
+    expect(document.activeElement).toBe(container.firstElementChild);
   });
 
   it("memperlihatkan jumlah ketikan yang sedang diantre", async () => {
@@ -1008,6 +1044,16 @@ describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", (
     for (const c of [..."ya"]) act(() => { xt.dataHandler?.(c); });
     await reconnect();
     expect(inputsOf(sockets[1])).toEqual(["ya"]);
+  });
+
+  it("status gone menawarkan Hapus sel yang memanggil onForget", async () => {
+    const onForget = vi.fn();
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} onForget={onForget} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    act(() => { sockets[0]!.readyState = 3; sockets[0]!.onclose?.({ code: 4004 }); });
+    fireEvent.click(await screen.findByRole("button", { name: "Hapus sel" }));
+    expect(onForget).toHaveBeenCalledTimes(1);
   });
 
   it("berhenti memprediksi begitu sesi tmux-nya dinyatakan lenyap", async () => {
@@ -1130,23 +1176,36 @@ describe("TerminalPane · kolom ketik perangkat sentuh (SPEC-882)", () => {
     expect(composer().value).toBe("");
   });
 
-  it("mengikuti keadaan sambungan dan antrean pada penanda status", async () => {
+  // Audit UI/UX · kolom ketik tak lagi memasang "terkirim" terus-menerus, dan antrean/tertahan
+  // hanya dinyatakan oleh strip status pane (satu sumber, tak dobel dengan kolom ketik).
+  it("mengikuti keadaan sambungan dan antrean pada strip status, bukan pada kolom ketik", async () => {
     const { container } = await openPane();
-    expect(screen.getByTestId("terminal-composer-status").textContent).toBe("terkirim");
+    expect(screen.getByTestId("terminal-composer-status").textContent).toBe("");
     act(() => { sockets[0]!.readyState = 3; sockets[0]!.onclose?.({ code: 1006 }); });
     for (const c of [..."halo"]) act(() => { xt.dataHandler?.(c); });
     await wait882(40);
     await vi.waitFor(() => {
-      expect(screen.getByTestId("terminal-composer-status").textContent).toBe("diantre 4");
+      expect(container.querySelector('[data-testid="terminal-queue"]')?.textContent).toBe("4 ketikan diantre");
     });
+    expect(screen.getByTestId("terminal-composer-status").textContent).toBe("");
     act(() => { xt.dataHandler?.("\r"); });
     await vi.waitFor(() => expect(sockets.length).toBeGreaterThan(1), { timeout: 3_000 });
     act(() => { sockets[1]!.onopen?.(); });
     await vi.waitFor(() => {
-      expect(screen.getByTestId("terminal-composer-status").textContent)
-        .toBe("tertahan — Kirim di atas");
+      expect(container.querySelector('[data-testid="terminal-held"]')).not.toBeNull();
     });
-    expect(container.querySelector('[data-testid="terminal-held"]')).not.toBeNull();
+    expect(screen.getByTestId("terminal-composer-status").textContent).toBe("");
+  });
+
+  it("badge terkirim muncul sesaat sesudah Enter di kolom ketik, lalu hilang", async () => {
+    await openPane();
+    const input = screen.getByTestId("terminal-composer") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "ls" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByTestId("terminal-composer-status").textContent).toBe("terkirim");
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("terminal-composer-status").textContent).toBe("");
+    }, { timeout: 3_000 });
   });
 
   it("menyesuaikan geometri pty saat kolom ketik muncul dan hilang", async () => {

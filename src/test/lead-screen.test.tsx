@@ -1,9 +1,9 @@
-import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { render, screen, waitFor, fireEvent, act, within } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // SPEC-409 · ADR-0091 · panel hanoman-lead. Layar ini adalah SATU-SATUNYA tempat operator melihat
 // apa yang diputuskan mesin atas namanya — jadi yang diuji di sini: jejaknya terbaca (pertanyaan →
-// jawaban → alasan → rujukan), rem daruratnya benar-benar menulis knob, dan Timpa memanggil
+// jawaban → alasan → rujukan), rem daruratnya benar-benar menulis knob, dan "Ubah jawaban" memanggil
 // endpoint override (bukan sekadar menutup formulirnya).
 
 const {
@@ -26,6 +26,13 @@ vi.mock("../src/api/client", () => ({
 }));
 
 import { LeadScreen } from "../src/screens/LeadScreen";
+
+beforeEach(() => {
+  // Penyaring & nomor halaman dipersistensi (ADR-0115) dan mock tak di-reset antartest: keduanya
+  // dibersihkan supaya assertion "tidak dipanggil" hanya melihat test ini.
+  localStorage.clear();
+  vi.clearAllMocks();
+});
 
 const CONFIG = {
   enabled: true, paused: false, pausedProjects: [], everyMin: 5, timeoutSec: 120,
@@ -64,6 +71,10 @@ function renderScreen(over: Partial<Parameters<typeof LeadScreen>[0]> = {}) {
     onToast={vi.fn()} onGotoTerminal={vi.fn()} {...over} />);
 }
 
+// Dialog konfirmasi = `role="dialog"`. Tombol di dalamnya dicari dari situ: namanya sering sama
+// dengan tombol pemicunya di baris (mis. "Batalkan").
+const inDialog = () => within(screen.getByRole("dialog"));
+
 describe("LeadScreen · jejak keputusan (AC-23/24, US-2)", () => {
   it("shows question, answer, reason and the refs lead actually used", async () => {
     getLeadStatus.mockResolvedValue(STATUS);
@@ -80,16 +91,16 @@ describe("LeadScreen · jejak keputusan (AC-23/24, US-2)", () => {
     getLeadDecisions.mockResolvedValue(DECISIONS);
     renderScreen();
     expect(await screen.findByText("berbobot")).toBeInTheDocument();
-    expect(screen.getByText("ragu")).toBeInTheDocument();
+    expect(screen.getByText("ragu-ragu")).toBeInTheDocument();
     expect(screen.getByText("tindakan ditolak")).toBeInTheDocument();
   });
   // AC-3 · sesi yang sedang DISUSUN keputusannya tak boleh terbaca sebagai sesi mandek.
-  it("separates 'sedang diputuskan' from plain 'menunggu'", async () => {
+  it("separates 'sedang diputuskan' from plain 'menunggu kamu'", async () => {
     getLeadStatus.mockResolvedValue(STATUS);
     getLeadDecisions.mockResolvedValue(DECISIONS);
     renderScreen();
-    expect(await screen.findByText("sedang diputuskan")).toBeInTheDocument();
-    expect(screen.getByText("menunggu")).toBeInTheDocument();
+    expect(await screen.findByText("Sedang diputuskan")).toBeInTheDocument();
+    expect(screen.getByText("Menunggu kamu")).toBeInTheDocument();
   });
 
   // SPEC-479 (QA) · keadaan KETIGA. Di pane, "menunggu manusia", "sedang diputuskan", dan
@@ -104,9 +115,9 @@ describe("LeadScreen · jejak keputusan (AC-23/24, US-2)", () => {
     });
     getLeadDecisions.mockResolvedValue(DECISIONS);
     renderScreen();
-    expect(await screen.findByText("sedang diputuskan")).toBeInTheDocument();
-    expect(screen.getByText("antre")).toBeInTheDocument();
-    expect(screen.queryByText("menunggu")).not.toBeInTheDocument();
+    expect(await screen.findByText("Sedang diputuskan")).toBeInTheDocument();
+    expect(screen.getByText("Antre giliran")).toBeInTheDocument();
+    expect(screen.queryByText("Menunggu kamu")).not.toBeInTheDocument();
   });
 
   it("menyebut batas konkurensi saat gerbangnya sedang mengikat", async () => {
@@ -116,50 +127,104 @@ describe("LeadScreen · jejak keputusan (AC-23/24, US-2)", () => {
     });
     getLeadDecisions.mockResolvedValue(DECISIONS);
     renderScreen();
-    expect(await screen.findByText(/2\/2 diputuskan · 3 antre/)).toBeInTheDocument();
+    expect(await screen.findByText(/2 dari 2 sedang diputuskan, 3 menunggu giliran/)).toBeInTheDocument();
+  });
+
+  // Audit 1G · "Menunggu kamu" paling atas halaman, sebelum kendali.
+  it("'Menunggu kamu' paling atas halaman, sebelum kartu kendali", async () => {
+    getLeadStatus.mockResolvedValue(STATUS);
+    getLeadDecisions.mockResolvedValue(DECISIONS);
+    renderScreen();
+    await screen.findByText(/Pakai kolom baru atau turunkan/);
+    const body = document.body.textContent ?? "";
+    expect(body.indexOf("Menunggu kamu (")).toBeLessThan(body.indexOf("hanoman-lead"));
+  });
+
+  // Audit 1G · sesi di "Menunggu kamu" tampil dengan project & spec, bukan ID sesi mentah.
+  it("sesi menunggu tampil dengan nama project dan spec dari jejak keputusan", async () => {
+    getLeadStatus.mockResolvedValue({ ...STATUS, deciding: [], queued: [], waiting: ["spec-1"] });
+    getLeadDecisions.mockResolvedValue(DECISIONS);
+    renderScreen();
+    // Nama itu muncul di baris "Menunggu kamu" DAN di footer jejak keputusan: cukup ada, dan ID mentah tak.
+    expect((await screen.findAllByText("Alpha · SPEC-1")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("spec-1")).not.toBeInTheDocument();
   });
 });
 
 describe("LeadScreen · kendali manusia (AC-27/28, US-3/4)", () => {
-  it("Pause writes paused:true through the config endpoint", async () => {
+  it("Jeda menulis paused:true lewat endpoint config", async () => {
     getLeadStatus.mockResolvedValue(STATUS);
     getLeadDecisions.mockResolvedValue(DECISIONS);
     putLeadConfig.mockResolvedValue(CONFIG);
     renderScreen();
-    // Ada DUA tombol "Pause" di layar ini — rem global (paling atas) dan rem per project.
+    // Ada DUA tombol "Jeda" di layar ini — rem global (paling atas) dan rem per project.
     // Yang pertama adalah rem global; keduanya sengaja diuji terpisah.
-    const btn = (await screen.findAllByRole("button", { name: /^pause$/i }))[0]!;
+    const btn = (await screen.findAllByRole("button", { name: /^jeda$/i }))[0]!;
     await act(async () => { fireEvent.click(btn); });
     await waitFor(() => expect(putLeadConfig).toHaveBeenCalledWith(expect.objectContaining({ paused: true })));
   });
-  it("overriding a decision sends the operator answer to the server", async () => {
+
+  // Audit 1G · Matikan lead minta konfirmasi dan menyebut efeknya; batal tak menulis apa pun.
+  it("Matikan lead minta konfirmasi dulu dan menjelaskan efeknya", async () => {
+    getLeadStatus.mockResolvedValue(STATUS);
+    getLeadDecisions.mockResolvedValue(DECISIONS);
+    putLeadConfig.mockResolvedValue(CONFIG);
+    renderScreen();
+    fireEvent.click(await screen.findByRole("button", { name: "Matikan" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Matikan lead?");
+    expect(inDialog().getByText(/Sesi yang sudah berjalan tidak diubah/)).toBeInTheDocument();
+    expect(putLeadConfig).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.click(inDialog().getByRole("button", { name: "Matikan lead" })); });
+    await waitFor(() => expect(putLeadConfig).toHaveBeenCalledWith(expect.objectContaining({ enabled: false })));
+  });
+
+  it("'Ubah jawaban' lalu 'Kirim jawaban' memanggil endpoint override", async () => {
     getLeadStatus.mockResolvedValue(STATUS);
     getLeadDecisions.mockResolvedValue(DECISIONS);
     overrideLeadDecision.mockResolvedValue({ old: DECISIONS.items[0], next: DECISIONS.items[0], delivered: true });
     renderScreen();
-    const btn = (await screen.findAllByRole("button", { name: /timpa/i }))[0]!;
+    const btn = (await screen.findAllByRole("button", { name: /ubah jawaban/i }))[0]!;
     await act(async () => { fireEvent.click(btn); });
-    const input = screen.getByLabelText("jawaban operator untuk d1");
+    const input = screen.getByLabelText("Jawaban kamu untuk SPEC-1");
     await act(async () => { fireEvent.change(input, { target: { value: "turunkan saja" } }); });
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /simpan/i })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /kirim jawaban/i })); });
     // SPEC-485 · tanda tangannya kini `(id, answer, reason, choices)` — centang operator adalah DATA.
     await waitFor(() => expect(overrideLeadDecision).toHaveBeenCalledWith("d1", "turunkan saja", "", []));
   });
-  it("cancelling a decision calls the cancel endpoint", async () => {
+
+  // Audit 1G · draft jawaban dikosongkan HANYA setelah API sukses; galat menyisakan ketikan utuh.
+  it("draft jawaban tetap utuh bila kirim gagal", async () => {
+    getLeadStatus.mockResolvedValue(STATUS);
+    getLeadDecisions.mockResolvedValue(DECISIONS);
+    overrideLeadDecision.mockRejectedValue(new Error("server sibuk"));
+    renderScreen();
+    fireEvent.click((await screen.findAllByRole("button", { name: /ubah jawaban/i }))[0]!);
+    fireEvent.change(screen.getByLabelText("Jawaban kamu untuk SPEC-1"), { target: { value: "jangan hilang" } });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /kirim jawaban/i })); });
+    await waitFor(() => expect(overrideLeadDecision).toHaveBeenCalled());
+    expect(screen.getByLabelText("Jawaban kamu untuk SPEC-1")).toHaveValue("jangan hilang");
+  });
+
+  // Audit 1G · membatalkan keputusan minta konfirmasi lebih dulu.
+  it("membatalkan keputusan meminta konfirmasi dulu", async () => {
     getLeadStatus.mockResolvedValue(STATUS);
     getLeadDecisions.mockResolvedValue(DECISIONS);
     cancelLeadDecision.mockResolvedValue(DECISIONS.items[0]);
     renderScreen();
-    const btn = (await screen.findAllByRole("button", { name: /batalkan/i }))[0]!;
+    const btn = (await screen.findAllByRole("button", { name: /^batalkan$/i }))[0]!;
     await act(async () => { fireEvent.click(btn); });
+    expect(screen.getByRole("dialog")).toHaveTextContent("Batalkan keputusan ini?");
+    expect(cancelLeadDecision).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.click(inDialog().getByRole("button", { name: "Batalkan keputusan" })); });
     await waitFor(() => expect(cancelLeadDecision).toHaveBeenCalledWith("d1"));
   });
+
   it("per-project pause writes the project into pausedProjects (AC-15)", async () => {
     getLeadStatus.mockResolvedValue(STATUS);
     getLeadDecisions.mockResolvedValue(DECISIONS);
     putLeadConfig.mockResolvedValue(CONFIG);
     renderScreen();
-    const buttons = await screen.findAllByRole("button", { name: /^pause$/i });
+    const buttons = await screen.findAllByRole("button", { name: /^jeda$/i });
     await act(async () => { fireEvent.click(buttons[buttons.length - 1]!); });
     await waitFor(() => expect(putLeadConfig).toHaveBeenCalledWith(expect.objectContaining({ pausedProjects: ["a"] })));
   });
@@ -168,7 +233,7 @@ describe("LeadScreen · kendali manusia (AC-27/28, US-3/4)", () => {
     getLeadDecisions.mockResolvedValue(DECISIONS);
     updateProject.mockResolvedValue({});
     renderScreen();
-    const btn = await screen.findByRole("button", { name: /lepas/i });
+    const btn = await screen.findByRole("button", { name: /tarik dari lead/i });
     await act(async () => { fireEvent.click(btn); });
     await waitFor(() => expect(updateProject).toHaveBeenCalledWith("a", { leadOptIn: false }));
   });
@@ -180,7 +245,7 @@ describe("LeadScreen · keadaan kosong", () => {
     getLeadDecisions.mockResolvedValue({ items: [] });
     renderScreen();
     expect(await screen.findByText(/Belum ada keputusan/)).toBeInTheDocument();
-    expect(screen.getByText(/Tak ada sesi yang menunggu keputusan/)).toBeInTheDocument();
+    expect(screen.getByText(/Tidak ada sesi yang menunggu keputusanmu/)).toBeInTheDocument();
   });
 });
 
@@ -198,7 +263,7 @@ describe("LeadScreen · pilihan terstruktur (SPEC-480)", () => {
       choice: "Node 22", choiceIndex: 2, options: ["Node 20 LTS", "Node 22"],
     })] });
     renderScreen();
-    expect(await screen.findByText("opsi 2/2")).toBeInTheDocument();
+    expect(await screen.findByText("opsi 2 dari 2")).toBeInTheDocument();
     expect(screen.getByText("Node 22")).toBeInTheDocument();
   });
 
@@ -253,53 +318,70 @@ describe("LeadScreen · pilihan jamak & rantai (SPEC-485)", () => {
     expect(screen.getByText("2 dari 3 opsi")).toBeInTheDocument();
   });
 
-  it("Timpa menampilkan CHECKBOX saat pilihannya jamak, dan mengirim semua yang dicentang", async () => {
+  it("Ubah jawaban menampilkan CHECKBOX saat pilihannya jamak, dan mengirim semua yang dicentang", async () => {
     boot([OPT_ROW]);
     overrideLeadDecision.mockResolvedValue({ old: OPT_ROW, next: OPT_ROW, delivered: true });
     renderScreen();
-    const timpa = (await screen.findAllByRole("button", { name: /timpa/i }))[0]!;
-    await act(async () => { fireEvent.click(timpa); });
+    const ubah = (await screen.findAllByRole("button", { name: /ubah jawaban/i }))[0]!;
+    await act(async () => { fireEvent.click(ubah); });
     const boxes = screen.getAllByRole("checkbox");
     expect(boxes).toHaveLength(3);
     expect(screen.queryAllByRole("radio")).toHaveLength(0);
     await act(async () => { fireEvent.click(boxes[0]!); });
     await act(async () => { fireEvent.click(boxes[2]!); });
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /simpan/i })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /kirim jawaban/i })); });
     await waitFor(() => expect(overrideLeadDecision)
       .toHaveBeenCalledWith("d3", expect.any(String), "", ["alpha", "gamma"]));
   });
 
-  it("Timpa menampilkan RADIO saat pilihannya tunggal, dan hanya satu yang bertahan", async () => {
+  it("Ubah jawaban menampilkan RADIO saat pilihannya tunggal, dan hanya satu yang bertahan", async () => {
     boot([{ ...OPT_ROW, select: { mode: "single", min: 0, max: 1 },
       choices: [{ index: 2, option: "beta" }] }]);
     overrideLeadDecision.mockResolvedValue({ old: OPT_ROW, next: OPT_ROW, delivered: true });
     renderScreen();
-    const timpa = (await screen.findAllByRole("button", { name: /timpa/i }))[0]!;
-    await act(async () => { fireEvent.click(timpa); });
+    const ubah = (await screen.findAllByRole("button", { name: /ubah jawaban/i }))[0]!;
+    await act(async () => { fireEvent.click(ubah); });
     const radios = screen.getAllByRole("radio");
     expect(radios).toHaveLength(3);
     expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
     await act(async () => { fireEvent.click(radios[0]!); });
     await act(async () => { fireEvent.click(radios[2]!); });
-    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /simpan/i })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /kirim jawaban/i })); });
     await waitFor(() => expect(overrideLeadDecision)
       .toHaveBeenCalledWith("d3", expect.any(String), "", ["gamma"]));
   });
 
-  it("kartu rantai merender status & tombol hanya untuk alur yang masih terbuka", async () => {
-    boot([], [flow(), flow({ id: "f2", status: "selesai", title: "Versi mana?", closeReason: "submit" })]);
+  // Audit 1G · pilihan tunggal = radiogroup; panah memindahkan pilihan sekaligus fokus.
+  it("pilihan tunggal berupa radiogroup yang bisa digeser dengan panah", async () => {
+    boot([{ ...OPT_ROW, select: { mode: "single", min: 0, max: 1 }, choices: [] }]);
     renderScreen();
-    expect(await screen.findByText("sebagian")).toBeInTheDocument();
-    expect(screen.getByText("selesai")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /^submit$/i })).toHaveLength(1);
+    fireEvent.click((await screen.findAllByRole("button", { name: /ubah jawaban/i }))[0]!);
+    const radios = within(screen.getByRole("radiogroup")).getAllByRole("radio");
+    fireEvent.keyDown(radios[0]!, { key: "ArrowDown" });            // dari belum memilih → opsi pertama
+    expect(radios[0]).toHaveAttribute("aria-checked", "true");
+    fireEvent.keyDown(radios[0]!, { key: "ArrowDown" });
+    expect(radios[1]).toHaveAttribute("aria-checked", "true");
+    fireEvent.keyDown(radios[1]!, { key: "ArrowUp" });
+    expect(radios[0]).toHaveAttribute("aria-checked", "true");
   });
 
-  it("Submit rantai memanggil endpointnya", async () => {
+  it("kartu rangkaian merender status & tombol hanya untuk alur yang masih terbuka", async () => {
+    boot([], [flow(), flow({ id: "f2", status: "selesai", title: "Versi mana?", closeReason: "submit" })]);
+    renderScreen();
+    expect(await screen.findByText("Sebagian terjawab")).toBeInTheDocument();
+    expect(screen.getByText("Selesai")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^kirim rangkaian$/i })).toHaveLength(1);
+  });
+
+  // Audit 1G · menutup rangkaian minta konfirmasi lebih dulu (dampaknya disebut di dialog).
+  it("Kirim rangkaian minta konfirmasi lalu memanggil endpoint submit", async () => {
     boot([], [flow()]);
     submitLeadFlow.mockResolvedValue(flow({ status: "selesai" }));
     renderScreen();
-    const btn = await screen.findByRole("button", { name: /^submit$/i });
-    await act(async () => { fireEvent.click(btn); });
+    fireEvent.click(await screen.findByRole("button", { name: /^kirim rangkaian$/i }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Kirim rangkaian ini?");
+    expect(submitLeadFlow).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.click(inDialog().getByRole("button", { name: /^kirim rangkaian$/i })); });
     await waitFor(() => expect(submitLeadFlow).toHaveBeenCalledWith("f1"));
   });
 
@@ -310,6 +392,16 @@ describe("LeadScreen · pilihan jamak & rantai (SPEC-485)", () => {
     getLeadFlows.mockResolvedValue({});
     renderScreen();
     expect(await screen.findByText(/Pakai kolom baru atau turunkan/)).toBeInTheDocument();
+  });
+
+  // Audit 1G · galat memuat rangkaian TAMPIL sebagai galat, bukan "Belum ada rangkaian".
+  it("galat memuat rangkaian tampil sebagai galat, bukan daftar kosong", async () => {
+    getLeadStatus.mockResolvedValue(STATUS);
+    getLeadDecisions.mockResolvedValue(DECISIONS);
+    getLeadFlows.mockRejectedValueOnce(new Error("404"));
+    renderScreen();
+    expect(await screen.findByText("Gagal memuat rangkaian keputusan.")).toBeInTheDocument();
+    expect(screen.queryByText(/Belum ada rangkaian/)).not.toBeInTheDocument();
   });
 });
 
@@ -347,5 +439,68 @@ describe("SPEC-488 · baris mesin lead", () => {
     getLeadDecisions.mockResolvedValue(DECISIONS);
     renderScreen();
     expect(await screen.findByTestId("lead-engine-line")).toHaveTextContent("ikut default global");
+  });
+});
+
+// Audit 1G · kolom angka: mengetik tak menyimpan; blur/Enter menyimpan sekali dengan nilai yang dijepit.
+describe("LeadScreen · kolom angka (Audit 1G)", () => {
+  it("mengetik tak menyimpan; blur menyimpan sekali dengan nilai yang sah", async () => {
+    getLeadStatus.mockResolvedValue(STATUS);
+    getLeadDecisions.mockResolvedValue(DECISIONS);
+    putLeadConfig.mockResolvedValue(CONFIG);
+    renderScreen();
+    const field = await screen.findByLabelText("lead memeriksa tiap (menit)");
+    fireEvent.change(field, { target: { value: "" } });
+    expect(field).toHaveValue(null);
+    expect(field).toBeEnabled();                       // tak dinonaktifkan selagi menyimpan
+    fireEvent.change(field, { target: { value: "3" } });
+    expect(putLeadConfig).not.toHaveBeenCalled();      // tak ada PUT per ketukan
+    fireEvent.blur(field);
+    await waitFor(() => expect(putLeadConfig).toHaveBeenCalledTimes(1));
+    expect(putLeadConfig).toHaveBeenCalledWith(expect.objectContaining({ everyMin: 3 }));
+    expect(await screen.findByText("Tersimpan")).toBeInTheDocument();
+  });
+
+  it("nilai di luar rentang dijepit saat blur", async () => {
+    getLeadStatus.mockResolvedValue(STATUS);
+    getLeadDecisions.mockResolvedValue(DECISIONS);
+    putLeadConfig.mockResolvedValue(CONFIG);
+    renderScreen();
+    const field = await screen.findByLabelText("batas waktu keputusan (detik)");
+    fireEvent.change(field, { target: { value: "5" } });
+    fireEvent.blur(field);
+    await waitFor(() => expect(putLeadConfig).toHaveBeenCalledWith(expect.objectContaining({ timeoutSec: 10 })));
+  });
+
+  it("dikosongkan lalu blur tanpa perubahan nilai tak menulis apa pun", async () => {
+    getLeadStatus.mockResolvedValue(STATUS);
+    getLeadDecisions.mockResolvedValue(DECISIONS);
+    renderScreen();
+    const field = await screen.findByLabelText("lead memeriksa tiap (menit)");
+    fireEvent.change(field, { target: { value: "" } });
+    fireEvent.blur(field);
+    expect(field).toHaveValue(5);                      // kembali ke nilai tersimpan
+    expect(putLeadConfig).not.toHaveBeenCalled();
+  });
+});
+
+// Audit 1G · ganti penyaring/halaman tak menjatuhkan layar ke loading penuh; draft tetap hidup.
+describe("LeadScreen · muat ulang senyap", () => {
+  it("ganti penyaring tak menampilkan loading dan draft jawaban tetap ada", async () => {
+    getLeadStatus.mockResolvedValue(STATUS);
+    getLeadDecisions.mockResolvedValueOnce(DECISIONS);
+    renderScreen();
+    await screen.findByText(/Pakai kolom baru atau turunkan/);
+    fireEvent.click((await screen.findAllByRole("button", { name: /ubah jawaban/i }))[0]!);
+    fireEvent.change(screen.getByLabelText("Jawaban kamu untuk SPEC-1"), { target: { value: "draf saya" } });
+
+    let resolveNext: (v: unknown) => void = () => undefined;
+    getLeadDecisions.mockReturnValueOnce(new Promise((r) => { resolveNext = r; }));
+    fireEvent.change(screen.getByRole("combobox", { name: "saring project" }), { target: { value: "a" } });
+    await waitFor(() => expect(getLeadDecisions.mock.calls.length).toBeGreaterThan(1));
+
+    expect(screen.queryByText(/Memuat/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Jawaban kamu untuk SPEC-1")).toHaveValue("draf saya");
+    await act(async () => { resolveNext(DECISIONS); });
   });
 });

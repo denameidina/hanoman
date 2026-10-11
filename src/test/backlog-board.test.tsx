@@ -68,12 +68,14 @@ function board(specs: Spec[], activeSpecs?: Set<string>) {
   return onStart;
 }
 
-describe("tombol Review (SPEC-171)", () => {
-  it("klik Review memanggil onOpenReview dengan spec-nya", () => {
+describe("Review perubahan (SPEC-171) di menu ⋯", () => {
+  it("menu ⋯ berisi Review perubahan yang memanggil onOpenReview dengan spec-nya", () => {
     const onOpenReview = vi.fn();
     render(<BacklogScreen backlog={[spec({ title: "x" })]} projects={[{ id: "p", name: "p" }] as never}
       onOpenReview={onOpenReview} projectFilter="all" onProjectFilter={() => {}} />);
-    fireEvent.click(screen.getByText("Review"));
+    // Aksi sekunder tak lagi sejajar di kartu: buka menu dulu, lalu pilih Review perubahan.
+    fireEvent.click(screen.getByRole("button", { name: "Aksi lain SPEC-1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review perubahan" }));
     expect(onOpenReview).toHaveBeenCalledOnce();
     expect(onOpenReview.mock.calls[0]![0].id).toBe("SPEC-1");
   });

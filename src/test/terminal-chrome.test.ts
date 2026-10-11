@@ -1,35 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  TERMINAL_KEYS, clampFontSize, dialogChoiceAt, inlineActionCount,
+  TERMINAL_KEYS, clampFontSize, dialogChoiceAt, isFocusEscape,
   shouldCollapseToTabs, MIN_PANE_WIDTH,
 } from "../src/screens/terminal-chrome";
-
-describe("inlineActionCount", () => {
-  it("membiarkan semua aksi inline selagi lebarnya belum terukur", () => {
-    expect(inlineActionCount(Number.POSITIVE_INFINITY, 4, 28)).toBe(4);
-    expect(inlineActionCount(0, 4, 28)).toBe(4);
-  });
-
-  it("membiarkan semua aksi inline pada sel lebar", () => {
-    expect(inlineActionCount(1000, 4, 28)).toBe(4);
-  });
-
-  it("menyisakan satu slot untuk tombol overflow saat tak semuanya muat", () => {
-    // slot 30px (28 + gap klaster 2), tetap 96 + 50 = 146 → sisa 104 → 3 slot;
-    // satu dipakai tombol overflow
-    expect(inlineActionCount(250, 4, 28)).toBe(2);
-    expect(inlineActionCount(250, 4, 28, 60)).toBe(0);
-  });
-
-  it("meruntuhkan seluruh aksi saat pointer kasar memperbesar tiap kontrol", () => {
-    // slot 46px, tetap 146 → sisa 54 → 1 slot, habis untuk tombol overflow
-    expect(inlineActionCount(200, 4, 44)).toBe(0);
-  });
-
-  it("tak pernah mengembalikan angka negatif", () => {
-    expect(inlineActionCount(80, 4, 44)).toBe(0);
-  });
-});
 
 describe("dialogChoiceAt", () => {
   const dialog = [
@@ -105,5 +78,22 @@ describe("TERMINAL_KEYS", () => {
 
   it("memberi tiap tombol nama aksesibel", () => {
     for (const key of TERMINAL_KEYS) expect(key.aria.length).toBeGreaterThan(0);
+  });
+});
+
+describe("isFocusEscape (jalan keluar keyboard dari xterm)", () => {
+  const key = (init: Partial<KeyboardEventInit>) => ({ key: "Escape", ctrlKey: false, shiftKey: false,
+    altKey: false, metaKey: false, ...init });
+  it("hanya Ctrl+Shift+Esc yang memicu jalan keluar", () => {
+    expect(isFocusEscape(key({ ctrlKey: true, shiftKey: true }))).toBe(true);
+  });
+  it("Esc polos tetap milik terminal (sampai ke agen)", () => {
+    expect(isFocusEscape(key({}))).toBe(false);
+    expect(isFocusEscape(key({ shiftKey: true }))).toBe(false);
+    expect(isFocusEscape(key({ ctrlKey: true }))).toBe(false);
+  });
+  it("kombinasi dengan Alt/Meta atau tombol lain bukan jalan keluar", () => {
+    expect(isFocusEscape(key({ ctrlKey: true, shiftKey: true, altKey: true }))).toBe(false);
+    expect(isFocusEscape({ ...key({ ctrlKey: true, shiftKey: true }), key: "Enter" })).toBe(false);
   });
 });
