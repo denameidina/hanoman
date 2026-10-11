@@ -12,10 +12,13 @@ describe("agent capabilities", () => {
   // ADR-0157 · +domain `team` (papan Tim: `/api/tasks` & `/api/members`) → 13 domain, 30 id.
   // ADR-0172 · +domain `skills` (skill library: `/api/skills*`) → 14 domain, 32 id.
   // ADR-0174 · +domain `qa` (Workspace QA: `/api/projects/:id/qa/**`, `/api/qa/**`) → 15 domain, 34 id.
-  it("has 16 domains, 36 capability ids across three access levels, all in metadata", () => {
-    expect(CAPABILITY_IDS.length).toBe(36);
-    expect(new Set(CAPABILITY_IDS).size).toBe(36);
-    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(16);
+  // ADR-0188 · +domain `activity` (log aktivitas `/api/session-results`) → 16 domain, 36 id.
+  // ADR-0189 · +domain `portal-chat` (permukaan operator chat portal) → 17 domain, 38 id.
+  // (Angka 36/16 sebelumnya sudah basi sejak ADR-0182 mencabut domain `memory`: basisnya 34/15.)
+  it("has 17 domains, 38 capability ids across three access levels, all in metadata", () => {
+    expect(CAPABILITY_IDS.length).toBe(38);
+    expect(new Set(CAPABILITY_IDS).size).toBe(38);
+    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(17);
     expect(CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id).sort())
       .toEqual(["backlog:lifecycle", "ide:git", "sessions:spawn", "vps:exec"]);
     expect(CAPABILITIES.map((c) => c.id).sort()).toEqual([...CAPABILITY_IDS].sort());
@@ -23,6 +26,8 @@ describe("agent capabilities", () => {
     expect(zCapability.safeParse("telegram:write").success).toBe(true);
     expect(zCapability.safeParse("skills:write").success).toBe(true);
     expect(zCapability.safeParse("qa:write").success).toBe(true);
+    expect(zCapability.safeParse("activity:write").success).toBe(true);
+    expect(zCapability.safeParse("portal-chat:write").success).toBe(true);
     expect(zCapability.safeParse("nope:read").success).toBe(false);
   });
 

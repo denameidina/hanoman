@@ -39,6 +39,14 @@ export const CAPABILITY_IDS = [
   // `:write` TIDAK mengimplikasikannya (lihat grantsCapability di bawah): kalau diimplikasikan,
   // pemecahan ini kosmetik dan tak menghasilkan batas apa pun.
   "sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec",
+  // ADR-0188 · log aktivitas (`/api/session-results`): perpindahan stage, commit, PR lintas device.
+  // Domain TERSENDIRI: purge-nya menyeberang lewat tombstone sync ke SEMUA mesin (ADR-0119), jadi
+  // ia tak pantas menumpang `sessions:write`.
+  "activity:read", "activity:write",
+  // ADR-0189 · permukaan OPERATOR obrolan portal klien (`/api/portal-chat/*`). Domain TERSENDIRI
+  // karena isinya percakapan + email KLIEN, dan `portal-chat:write` menulis berkas PRD ke checkout.
+  // Bukan `portal`: itu permukaan sesi cookie klien dan tetap cookie-only (ADR-0110).
+  "portal-chat:read", "portal-chat:write",
 ] as const;
 export const zCapability = z.enum(CAPABILITY_IDS);
 export type Capability = z.infer<typeof zCapability>;
@@ -87,6 +95,11 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "ide:git", domain: "ide", access: "danger", label: "IDE/Git — operasi git", desc: "merge, rebase, pull, drop, hapus branch, hapus worktree. Mengubah sejarah dan menghapus pekerjaan yang tak dipegang berkas mana pun; dipisah dari menulis berkas working tree.", risk: "exec" },
   { id: "backlog:lifecycle", domain: "backlog", access: "danger", label: "Backlog — siklus hidup", desc: "Integrate, hapus backlog, dan geser stage. Ketiganya menghapus artefak dokumen; dipisah dari menyunting isi backlog.", risk: "exec" },
   { id: "vps:exec", domain: "vps", access: "danger", label: "VPS — remote exec", desc: "console, session, provision, harden, remediate, probe, test, audit. Menjalankan perintah di VPS produksi; dipisah dari mengelola daftar VPS & checklist kepatuhan.", risk: "exec" },
+  // ADR-0188 · ADR-0189 · domain biasa (read/write), bukan `danger`: tak satu pun memulai pekerjaan di luar proses hanoman.
+  { id: "activity:read", domain: "activity", access: "read", label: "Aktivitas — baca", desc: "Baca log aktivitas: perpindahan stage, commit, branch, dan PR lintas device." },
+  { id: "activity:write", domain: "activity", access: "write", label: "Aktivitas — tulis", desc: "Purge log aktivitas per project dan/atau rentang tanggal. Penghapusan menyeberang ke semua mesin lewat sync dan tak bisa dibatalkan." },
+  { id: "portal-chat:read", domain: "portal-chat", access: "read", label: "Chat portal — baca", desc: "Baca percakapan klien di chat portal berikut email klien, kuota, dan PRD draft; termasuk ekspor transkrip." },
+  { id: "portal-chat:write", domain: "portal-chat", access: "write", label: "Chat portal — tulis", desc: "Materialisasi PRD draft chat portal menjadi berkas docs/prd/<slug>.md di checkout repo (menimpa berkas bernama sama). Isi draftnya berasal dari percakapan klien.", risk: "exec" },
 ];
 
 // SPEC-264 · Metadata per-domain untuk grid capability di Settings (label ramah + cakupan).
@@ -109,6 +122,8 @@ export const CAPABILITY_DOMAINS: { domain: string; label: string; desc: string }
   { domain: "telegram", label: "Telegram", desc: "Status, binding, memory, reply, dan audit kanal operator Telegram." },
   { domain: "team", label: "Tim", desc: "Kartu papan Tim (kerja manusia), direktori anggota, eskalasi kartu ke backlog." },
   { domain: "qa", label: "QA", desc: "Laporan QA per project: test case, temuan, lampiran, ekspor/impor." },
+  { domain: "activity", label: "Aktivitas", desc: "Log aktivitas lintas device (stage, commit, PR) dan purge-nya." },
+  { domain: "portal-chat", label: "Chat portal", desc: "Percakapan klien di chat portal (berisi email klien), PRD draft, dan ekspor transkrip." },
 ];
 
 // write meng-implikasikan read pada domain yang sama.

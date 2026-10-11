@@ -91,8 +91,8 @@ host-mu benar dan masalahnya ada pada token atau master switch.
 ## 3. Capability
 
 Capability berformat `"<domain>:<access>"`, `access ∈ {read, write}`, dan **write meng-implikasikan
-read** pada domain yang sama. Ada **13 domain**; empat di antaranya punya akses KETIGA `danger`
-(ADR-0155) yang **tak diimplikasikan `:write`**, sehingga totalnya **30 capability**. Katalog resmi (dengan label &
+read** pada domain yang sama. Ada **17 domain**; empat di antaranya punya akses KETIGA `danger`
+(ADR-0155) yang **tak diimplikasikan `:write`**, sehingga totalnya **38 capability**. Katalog resmi (dengan label &
 deskripsi) tampil di panel **Settings → Akses AI Agent** saat manusia membuat token; endpoint
 katalognya (`GET /api/agent-tokens/capabilities`) bersifat **cookie-only** (lihat §5) — kamu tak
 perlu mengambilnya, cukup rujuk tabel di bawah:
@@ -112,6 +112,9 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 | `agents` | `/api/custom-agents*` | katalog custom agent global & per project — **`agents:write` mengubah apa yang dilihat SETIAP sesi baru** (ADR-0094) |
 | `skills` | `/api/skills*` | skill global hanoman, user, plugin (baca-saja) & per project, termasuk isi berkasnya — **`skills:write` pada skill global hanoman mengubah instruksi SETIAP sesi baru di semua project** |
 | `telegram` | `/api/telegram*` kecuali sub-path kredensial | context/memory/reply/audit kanal operator Telegram (ADR-0096) |
+| `qa` | `/api/projects/:id/qa*`, `/api/qa*` | laporan QA per project: test case, temuan, lampiran |
+| `activity` | `/api/session-results*` | log aktivitas lintas device (stage, commit, PR); **`activity:write` = purge yang menyeberang ke SEMUA mesin lewat sync** (ADR-0188) |
+| `portal-chat` | `/api/portal-chat*` | chat portal klien sisi OPERATOR: sesi, PRD draft, ekspor transkrip — berisi **email & percakapan klien**; `portal-chat:write` menulis `docs/prd/<slug>.md` di checkout (ADR-0189). Beda dari `/api/portal*` yang tetap cookie-only |
 | `team` | `/api/tasks*`, `/api/members*` | papan **Tim**: kartu kerja MANUSIA & direktori anggota (ADR-0157). `status` kartu milik manusia — ia **bukan** `stage` backlog. `POST /api/tasks/:id/escalate` melahirkan backlog item dan tetap `team:write` (cermin `POST /api/tickets/:id/accept`) |
 
 ## 4. Aturan gate & kode status
@@ -165,8 +168,8 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
   memalsukan seluruh jejak sesi. Cookie-only apa pun method-nya — beda dari `POST /api/sync/logs`
   (pengiriman batch **dari** klien), yang tetap device-token seperti jalur sync lain
 - `POST /api/update/apply` dan tulis lain di bawah prefix status (`/api/limits`, `/api/update`,
-  `/api/events`, `/api/fs`, `/api/health`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya
-  cookie-only
+  `/api/events`, `/api/fs`, `/api/health`, serta — sejak ADR-0187 — `/api/models`, `/api/methods`,
+  `/api/codex`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya cookie-only
 
 Route yang tak dikenal peta juga **default cookie-only** (aman): endpoint baru tak pernah terbuka
 karena kelalaian. Endpoint `/api/help*` (Help Center publik) punya otorisasi sendiri (kunci tiket)
@@ -433,6 +436,12 @@ Panduan siap salin untuk keempat klien, berikut tabel tool → capability, ada d
 | `hanoman_backlog_create`, `hanoman_backlog_update` | tulis | `backlog:write` |
 | `hanoman_notifications_mark_read` | tulis | `notifications:write` |
 | `hanoman_lead_ask` | tulis | `lead:write` |
+| `hanoman_health`, `hanoman_models`, `hanoman_codex_version`, `hanoman_methods_status` | baca | — (`GLOBAL_READ`, ADR-0187) |
+| `hanoman_activity_list` | baca | `activity:read` |
+| `hanoman_activity_purge` | **berbahaya** | `activity:write` |
+| `hanoman_portal_chat_sessions`, `hanoman_portal_chat_session_get` | baca | `portal-chat:read` |
+| `hanoman_portal_chat_export` | **berbahaya** | `portal-chat:read` |
+| `hanoman_portal_chat_prd_write` | **berbahaya** | `portal-chat:write` |
 
 ### Yang sengaja TIDAK tersedia lewat MCP
 

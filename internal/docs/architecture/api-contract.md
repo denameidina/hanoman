@@ -152,6 +152,9 @@ POST /portal-chat/sessions/:id/prd                <- { slug }  -> 201 { path }
 #   pekerjaan apa pun — eskalasi adalah keputusan manusia pemilik project (SPEC-854 huruf B).
 #   400 slug tak aman · 409 project tanpa checkout
 GET  /portal-chat/export?project=&from=&to=       -> application/x-ndjson (transkrip untuk training)
+#   from/to cacat -> 400 (ADR-0189; dulu 500).
+#   Gerbang agent token (ADR-0189): GET = `portal-chat:read`, POST = `portal-chat:write`. Tool MCP:
+#   hanoman_portal_chat_{sessions,session_get,export,prd_write}; export & prd_write bermode `danger`.
 ```
 
 Tak satu pun route ini ada di `clientRouteAllowed`, jadi gerbang `app.ts` membalasnya **403** untuk
@@ -692,6 +695,11 @@ GET/PUT  /settings                      # Setting blob (zSetting): model, effort
 #                                           menjatuhkan readiness ke `error` gara-gara satu dropdown.
 #                                         PUT ganti seluruh blob (full replace).
 GET      /codex/version                 # { version: string|null, minRequired: "0.144.0", ok: boolean }  (SPEC-339)
+#   Baca-global (ADR-0187): agent token mana pun, tanpa capability. Tool MCP: `hanoman_codex_version`.
+GET      /session-results?projectId&limit  # SessionResultView[] terbaru dulu · limit default 200, maks 1000 (SPEC-213/ADR-0047)
+DELETE   /session-results?projectId&before # { purged } · 400 tanpa keduanya / `before` cacat · tiap baris dihapus lewat
+#   `deleteSynced` -> tombstone menyeberang ke SEMUA mesin (ADR-0119). Agent token (ADR-0188): GET =
+#   `activity:read`, DELETE = `activity:write`. Tool MCP: hanoman_activity_{list,purge}; purge bermode `danger`.
 #   Versi codex CLI pada konteks sesi efektif (host: `<HANOMAN_CODEX_BIN> --version`; sandbox:
 #   probe biner yang sama di `HANOMAN_SESSION_IMAGE`, cache 5 menit). `version: null` = tak
 #   terdeteksi (biner/image tak ada / keluaran tak dikenal) dan itu TIDAK dianggap gagal → `ok: true`.
@@ -710,7 +718,8 @@ GET      /methods/status               # { agents[], methods[] }  (SPEC-739/ADR-
 #   `install[]` = perintah dari katalog untuk agen itu. Pencocokan KETAT & id persis — skill polos
 #   `brainstorming` TIDAK memuaskan `superpowers:brainstorming`. Murni observabilitas: metode belum
 #   siap ditandai, TIDAK pernah memblokir Start (ADR-0037), cermin GET /codex/version.
-#   Cookie-only (`capabilityForRoute` tak mengenal prefix `methods`).
+#   Baca-global (ADR-0187, mengamandemen ADR-0114 §4): `GET` terbuka untuk agent token mana pun tanpa
+#   capability, method tulis tetap cookie-only. Tool MCP: `hanoman_methods_status`.
 GET      /limits/codex                  # CodexLimitsDTO { status, windows[], fetchedAt, plan }  (SPEC-338/ADR-0074)
 #   Limit langganan CODEX. Sumbernya BUKAN jaringan: codex menulis `rate_limits` (used_percent,
 #   window_minutes, resets_at, plan_type, rate_limit_reached_type) ke rollout sesinya di
@@ -1253,7 +1262,8 @@ DELETE /terminal/history?projectId&before
 
 ## Events (SPEC-199 · ADR-0039 · SPEC-908/ADR-0145)
 
-Katalog model runtime: `GET /api/models` (admin cookie, tanpa query/body) mengembalikan
+Katalog model runtime: `GET /api/models` (cookie ATAU agent token tanpa capability — `GLOBAL_READ`, ADR-0187;
+tanpa query/body) mengembalikan
 `{claude: [{id,label,efforts?}], codex: [{id,label,efforts,fallback,minClient}],
 providers: {claude,codex}}`. Status provider = `{source:"bundled"|"cache"|"cli",
 checkedAt:string|null, updatedAt:string|null, error:string|null}`.

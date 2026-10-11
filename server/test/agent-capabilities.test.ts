@@ -56,6 +56,23 @@ describe("capabilityForRoute", () => {
     ["GET", "/api/update", "GLOBAL_READ"],
     ["GET", "/api/events/ws", "GLOBAL_READ"],
     ["GET", "/api/fs/browse", "GLOBAL_READ"],
+    // ADR-0187 · properti MESIN, bukan akun: baca terbuka, tulis tetap cookie-only.
+    ["GET", "/api/models", "GLOBAL_READ"],
+    ["GET", "/api/methods/status", "GLOBAL_READ"],
+    ["GET", "/api/codex/version", "GLOBAL_READ"],
+    ["POST", "/api/models", "COOKIE_ONLY"],
+    ["POST", "/api/methods/status", "COOKIE_ONLY"],
+    ["PUT", "/api/codex/version", "COOKIE_ONLY"],
+    // ADR-0188 · log aktivitas MENURUT METHOD: DELETE = purge yang menyeberang lewat sync.
+    ["GET", "/api/session-results", "activity:read"],
+    ["DELETE", "/api/session-results", "activity:write"],
+    // ADR-0189 · chat portal sisi OPERATOR. `/api/portal/**` (sesi cookie klien) tetap cookie-only.
+    ["GET", "/api/portal-chat/sessions", "portal-chat:read"],
+    ["GET", "/api/portal-chat/sessions/s1", "portal-chat:read"],
+    ["GET", "/api/portal-chat/export", "portal-chat:read"],
+    ["POST", "/api/portal-chat/sessions/s1/prd", "portal-chat:write"],
+    ["GET", "/api/portal/projects/p1/chat", "COOKIE_ONLY"],
+    ["POST", "/api/portal/projects/p1/chat/sessions/s1/messages", "COOKIE_ONLY"],
     ["GET", "/api/auth/users", "COOKIE_ONLY"],
     ["GET", "/api/agent-tokens", "COOKIE_ONLY"],
     ["POST", "/api/agent-tokens", "COOKIE_ONLY"],

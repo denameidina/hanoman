@@ -233,6 +233,12 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   // ADR-0157 · papan Tim. Menghapus kartu/anggota permanen di seluruh mesin tersync, tapi domain
   // `team` tak punya pecahan `danger` — mode `danger`-nya ergonomi, bukan gerbang.
   "hanoman_task_delete", "hanoman_member_delete",
+  // ADR-0188/0189 · tiga tool danger yang capability-nya domain biasa (`activity:write`,
+  // `portal-chat:write`/`:read`): purge menyeberang ke semua mesin lewat tombstone sync, tulis-PRD
+  // menimpa berkas di checkout dengan isi berasal dari klien, ekspor menarik email+transkrip klien.
+  // Tak satu pun MEMULAI pekerjaan di luar proses hanoman, jadi bukan `danger` berakses — mode
+  // `danger`-nya ergonomi (tak terlihat di tingkat default), bukan gerbang.
+  "hanoman_activity_purge", "hanoman_portal_chat_prd_write", "hanoman_portal_chat_export",
 ]);
 
 describe("mode ⇔ capability", () => {

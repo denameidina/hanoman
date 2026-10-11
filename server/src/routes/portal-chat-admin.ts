@@ -92,6 +92,11 @@ export default async function (app: FastifyInstance) {
     const parsed = zQuery.safeParse(req.query);
     if (!parsed.success) return reply.code(400).send({ error: "project wajib" });
     const { from, to } = req.query as { from?: string; to?: string };
+    // ADR-0189 · tanggal cacat dulu jatuh ke `Invalid Date` → Prisma melempar → 500 tanpa sebab yang
+    // terbaca. Pemanggil baru (tool MCP) mengirim string bebas, jadi ditolak 400 di sini, bukan 500.
+    for (const [k, v] of [["from", from], ["to", to]] as const)
+      if (v && Number.isNaN(new Date(v).getTime()))
+        return reply.code(400).send({ error: `${k} bukan tanggal valid` });
     const rows = await prisma.portalChatSession.findMany({
       where: {
         projectId: parsed.data.project,
