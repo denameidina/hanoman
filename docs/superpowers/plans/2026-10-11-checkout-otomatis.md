@@ -731,7 +731,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `cloneProjectCheckout`, `CheckoutError` (Task 3).
 - Produces: kontrak HTTP tetap — `201 { repoDir }`, `404`, `409 { error, detail? }`. Body tetap `{ dir }` wajib (MCP `hanoman_project_clone` tidak berubah).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan di `server/test/bindings.route.test.ts`, di dalam `describe` yang ada:
 
@@ -758,12 +758,12 @@ Tambahkan di `server/test/bindings.route.test.ts`, di dalam `describe` yang ada:
 
 dan tambahkan `writeFileSync` ke impor `node:fs` di file itu.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/bindings.route.test.ts --no-file-parallelism`
 Expected: FAIL pada test "folder yang sudah berisi hal lain" (`git clone` ke folder tak kosong gagal, tapi `detail` bentuk lama dan test kedua gagal karena `detail` kosong untuk path non-repo). Catat output sebenarnya sebelum lanjut.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Ganti handler `app.post("/projects/:id/clone", …)` di `server/src/routes/bindings.ts` dan hapus impor `spawnSync` yang tak terpakai:
 
@@ -789,12 +789,12 @@ dengan impor:
 import { CheckoutError, cloneProjectCheckout } from "../services/project-checkout";
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/bindings.route.test.ts test/binding-routes.test.ts test/binding-edit.test.ts test/binding-aware.test.ts --no-file-parallelism`
 Expected: PASS, termasuk test lama (201 + `.git`, 409 tanpa gitRemote).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/bindings.ts server/test/bindings.route.test.ts docs/superpowers/plans/2026-10-11-checkout-otomatis.md
