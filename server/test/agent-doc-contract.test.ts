@@ -26,12 +26,11 @@ describe("naskah panduan AI agent", () => {
     // yang baru tanpa penjelasan meninggalkan agen eksternal tanpa rujukan sama sekali.
     // ADR-0193..0195 · `webhooks` & `client-accounts` KELUAR dari daftar (kini capability opt-in),
     // `portal` hanya cookie-only untuk method TULIS (lihat bawah).
-    const kandidat = ["auth", "agent-tokens", "device-tokens", "sync", "presence", "remote-control"];
     // ADR-0196..0198 · `agent-tokens`, `device-tokens`, `presence`, `remote-control`, `logs`, dan
     // `devices` KELUAR dari daftar ini (kini capability opt-in, dijelaskan di §3 dan §5 naskah);
     // `auth` tinggal status/setup/login/logout, dan `session-events` ikut dicatat karena 401-nya
     // perlu penjelasan. Daftar kedua memastikan yang dibuka memang memetakan ke capability.
-    const kandidat = ["auth", "sync", "webhooks", "portal", "client-accounts", "session-events"];
+    const kandidat = ["auth", "sync", "session-events"];
     for (const seg of kandidat) expect(capabilityForRoute("GET", `/api/${seg}`)).toBe("COOKIE_ONLY");
     const dibuka: [string, string][] = [
       ["agent-tokens", "tokens:read"], ["device-tokens", "devices:read"], ["presence", "presence:read"],

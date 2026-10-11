@@ -171,12 +171,12 @@ describe("chat portal operator: portal-chat:read / portal-chat:write (ADR-0189)"
     const h = await bearer(["portal-chat:read"]);
     const list = await app.inject({ method: "GET", url: "/api/portal-chat/sessions?project=p1&limit=20", headers: h });
     expect(list.statusCode).toBe(200);
-    const shapedList = byName("hanoman_portal_chat_sessions").shape(list.json(), {}) as { items: Record<string, unknown>[]; kuota: unknown };
+    const shapedList = byName("hanoman_portal_admin_chat_sessions").shape(list.json(), {}) as { items: Record<string, unknown>[]; kuota: unknown };
     expect(shapedList.items[0]).toMatchObject({ id: sid, clientEmail: "klien@x.co", prdSiap: true });
     expect(shapedList.kuota).toBeDefined();
 
     const det = await app.inject({ method: "GET", url: `/api/portal-chat/sessions/${sid}`, headers: h });
-    const shapedDet = byName("hanoman_portal_chat_session_get").shape(det.json(), {}) as { items: { seq: number; rawText?: string }[]; total: number };
+    const shapedDet = byName("hanoman_portal_admin_chat_session_get").shape(det.json(), {}) as { items: { seq: number; rawText?: string }[]; total: number };
     expect(shapedDet.items.map((m) => m.seq)).toEqual([1, 2]);
     expect(shapedDet.items[1]!.rawText).toBe("mentah");   // baris tertolak menyertakan teks mentah
 
@@ -185,7 +185,7 @@ describe("chat portal operator: portal-chat:read / portal-chat:write (ADR-0189)"
     // Persis yang dilakukan klien MCP: coba JSON.parse, jatuh ke teks bila gagal. Satu sesi → OBJEK.
     let body: unknown = exp.body;
     try { body = JSON.parse(exp.body); } catch { /* tetap teks */ }
-    const shapedExp = byName("hanoman_portal_chat_export").shape(body, {}) as { items: { id: string; messageCount: number; messages: Record<string, unknown>[] }[]; total: number };
+    const shapedExp = byName("hanoman_portal_admin_chat_export").shape(body, {}) as { items: { id: string; messageCount: number; messages: Record<string, unknown>[] }[]; total: number };
     expect(shapedExp.total).toBe(1);
     expect(shapedExp.items[0]).toMatchObject({ id: sid, messageCount: 2 });
     expect(shapedExp.items[0]!.messages.every((m) => !("rawText" in m))).toBe(true);
@@ -216,7 +216,7 @@ describe("chat portal operator: portal-chat:read / portal-chat:write (ADR-0189)"
     const dir = repo();
     const sid = await seed(dir);
     const h = await bearer(["portal-chat:write"]);
-    const req = byName("hanoman_portal_chat_prd_write").build({ session: sid, slug: "program-loyalitas" })!;
+    const req = byName("hanoman_portal_admin_chat_prd_write").build({ session: sid, slug: "program-loyalitas" })!;
     const ok = await app.inject({ method: req.method, url: `/api${req.path}`, headers: h, payload: req.body as object });
     expect(ok.statusCode).toBe(201);
     expect(ok.json()).toEqual({ path: "docs/prd/program-loyalitas.md" });

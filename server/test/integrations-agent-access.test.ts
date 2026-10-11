@@ -475,7 +475,7 @@ describe("katalog integrasi", () => {
   });
 
   it("tool portal semuanya baca-saja bercapability portal:read dan mensyaratkan asClient", () => {
-    const portal = MCP_TOOLS.filter((t) => t.name.startsWith("hanoman_portal_"));
+    const portal = MCP_TOOLS.filter((t) => t.name.startsWith("hanoman_portal_") && !t.name.startsWith("hanoman_portal_admin_"));
     expect(portal.length).toBe(5);
     for (const t of portal) {
       expect(t.mode, t.name).toBe("read");

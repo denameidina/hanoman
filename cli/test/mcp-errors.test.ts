@@ -81,6 +81,8 @@ describe("explainHttpError", () => {
       expect(msg, reason).toMatch(/bukan soal capability/i);
       expect(msg, reason).not.toMatch(/tak akan pernah bisa mengaksesnya/);
     }
+  });
+
   // ADR-0196 · capability SUDAH cukup tapi isinya melanggar pagar tak-eskalasi-diri: pesan harus
   // menyebut apa yang melebihi dan bahwa ini bukan galat yang bisa diakali — bukan "cookie-only".
   it("403 pagar tak-eskalasi-diri menyebut `exceeds` dan bukan pesan cookie-only", () => {

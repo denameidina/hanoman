@@ -159,7 +159,7 @@ POST /portal-chat/sessions/:id/prd                <- { slug }  -> 201 { path }
 GET  /portal-chat/export?project=&from=&to=       -> application/x-ndjson (transkrip untuk training)
 #   from/to cacat -> 400 (ADR-0189; dulu 500).
 #   Gerbang agent token (ADR-0189): GET = `portal-chat:read`, POST = `portal-chat:write`. Tool MCP:
-#   hanoman_portal_chat_{sessions,session_get,export,prd_write}; export & prd_write bermode `danger`.
+#   hanoman_portal_admin_chat_{sessions,session_get,export,prd_write}; export & prd_write bermode `danger`.
 ```
 
 Tak satu pun route ini ada di `clientRouteAllowed`, jadi gerbang `app.ts` membalasnya **403** untuk

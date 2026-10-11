@@ -48,7 +48,7 @@ describe("/agent-tokens routes (cookie-only)", () => {
     // ADR-0188 menambahkan `activity:read`/`activity:write` (log aktivitas) dan ADR-0189
     // `portal-chat:read`/`portal-chat:write` (chat portal sisi operator) → 38. Keduanya domain BARU
     // yang opt-in: token lama tak mewarisinya (write meng-implikasikan read hanya DI domain yang sama).
-    expect(r.json().capabilities).toHaveLength(38);
+    expect(r.json().capabilities).toHaveLength(66);
     expect(r.json().capabilities[0]).toMatchObject({ id: expect.any(String), domain: expect.any(String), access: expect.any(String) });
   });
 

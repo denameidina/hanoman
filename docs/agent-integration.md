@@ -539,9 +539,9 @@ Panduan siap salin untuk keempat klien, berikut tabel tool → capability, ada d
 | `hanoman_health`, `hanoman_models`, `hanoman_codex_version`, `hanoman_methods_status` | baca | — (`GLOBAL_READ`, ADR-0187) |
 | `hanoman_activity_list` | baca | `activity:read` |
 | `hanoman_activity_purge` | **berbahaya** | `activity:write` |
-| `hanoman_portal_chat_sessions`, `hanoman_portal_chat_session_get` | baca | `portal-chat:read` |
-| `hanoman_portal_chat_export` | **berbahaya** | `portal-chat:read` |
-| `hanoman_portal_chat_prd_write` | **berbahaya** | `portal-chat:write` |
+| `hanoman_portal_admin_chat_sessions`, `hanoman_portal_admin_chat_session_get` | baca | `portal-chat:read` |
+| `hanoman_portal_admin_chat_export` | **berbahaya** | `portal-chat:read` |
+| `hanoman_portal_admin_chat_prd_write` | **berbahaya** | `portal-chat:write` |
 | `hanoman_sync_conflicts`, `hanoman_sync_pending` | baca | `sync:read` |
 | `hanoman_sync_now` | tulis | `sync:write` |
 | `hanoman_sync_conflict_resolve` | **danger** | `sync:resolve` |

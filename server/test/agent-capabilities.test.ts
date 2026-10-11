@@ -71,12 +71,7 @@ describe("capabilityForRoute", () => {
     ["GET", "/api/portal-chat/sessions/s1", "portal-chat:read"],
     ["GET", "/api/portal-chat/export", "portal-chat:read"],
     ["POST", "/api/portal-chat/sessions/s1/prd", "portal-chat:write"],
-    ["GET", "/api/portal/projects/p1/chat", "COOKIE_ONLY"],
     ["POST", "/api/portal/projects/p1/chat/sessions/s1/messages", "COOKIE_ONLY"],
-    ["GET", "/api/auth/users", "COOKIE_ONLY"],
-    ["GET", "/api/agent-tokens", "COOKIE_ONLY"],
-    ["POST", "/api/agent-tokens", "COOKIE_ONLY"],
-    ["GET", "/api/device-tokens", "COOKIE_ONLY"],
     // ADR-0196 · dulu COOKIE_ONLY; kini capability baru yang opt-in, menurut METHOD.
     ["GET", "/api/auth/users", "access:read"],
     ["POST", "/api/auth/users", "access:admin"],

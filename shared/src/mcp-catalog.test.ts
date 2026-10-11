@@ -44,7 +44,7 @@ describe("katalog tool MCP", () => {
   it("tak ada tool yang menyentuh route cookie-only", () => {
     for (const t of MCP_TOOLS) {
       // ADR-0199 · `sync` dibelah: now/conflicts/pending punya tool; kanal mesin-ke-mesin ber-device-token tetap terlarang.
-      expect(t.samplePath, t.name).not.toMatch(/^\/(auth\/(status|setup|login|logout)|sync\/(pull|bootstrap|push|logs|attachments|qa-attachments|ws|relay)|session-events|webhooks)\b/);
+      expect(t.samplePath, t.name).not.toMatch(/^\/(auth\/(status|setup|login|logout)|sync\/(pull|bootstrap|push|logs|attachments|qa-attachments|ws|relay)|session-events)\b/);
       expect(t.samplePath, t.name).not.toMatch(/^\/terminal\/workspace/);
     }
   });
@@ -247,7 +247,7 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   // menimpa berkas di checkout dengan isi berasal dari klien, ekspor menarik email+transkrip klien.
   // Tak satu pun MEMULAI pekerjaan di luar proses hanoman, jadi bukan `danger` berakses — mode
   // `danger`-nya ergonomi (tak terlihat di tingkat default), bukan gerbang.
-  "hanoman_activity_purge", "hanoman_portal_chat_prd_write", "hanoman_portal_chat_export",
+  "hanoman_activity_purge", "hanoman_portal_admin_chat_prd_write", "hanoman_portal_admin_chat_export",
   // ADR-0191 · cron: `scheduler:write` + (create/update/run) `sessions:spawn` yang ditegakkan di
   // HANDLER server, bukan di katalog — katalog hanya menyebut satu capability per tool. Mode
   // `danger`-nya bukan ergonomi belaka: tiga di antaranya membuka sesi berizin penuh secara tertunda.

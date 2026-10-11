@@ -57,10 +57,10 @@ menyembunyikannya dari tingkat default agar tak terpanggil tak sengaja.
 
 | Tool | Mode | Capability |
 |---|---|---|
-| `hanoman_portal_chat_sessions` | baca | `portal-chat:read` |
-| `hanoman_portal_chat_session_get` | baca | `portal-chat:read` |
-| `hanoman_portal_chat_export` | `danger` | `portal-chat:read` |
-| `hanoman_portal_chat_prd_write` | `danger` | `portal-chat:write` |
+| `hanoman_portal_admin_chat_sessions` | baca | `portal-chat:read` |
+| `hanoman_portal_admin_chat_session_get` | baca | `portal-chat:read` |
+| `hanoman_portal_admin_chat_export` | `danger` | `portal-chat:read` |
+| `hanoman_portal_admin_chat_prd_write` | `danger` | `portal-chat:write` |
 
 - **Daftar** selalu mengirim `limit` (default 20): tanpanya server mengembalikan SELURUH sesi.
 - **Detail**: pesan dipaginasi sebagai `items` (agar pemotong ukuran `renderResult` memangkas per
@@ -69,7 +69,7 @@ menyembunyikannya dari tingkat default agar tak terpanggil tak sengaja.
   yang bisa diserahkan klien MCP — multi-baris (string), SATU baris (lolos `JSON.parse` → objek),
   nol baris (`null`/`""`) — lalu memadatkan tiap sesi (pesan dipotong 800, `rawText` dibuang,
   PRD → `prdChars`) dan memaginasinya (default **5** sesi/halaman). Transkrip lengkap satu sesi:
-  `hanoman_portal_chat_session_get`.
+  `hanoman_portal_admin_chat_session_get`.
 - **Tulis PRD**: deskripsi menyebut bahwa berkas bernama sama DITIMPA, bahwa isinya masukan tak
   tepercaya, dan bahwa tool TIDAK membuat backlog (SPEC-854 huruf B tak berubah).
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redactSecrets, redactToken, secretValues } from "../src/mcp/redact";
+import { redactKeepingFresh, redactSecrets, redactToken, secretValues } from "../src/mcp/redact";
 
 describe("redaksi rahasia integrasi (ADR-0193)", () => {
   it("bot token Telegram disensor lewat BENTUKNYA, bukan hanya nilainya", () => {
@@ -18,7 +18,6 @@ describe("redaksi rahasia integrasi (ADR-0193)", () => {
     expect(secretValues(undefined, { password: "p4ssword" })).toEqual([]);
   });
 });
-import { redactKeepingFresh, redactToken } from "../src/mcp/redact";
 
 describe("redactToken", () => {
   it("mengganti token yang dipakai, di mana pun ia muncul", () => {

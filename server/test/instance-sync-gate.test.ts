@@ -14,6 +14,7 @@ const app = buildApp();
 const clean = async () => {
   await prisma.agentToken.deleteMany(); await prisma.setting.deleteMany();
   await prisma.session.deleteMany(); await prisma.user.deleteMany();
+  await prisma.syncConflict.deleteMany();   // tes lain (urutan serial, DB bersama) bisa meninggalkan baris
 };
 const blob = {
   model: "claude-opus-5", effort: "xhigh", autoDefault: true, autoScaffold: true,

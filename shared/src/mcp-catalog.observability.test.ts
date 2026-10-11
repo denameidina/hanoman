@@ -64,24 +64,24 @@ describe("katalog log aktivitas (ADR-0188)", () => {
 
 describe("katalog chat portal operator (ADR-0189)", () => {
   it("capability: baca → portal-chat:read, tulis PRD → portal-chat:write; export & tulis hanya danger", () => {
-    expect(byName("hanoman_portal_chat_sessions").capability).toBe("portal-chat:read");
-    expect(byName("hanoman_portal_chat_session_get").capability).toBe("portal-chat:read");
-    expect(byName("hanoman_portal_chat_export").capability).toBe("portal-chat:read");
-    expect(byName("hanoman_portal_chat_prd_write").capability).toBe("portal-chat:write");
+    expect(byName("hanoman_portal_admin_chat_sessions").capability).toBe("portal-chat:read");
+    expect(byName("hanoman_portal_admin_chat_session_get").capability).toBe("portal-chat:read");
+    expect(byName("hanoman_portal_admin_chat_export").capability).toBe("portal-chat:read");
+    expect(byName("hanoman_portal_admin_chat_prd_write").capability).toBe("portal-chat:write");
     const def = new Set(mcpToolsFor("default").map((t) => t.name));
-    expect(def.has("hanoman_portal_chat_sessions")).toBe(true);
-    expect(def.has("hanoman_portal_chat_export")).toBe(false);
-    expect(def.has("hanoman_portal_chat_prd_write")).toBe(false);
+    expect(def.has("hanoman_portal_admin_chat_sessions")).toBe(true);
+    expect(def.has("hanoman_portal_admin_chat_export")).toBe(false);
+    expect(def.has("hanoman_portal_admin_chat_prd_write")).toBe(false);
   });
 
   it("daftar sesi SELALU mengirim limit — tanpanya server mengembalikan seluruh sesi", () => {
-    const t = byName("hanoman_portal_chat_sessions");
+    const t = byName("hanoman_portal_admin_chat_sessions");
     expect(t.build({ project: "p1" })!.query).toEqual({ project: "p1", limit: "20" });
     expect(t.build({ project: "p1", page: 3, limit: 5 })!.query).toEqual({ project: "p1", page: "3", limit: "5" });
   });
 
   it("tulis PRD merakit path ter-encode dan body {slug}", () => {
-    expect(byName("hanoman_portal_chat_prd_write").build({ session: "a/b", slug: "fitur-x" })).toEqual({
+    expect(byName("hanoman_portal_admin_chat_prd_write").build({ session: "a/b", slug: "fitur-x" })).toEqual({
       method: "POST", path: "/portal-chat/sessions/a%2Fb/prd", body: { slug: "fitur-x" },
     });
   });
@@ -99,7 +99,7 @@ describe("katalog chat portal operator (ADR-0189)", () => {
   });
 
   it("detail sesi: pesan jadi `items` terpaginasi, teks dipotong, rawText hanya untuk yang tertolak", () => {
-    const out = byName("hanoman_portal_chat_session_get").shape(sess("s1"), {}) as Record<string, unknown>;
+    const out = byName("hanoman_portal_admin_chat_session_get").shape(sess("s1"), {}) as Record<string, unknown>;
     expect(out.clientEmail).toBe("klien@x.co");
     expect(out.prdChars).toBe(106);
     const items = out.items as Record<string, unknown>[];
@@ -112,7 +112,7 @@ describe("katalog chat portal operator (ADR-0189)", () => {
   });
 
   describe("ekspor NDJSON — tiga bentuk yang bisa diserahkan klien MCP", () => {
-    const t = byName("hanoman_portal_chat_export");
+    const t = byName("hanoman_portal_admin_chat_export");
     const ndjson = `${JSON.stringify(sess("s1"))}\n${JSON.stringify(sess("s2"))}\n`;
 
     it("banyak baris → string: tiap sesi dipadatkan, PRD jadi prdChars, rawText hilang", () => {

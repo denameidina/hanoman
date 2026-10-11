@@ -130,7 +130,7 @@ describe("agent-tokens · pagar tak-eskalasi-diri", () => {
     const a = await agent(["tokens:read"]);
     const r = await call("GET", "/api/agent-tokens/capabilities", a.token);
     expect(r.statusCode).toBe(200);
-    expect(r.json().capabilities.length).toBe(48);
+    expect(r.json().capabilities.length).toBe(66);
     // manusia: tanpa pagar — cookie menaikkan ke capability apa pun, seperti sebelumnya.
     const open = buildApp({ requireAuth: false });
     const c = await open.inject({ method: "POST", url: "/api/agent-tokens", payload: { name: "m", capabilities: ["vps:exec", "access:admin"] } });
@@ -362,11 +362,11 @@ describe("yang TETAP cookie-only tak bisa dibuka capability apa pun", () => {
     "tokens:write", "devices:write", "access:admin", "remote:control", "relay:exec", "logs:write",
     "metrics:write", "settings:write", "sessions:spawn", "projects:write",
   ];
-  it("terminal/workspace, sync, portal, client-accounts, webhooks → 403 cookie-only walau token memegang semuanya", async () => {
+  it("terminal/workspace → 403 cookie-only walau token memegang semuanya", async () => {
     const a = await agent(ALL);
     for (const [m, url] of [
       ["GET", "/api/terminal/workspace"], ["PUT", "/api/terminal/workspace"],
-      ["POST", "/api/sync/now"], ["GET", "/api/portal/projects"], ["GET", "/api/client-accounts"], ["GET", "/api/webhooks"],
+      
     ] as const) {
       const r = await call(m, url, a.token, m === "PUT" ? {} : undefined);
       expect(r.statusCode, `${m} ${url}`).toBe(403);

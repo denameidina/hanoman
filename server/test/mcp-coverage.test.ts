@@ -79,6 +79,11 @@ const UNWRAPPED = new Map<string, string>([
 // Dicatat di sini dengan NAMA tool-nya, bukan sekadar di-skip: bila tool-nya berganti nama atau
 // hilang, assert di bawah merah — jadi daftar ini tak bisa jadi tempat menyembunyikan route.
 const COVERED_BY_BRANCH = new Map<string, string>([
+  // ADR-0197 · satu tool `hanoman_device_relay` memilih method menurut argumen (relay meneruskan SEMUA method).
+  ["GET /devices/:deviceId/relay/*", "hanoman_device_relay"],
+  ["PUT /devices/:deviceId/relay/*", "hanoman_device_relay"],
+  ["PATCH /devices/:deviceId/relay/*", "hanoman_device_relay"],
+  ["DELETE /devices/:deviceId/relay/*", "hanoman_device_relay"],
   ["GET /projects/:id/prds", "hanoman_prds_list"],
   ["GET /projects/:id/graph/search", "hanoman_ide_graph"],
   ["GET /projects/:id/compare/file", "hanoman_ide_compare"],
