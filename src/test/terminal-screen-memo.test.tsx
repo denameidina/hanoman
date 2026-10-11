@@ -26,7 +26,8 @@ vi.mock("../src/api/client", () => ({
 }));
 vi.mock("../src/api/events", () => ({ subscribe: () => () => {} }));
 
-beforeEach(() => { localStorage.clear(); renders.n = 0; });
+// Pengukuran render Cell: butuh mode grid (default kini "Fokus", Fase 3E).
+beforeEach(() => { localStorage.clear(); localStorage.setItem("hn.ui.v1.terminal.view", JSON.stringify("grid")); renders.n = 0; });
 
 describe("TerminalScreen memo (SPEC-1267 · AC-S28)", () => {
   it("prop handler baru dengan perilaku sama tak merender ulang Cell", async () => {

@@ -32,7 +32,7 @@ beforeEach(() => {
 
 const openModel = () => {
   render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
+  fireEvent.click(screen.getByRole("button", { name: "Agen & model" }));
 };
 
 // SPEC-383 · Temuan B · ADR-0081 · sesi penyelesai konflik rebase/merge punya default sendiri.

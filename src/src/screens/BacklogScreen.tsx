@@ -1,10 +1,19 @@
-/* BacklogScreen — specs on the brainstorm → execute lifecycle.
-   Ported; spec.project → spec.projectId; window → ds imports. */
+/* BacklogScreen — item backlog di sepanjang siklus brainstorm → execute.
+
+   Redesign Audit UI/UX 2026-10 · Fase 3D:
+   - Tampilan utama = DAFTAR (RowList) ber-segmen tahap. Papan (kolom = tahap, drag-drop) tetap ada
+     sebagai tampilan sekunder dengan hint terlihat; tombol di kartu adalah jalur keyboard yang sama.
+   - Tiap baris/kartu: judul + tahap + titik prioritas + SATU aksi primer sadar-tahap; sisanya ⋯.
+   - Metadata (project, penulis, tanggal, branch) pindah ke detail. Detail berurutan: Ringkasan →
+     Jalankan → Review/Dokumen/Lampiran → Lanjutan (terlipat) → Zona berbahaya.
+   - Segmen tahap dikelompokkan di klien (server hanya menyaring satu nilai `stage` persis). Karena
+     itu daftar mengambil himpunan terfilter penuh lalu dipaginasi di klien — kontrak API tak berubah.
+   - Ported; spec.project → spec.projectId; window → ds imports. */
 import React from "react";
 import {
-  Card, Badge, Tabs, Select, Button, Icon, Checkbox, serverPage, Pager, Modal, StateBlock, Input,
-  Field, HnTextarea, LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE,
-  OverflowActions, useConfirm, type OverflowItem,
+  Badge, Button, Icon, OverflowActions, Tabs, Select, Checkbox, Input, Field, HnTextarea, Modal,
+  StateBlock, Pager, serverPage, SkeletonList, StatusPill, FilterBar, RowList, DenseRow, Stack,
+  useConfirm, useToast, ToastHost, type OverflowItem, type FilterChip,
 } from "../ds";
 import { api, ApiError, type SourceResetPending } from "../api/client";
 import { failureMessage } from "../lib/report-error";
@@ -21,14 +30,14 @@ import {
 import { ChangeSourceDialog } from "./ChangeSourceDialog";
 import { MarkDoneDialog, type MarkDoneResult } from "./MarkDoneDialog";
 import {
-  usePersistedState, useScrollRestore, useResetOnChange, ResetViewButton,
-  oneOf, isStr, isNum, nullableStr,
+  usePersistedState, useScrollRestore, useResetOnChange, oneOf, isStr, isNum, nullableStr,
 } from "../ui-state";
 import type { Spec, SpecListItem, SpecSlim } from "./types";
 import type { ProjectVM } from "./types";
 import type { AuditEscalation } from "@hanoman/shared";
 import { AUTO_MERGE_OFF, autoMergeSummary, resolveAutoMerge, payloadShapeFor, type AutoMerge } from "@hanoman/shared";
 import { PresenceChip } from "./PresenceChip";
+import "./styles/backlog.css";
 
 // Kosakata stage frontend (key → label). Di-reuse oleh BacklogPicker di TerminalScreen (SPEC-179).
 export const B_STAGES = [
@@ -46,17 +55,53 @@ const STAGE_HINT: Record<string, string> = {
   executing: "Execute: kode dikerjakan di worktree sesi",
   done: "Done: item selesai",
 };
-// Satu kata kerja untuk memulai/melanjutkan sesi agen. Dipakai kartu DAN detail — dulu detail hanya
-// punya tombol untuk item yang sudah selesai, sehingga item yang belum selesai tak punya jalan agen.
+
+// Segmen tahap di baris filter. Enam tahap lifecycle dikelompokkan jadi empat segmen. "Review" BUKAN
+// segmen: model data tak punya tahap review (`Spec.stage` berhenti di `done`); tinjauan adalah aksi
+// "Review perubahan" pada item, bukan posisinya di siklus.
+export type StageGroup = "all" | "brainstorm" | "spec" | "doing" | "done";
+export const STAGE_GROUPS: readonly { key: StageGroup; label: string; stages: readonly string[] }[] = [
+  { key: "all", label: "Semua", stages: B_STAGES.map((s) => s.key) },
+  { key: "brainstorm", label: "Brainstorm", stages: ["brainstorming", "objective"] },
+  { key: "spec", label: "Spec", stages: ["spec-ready", "planned"] },
+  { key: "doing", label: "Dikerjakan", stages: ["executing"] },
+  { key: "done", label: "Selesai", stages: ["done"] },
+];
+export const inStageGroup = (stage: string, group: StageGroup): boolean =>
+  group === "all" || (STAGE_GROUPS.find((g) => g.key === group)?.stages.includes(stage) ?? false);
+// Nama segmen dipakai juga sebagai label pil tahap di baris, supaya kosakatanya sama dengan segmen.
+const groupLabelOf = (stage: string): string =>
+  STAGE_GROUPS.find((g) => g.key !== "all" && g.stages.includes(stage))?.label ?? stage;
+const STAGE_STATUS: Record<string, "idle" | "queued" | "running" | "done"> = {
+  brainstorming: "idle", objective: "idle", "spec-ready": "queued", planned: "queued", executing: "running", done: "done",
+};
+
+// Satu kata kerja untuk memulai/melanjutkan sesi agen. Dipakai baris DAN kartu DAN detail.
 const startLabel = (stage: string) => (stage === "brainstorming" ? "Mulai" : "Lanjutkan");
-// Satu sumber label prioritas untuk board, grid, list, dan detail. Warnanya aksen (brass), BUKAN
+// Satu sumber label prioritas untuk papan, daftar, dan detail. Warnanya aksen (brass), BUKAN
 // `err`: `err` dipesan untuk gagal/terblokir, dan sumber QA sudah memakainya.
-const B_PRIO: Record<string, { tone: "brass" | "neutral"; label: string }> = {
-  tinggi: { tone: "brass", label: PRIORITY_LABEL.tinggi },
-  sedang: { tone: "neutral", label: PRIORITY_LABEL.sedang },
-  rendah: { tone: "neutral", label: PRIORITY_LABEL.rendah },
+const B_PRIO: Record<string, { tone: "brass" | "neutral"; label: string; level: "high" | "mid" | "low" }> = {
+  tinggi: { tone: "brass", label: PRIORITY_LABEL.tinggi, level: "high" },
+  sedang: { tone: "neutral", label: PRIORITY_LABEL.sedang, level: "mid" },
+  rendah: { tone: "neutral", label: PRIORITY_LABEL.rendah, level: "low" },
 };
 const prioMeta = (priority: string) => B_PRIO[priority] ?? B_PRIO.sedang!;
+// Opsi sumber di popover Filter. Label sama dengan tab lama supaya kosakatanya tak bergeser.
+const SOURCE_FILTER_OPTS = [
+  { value: "all", label: "Semua sumber" }, { value: "brief", label: "Dari brief" },
+  { value: "qa", label: "Dari QA" }, { value: "audit", label: "Audit" }, { value: "goal", label: "Goal" },
+  { value: "help", label: "Help Center" }, { value: "no_effort", label: "Tanpa effort" },
+];
+const PRIO_FILTER_OPTS = [
+  { value: "all", label: "Semua prioritas" }, { value: "tinggi", label: "Tinggi" },
+  { value: "sedang", label: "Sedang" }, { value: "rendah", label: "Rendah" },
+];
+// Keterangan sumber dengan istilah teknis. Sumber tanpa entri tak menampilkan apa pun.
+const TAB_HINT: Record<string, string> = {
+  audit: "Audit: hasil pemeriksaan project. Dari sini bisa dinaikkan jadi Finding QA, feature brief, atau PRD.",
+  goal: "Goal: item dengan tujuan terukur. Dikerjakan dua fase (Goal lalu Verifikasi) tanpa tahap perencanaan.",
+  no_effort: "Tanpa effort: tugas remeh yang dikerjakan satu fase, tanpa perencanaan maupun verifikasi.",
+};
 // SPEC-546 · ADR-0109 · katalog source (lencana, opsi, daftar field per bentuk) pindah ke
 // `source-meta.ts` supaya dialog "Ubah type" memakai katalog yang SAMA — dua katalog pasti
 // berselisih. Re-export menjaga pemakai lama (TerminalScreen, test) tetap tersambung.
@@ -75,35 +120,55 @@ function BlockedBadge({ spec }: { spec: SpecListItem }) {
       title={bl.map((b) => `${b.id} — ${blockLabel(b.reason)}`).join(" · ")}>Terblokir</Badge>
   );
 }
+
+// Titik prioritas: bentuk (penuh / berisi / berlubang) + teks tersembunyi, jadi maknanya tetap
+// terbaca tanpa warna. Label lengkapnya ada di detail.
+function PrioDot({ priority }: { priority: string }) {
+  const p = prioMeta(priority);
+  return (
+    <span className={`hn-bl-prio hn-bl-prio-${p.level}`} title={`Prioritas ${p.label}`}>
+      <span className="hn-sr-only">Prioritas {p.label}</span>
+    </span>
+  );
+}
+
+// Asal item (brief/QA/audit/…) sebagai teks meta, bukan lencana: menentukan jalur lanjutnya, dan
+// tak dihitung ke batas dua lencana per baris.
+function SourceTag({ source }: { source: string }) {
+  const m = sourceMeta(source);
+  return (
+    <span className="hn-bl-source">
+      <Icon name={m.icon} size={12} color={m.color} />
+      {m.label}
+    </span>
+  );
+}
+
+function StagePill({ stage }: { stage: string }) {
+  return (
+    <StatusPill status={STAGE_STATUS[stage] ?? "idle"} size="sm" variant="dot" className="hn-bl-stage-pill"
+      title={STAGE_HINT[stage]}>{groupLabelOf(stage)}</StatusPill>
+  );
+}
+
+// Progres tahap penuh untuk detail. role="progressbar": tahap aktif sebagai nilai (0 = Brainstorm …
+// 5 = Done); nama aksesibel tetap "Status <tahap>" (dipakai test & layar).
 function StageBar({ stage }: { stage: string }) {
   const idx = bStageIndex(stage);
   const label = B_STAGES[idx]?.label ?? stage;
-  // role="progressbar": tahap aktif sebagai nilai (0 = Brainstorm … 5 = Done), bukan `div` berlabel
-  // yang tak diumumkan pembaca layar. Nama aksesibel tetap "Status <tahap>" (dipakai test & layar).
   return (
     <div role="progressbar" aria-label={`Status ${label}`} aria-valuemin={0}
       aria-valuemax={B_STAGES.length - 1} aria-valuenow={Math.max(idx, 0)} aria-valuetext={label}
-      style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      className="hn-bl-stagebar">
       {B_STAGES.map((s, i) => {
         const done = i < idx || stage === "done";
         const active = i === idx && stage !== "done";
+        const state = done ? "done" : active ? "active" : "todo";
         return (
-          <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span title={STAGE_HINT[s.key]} style={{
-              display: "inline-flex", alignItems: "center", gap: 5,
-              padding: active ? "3px 9px" : 0, borderRadius: "var(--radius-pill)",
-              background: active ? "var(--brass-100)" : "transparent",
-            }}>
-              <span style={{
-                width: 8, height: 8, borderRadius: "50%",
-                background: done ? "var(--leaf-500)" : active ? "var(--brass-500)" : "var(--bone-400)"
-              }} />
-              {active && <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 500, color: "var(--brass-700)" }}>{s.label}</span>}
-            </span>
-            {i < B_STAGES.length - 1 && (
-              <span style={{ width: 12, height: 1.5, background: (i < idx || stage === "done") ? "var(--leaf-500)" : "var(--bone-300)" }} />
-            )}
-          </div>
+          <span key={s.key} className="hn-bl-stage" data-state={state} title={STAGE_HINT[s.key]}>
+            <span className="hn-bl-stage-dot" aria-hidden="true" />
+            {active && <span className="hn-bl-stage-label">{s.label}</span>}
+          </span>
         );
       })}
     </div>
@@ -112,11 +177,9 @@ function StageBar({ stage }: { stage: string }) {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div className="hn-eyebrow" style={{ marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 13.5, color: "var(--text-strong)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-        {value || "—"}
-      </div>
+    <div className="hn-bl-field">
+      <div className="hn-eyebrow">{label}</div>
+      <div className="hn-bl-field-value">{value || "—"}</div>
     </div>
   );
 }
@@ -137,7 +200,15 @@ const isAuditSource = (source: string) => source === "audit";
 // belum dimuat (`null` = memang tak punya payload).
 type DetailSpec = SpecListItem & { payload?: Spec["payload"]; sourceHistory?: Spec["sourceHistory"] };
 
-function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, projectPolicy, allSpecs, onAttachmentToast, running, onOpenRun }:
+// Aksi yang dibawa daftar & papan. Satu tempat supaya baris, kartu, dan detail membaca kontrak yang sama.
+type ItemActions = {
+  onStart?: (s: SpecSlim) => void; onDelete?: (s: SpecSlim) => void; onOpenRun?: (s: SpecSlim) => void;
+  onOpenReview?: (s: SpecSlim) => void;
+  onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+  running?: boolean;
+};
+
+function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, onRequestDelete, onUndoable, projectPolicy, allSpecs, onAttachmentToast, running, onOpenRun, projectName, presenceOn }:
   {
     spec: DetailSpec | null; onClose: () => void; onEditBranch?: (s: SpecSlim, b: string | null) => void;
     onRevertStage?: (s: SpecSlim, target: string, confirmDelete?: boolean) => Promise<any>;
@@ -157,21 +228,25 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
     // gerbangnya soal peluncuran BERIKUTNYA, bukan konten yang sedang dikerjakan sesi hidup.
     onEditDeps?: (s: SpecSlim, ids: string[]) => void;
     // SPEC-486 · ADR-0103 · override kebijakan auto-merge item ini (null = kembali ikut project).
-    // Alasan yang sama dengan onEditDeps: ia menggerbangi apa yang terjadi SESUDAH kerja.
     onEditAutoMerge?: (s: SpecSlim, v: AutoMerge | null) => void;
-    // SPEC-546 · ADR-0109 · ubah type/source item in-place. Boleh ditawarkan kapan saja:
-    // gerbangnya ditegakkan server, dan dialog mencerminkannya.
-    // ADR-0149 · mengembalikan rencana reset (atau null) supaya dialog bisa menampilkan daftar
-    // apa yang hilang dan meminta konfirmasi sebelum satu byte pun terhapus.
+    // SPEC-546 · ADR-0109 · ubah type/source item in-place. ADR-0149 · mengembalikan rencana reset
+    // (atau null) supaya dialog bisa menampilkan daftar apa yang hilang sebelum satu byte terhapus.
     onChangeSource?: (s: SpecListItem, source: string, payload?: unknown, confirmReset?: boolean)
       => Promise<SourceResetPending | null> | void;
+    // Hapus = konfirmasi dulu (useConfirm di BacklogScreen). Tombolnya ada di zona berbahaya.
+    onRequestDelete?: (s: SpecSlim) => void;
+    // Aksi yang bisa dibatalkan: dipanggil dengan pesan dan fungsi urung. Toast dirender BacklogScreen.
+    onUndoable?: (message: string, undo: () => void) => void;
     projectPolicy?: unknown;   // Project.autoMerge — untuk label "Ikut project (…)"
+    projectName?: string;
     allSpecs?: SpecSlim[];
     // SPEC-843 · ADR-0124 · hasil unggah/hapus lampiran. Bentuknya `AttachmentToast`, bukan
     // `onToast` layar (yang bersignature toast App); panel lampiran tak perlu tahu ikon.
     onAttachmentToast?: AttachmentToast;
     // Sesi hidup untuk item ini: CTA berubah jadi "Buka sesi" (sama dengan kartunya).
     running?: boolean; onOpenRun?: (s: SpecSlim) => void;
+    // SPEC-919 · ADR-0147 · penanda LIVE lintas device untuk item ini.
+    presenceOn?: string[];
   }) {
   // Hook HARUS mendahului early-return `if (!spec)` — rules-of-hooks.
   const [branches, setBranches] = React.useState<string[]>([]);
@@ -182,6 +257,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
   const [stageBusy, setStageBusy] = React.useState(false);
   const stageBusyRef = React.useRef(false);
   const [showIntegrate, setShowIntegrate] = React.useState(false);
+  const [showDocs, setShowDocs] = React.useState(false);
   // SPEC-546 · ADR-0109 · dialog "Ubah type".
   const [showSource, setShowSource] = React.useState(false);
   // SPEC-186 · konten hanya boleh diubah selagi item masih di backlog & belum pernah dimulai.
@@ -223,6 +299,13 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
       : { title: form.title, priority: form.priority, payload: { context: form.context, outcome: form.outcome, constraints: form.constraints, priority: form.priority } };
     onEditSpec(spec, patch);
     setEditing(false);
+  };
+  // Prioritas diubah langsung (tanpa form), dan bisa diurungkan. Hanya selagi item masih boleh diedit.
+  const changePriority = (next: string) => {
+    if (!spec || !onEditSpec || next === spec.priority) return;
+    const prev = spec.priority;
+    onEditSpec(spec, { priority: next });
+    onUndoable?.(`Prioritas ${spec.id} diubah ke ${prioMeta(next).label}`, () => onEditSpec(spec, { priority: prev }));
   };
   const projectId = spec?.projectId;
   React.useEffect(() => {
@@ -280,292 +363,310 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
   // menolak keduanya). Diambil dari daftar yang sudah dimuat layar — tanpa fetch tambahan.
   const depPickList = (allSpecs ?? []).filter((c) => c.projectId === spec.projectId && c.id !== spec.id);
   const fields: readonly (readonly [string, string, string])[] = SHAPE_FIELDS[shape]!;
+  const src = sourceMeta(spec.source);
   return (
-    <Modal open title={spec.title} eyebrow={spec.id + " · " + spec.projectId}
-      icon={sourceMeta(spec.source).icon} onClose={closeDetail}>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
-        <Badge tone={sourceMeta(spec.source).tone} size="sm">{sourceMeta(spec.source).label}</Badge>
-        <Badge tone={prioMeta(spec.priority).tone} size="sm" variant="outline" title={`Prioritas ${prioMeta(spec.priority).label}`}>
-          {prioMeta(spec.priority).label}
-        </Badge>
-        <Badge tone="neutral" size="sm">{spec.author}</Badge>
-        <span style={{ flex: 1 }} />
-        {/* Aksi utama item yang belum selesai = jalankan agen, sama dengan kartunya (satu kata kerja). */}
-        {spec.stage !== "done" && running && (
-          <Button size="sm" variant="primary" leftIcon="terminal" onClick={() => onOpenRun && onOpenRun(spec)}>
-            Buka sesi
-          </Button>
-        )}
-        {spec.stage !== "done" && !running && onStart && (
-          <Button size="sm" variant="primary" leftIcon="play" onClick={() => onStart(spec)}>
-            {startLabel(spec.stage)}
-          </Button>
-        )}
-        {/* SPEC-186 · edit konten selagi item masih di backlog & belum dimulai. */}
-        {editable && !editing && (
-          <Button size="sm" variant="secondary" leftIcon="pencil" onClick={startEdit}>Edit</Button>
-        )}
-        {/* SPEC-546 · ADR-0109 · ubah type/source in-place. Tak digerbangi `editable`: item yang
-            sudah dimulai tetap boleh berpindah ke source ber-flow sama (dialog yang menyaring). */}
-        {onChangeSource && (
-          <Button size="sm" variant="secondary" leftIcon="shuffle"
-            onClick={() => setShowSource(true)}>Ubah type</Button>
-        )}
-        {/* SPEC-171 · buka layar review all files + file changed dari worktree. */}
-        {onOpenReview && (
-          <Button size="sm" variant="secondary" leftIcon="git-compare"
-            onClick={() => { onOpenReview(spec); onClose(); }}>Review perubahan</Button>
-        )}
-      </div>
-      <div style={{ marginBottom: 18 }}>
-        <StageBar stage={spec.stage} />
-        {/* SPEC-172 · reopen sesi hanya di detail (bukan list/grid/board): spec yang keburu
-            `done` bisa dibuka lagi untuk melanjutkan sisa kerja (lanjut di fase Execute). */}
-        {spec.stage === "done" && onStart && (
-          <div style={{ marginTop: 12 }}>
-            <Button size="sm" variant="primary" leftIcon="play" onClick={() => onStart(spec)}>
-              Buka sesi lagi
-            </Button>
+    <Modal open title={spec.title} eyebrow={spec.id}
+      icon={src.icon} onClose={closeDetail} width={600}>
+      <div className="hn-bl-detail">
+        {/* 1 · Ringkasan: keadaan, rincian, dan isi item. */}
+        <section className="hn-bl-section" aria-labelledby="bl-sec-ringkasan">
+          <h3 id="bl-sec-ringkasan" className="hn-bl-section-title">Ringkasan</h3>
+          <div className="hn-bl-summary-meta">
+            <StagePill stage={spec.stage} />
+            <span className="hn-bl-prio-text">
+              <PrioDot priority={spec.priority} />{prioMeta(spec.priority).label}
+            </span>
+            <BlockedBadge spec={spec} />
+            <PresenceChip names={presenceOn} />
           </div>
-        )}
-        {/* SPEC-237 · audit tetap doc-of-record. SPEC-340 · ADR-0076 · tiga pintu eskalasi:
-            target rekomendasi disorot (primary + badge), sisanya secondary — ketiganya selalu
-            tersedia karena manusia yang terakhir memutuskan. */}
-        {isAuditSource(spec.source) && (onPromoteToQa || onPromoteToBrief || onPromoteToPrd) && (
-          <div style={{ marginTop: 12 }}>
-            <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Tindak lanjut</div>
-            {esc && (
-              <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 8 }}>
-                {esc.target === "none"
-                  ? <span>Audit menilai <strong>cukup jawaban</strong> — tak perlu perbaikan.</span>
-                  : <span><Badge tone="brass" size="sm">direkomendasikan hanoman</Badge>{" "}{ESC_LABEL[esc.target]}</span>}
-                {esc.reason ? <div style={{ marginTop: 4 }}>{esc.reason}</div> : null}
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {onPromoteToQa && (
-                <Button size="sm" variant={escVariant(esc, "qa")} leftIcon="bug"
-                  onClick={() => onPromoteToQa(spec, esc)}>Jadikan Finding QA</Button>
-              )}
-              {onPromoteToBrief && (
-                <Button size="sm" variant={escVariant(esc, "brief")} leftIcon="lightbulb"
-                  onClick={() => onPromoteToBrief(spec, esc)}>Jadikan Feature brief</Button>
-              )}
-              {onPromoteToPrd && (
-                <Button size="sm" variant={escVariant(esc, "prd")} leftIcon="scroll-text"
-                  onClick={() => onPromoteToPrd(spec, esc)}>Jadikan PRD</Button>
-              )}
+          <StageBar stage={spec.stage} />
+          {editing ? (
+            <Field label="Judul"><Input value={form.title ?? ""} onChange={setField("title")}
+              placeholder="mis. Jadwal invoice berulang" className="hn-bl-full" /></Field>
+          ) : (
+            <DetailRow label="Tujuan" value={spec.objective} />
+          )}
+          {/* Rincian yang dulu memenuhi kartu: project, penulis, tanggal, branch asal. */}
+          <dl className="hn-bl-facts">
+            <div><dt>Project</dt><dd>{projectName ?? spec.projectId}</dd></div>
+            <div><dt>Penulis</dt><dd>{spec.author || "—"}</dd></div>
+            <div><dt>Dibuat</dt><dd>{fmtCreated(spec.createdAt) || "—"}</dd></div>
+            <div><dt>Branch asal</dt><dd>{spec.branchFrom || "—"}</dd></div>
+          </dl>
+          {editable && !editing && (
+            <div className="hn-bl-inline-row">
+              <Select size="sm" aria-label="Prioritas item ini" value={spec.priority}
+                onChange={(e) => changePriority(e.target.value)}
+                options={PRIO_OPTS} />
+              <Button size="sm" variant="secondary" leftIcon="pencil" onClick={startEdit}>Edit</Button>
             </div>
-          </div>
-        )}
-        {/* SPEC-175 · rebase/merge branch hasil done spec ke target pilihan (lokal/origin). */}
-        {spec.stage === "done" && onIntegrate && (
-          <div style={{ marginTop: 12 }}>
-            <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Integrasi</div>
-            <Button size="sm" variant="secondary" leftIcon="git-merge" onClick={() => setShowIntegrate(true)}>
-              Rebase / Merge
-            </Button>
-          </div>
-        )}
-        {(onRevertStage || onMarkDone) && (
-          <div style={{ marginTop: 12 }}>
-            <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Ubah status</div>
-            <div style={{ fontSize: 13, color: "var(--text-strong)", fontWeight: 600, marginBottom: 6 }}>
-              {`Status saat ini: ${currentStageLabel}`}
-            </div>
-            {/* SPEC-804 · ADR-0120 · satu blok, dua arah: maju ke selesai di sini, mundur di bawah. */}
-            {spec.stage !== "done" && onMarkDone && (
-              <div style={{ marginBottom: 10 }}>
-                <Button size="sm" variant="secondary" leftIcon="circle-check"
-                  onClick={() => setMarkDone(true)}>Tandai selesai</Button>
+          )}
+          {editing ? (
+            <>
+              {!qa && (
+                <Field label="Prioritas">
+                  <Select value={form.priority ?? "sedang"} onChange={setField("priority")} options={PRIO_OPTS} className="hn-bl-full" />
+                </Field>
+              )}
+              {fields.map(([k, label, ph]) => (
+                <Field key={k} label={label}>
+                  {k === "severity"
+                    ? <Select value={form[k] ?? "major"} onChange={setField(k)} options={SEV_OPTS} className="hn-bl-full" />
+                    : <HnTextarea value={form[k] ?? ""} onChange={setField(k)} rows={2} placeholder={ph} />}
+                </Field>
+              ))}
+              <div className="hn-bl-inline-row hn-bl-end">
+                <Button size="sm" variant="secondary" onClick={() => setEditing(false)}>Batal</Button>
+                <Button size="sm" variant="primary" leftIcon="check" onClick={saveEdit}>Simpan</Button>
               </div>
+            </>
+          ) : (
+            fields.map(([k, label]) => <DetailRow key={k} label={label} value={p[k] ?? ""} />)
+          )}
+          {/* SPEC-804 · ADR-0120 · jejak penandaan manual. Hanya muncul bila item memang ditandai manusia. */}
+          {spec.manualDone && (
+            <div className="hn-bl-field" data-testid="manual-done-trail">
+              <div className="hn-eyebrow">Ditandai selesai manual</div>
+              <div className="hn-bl-field-value hn-bl-muted">
+                {spec.manualDone.by} · {new Date(spec.manualDone.at).toLocaleString("id-ID")}
+                {spec.manualDone.reason ? <div className="hn-bl-gap-top">{spec.manualDone.reason}</div> : null}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* 2 · CTA utama: satu aksi, semua tahap. Sesi hidup = "Buka sesi". */}
+        <div className="hn-bl-cta">
+          {running && onOpenRun && (
+            <Button variant="primary" leftIcon="terminal" onClick={() => onOpenRun(spec)}>Buka sesi</Button>
+          )}
+          {!running && onStart && (
+            <Button variant="primary" leftIcon="play" onClick={() => onStart(spec)}>Jalankan</Button>
+          )}
+          {spec.stage === "done" && (
+            <span className="hn-bl-hint">Sesi baru melanjutkan sisa kerja item ini.</span>
+          )}
+        </div>
+
+        {/* 3 · Review, dokumen, lampiran. */}
+        <section className="hn-bl-section" aria-labelledby="bl-sec-review">
+          <h3 id="bl-sec-review" className="hn-bl-section-title">Review, dokumen, dan lampiran</h3>
+          <div className="hn-bl-inline-row">
+            {onOpenReview && (
+              <Button size="sm" variant="secondary" leftIcon="git-compare"
+                onClick={() => { onOpenReview(spec); onClose(); }}>Review perubahan</Button>
             )}
-            {!onRevertStage ? null : earlier.length > 0 ? (
-              <>
-                <Select size="sm" aria-label="Kembalikan stage" value={stageTarget}
-                  onChange={(e) => setStageTarget(e.target.value)} disabled={stageBusy}
-                  placeholder="Pilih status lebih awal…"
-                  options={earlier.map((s) => ({ value: s.key, label: "← " + s.label }))} />
-                <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5, marginTop: 6 }}>
-                  Status saat ini dan status berikutnya tidak dapat dipilih. Kemajuan hanya berasal dari fase sesi.
+            <Button size="sm" variant="secondary" leftIcon="file-text" onClick={() => setShowDocs(true)}>Lihat dokumen</Button>
+          </div>
+          {/* SPEC-237 · audit tetap doc-of-record. SPEC-340 · ADR-0076 · tiga pintu eskalasi:
+              target rekomendasi disorot (primary + badge), sisanya secondary — ketiganya selalu
+              tersedia karena manusia yang terakhir memutuskan. */}
+          {isAuditSource(spec.source) && (onPromoteToQa || onPromoteToBrief || onPromoteToPrd) && (
+            <div className="hn-bl-subsection">
+              <div className="hn-eyebrow">Tindak lanjut</div>
+              {esc && (
+                <div className="hn-bl-hint">
+                  {esc.target === "none"
+                    ? <span>Audit menilai <strong>cukup jawaban</strong> — tak perlu perbaikan.</span>
+                    : <span><Badge tone="brass" size="sm">direkomendasikan hanoman</Badge>{" "}{ESC_LABEL[esc.target]}</span>}
+                  {esc.reason ? <div className="hn-bl-gap-top">{esc.reason}</div> : null}
                 </div>
-                {stageTarget && (
-                  <div style={{
-                    border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)",
-                    background: "var(--bone-100)", padding: 10, marginTop: 8, fontSize: 12.5,
-                    color: "var(--text-muted)", lineHeight: 1.5,
-                  }}>
-                    <div style={{ color: "var(--text-strong)", fontWeight: 600 }}>
-                      {currentStageLabel} → {targetStageLabel}
-                    </div>
-                    Fase sesi yang sudah berjalan tidak dibatalkan. Dokumen Spec/Plan di atas target
-                    mungkin perlu dihapus setelah konfirmasi; kode dan commit tidak disentuh.
+              )}
+              <div className="hn-bl-inline-row">
+                {onPromoteToQa && (
+                  <Button size="sm" variant={escVariant(esc, "qa")} leftIcon="bug"
+                    onClick={() => onPromoteToQa(spec, esc)}>Jadikan Finding QA</Button>
+                )}
+                {onPromoteToBrief && (
+                  <Button size="sm" variant={escVariant(esc, "brief")} leftIcon="lightbulb"
+                    onClick={() => onPromoteToBrief(spec, esc)}>Jadikan Feature brief</Button>
+                )}
+                {onPromoteToPrd && (
+                  <Button size="sm" variant={escVariant(esc, "prd")} leftIcon="scroll-text"
+                    onClick={() => onPromoteToPrd(spec, esc)}>Jadikan PRD</Button>
+                )}
+              </div>
+            </div>
+          )}
+          {/* SPEC-843 · ADR-0124 · lampiran boleh ditambah/dihapus KAPAN SAJA, termasuk selagi sesi
+              berjalan — server memateralisasi ulang dan fase berikutnya membacanya. */}
+          <SpecAttachmentsPanel specId={spec.id} onToast={onAttachmentToast ?? (() => {})} />
+        </section>
+
+        {/* 4 · Lanjutan: terlipat, karena tak dibutuhkan setiap kali item dibuka. */}
+        <details className="hn-bl-advanced" data-testid="spec-advanced">
+          <summary>Lanjutan</summary>
+          <div className="hn-bl-advanced-body">
+            {/* SPEC-143 · dapat diubah selama item masih di backlog; hanya menentukan basis run berikutnya. */}
+            <div className="hn-bl-subsection">
+              <div className="hn-eyebrow">Branch worktree</div>
+              <Select size="sm" value={spec.branchFrom ?? ""} disabled={!branches.length}
+                onChange={(e) => onEditBranch && onEditBranch(spec, e.target.value || null)}
+                options={branchOptions(branches, remoteOnly)} />
+            </div>
+            {/* SPEC-447 · ADR-0093 · siapa yang ditunggu item ini, dan kenapa. */}
+            <div className="hn-bl-subsection">
+              <div className="hn-eyebrow">Bergantung pada</div>
+              {(spec.dependsOn ?? []).length === 0 ? (
+                <div className="hn-bl-hint">— berdiri sendiri</div>
+              ) : (
+                <div className="hn-bl-stack-list">
+                  {(spec.dependsOn ?? []).map((depId) => {
+                    const b = (spec.blockedBy ?? []).find((x) => x.id === depId);
+                    return (
+                      <div key={depId} className="hn-bl-dep">
+                        <span className="hn-bl-id">{depId}</span>
+                        {b
+                          ? <Badge tone="warn" size="sm">{blockLabel(b.reason)}</Badge>
+                          : <Badge tone="ok" size="sm" icon="check">selesai &amp; ter-merge</Badge>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {onEditDeps && depPickList.length > 0 && (
+                <div className="hn-bl-checklist">
+                  {depPickList.map((c) => {
+                    const on = (spec.dependsOn ?? []).includes(c.id);
+                    return (
+                      <Checkbox key={c.id} aria-label={`Bergantung pada ${c.id}`} checked={on}
+                        label={`${c.id} · ${c.title}`}
+                        onChange={() => onEditDeps(spec, on
+                          ? (spec.dependsOn ?? []).filter((x) => x !== c.id)
+                          : [...(spec.dependsOn ?? []), c.id])} />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {/* SPEC-486 · ADR-0103 · override kebijakan auto-merge item ini. Pilihan pertama
+                menyebut kebijakan project apa adanya supaya tak pernah ada pertanyaan "lalu ini pakai apa". */}
+            {onEditAutoMerge && (
+              <div className="hn-bl-subsection">
+                <div className="hn-eyebrow">Auto-merge saat selesai</div>
+                <Select size="sm" aria-label="Auto-merge item ini"
+                  value={spec.autoMerge ? spec.autoMerge.mode : "inherit"}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "inherit") return onEditAutoMerge(spec, null);
+                    if (v === "off") return onEditAutoMerge(spec, { ...AUTO_MERGE_OFF });
+                    onEditAutoMerge(spec, {
+                      ...(spec.autoMerge ?? AUTO_MERGE_OFF),
+                      mode: v as AutoMerge["mode"],
+                      branch: v === "branch" ? (spec.autoMerge?.branch ?? branches[0] ?? null) : null,
+                    });
+                  }}
+                  options={[
+                    { value: "inherit", label: `Ikut project (${autoMergeSummary(resolveAutoMerge(projectPolicy, null))})` },
+                    { value: "off", label: "Tanpa auto-merge untuk item ini" },
+                    { value: "default-branch", label: "Auto-merge ke default branch repo" },
+                    { value: "branch", label: "Auto-merge ke branch tujuan…" },
+                  ]} />
+                {spec.autoMerge?.mode === "branch" && (
+                  <div className="hn-bl-gap-top">
+                    <Select size="sm" aria-label="Branch tujuan item ini" value={spec.autoMerge.branch ?? ""}
+                      onChange={(e) => onEditAutoMerge(spec, { ...spec.autoMerge!, branch: e.target.value || null })}
+                      options={[{ value: "", label: "Pilih branch…" },
+                        ...branches.map((b) => ({ value: b, label: b }))]} />
                   </div>
                 )}
-                <div style={{ marginTop: 8 }}>
-                  <Button size="sm" variant="secondary" leftIcon="rotate-ccw"
-                    disabled={!stageTarget} loading={stageBusy} onClick={saveStage}>Simpan status</Button>
+              </div>
+            )}
+            {/* SPEC-804 · ADR-0120 · satu blok, dua arah: maju ke selesai di sini, mundur di bawah. */}
+            {(onRevertStage || onMarkDone) && (
+              <div className="hn-bl-subsection">
+                <div className="hn-eyebrow">Ubah status</div>
+                <div className="hn-bl-status-now">{`Status saat ini: ${currentStageLabel}`}</div>
+                {spec.stage !== "done" && onMarkDone && (
+                  <div className="hn-bl-gap-bottom">
+                    <Button size="sm" variant="secondary" leftIcon="circle-check"
+                      onClick={() => setMarkDone(true)}>Tandai selesai</Button>
+                  </div>
+                )}
+                {!onRevertStage ? null : earlier.length > 0 ? (
+                  <>
+                    <Select size="sm" aria-label="Kembalikan stage" value={stageTarget}
+                      onChange={(e) => setStageTarget(e.target.value)} disabled={stageBusy}
+                      placeholder="Pilih status lebih awal…"
+                      options={earlier.map((s) => ({ value: s.key, label: "← " + s.label }))} />
+                    <div className="hn-bl-hint hn-bl-gap-top">
+                      Status saat ini dan status berikutnya tidak dapat dipilih. Kemajuan hanya berasal dari fase sesi.
+                    </div>
+                    {stageTarget && (
+                      <div className="hn-bl-callout">
+                        <div className="hn-bl-callout-title">{currentStageLabel} → {targetStageLabel}</div>
+                        Fase sesi yang sudah berjalan tidak dibatalkan. Dokumen Spec/Plan di atas target
+                        mungkin perlu dihapus setelah konfirmasi; kode dan commit tidak disentuh.
+                      </div>
+                    )}
+                    <div className="hn-bl-gap-top">
+                      <Button size="sm" variant="secondary" leftIcon="rotate-ccw"
+                        disabled={!stageTarget} loading={stageBusy} onClick={saveStage}>Simpan status</Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="hn-bl-hint">
+                    {currentStageLabel} adalah status paling awal. Kemajuan hanya berasal dari fase sesi.
+                  </div>
+                )}
+              </div>
+            )}
+            {/* SPEC-175 · rebase/merge branch hasil done spec ke target pilihan (lokal/origin). */}
+            {spec.stage === "done" && onIntegrate && (
+              <div className="hn-bl-subsection">
+                <div className="hn-eyebrow">Integrasi</div>
+                <Button size="sm" variant="secondary" leftIcon="git-merge" onClick={() => setShowIntegrate(true)}>
+                  Rebase / Merge
+                </Button>
+              </div>
+            )}
+            {/* SPEC-546 · ADR-0109 · ubah type/source in-place. Tak digerbangi `editable`. */}
+            {onChangeSource && (
+              <div className="hn-bl-subsection">
+                <div className="hn-eyebrow">Type</div>
+                <Button size="sm" variant="secondary" leftIcon="shuffle" onClick={() => setShowSource(true)}>Ubah type</Button>
+              </div>
+            )}
+            {/* SPEC-546 · ADR-0109 · jejak konversi type. Hanya muncul bila item pernah dikonversi. */}
+            {(spec.sourceHistory ?? []).length > 0 && (
+              <div className="hn-bl-subsection" data-testid="source-trail">
+                <div className="hn-eyebrow">Jejak konversi type</div>
+                <div className="hn-bl-stack-list">
+                  {(spec.sourceHistory ?? []).map((h, i) => (
+                    <div key={`${h.at}-${i}`} className="hn-bl-trail">
+                      <span className="hn-bl-id">{h.from} → {h.to}</span>
+                      {" · "}{new Date(h.at).toLocaleString("id-ID")}{" · "}{h.by}
+                    </div>
+                  ))}
                 </div>
-              </>
-            ) : (
-              <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
-                {currentStageLabel} adalah status paling awal. Kemajuan hanya berasal dari fase sesi.
               </div>
             )}
           </div>
-        )}
-      </div>
-      {/* SPEC-804 · ADR-0120 · jejak penandaan manual. Hanya muncul bila item memang ditandai
-          manusia — item yang selesai lewat sesi tak punya barisnya. */}
-      {spec.manualDone && (
-        <div style={{ marginBottom: 14 }} data-testid="manual-done-trail">
-          <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Ditandai selesai manual</div>
-          <div style={{ fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            {spec.manualDone.by} · {new Date(spec.manualDone.at).toLocaleString("id-ID")}
-            {spec.manualDone.reason ? <div style={{ marginTop: 4 }}>{spec.manualDone.reason}</div> : null}
-          </div>
-        </div>
-      )}
-      {/* SPEC-546 · ADR-0109 · jejak konversi type. Hanya muncul bila item pernah dikonversi —
-          item yang tak pernah berpindah tak perlu barisnya. */}
-      {(spec.sourceHistory ?? []).length > 0 && (
-        <div style={{ marginBottom: 14 }} data-testid="source-trail">
-          <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Jejak konversi type</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {(spec.sourceHistory ?? []).map((h, i) => (
-              <div key={`${h.at}-${i}`} style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-strong)" }}>
-                  {h.from} → {h.to}
-                </span>
-                {" · "}{new Date(h.at).toLocaleString("id-ID")}{" · "}{h.by}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {/* SPEC-486 · ADR-0103 · override kebijakan auto-merge untuk item ini. Pilihan pertama
-          menyebut kebijakan project apa adanya supaya tak pernah ada pertanyaan "lalu ini pakai apa". */}
-      {onEditAutoMerge && (
-        <div style={{ marginBottom: 14 }}>
-          <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Auto-merge saat selesai</div>
-          <Select size="sm" aria-label="Auto-merge item ini"
-            value={spec.autoMerge ? spec.autoMerge.mode : "inherit"}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === "inherit") return onEditAutoMerge(spec, null);
-              if (v === "off") return onEditAutoMerge(spec, { ...AUTO_MERGE_OFF });
-              onEditAutoMerge(spec, {
-                ...(spec.autoMerge ?? AUTO_MERGE_OFF),
-                mode: v as AutoMerge["mode"],
-                branch: v === "branch" ? (spec.autoMerge?.branch ?? branches[0] ?? null) : null,
-              });
-            }}
-            options={[
-              { value: "inherit", label: `Ikut project (${autoMergeSummary(resolveAutoMerge(projectPolicy, null))})` },
-              { value: "off", label: "Tanpa auto-merge untuk item ini" },
-              { value: "default-branch", label: "Auto-merge ke default branch repo" },
-              { value: "branch", label: "Auto-merge ke branch tujuan…" },
-            ]} />
-          {spec.autoMerge?.mode === "branch" && (
-            <div style={{ marginTop: 6 }}>
-              <Select size="sm" aria-label="Branch tujuan item ini" value={spec.autoMerge.branch ?? ""}
-                onChange={(e) => onEditAutoMerge(spec, { ...spec.autoMerge!, branch: e.target.value || null })}
-                options={[{ value: "", label: "Pilih branch…" },
-                  ...branches.map((b) => ({ value: b, label: b }))]} />
+        </details>
+
+        {/* 5 · Zona berbahaya: satu-satunya tempat Hapus. Selalu lewat konfirmasi (useConfirm). */}
+        {onRequestDelete && (
+          <section className="hn-bl-danger" aria-labelledby="bl-sec-bahaya">
+            <h3 id="bl-sec-bahaya" className="hn-bl-section-title">Zona berbahaya</h3>
+            <div className="hn-bl-hint">Menghapus item tak bisa dibatalkan. Kode dan commit di repo tidak disentuh.</div>
+            <div className="hn-bl-gap-top">
+              <Button size="sm" variant="danger" leftIcon="trash-2" onClick={() => onRequestDelete(spec)}>Hapus spec</Button>
             </div>
-          )}
-        </div>
-      )}
-      {editing ? (
-        <Field label="Judul"><Input value={form.title ?? ""} onChange={setField("title")}
-          placeholder="mis. Jadwal invoice berulang" style={{ width: "100%" }} /></Field>
-      ) : (
-        <DetailRow label="Tujuan" value={spec.objective} />
-      )}
-      {/* SPEC-143 · dapat diubah selama item masih di backlog; hanya menentukan basis run berikutnya. */}
-      <div style={{ marginBottom: 14 }}>
-        <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Branch worktree</div>
-        <Select size="sm" value={spec.branchFrom ?? ""} disabled={!branches.length}
-          onChange={(e) => onEditBranch && onEditBranch(spec, e.target.value || null)}
-          options={branchOptions(branches, remoteOnly)} />
-      </div>
-      {/* SPEC-843 · ADR-0124 · lampiran boleh ditambah/dihapus KAPAN SAJA, termasuk selagi sesi
-          berjalan — server memateralisasi ulang dan fase berikutnya membacanya. */}
-      <SpecAttachmentsPanel specId={spec.id} onToast={onAttachmentToast ?? (() => {})} />
-      {/* SPEC-447 · ADR-0093 · siapa yang ditunggu item ini, dan kenapa. */}
-      <div style={{ marginBottom: 14 }}>
-        <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Bergantung pada</div>
-        {(spec.dependsOn ?? []).length === 0 ? (
-          <div style={{ fontSize: 13, color: "var(--text-subtle)" }}>— berdiri sendiri</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {(spec.dependsOn ?? []).map((depId) => {
-              const b = (spec.blockedBy ?? []).find((x) => x.id === depId);
-              return (
-                <div key={depId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-strong)" }}>{depId}</span>
-                  {b
-                    ? <Badge tone="warn" size="sm">{blockLabel(b.reason)}</Badge>
-                    : <Badge tone="ok" size="sm" icon="check">selesai &amp; ter-merge</Badge>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {onEditDeps && depPickList.length > 0 && (
-          <div style={{
-            maxHeight: 132, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6,
-            border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", padding: 8, marginTop: 8,
-          }}>
-            {depPickList.map((c) => {
-              const on = (spec.dependsOn ?? []).includes(c.id);
-              return (
-                <Checkbox key={c.id} aria-label={`Bergantung pada ${c.id}`} checked={on}
-                  label={`${c.id} · ${c.title}`}
-                  onChange={() => onEditDeps(spec, on
-                    ? (spec.dependsOn ?? []).filter((x) => x !== c.id)
-                    : [...(spec.dependsOn ?? []), c.id])} />
-              );
-            })}
-          </div>
+          </section>
         )}
       </div>
-      {editing ? (
-        <>
-          {!qa && (
-            <Field label="Prioritas">
-              <Select value={form.priority ?? "sedang"} onChange={setField("priority")} options={PRIO_OPTS} style={{ width: "100%" }} />
-            </Field>
-          )}
-          {fields.map(([k, label, ph]) => (
-            <Field key={k} label={label}>
-              {k === "severity"
-                ? <Select value={form[k] ?? "major"} onChange={setField(k)} options={SEV_OPTS} style={{ width: "100%" }} />
-                : <HnTextarea value={form[k] ?? ""} onChange={setField(k)} rows={2} placeholder={ph} />}
-            </Field>
-          ))}
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-            <Button size="sm" variant="secondary" onClick={() => setEditing(false)}>Batal</Button>
-            <Button size="sm" variant="primary" leftIcon="check" onClick={saveEdit}>Simpan</Button>
-          </div>
-        </>
-      ) : (
-        fields.map(([k, label]) => <DetailRow key={k} label={label} value={p[k] ?? ""} />)
-      )}
+
       {confirm && (
         <Modal open title="Kembalikan status & hapus dokumen fase" icon="rotate-ccw"
           eyebrow={spec.id + " → " + confirm.target}
           onClose={stageBusy ? undefined : () => setConfirm(null)}>
-          <div style={{ fontSize: 13.5, color: "var(--text-strong)", marginBottom: 12 }}>
+          <div className="hn-bl-confirm-lead">
             {confirm.files.length} berkas docs akan dihapus dari disk (kode & commit tak disentuh):
           </div>
-          <ul style={{
-            fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)",
-            marginBottom: 16, paddingLeft: 18
-          }}>
+          <ul className="hn-bl-file-list">
             {confirm.files.map((f) => <li key={f}>{f}</li>)}
           </ul>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <div className="hn-bl-inline-row hn-bl-end">
             <Button size="sm" variant="secondary" disabled={stageBusy}
               onClick={() => setConfirm(null)}>Batal</Button>
             <Button size="sm" variant="danger" leftIcon="trash-2" loading={stageBusy}
@@ -582,6 +683,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
       {markDone && onMarkDone && (
         <MarkDoneDialog spec={spec} onClose={() => setMarkDone(false)} onSubmit={onMarkDone} />
       )}
+      {showDocs && <SpecDocsModal specId={spec.id} onClose={() => setShowDocs(false)} />}
       {/* SPEC-546 · ADR-0109 · dialog pilih source tujuan + form field bentuk barunya. */}
       {showSource && onChangeSource && spec.payload !== undefined && (
         // ADR-0149 · dialog yang menutup dirinya sendiri lewat `onClose`: submit PERTAMA pada
@@ -594,42 +696,33 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
   );
 }
 
-/* Aksi per-spec. Dipakai grid, list, dan board. Kartu memegang SATU aksi utama sadar-stage
-   (Mulai / Lanjutkan / Buka sesi); aksi sekunder — review, dokumen, tandai selesai, hapus — ada di
-   menu ⋯. Board tetap bisa dipakai tanpa drag: aksi utama selalu tersedia untuk item yang belum selesai.
-   Dialog-nya hidup DI LUAR menu: menu menutup dirinya lebih dulu, lalu aksinya membuka dialog ini. */
+/* Aksi per-item. Dipakai baris, kartu, dan papan. Satu aksi primer sadar-tahap (Mulai / Lanjutkan /
+   Buka sesi / Review perubahan untuk item selesai); sisanya di menu ⋯. Dialognya hidup DI LUAR menu:
+   menu menutup dirinya lebih dulu, lalu aksinya membuka dialog ini. */
 function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, onMarkDone, running }:
-  {
-    spec: SpecListItem; onStart?: (s: SpecSlim) => void; onDelete?: (s: SpecSlim) => void;
-    onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void;
-    // SPEC-804 · ADR-0120 · tandai selesai manual. Dua langkahnya ditangani MarkDoneDialog.
-    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
-    running?: boolean
-  }) {
+  { spec: SpecListItem } & ItemActions) {
   const [docs, setDocs] = React.useState(false);
   const [markDone, setMarkDone] = React.useState(false);
   const open = spec.stage !== "done";
-  // SPEC-171 · review all files + file changed dari worktree; tersedia di semua stage.
+  const primary: { label: string; icon: string; run: () => void } | null = running
+    ? (onOpenRun ? { label: "Buka sesi", icon: "terminal", run: () => onOpenRun(spec) } : null)
+    : open
+      ? (onStart ? { label: startLabel(spec.stage), icon: "play", run: () => onStart(spec) } : null)
+      : (onOpenReview ? { label: "Review perubahan", icon: "git-compare", run: () => onOpenReview(spec) } : null);
+  const reviewInMenu = Boolean(onOpenReview) && primary?.label !== "Review perubahan";
   const items: OverflowItem[] = [
-    ...(onOpenReview ? [{ key: "review", label: "Review perubahan", icon: "git-compare", onSelect: () => onOpenReview(spec) }] : []),
+    ...(reviewInMenu && onOpenReview ? [{ key: "review", label: "Review perubahan", icon: "git-compare", onSelect: () => onOpenReview(spec) }] : []),
     { key: "docs", label: "Lihat dokumen", icon: "file-text", onSelect: () => setDocs(true) },
+    ...(!open && onStart ? [{ key: "rerun", label: "Jalankan lagi", icon: "play", onSelect: () => onStart(spec) }] : []),
     // SPEC-804 · ADR-0120 · maju ke `done` tanpa sesi — untuk item yang beres di luar hanoman.
     ...(open && onMarkDone ? [{ key: "done", label: "Tandai selesai", icon: "circle-check", onSelect: () => setMarkDone(true) }] : []),
-    ...(onDelete ? [{ key: "delete", label: "Hapus spec", icon: "trash-2", onSelect: () => onDelete(spec) }] : []),
+    ...(onDelete ? [{ key: "delete", label: "Hapus spec", icon: "trash-2", tone: "danger" as const, onSelect: () => onDelete(spec) }] : []),
   ];
   return (
-    <div className="hn-row-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      {open && running && (
-        <Button size="sm" variant="primary" leftIcon="terminal" onClick={() => onOpenRun && onOpenRun(spec)}>
-          Buka sesi
-        </Button>
+    <div className="hn-bl-actions">
+      {primary && (
+        <Button size="sm" variant="primary" leftIcon={primary.icon} onClick={primary.run}>{primary.label}</Button>
       )}
-      {open && !running && (
-        <Button size="sm" variant="primary" leftIcon="play" onClick={() => onStart && onStart(spec)}>
-          {startLabel(spec.stage)}
-        </Button>
-      )}
-      {!open && <Badge tone="ok" size="sm" icon="check-circle-2">selesai</Badge>}
       <OverflowActions label={`Aksi lain ${spec.id}`} items={items} />
       {markDone && onMarkDone && (
         <MarkDoneDialog spec={spec} onClose={() => setMarkDone(false)} onSubmit={onMarkDone} />
@@ -646,119 +739,45 @@ export const fmtCreated = (iso?: string | null): string => {
     ? t.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "";
 };
 
-function CreatedAt({ spec, style }: { spec: SpecListItem; style?: React.CSSProperties }) {
-  const label = fmtCreated(spec.createdAt);
-  if (!label) return null;
+function TitleButton({ spec, onOpenDetail, className = "hn-bl-title" }:
+  { spec: SpecListItem; onOpenDetail?: (s: SpecSlim) => void; className?: string }) {
   return (
-    <time dateTime={spec.createdAt} title="Tanggal dibuat" data-testid="spec-created"
-      style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", whiteSpace: "nowrap", ...style }}>
-      {label}
-    </time>
-  );
-};
-
-function TitleButton({ spec, onOpenDetail, size = 15 }:
-  { spec: SpecListItem; onOpenDetail?: (s: SpecSlim) => void; size?: number }) {
-  return (
-    <button onClick={() => onOpenDetail && onOpenDetail(spec)} style={{
-      border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer",
-      fontFamily: "var(--font-sans)", fontSize: size, fontWeight: 600, color: "var(--text-strong)",
-      overflowWrap: "anywhere",
-    }}>
+    <button type="button" className={className} onClick={() => onOpenDetail && onOpenDetail(spec)}>
       {spec.title}
     </button>
   );
 }
 
-const CLAMP = (n: number): React.CSSProperties => ({
-  display: "-webkit-box", WebkitLineClamp: n, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere",
-});
-
-function SpecCard({ spec, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running, presenceOn }:
-  {
-    spec: SpecListItem; onStart?: (s: SpecSlim) => void; onDelete?: (s: SpecSlim) => void;
-    onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void; onOpenDetail?: (s: SpecSlim) => void;
-    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
-    running?: boolean; presenceOn?: string[]
-  }) {
-  const prio = prioMeta(spec.priority);
+/* ── Daftar (tampilan utama) ─────────────────────────────────────────────────
+   Satu baris per item: titik prioritas, judul, lalu id, tahap, dan lencana status. Aksi primer dan
+   ⋯ di luar elemen klik (DenseRow), jadi tak ada tombol di dalam tombol. */
+type RowProps = ItemActions & {
+  spec: SpecListItem; presenceOn?: string[]; onOpenDetail?: (s: SpecSlim) => void;
+};
+function SpecRow({ spec, presenceOn, onOpenDetail, ...actions }: RowProps) {
   return (
-    <Card padding={16} fill style={{ height: "100%" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)" }}>{spec.id}</span>
-            <Badge tone={sourceMeta(spec.source).tone} size="sm" icon={sourceMeta(spec.source).icon}>
-              {sourceMeta(spec.source).label}
-            </Badge>
-            {spec.branchFrom && <Badge tone="neutral" size="sm" icon="git-branch">{spec.branchFrom}</Badge>}
-            <BlockedBadge spec={spec} />
-            {/* SPEC-919 · ADR-0147 · penanda LIVE lintas device. */}
-            <PresenceChip names={presenceOn} />
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)" }}>· {spec.projectId}</span>
-          </div>
-          <div style={{ marginTop: 8, ...CLAMP(2) }}><TitleButton spec={spec} onOpenDetail={onOpenDetail} /></div>
-          {/* Ukuran kartu tetap: deskripsi panjang dipotong elipsis (3 baris), bukan memanjangkan kartu. */}
-          <div title={spec.objective} style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 4, lineHeight: 1.45, ...CLAMP(3) }}>{spec.objective}</div>
-        </div>
-        <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"} title={`Prioritas ${prio.label}`}>{prio.label}</Badge>
-      </div>
-      <div style={{ marginTop: "auto", paddingTop: 12, borderTop: "1px solid var(--border-hair)" }}>
-        <StageBar stage={spec.stage} />
-        <div className="hn-card-footer" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 12 }}>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>
-            {spec.author}{fmtCreated(spec.createdAt) && " · "}<CreatedAt spec={spec} />
-          </span>
-          <SpecActions spec={spec} onStart={onStart} onDelete={onDelete} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onMarkDone={onMarkDone} running={running} />
-        </div>
-      </div>
-    </Card>
+    <DenseRow onClick={onOpenDetail ? () => onOpenDetail(spec) : undefined}
+      actions={<SpecActions spec={spec} {...actions} />}>
+      <PrioDot priority={spec.priority} />
+      <span className="hn-bl-row-body">
+        <span className="hn-bl-row-title">{spec.title}</span>
+        <span className="hn-bl-row-meta">
+          <span className="hn-bl-id">{spec.id}</span>
+          <SourceTag source={spec.source} />
+          <StagePill stage={spec.stage} />
+          <BlockedBadge spec={spec} />
+          {/* SPEC-919 · ADR-0147 · penanda LIVE lintas device. */}
+          <PresenceChip names={presenceOn} />
+        </span>
+      </span>
+    </DenseRow>
   );
 }
 
-/* ── List view ─────────────────────────────────────────────────────────────
-   Baris padat: satu spec per baris, stage bar inline, aksi di kanan. */
-function SpecRow({ spec, projectName, onStart, onDelete, onOpenRun, onOpenReview, onOpenDetail, onMarkDone, running, presenceOn }:
-  {
-    spec: SpecListItem; projectName?: string; onStart?: (s: SpecSlim) => void; onDelete?: (s: SpecSlim) => void;
-    onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void; onOpenDetail?: (s: SpecSlim) => void;
-    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
-    running?: boolean; presenceOn?: string[]
-  }) {
-  const prio = prioMeta(spec.priority);
-  return (
-    <div className="hn-backlog-row" style={{
-      display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px 14px", padding: "12px 16px",
-      borderBottom: "1px solid var(--border-hair)", background: "var(--surface-card)"
-    }}>
-      <Icon name={sourceMeta(spec.source).icon} size={15} color={sourceMeta(spec.source).color} />
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)", flex: "0 0 84px" }}>{spec.id}</span>
-      {/* Judul tak boleh diperas jadi kolom sempit: basis 320px, sisa meta turun ke baris berikutnya. */}
-      <div style={{ flex: "1 1 320px", minWidth: 240 }}>
-        <TitleButton spec={spec} onOpenDetail={onOpenDetail} size={14} />
-        <div style={{
-          fontSize: 12, color: "var(--text-muted)", marginTop: 2, overflow: "hidden",
-          textOverflow: "ellipsis", whiteSpace: "nowrap"
-        }}>{spec.objective}</div>
-      </div>
-      <Badge tone="neutral" size="sm" icon="folder" data-testid="spec-project">{projectName ?? spec.projectId}</Badge>
-      {spec.branchFrom && <Badge tone="neutral" size="sm" icon="git-branch">{spec.branchFrom}</Badge>}
-      <BlockedBadge spec={spec} />
-      <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"} title={`Prioritas ${prio.label}`}>{prio.label}</Badge>
-      <CreatedAt spec={spec} />
-      {/* SPEC-919 · ADR-0147 · penanda LIVE lintas device — beda dari StageBar yang stage tersimpan. */}
-      <PresenceChip names={presenceOn} />
-      <div style={{ flex: "0 0 auto" }}><StageBar stage={spec.stage} /></div>
-      <SpecActions spec={spec} onStart={onStart} onDelete={onDelete} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onMarkDone={onMarkDone} running={running} />
-    </div>
-  );
-}
-
-/* ── Board view ────────────────────────────────────────────────────────────
-   Kolom = stage (+ backlog di depan, success/failed di belakang). Enam kolom
-   tengah dimiliki runner: `spec.stage` cuma cermin fase run (SPEC-009), jadi
-   kartu di sana tak bisa diangkat. Yang bisa didrag hanya dua kolom ujung,
-   dan drop-nya memanggil aksi yang memang ada tombolnya: mulai / jalankan lagi. */
+/* ── Papan (tampilan sekunder) ───────────────────────────────────────────────
+   Kolom = tahap (+ backlog di depan, success di belakang). Enam kolom tengah dimiliki runner:
+   `spec.stage` cuma cermin fase run (SPEC-009), jadi kartu di sana tak bisa diangkat. Yang bisa
+   didrag hanya kolom Backlog, dan drop-nya memanggil aksi yang memang ada tombolnya. */
 const BACKLOG_COL = "backlog", SUCCESS_COL = "success";
 const FIRST_STAGE = B_STAGES[0]!.key;   // brainstorming
 const COLUMNS: { key: string; label: string; icon?: string }[] = [
@@ -769,11 +788,7 @@ const COLUMNS: { key: string; label: string; icon?: string }[] = [
 
 /* Kolom sebuah spec. `hasSession` = ada sesi claude yang hidup untuknya (SPEC-162). Spec
    yang belum pernah dikerjakan tapi stage-nya sudah maju tetap tampil di kolom stage-nya —
-   bukan diklaim balik ke Backlog.
-
-   Kolom "Failed" hilang bersama tabel Run: sebuah sesi tak punya status terminal yang bisa
-   dibaca dari luar. Yang gagal terlihat di terminalnya sendiri, dan itu satu-satunya tempat
-   yang jujur. */
+   bukan diklaim balik ke Backlog. */
 export function specColumn(spec: SpecListItem, hasSession?: boolean): string {
   if (spec.stage === "done") return SUCCESS_COL;
   if (!hasSession && spec.stage === "brainstorming") return BACKLOG_COL;
@@ -783,67 +798,47 @@ export function specColumn(spec: SpecListItem, hasSession?: boolean): string {
 /* Satu-satunya aturan drop, dan ia menuruti kontrak kanban: kartu mendarat di kolom
    tempat ia dijatuhkan. Sesi selalu mulai dari awal pipeline, jadi spec yang baru
    dijalankan berakhir di stage `brainstorming` — maka Brainstorm satu-satunya tujuan
-   yang jujur. Kolom kerja lain sengaja menolak: dulu drop di Execute diterima lalu
-   kartunya melompat empat kolom ke kiri.
-
-   Drop berujung pada POST /terminal/sessions, tak pernah menulis field spec. */
+   yang jujur. Drop berujung pada POST /terminal/sessions, tak pernah menulis field spec. */
 export const canDrop = (from: string, to: string): boolean =>
   from === BACKLOG_COL && to === FIRST_STAGE;
 
-function BoardCard({ spec, col, onOpenDetail, onStart, onOpenRun, onOpenReview, onMarkDone, running, presenceOn, onDragStart, onDragEnd, dragging }:
-  {
-    spec: SpecListItem; col: string; onOpenDetail?: (s: SpecSlim) => void; onStart?: (s: SpecSlim) => void;
-    onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void;
-    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
-    running?: boolean; presenceOn?: string[];
+function BoardCard({ spec, col, onOpenDetail, presenceOn, onDragStart, onDragEnd, dragging, ...actions }:
+  ItemActions & {
+    spec: SpecListItem; col: string; onOpenDetail?: (s: SpecSlim) => void; presenceOn?: string[];
     onDragStart: () => void; onDragEnd: () => void; dragging: boolean
   }) {
-  const prio = prioMeta(spec.priority);
   const draggable = col === BACKLOG_COL;
   return (
-    <div draggable={draggable}
+    <div draggable={draggable} className="hn-bl-card" data-dragging={dragging || undefined}
       onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", spec.id); onDragStart(); }}
       onDragEnd={onDragEnd}
       title={draggable ? "Seret ke Brainstorm untuk memulai sesi"
         : "Stage mengikuti fase yang dilaporkan agen — kartu tak bisa dipindah"}
-      style={{
-        // `0 0 auto`: tanpa ini kartu menyusut mengisi kolom, bukan kolomnya yang menggulir.
-        flex: "0 0 auto",
-        background: "var(--surface-card)", border: "1px solid var(--border-hair)",
-        borderRadius: "var(--radius-md)", padding: 10, boxShadow: "var(--shadow-xs)",
-        cursor: draggable ? "grab" : "default", opacity: dragging ? 0.4 : 1,
-      }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-        <Icon name={sourceMeta(spec.source).icon} size={13} color={sourceMeta(spec.source).color} />
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{spec.id}</span>
-        <span style={{ flex: 1 }} />
-        <CreatedAt spec={spec} />
-        <Badge tone={prio.tone} size="sm" variant={spec.priority === "tinggi" ? "soft" : "outline"} title={`Prioritas ${prio.label}`}>{prio.label}</Badge>
+      data-draggable={draggable || undefined}>
+      <div className="hn-bl-card-head">
+        <PrioDot priority={spec.priority} />
+        <span className="hn-bl-id">{spec.id}</span>
+        <SourceTag source={spec.source} />
       </div>
-      <TitleButton spec={spec} onOpenDetail={onOpenDetail} size={13} />
-      {spec.branchFrom && (
-        <div style={{ marginTop: 6 }}><Badge tone="neutral" size="sm" icon="git-branch">{spec.branchFrom}</Badge></div>
-      )}
-      {(spec.blockedBy ?? []).length > 0 && (
-        <div style={{ marginTop: 6 }}><BlockedBadge spec={spec} /></div>
-      )}
-      {presenceOn?.length ? (
-        <div style={{ marginTop: 6 }}><PresenceChip names={presenceOn} /></div>
+      <TitleButton spec={spec} onOpenDetail={onOpenDetail} />
+      {(spec.blockedBy ?? []).length > 0 || presenceOn?.length ? (
+        <div className="hn-bl-card-badges">
+          <BlockedBadge spec={spec} />
+          <PresenceChip names={presenceOn} />
+        </div>
       ) : null}
-      {/* HTML5 drag-and-drop mati di keyboard dan di layar sentuh. Tombol ini jalur
-          satu-satunya di sana — termasuk retry spec di kolom Failed. */}
-      <div style={{ marginTop: 8 }}>
-        <SpecActions spec={spec} onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onMarkDone={onMarkDone} running={running} />
+      {/* HTML5 drag-and-drop mati di keyboard dan di layar sentuh. Tombol ini jalur satu-satunya di sana. */}
+      <div className="hn-bl-card-foot">
+        <SpecActions spec={spec} {...actions} />
       </div>
     </div>
   );
 }
 
-function Board({ specs, activeSpecs, presenceBySpec, onStart, onOpenRun, onOpenReview, onOpenDetail, onMarkDone }:
-  {
+function Board({ specs, activeSpecs, presenceBySpec, onOpenDetail, ...actions }:
+  ItemActions & {
     specs: SpecListItem[]; activeSpecs?: Set<string>; presenceBySpec?: Map<string, string[]>;
-    onStart?: (s: SpecSlim) => void; onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void; onOpenDetail?: (s: SpecSlim) => void;
-    onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    onOpenDetail?: (s: SpecSlim) => void;
   }) {
   const [drag, setDrag] = React.useState<{ spec: SpecListItem; from: string } | null>(null);
   const [over, setOver] = React.useState<string | null>(null);
@@ -855,46 +850,35 @@ function Board({ specs, activeSpecs, presenceBySpec, onStart, onOpenRun, onOpenR
   }, [specs, activeSpecs]);
 
   const drop = (to: string) => {
-    if (drag && canDrop(drag.from, to) && onStart) onStart(drag.spec);
+    if (drag && canDrop(drag.from, to) && actions.onStart) actions.onStart(drag.spec);
     setDrag(null); setOver(null);
   };
   return (
     /* Baris kolom menggulir mendatar; tiap KOLOM menggulir tegak sendiri, jadi judul
        kolom tak pernah tergulir keluar dan kolom terpanjang tak menyeret yang lain. */
-    <div data-testid="backlog-board" className="hn-board-local-overflow" style={{
-      flex: "1 1 auto", minHeight: 0, display: "flex", gap: 10,
-      overflowX: "auto", overflowY: "hidden", alignItems: "stretch", paddingBottom: 4
-    }}>
+    <div data-testid="backlog-board" className="hn-board-local-overflow hn-bl-board">
       {COLUMNS.map((c) => {
         const items = byCol.get(c.key)!;
         const active = !!drag && canDrop(drag.from, c.key);
         const hot = active && over === c.key;
         return (
-          <div key={c.key}
+          <div key={c.key} className="hn-bl-col" data-active={active || undefined} data-hot={hot || undefined}
+            data-dimmed={drag && !active || undefined}
             onDragOver={(e) => { if (active) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setOver(c.key); } }}
             onDragLeave={() => setOver((o) => (o === c.key ? null : o))}
-            onDrop={(e) => { e.preventDefault(); drop(c.key); }}
-            style={{
-              flex: "0 0 244px", display: "flex", flexDirection: "column", minHeight: 0, padding: 10,
-              borderRadius: "var(--radius-lg)",
-              background: hot ? "var(--brass-100)" : "var(--bone-100)",
-              border: `1px ${active ? "dashed" : "solid"} ${hot ? "var(--brass-500)" : "var(--border-hair)"}`,
-              opacity: drag && !active ? 0.5 : 1, transition: "var(--transition-fast)",
-            }}>
-            <div style={{ ...FIXED_ROW_STYLE, display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            onDrop={(e) => { e.preventDefault(); drop(c.key); }}>
+            <div className="hn-bl-col-head">
               {c.icon && <Icon name={c.icon} size={13} color="var(--text-muted)" />}
               <span className="hn-eyebrow">{c.label}</span>
-              <span style={{ flex: 1 }} />
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{items.length}</span>
+              <span className="hn-bl-col-count">{items.length}</span>
             </div>
             {/* Zona drop mencakup ruang kosong di bawah kartu: event menggelembung ke kolom. */}
-            <div style={{ ...LIST_SCROLL_STYLE, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="hn-bl-col-body">
               {items.map((s) => (
                 <BoardCard key={s.id} spec={s} col={c.key} onOpenDetail={onOpenDetail}
-                  onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview}
-                  onMarkDone={onMarkDone} running={activeSpecs?.has(s.id)}
-                  presenceOn={presenceBySpec?.get(s.id)}
+                  presenceOn={presenceBySpec?.get(s.id)} {...actions}
                   dragging={drag?.spec.id === s.id}
+                  running={activeSpecs?.has(s.id)}
                   onDragStart={() => setDrag({ spec: s, from: c.key })}
                   onDragEnd={() => { setDrag(null); setOver(null); }} />
               ))}
@@ -906,18 +890,28 @@ function Board({ specs, activeSpecs, presenceBySpec, onStart, onOpenRun, onOpenR
   );
 }
 
-// Keterangan sumber dengan istilah teknis (SOURCE_META). Tab tanpa entri tak menampilkan apa pun.
-const TAB_HINT: Record<string, string> = {
-  audit: "Audit: hasil pemeriksaan project. Dari sini bisa dinaikkan jadi Finding QA, feature brief, atau PRD.",
-  goal: "Goal: item dengan tujuan terukur. Dikerjakan dua fase (Goal lalu Verifikasi) tanpa tahap perencanaan.",
-  no_effort: "Tanpa effort: tugas remeh yang dikerjakan satu fase, tanpa perencanaan maupun verifikasi.",
-};
-
+// Dua tampilan: daftar (utama) dan papan (sekunder, ikon saja dengan nama aksesibel).
 const VIEWS = [
-  { value: "grid", label: "Grid", icon: "layout-grid" },
-  { value: "list", label: "List", icon: "list" },
-  { value: "board", label: "Board", icon: "kanban" },
+  { value: "list", label: "Daftar", icon: "list" },
+  { value: "board", label: "Papan", icon: "kanban" },
 ];
+
+function ViewToggle({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="hn-bl-view-toggle" role="group" aria-label="Mode tampilan">
+      {VIEWS.map((v) => (
+        <button key={v.value} type="button" className="hn-bl-view-btn hn-touch-target"
+          aria-pressed={value === v.value} aria-label={v.label} title={v.label}
+          onClick={() => onChange(v.value)}>
+          <Icon name={v.icon} size={15} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Ringkasan skeleton saat muat pertama: tiga baris yang tak tampak seperti "kosong".
+const LOADING_ROWS = 5;
 
 export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, presenceBySpec, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onMarkDone, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onChangeSource, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
   {
@@ -937,8 +931,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     onEditAutoMerge?: (s: SpecSlim, v: AutoMerge | null) => void;
     // SPEC-546 · ADR-0109 · ubah type/source item in-place (id/riwayat/dependency tetap).
     // ADR-0149 · signature harus SAMA dengan yang dipakai `SpecDetail`: tipe 3-argumen tetap
-    // lolos tsc (arity lebih sedikit assignable), jadi ia berbohong tanpa satu pun error —
-    // dan `confirmReset` yang tak terbaca berarti konfirmasi operator tak pernah sampai.
+    // lolos tsc (arity lebih sedikit assignable), jadi ia berbohong tanpa satu pun error.
     onChangeSource?: (s: SpecListItem, source: string, payload?: unknown, confirmReset?: boolean)
       => Promise<SourceResetPending | null> | void;
     // SPEC-237 · naikkan audit → Finding QA. SPEC-340 · ADR-0076 · + feature brief & PRD;
@@ -954,16 +947,16 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   const [tab, setTab] = usePersistedState("backlog", "tab", "all", isStr);
   // SPEC-268 · bump untuk re-fetch daftar sesudah tombol Sync menarik data baru.
   const [syncNonce, setSyncNonce] = React.useState(0);
-  // `string`, bukan union: `Tabs.onChange` memberi string. Guard-nya tetap ketat, jadi
-  // nilai di luar daftar tetap jatuh ke "grid".
-  const [view, setView] = usePersistedState<string>("backlog", "view", "grid", oneOf<string>("grid", "list", "board"));
-  // SPEC-178 · search + filter stage/prioritas, semua view-local (tak diangkat ke App).
+  // Daftar adalah tampilan utama; papan sekunder. Nilai lama (`grid`) jatuh ke daftar.
+  const [view, setView] = usePersistedState<string>("backlog", "view", "list", oneOf<string>("list", "board"));
+  // Segmen tahap: kunci baru (`stageGroup`) supaya nilai tahap lama di penyimpanan jatuh ke "all".
+  const [stage, setStage] = usePersistedState<StageGroup>("backlog", "stageGroup", "all",
+    oneOf<StageGroup>("all", "brainstorm", "spec", "doing", "done"));
+  // SPEC-178 · search + filter prioritas, semua view-local (tak diangkat ke App).
   const [q, setQ] = usePersistedState("backlog", "q", "", isStr);
-  const [stageFilter, setStageFilter] = usePersistedState("backlog", "stage", "all", isStr);
   const [prioFilter, setPrioFilter] = usePersistedState("backlog", "prio", "all", isStr);
   // SPEC-408 · ADR-0090 · rentang tanggal. `dateField` memilih sumbunya (dibuat / dikerjakan);
   // `from`/`to` = "YYYY-MM-DD" apa adanya dari <input type="date">, inklusif, boleh sendirian.
-  // View-local seperti filter SPEC-178 — tak diangkat ke App.
   const [dateField, setDateField] = usePersistedState<"created" | "started">(
     "backlog", "dateField", "created", oneOf("created", "started"));
   const [from, setFrom] = usePersistedState("backlog", "from", "", isStr);
@@ -976,67 +969,60 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   // SPEC-293 · deep-link: buka SpecDetail untuk id yang diberikan App (dari hash #spec=).
   React.useEffect(() => { if (initialDetailId) setDetailId(initialDetailId); }, [initialDetailId]);
   const projOptions = projects || [...new Set(backlog.map((s) => s.projectId))].map((id) => ({ id, name: id }));
-  // SPEC-198 · search/filter/paginasi via API. Seed dari prop `backlog` (App tetap memuat set
-  // penuh utk Overview/board/poll) → render instan + tahan mock parsial di test; lalu refetch
-  // potongan terfilter/terpaginasi dari server. Board minta set terfilter penuh (tanpa page).
-  const [data, setData] = React.useState<{ items: SpecListItem[]; total: number }>(
-    () => ({ items: backlog.map((s) => ({ objective: "", ...s })), total: backlog.length }));
-  // Yang dipulihkan `page`, BUKAN `limit` — `limit` tanpa `page` berperilaku sebagai
-  // PLAFON (SPEC-523 · ADR-0107). `pageSize` tetap prop konstanta.
+  // Himpunan terfilter penuh dari server (tanpa page/limit). Segmen tahap dikelompokkan di klien,
+  // karena server hanya menyaring SATU nilai `stage` persis; paginasi pun dipegang klien.
+  const [data, setData] = React.useState<SpecListItem[]>(() => backlog.map((s) => ({ objective: "", ...s })));
+  // Yang dipulihkan `page` (bukan `limit`) — SPEC-523 · ADR-0107.
   const [page, setPage] = usePersistedState("backlog", "page", 1, isNum);
-  // Di-seed dari `q` yang DIPULIHKAN, bukan dari string kosong: `dq` yang menyusul 250 ms
-  // kemudian akan terbaca sebagai pergantian penyaring dan menghapus halaman tersimpan — dan
-  // sebelum itu layar sempat menampilkan hasil TANPA filter yang sedang menyala.
+  // Di-seed dari `q` yang DIPULIHKAN, bukan dari string kosong (lihat catatan SPEC-178 di git history).
   const [dq, setDq] = React.useState(() => q.trim());
-  // SPEC-857 · ADR-0131 · kegagalan refetch dulu ditelan `.catch(() => { })`: `data` bertahan pada
-  // nilai terakhir yang BERHASIL dan layar menyajikan jumlah basi seolah itu kebenaran, tanpa satu
-  // pun tanda. Itulah bentuk keluhan "backlog saya berkurang" — hub yang tercekik `P1008 Socket
-  // timeout` (change-feed tak berbatas, ADR-0131) membuat sebagian refetch gagal dan sisanya lolos,
-  // jadi angkanya berubah-ubah sementara DB-nya sendiri tak pernah kehilangan satu baris pun.
+  // SPEC-857 · ADR-0131 · kegagalan refetch tak lagi ditelan: `data` bertahan pada nilai terakhir
+  // yang BERHASIL dan layar menandainya sebagai data mungkin usang.
   const [stale, setStale] = React.useState(false);
-  // Refetch yang sedang berjalan (ganti filter/halaman/sumber). Daftar lama TETAP tampil selama
-  // menunggu — indikatornya ringan, tak mengosongkan layar.
+  // Refetch yang sedang berjalan. Daftar lama TETAP tampil selama menunggu.
   const [refreshing, setRefreshing] = React.useState(false);
+  // Muat pertama selesai (skeleton hanya sebelum ini; sesudahnya refetch tak mengosongkan layar).
+  const [loaded, setLoaded] = React.useState(false);
   // Refetch ikut tiap `dataVersion` (tiap frame siar WS), jadi toast digerbangi TRANSISI
   // sehat→gagal lewat ref — bukan setiap kegagalan, yang akan jadi hujan toast saat hub sakit.
   const staleRef = React.useRef(false);
+  // Toast dengan aksi "Urungkan" untuk perubahan yang reversibel. Hapus TIDAK lewat sini (konfirmasi).
+  const [toast, showToast] = useToast();
+  const undoable = React.useCallback((message: string, undo: () => void) => {
+    showToast(message, "ok", undefined, { action: { label: "Urungkan", onAction: undo } });
+  }, [showToast]);
   // Filter yang dipulihkan wajib TERLIHAT menyala: daftar yang tampak kosong tak boleh
   // terbaca sebagai backlog kosong.
   const activeFilters = [
-    tab !== "all", proj !== "all", q.trim() !== "", stageFilter !== "all",
+    tab !== "all", proj !== "all", q.trim() !== "", stage !== "all",
     prioFilter !== "all", from !== "", to !== "",
   ].filter(Boolean).length;
   // Scroll dipulihkan sesudah potongan pertama dari server mendarat — sebelum itu tinggi
   // daftar belum final dan posisinya meleset.
-  const listRef = useScrollRestore("backlog", "scroll", data.items.length > 0);
-  // `proj` dimiliki App (SPEC-146) sehingga di luar jangkauan resetUiState("backlog").
-  const resetView = () => setProj("all");
+  const listRef = useScrollRestore("backlog", "scroll", data.length > 0);
   React.useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
   useResetOnChange(
-    JSON.stringify([tab, proj, stageFilter, prioFilter, dq, view, dateField, from, to]),
+    JSON.stringify([tab, proj, stage, prioFilter, dq, dateField, from, to]),
     () => setPage(1));
   React.useEffect(() => {
     let alive = true;
-    // sentinel "all" → undefined di call-site; server yang menyaring/memotong.
+    // sentinel "all" → undefined di call-site; server yang menyaring. Tanpa page/limit = himpunan penuh.
     const p = api.listSpecs?.({
       project: proj === "all" ? undefined : proj,
       source: tab === "all" ? undefined : tab,
       q: dq || undefined,
-      stage: stageFilter === "all" ? undefined : stageFilter,
       priority: prioFilter === "all" ? undefined : prioFilter,
-      // Kirim sumbu HANYA saat rentangnya aktif — tanpa itu `dateField` jadi kebisingan di
-      // setiap request dan test kontrak param lama ikut goyah.
+      // Kirim sumbu HANYA saat rentangnya aktif — tanpa itu `dateField` jadi kebisingan di setiap request.
       dateField: from || to ? dateField : undefined,
       from: from || undefined,
       to: to || undefined,
-      page: view === "board" ? undefined : page,
-      limit: view === "board" ? undefined : pageSize,
     });
     // `!!p`: klien tanpa `listSpecs` tak pernah menyelesaikan refetch — jangan biarkan indikator menyala.
     setRefreshing(!!p);
     p?.then((r) => {
       if (!alive) return;
-      setData({ items: r.items, total: r.total });
+      setData(r.items);
+      setLoaded(true);
       staleRef.current = false;
       setStale(false);
       setRefreshing(false);
@@ -1050,14 +1036,23 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
       setRefreshing(false);
     });
     return () => { alive = false; };
-  }, [tab, proj, stageFilter, prioFilter, dq, view, page, pageSize, dataVersion, syncNonce, dateField, from, to]);
+  }, [tab, proj, prioFilter, dq, dateField, from, to, dataVersion, syncNonce]);
   const backlogById = React.useMemo(() => new Map(backlog.map((s) => [s.id, s])), [backlog]);
   // Frame siar lebih segar daripada daftar HTTP, tapi tak membawa `objective`: yang ringan ditimpa
   // dari siar, sisanya tetap dari HTTP.
   const items = React.useMemo(
-    () => data.items.map((s) => mergeSlim(s, backlogById.get(s.id))),
-    [data.items, backlogById],
+    () => data.map((s) => mergeSlim(s, backlogById.get(s.id))),
+    [data, backlogById],
   );
+  // Hitungan per segmen dari himpunan yang SAMA dengan daftar: satu sumber untuk angka dan isi.
+  const counts = React.useMemo(() => {
+    const out = {} as Record<StageGroup, number>;
+    for (const g of STAGE_GROUPS) out[g.key] = items.filter((s) => inStageGroup(s.stage, g.key)).length;
+    return out;
+  }, [items]);
+  const visible = React.useMemo(() => items.filter((s) => inStageGroup(s.stage, stage)), [items, stage]);
+  const sp = serverPage(visible.length, page, pageSize);
+  const pageItems = visible.slice((sp.page - 1) * pageSize, sp.page * pageSize);
   const [detail, setDetail] = React.useState<Spec | null>(null);
   // Detail penuh dimuat saat item dibuka dan disegarkan tiap `dataVersion` (edit/stage mengubah
   // digest siar); item yang lenyap (404) menutup dialog.
@@ -1075,11 +1070,11 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     if (!detailId) return null;
     const slim = backlogById.get(detailId);
     if (detail?.id === detailId) return mergeSlim(detail, slim);
-    const listed = data.items.find((s) => s.id === detailId);
+    const listed = data.find((s) => s.id === detailId);
     return listed ? mergeSlim(listed, slim) : slim ? { objective: "", ...slim } : null;
-  }, [detailId, detail, data.items, backlogById]);
+  }, [detailId, detail, data, backlogById]);
   // Hapus spec = konfirmasi dulu: nama & ID objeknya, dampaknya sebagai daftar, label aksi eksplisit.
-  // Satu dialog untuk kartu, baris, dan menu; dirender sekali di bawah layar (lihat `{dialog}`).
+  // Satu dialog untuk baris, kartu, detail, dan menu; dirender sekali di bawah layar (lihat `{dialog}`).
   const { confirm: confirmDelete, dialog } = useConfirm();
   const requestDelete = onDelete ? (s: SpecSlim) => {
     const projectName = projects.find((x) => x.id === s.projectId)?.name ?? s.projectId;
@@ -1094,135 +1089,145 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
         "Kode dan commit di repo tidak disentuh.",
       ],
       confirmLabel: "Hapus spec", tone: "danger", icon: "trash-2",
-      run: async () => { await onDelete(s); },
+      run: async () => {
+        await onDelete(s);
+        // Detail yang menampilkan item ini ikut tertutup: item-nya sudah tak ada.
+        if (detailId === s.id) setDetailId(null);
+      },
     }).catch((e: unknown) => onToast?.(failureMessage(`menghapus ${s.id}`, e), "err", "x-circle"));
   } : undefined;
-  const sp = serverPage(data.total, page, pageSize);
-  return (
-    <div style={LIST_SCREEN_STYLE}>
-      <div className="hn-backlog-controls" role="region" aria-label="Kontrol backlog" style={{ ...FIXED_ROW_STYLE, marginBottom: 18 }}>
-        <div className="hn-backlog-topline" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-          <Tabs aria-label="Sumber backlog" variant="pill" value={tab} onChange={setTab} tabs={[
-            { value: "all", label: "Semua spec" }, { value: "brief", label: "Dari brief" },
-            { value: "qa", label: "Dari QA" }, { value: "audit", label: "Audit" },
-            // SPEC-521 · ADR-0089 · backlog goal punya alur sendiri (dua fase, tanpa perencanaan),
-            // jadi ia butuh pintunya sendiri — tanpa tab ini item goal hanya muncul tercampur di
-            // "Semua spec". `tab` menyeberang apa adanya sebagai `source` ke GET /specs.
-            { value: "goal", label: "Goal" },
-            // SPEC-546 · ADR-0109 · `help` kini tujuan konversi yang sah, jadi ia butuh pintunya
-            // sendiri — tanpa tab ini item Help Center hanya muncul tercampur di "Semua spec".
-            { value: "help", label: "Help Center" },
-            // SPEC-825 · ADR-0123 · item no_effort punya alur sendiri (satu fase), jadi ia butuh
-            // pintunya sendiri — tanpa tab ini ia hanya muncul tercampur di "Semua spec".
-            { value: "no_effort", label: "Tanpa effort" },
-          ]} />
-          <div className="hn-backlog-view-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Tabs variant="pill" value={view} onChange={setView} tabs={VIEWS} aria-label="Mode tampilan" />
-            <SyncButton onDone={() => setSyncNonce((n) => n + 1)} onToast={onToast ?? (() => {})} />
-            <ResetViewButton screen="backlog" active={activeFilters} onReset={resetView} />
-            {/* SPEC-857 · ADR-0131 · saat refetch gagal, jumlah ini TIDAK boleh tampil sebagai
-                kebenaran — operator harus tahu ia sedang membaca nilai basi, bukan backlog yang
-                menyusut. `role="status"` supaya perubahannya juga terdengar pembaca layar. */}
-            <span className="hn-eyebrow" role="status"
-              style={stale ? { color: "var(--status-warn)" } : undefined}
-              title={stale ? "Server tak menjawab saat menyegarkan — angka ini dari muatan terakhir yang berhasil" : undefined}>
-              {data.total} spec{stale ? " · data mungkin usang" : ""}
-            </span>
-            {refreshing && (
-              <span data-testid="backlog-refreshing" style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-                Memuat…
-              </span>
-            )}
-          </div>
-        </div>
-        {/* Keterangan sumber yang namanya bukan kata sehari-hari — terlihat, bukan hanya tooltip. */}
-        {TAB_HINT[tab] && (
-          <div data-testid="backlog-tab-hint" style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.5, marginBottom: 10 }}>
-            {TAB_HINT[tab]}
-          </div>
-        )}
-        {/* SPEC-178 · baris penyaring: search + project + stage + prioritas. */}
-        <div className="hn-backlog-filters" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <Input size="sm" leftIcon="search" placeholder="mis. invoice atau SPEC-412" aria-label="Cari backlog"
-            value={q} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value)} style={{ flex: "1 1 220px" }} />
-          <Select size="sm" aria-label="Filter project" value={proj} onChange={(e) => setProj(e.target.value)}
-            options={[{ value: "all", label: "Semua project" }].concat(projOptions.map((p) => ({ value: p.id, label: p.name })))} />
-          <Select size="sm" aria-label="Filter stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}
-            options={[{ value: "all", label: "Semua stage" }].concat(B_STAGES.map((s) => ({ value: s.key, label: s.label })))} />
-          <Select size="sm" aria-label="Filter prioritas" value={prioFilter} onChange={(e) => setPrioFilter(e.target.value)}
-            options={[
-              { value: "all", label: "Semua prioritas" }, { value: "tinggi", label: "Tinggi" },
-              { value: "sedang", label: "Sedang" }, { value: "rendah", label: "Rendah" },
-            ]} />
-          {/* SPEC-408 · ADR-0090 · rentang tanggal: satu sumbu + dua batas inklusif. DS `Input`
-              meneruskan ...rest ke <input>, jadi type="date" jalan tanpa mengubah design system. */}
+  const resetAll = () => {
+    setTab("all"); setProj("all"); setQ(""); setStage("all"); setPrioFilter("all");
+    setDateField("created"); setFrom(""); setTo(""); setPage(1);
+  };
+  // Chip untuk filter yang ada di popover. Tahap tak perlu chip: ia sudah segmen yang tampak.
+  const chips: FilterChip[] = [
+    ...(tab !== "all" ? [{ key: "tab", label: `Sumber: ${SOURCE_FILTER_OPTS.find((o) => o.value === tab)?.label ?? tab}`,
+      onRemove: () => setTab("all") }] : []),
+    ...(proj !== "all" ? [{ key: "proj", label: `Project: ${projOptions.find((x) => x.id === proj)?.name ?? proj}`,
+      onRemove: () => setProj("all") }] : []),
+    ...(prioFilter !== "all" ? [{ key: "prio", label: `Prioritas: ${prioMeta(prioFilter).label}`,
+      onRemove: () => setPrioFilter("all") }] : []),
+    ...(from || to ? [{ key: "date", label: `Tanggal ${dateField === "created" ? "dibuat" : "dikerjakan"}: ${from || "…"} – ${to || "…"}`,
+      onRemove: () => { setFrom(""); setTo(""); } }] : []),
+  ];
+  // Isi popover "Filter": sumber, project, prioritas, dan rentang tanggal. Dibuka dari satu tombol.
+  const filtersPanel = (
+    <Stack gap={3}>
+      <Field label="Sumber">
+        <Select size="sm" aria-label="Filter sumber" value={tab} onChange={(e) => setTab(e.target.value)} options={SOURCE_FILTER_OPTS} />
+      </Field>
+      <Field label="Project">
+        <Select size="sm" aria-label="Filter project" value={proj} onChange={(e) => setProj(e.target.value)}
+          options={[{ value: "all", label: "Semua project" }].concat(projOptions.map((p) => ({ value: p.id, label: p.name })))} />
+      </Field>
+      <Field label="Prioritas">
+        <Select size="sm" aria-label="Filter prioritas" value={prioFilter} onChange={(e) => setPrioFilter(e.target.value)} options={PRIO_FILTER_OPTS} />
+      </Field>
+      {/* SPEC-408 · ADR-0090 · rentang tanggal: satu sumbu + dua batas inklusif. */}
+      <Field label="Tanggal">
+        <div className="hn-bl-date-row">
           <Select size="sm" aria-label="Filter tanggal berdasarkan" value={dateField}
             onChange={(e) => setDateField(e.target.value as "created" | "started")}
             options={[{ value: "created", label: "Dibuat" }, { value: "started", label: "Dikerjakan" }]} />
           <Input size="sm" type="date" aria-label="Tanggal dari" value={from}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFrom(e.target.value)}
-            style={{ flex: "0 0 auto" }} />
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFrom(e.target.value)} />
           <span className="hn-eyebrow" aria-hidden="true">→</span>
           <Input size="sm" type="date" aria-label="Tanggal sampai" value={to}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTo(e.target.value)}
-            style={{ flex: "0 0 auto" }} />
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTo(e.target.value)} />
         </div>
-      </div>
-      {data.total === 0 ? (
+      </Field>
+    </Stack>
+  );
+  const firstLoad = !loaded && items.length === 0 && refreshing;
+  const sharedActions: ItemActions = {
+    onStart, onDelete: requestDelete, onOpenRun, onOpenReview, onMarkDone,
+  };
+  const openDetail = (s: SpecSlim) => setDetailId(s.id);
+  const stageLabel = STAGE_GROUPS.find((g) => g.key === stage)?.label ?? "";
+  return (
+    <div className="hn-bl-screen">
+      <section className="hn-bl-toolbar" role="region" aria-label="Kontrol backlog">
+        <FilterBar label="Penyaring backlog"
+          search={{ value: q, onChange: setQ, label: "Cari backlog", placeholder: "mis. invoice atau SPEC-412" }}
+          chips={chips} filters={filtersPanel} filtersLabel="Filter"
+          onReset={activeFilters > 0 ? resetAll : undefined} resetLabel="Reset filter"
+          actions={<>
+            <ViewToggle value={view} onChange={setView} />
+            <SyncButton onDone={() => setSyncNonce((n) => n + 1)} onToast={onToast ?? (() => {})} />
+          </>} />
+        <Tabs variant="pill" aria-label="Tahap backlog" value={stage} onChange={(v) => setStage(v as StageGroup)}
+          className="hn-bl-stage-tabs"
+          tabs={STAGE_GROUPS.map((g) => ({ value: g.key, label: g.label, count: counts[g.key] }))} />
+        {/* Keterangan sumber yang namanya bukan kata sehari-hari — terlihat, bukan hanya tooltip. */}
+        {TAB_HINT[tab] && (
+          <p className="hn-bl-hint" data-testid="backlog-tab-hint">{TAB_HINT[tab]}</p>
+        )}
+        {/* SPEC-857 · ADR-0131 · saat refetch gagal, angka ini TIDAK boleh tampil sebagai kebenaran. */}
+        <div className="hn-bl-status-line">
+          {stale && (
+            <span role="status" className="hn-bl-stale"
+              title="Server tak menjawab saat menyegarkan — angka ini dari muatan terakhir yang berhasil">
+              Data mungkin usang: server tak menjawab saat menyegarkan.
+            </span>
+          )}
+          {refreshing && (
+            <span data-testid="backlog-refreshing" className="hn-bl-muted">Memuat…</span>
+          )}
+        </div>
+      </section>
+
+      {firstLoad ? (
+        <SkeletonList rows={LOADING_ROWS} label="Memuat backlog" />
+      ) : items.length === 0 ? (
         backlog.length === 0
           ? <StateBlock kind="empty" illustration="PST-002" title="Backlog masih kosong"
             hint="Ajukan feature brief atau Finding QA — hanoman menjalankannya dari brainstorm sampai execute."
             action={onNew} actionLabel="Tambah spec" />
           : <StateBlock kind="empty" icon="filter" title="Tidak ada spec untuk filter ini"
             hint={`${backlog.length} spec ada di backlog, tapi tak ada yang cocok dengan filter aktif.`}
-            action={() => { setTab("all"); setProj("all"); setQ(""); setStageFilter("all"); setPrioFilter("all"); setDateField("created"); setFrom(""); setTo(""); }} actionLabel="Reset filter" actionIcon="rotate-ccw" />
+            action={resetAll} actionLabel="Reset filter" actionIcon="rotate-ccw" />
+      ) : visible.length === 0 ? (
+        <StateBlock kind="empty" compact icon="filter" title={`Tidak ada spec di tahap ${stageLabel}`}
+          hint="Tahap lain tetap memuat item yang sama." action={() => setStage("all")}
+          actionLabel="Tampilkan semua" actionIcon="x" />
       ) : view === "board" ? (
-        // Board tak dipaginasi: minta set terfilter penuh dari server (fetch tanpa page/limit).
-        <>
+        // Papan tak dipaginasi: kolomnya sendiri yang menjadi pengelompokan.
+        <div className="hn-bl-body">
           {/* Hint drag terlihat di layar, bukan hanya `title` — tombol di kartu adalah jalur yang sama. */}
-          <div data-testid="board-drag-hint" style={{ ...FIXED_ROW_STYLE, fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 8 }}>
+          <p data-testid="board-drag-hint" className="hn-bl-hint">
             Seret kartu dari kolom Backlog ke Brainstorm untuk memulai sesi. Tombol di kartu melakukan hal yang sama.
-          </div>
-          <Board specs={items} activeSpecs={activeSpecs} presenceBySpec={presenceBySpec} onMarkDone={onMarkDone}
-            onStart={onStart} onOpenRun={onOpenRun} onOpenReview={onOpenReview} onOpenDetail={(x) => setDetailId(x.id)} />
-        </>
+          </p>
+          <Board specs={visible} activeSpecs={activeSpecs} presenceBySpec={presenceBySpec}
+            onOpenDetail={openDetail} {...sharedActions} />
+        </div>
       ) : (
-        <>
-          {view === "list" ? (
-            // overflowX, bukan `overflow` — `overflow: hidden` akan menimpa overflowY dari spread.
-            <div ref={listRef} data-testid="backlog-scroll" aria-busy={refreshing || undefined} className="hn-backlog-list" style={{
-              ...LIST_SCROLL_STYLE, border: "1px solid var(--border-hair)",
-              borderRadius: "var(--radius-lg)", overflowX: "hidden"
-            }}>
-              {items.map((s) => <SpecRow key={s.id} spec={s} projectName={projects.find((x) => x.id === s.projectId)?.name} onStart={onStart}
-                running={activeSpecs?.has(s.id)} presenceOn={presenceBySpec?.get(s.id)} onDelete={requestDelete} onOpenRun={onOpenRun}
-                onOpenReview={onOpenReview} onMarkDone={onMarkDone}
-                onOpenDetail={(x) => setDetailId(x.id)} />)}
-            </div>
-          ) : (
-            <div ref={listRef} data-testid="backlog-scroll" aria-busy={refreshing || undefined} className="hn-backlog-grid" style={{
-              ...LIST_SCROLL_STYLE, display: "grid", gap: 12,
-              gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))", gridAutoRows: "1fr"
-            }}>
-              {items.map((s) => <SpecCard key={s.id} spec={s} onStart={onStart}
-                running={activeSpecs?.has(s.id)} presenceOn={presenceBySpec?.get(s.id)} onDelete={requestDelete} onOpenRun={onOpenRun}
-                onOpenReview={onOpenReview} onMarkDone={onMarkDone}
-                onOpenDetail={(x) => setDetailId(x.id)} />)}
-            </div>
-          )}
-          <div style={{ ...FIXED_ROW_STYLE, marginTop: 14, border: "1px solid var(--border-hair)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
-            <Pager page={sp.page} pageCount={sp.pageCount} total={data.total} from={sp.from} to={sp.to} onPage={setPage} unit="spec" />
+        <div className="hn-bl-body">
+          <div ref={listRef} data-testid="backlog-scroll" aria-busy={refreshing || undefined} className="hn-bl-list-scroll">
+            <RowList label="Daftar backlog">
+              {pageItems.map((s) => (
+                <SpecRow key={s.id} spec={s} presenceOn={presenceBySpec?.get(s.id)}
+                  running={activeSpecs?.has(s.id)} onOpenDetail={openDetail} {...sharedActions} />
+              ))}
+            </RowList>
           </div>
-        </>
+          <div className="hn-bl-pager">
+            <Pager page={sp.page} pageCount={sp.pageCount} total={visible.length} from={sp.from} to={sp.to} onPage={setPage} unit="spec" />
+          </div>
+        </div>
       )}
       <SpecDetail spec={detailSpec} onClose={() => setDetailId(null)}
         running={!!detailId && !!activeSpecs?.has(detailId)} onOpenRun={onOpenRun}
+        presenceOn={detailId ? presenceBySpec?.get(detailId) : undefined}
         onEditBranch={onEditBranch} onRevertStage={onRevertStage} onMarkDone={onMarkDone} onOpenReview={onOpenReview} onStart={onStart} onIntegrate={onIntegrate} onEditSpec={onEditSpec} onPromoteToQa={onPromoteToQa}
         onPromoteToBrief={onPromoteToBrief} onPromoteToPrd={onPromoteToPrd}
         onEditDeps={onEditDeps} onEditAutoMerge={onEditAutoMerge} onChangeSource={onChangeSource}
+        onRequestDelete={requestDelete} onUndoable={undoable}
         projectPolicy={(projects.find((x) => x.id === backlog.find((s) => s.id === detailId)?.projectId) as { autoMerge?: unknown } | undefined)?.autoMerge}
+        projectName={projects.find((x) => x.id === detailSpec?.projectId)?.name}
         allSpecs={backlog}
         onAttachmentToast={(m, tone) => onToast?.(m, tone ?? "ok", "paperclip")} />
+      <ToastHost toast={toast} />
       {dialog}
     </div>
   );

@@ -1,15 +1,20 @@
 import React from "react";
 import type { ClientAccountView } from "@hanoman/shared";
-import { Button, Callout, Card, Checkbox, Field, Input, StateBlock, StatusPill, useConfirm, type ShowToast } from "../ds";
+import {
+  Button, Callout, Card, Checkbox, DenseRow, Field, Input, OverflowActions, RowList, StateBlock, StatusPill,
+  useConfirm, type ShowToast,
+} from "../ds";
 import { api } from "../api/client";
 import { failureMessage } from "../lib/report-error";
+import "./styles/clients.css";
 
-// SPEC-617 · ADR-0110 · layar admin "Akses klien". Berkasnya sendiri: SettingsScreen.tsx sudah
-// ~80 KB, dan panel ini punya state serta siklus datanya sendiri.
+// SPEC-617 · ADR-0110 · tab "Akun" di Klien. Berkasnya sendiri: panel ini punya state serta siklus
+// datanya sendiri.
 //
 // Audit UI/UX 2026-10: gagal memuat akun atau project tampil sebagai galat dengan "Coba lagi" (bukan
-// daftar kosong yang berbohong), perubahan akses punya feedback dan tak pernah diam saat gagal, dan
-// "Hapus akun" lewat `useConfirm` dengan daftar dampaknya.
+// daftar kosong yang berbohong), perubahan akses punya feedback dan tak pernah diam saat gagal.
+// Fase 3G: tiap akun satu baris; aksi utama "Nonaktifkan/Aktifkan" dan "Cabut akses" (dikonfirmasi);
+// "Hapus akun" (destruktif) di menu ⋯.
 
 const EMAIL_OK = /\S+@\S+\.\S+/;
 
@@ -80,6 +85,32 @@ export function ClientAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
     } finally { setBusyId(null); }
   };
 
+  // Cabut akses: akun tetap ada, hanya daftar project-nya dikosongkan. Dikonfirmasi karena klien
+  // langsung kehilangan semua tampilan yang tadinya boleh ia lihat.
+  const revoke = async (a: ClientAccountView) => {
+    setActionErr(null);
+    try {
+      const done = await confirm({
+        title: `Cabut akses ${a.email}?`,
+        message: "Akun tetap ada, tetapi klien ini tak bisa lagi melihat project mana pun.",
+        impact: [
+          `${a.projects.length} project dicabut dari akun ini.`,
+          "Akses bisa diberikan lagi kapan saja dari daftar ini.",
+        ],
+        confirmLabel: "Cabut akses",
+        tone: "danger",
+        icon: "shield",
+        run: () => api.updateClientAccount(a.id, { projects: [] }),
+      });
+      if (done) {
+        onToast?.(`Akses ${a.email} dicabut`, "warn", "shield");
+        await loadAccounts();
+      }
+    } catch (e) {
+      setActionErr(failureMessage(`mencabut akses ${a.email}`, e));
+    }
+  };
+
   const remove = async (a: ClientAccountView) => {
     setActionErr(null);
     const impact: React.ReactNode[] = ["Akun dan password-nya dihapus permanen."];
@@ -112,7 +143,7 @@ export function ClientAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
   return (
     <>
       <Card eyebrow="akses" title="Buat akun klien">
-        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14, lineHeight: 1.5 }}>
+        <div className="kl-intro">
           Akun klien melihat <b>daftar backlog</b> dan <b>tiket help desk</b> project yang dipilih —
           hanya baca, tanpa terminal, dokumen internal, maupun setelan. Ia tak pernah melihat dashboard
           operator.
@@ -123,7 +154,7 @@ export function ClientAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
               aria-invalid={emailBad || undefined} aria-describedby={emailBad ? emailHintId : undefined}
               invalid={emailBad} value={email}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)} />
-            {emailBad && <span id={emailHintId} style={{ display: "block", fontSize: 11.5, color: "var(--status-err)", marginTop: 5 }}>
+            {emailBad && <span id={emailHintId} className="kl-field-err">
               Format email belum benar, mis. nama@domain.id.</span>}
           </Field>
           <Field label="Password awal"
@@ -140,9 +171,9 @@ export function ClientAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
             ) : !projects ? (
               <StateBlock kind="loading" compact title="Memuat project…" />
             ) : projects.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: "var(--text-subtle)" }}>Belum ada project untuk dibagikan.</div>
+              <div className="kl-muted">Belum ada project untuk dibagikan.</div>
             ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
+              <div className="kl-checks">
                 {projects.map((p) => (
                   <Checkbox key={p.id} aria-label={`Beri akses ${p.name}`} label={p.name}
                     checked={picked.includes(p.id)}
@@ -151,12 +182,10 @@ export function ClientAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
               </div>
             )}
           </Field>
-          {createErr && <Callout tone="err" role="alert" style={{ marginBottom: 10 }}>{createErr}</Callout>}
+          {createErr && <Callout tone="err" role="alert">{createErr}</Callout>}
           <Button size="sm" type="submit" leftIcon="user-plus" disabled={!!createBlock || creating} loading={creating}
             aria-describedby={createBlock ? createHintId : undefined}>Buat akun</Button>
-          {createBlock && (
-            <div id={createHintId} style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>{createBlock}</div>
-          )}
+          {createBlock && <div id={createHintId} className="kl-muted">{createBlock}</div>}
         </form>
       </Card>
 
@@ -169,42 +198,55 @@ export function ClientAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
             ? <StateBlock kind="empty" icon="users" title="Belum ada akun klien"
                 hint="Buat akun di atas, lalu pilih project yang boleh ia lihat." />
             : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <>
                 {!projectsReady && (
-                  <div role="status" style={{ fontSize: 12.5, color: "var(--text-muted)", padding: "8px 0" }}>
+                  <div role="status" className="kl-muted">
                     Akses project belum bisa diubah sebelum daftar project termuat.
                   </div>
                 )}
-                {accounts.map((a) => (
-                  <div key={a.id} style={{
-                    display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-                    padding: "12px 0", borderBottom: "1px solid var(--border-hair)",
-                  }}>
-                    <span style={{ fontWeight: 500, color: "var(--text-strong)" }}>{a.email}</span>
-                    <StatusPill status={a.disabled ? "stopped" : "done"} size="sm">
-                      {a.disabled ? "nonaktif" : "aktif"}
-                    </StatusPill>
-                    <div style={{ flex: 1, minWidth: 240, display: "flex", flexWrap: "wrap", gap: 14 }}>
-                      {(projects ?? []).map((p) => (
-                        <Checkbox key={p.id} aria-label={`${a.email} · ${p.name}`} label={p.name}
-                          checked={a.projects.includes(p.id)} disabled={busyId === a.id || !projectsReady}
-                          onChange={(on) => void patch(a, { projects: withProject(a.projects, p.id, on) },
-                            on ? `Akses ${p.name} diberikan` : `Akses ${p.name} dicabut`)} />
-                      ))}
-                    </div>
-                    <Button size="sm" variant="secondary" disabled={busyId === a.id}
-                      onClick={() => void patch(a, { disabled: !a.disabled },
-                        a.disabled ? "Akun diaktifkan" : "Akun dinonaktifkan")}>
-                      {a.disabled ? "Aktifkan" : "Nonaktifkan"}
-                    </Button>
-                    <Button size="sm" variant="secondary" leftIcon="trash-2" disabled={busyId === a.id}
-                      style={{ color: "var(--clay-600)" }} onClick={() => void remove(a)}>Hapus</Button>
-                  </div>
-                ))}
-              </div>
+                <RowList label="Akun klien">
+                  {accounts.map((a) => (
+                    <DenseRow key={a.id} actions={
+                      <>
+                        <Button size="sm" variant="secondary" disabled={busyId === a.id}
+                          onClick={() => void patch(a, { disabled: !a.disabled },
+                            a.disabled ? "Akun diaktifkan" : "Akun dinonaktifkan")}>
+                          {a.disabled ? "Aktifkan" : "Nonaktifkan"}
+                        </Button>
+                        <Button size="sm" variant="secondary" leftIcon="shield"
+                          disabled={busyId === a.id || a.projects.length === 0 || !projectsReady}
+                          onClick={() => void revoke(a)}>
+                          Cabut akses
+                        </Button>
+                        <OverflowActions label={`Aksi lain untuk ${a.email}`} title={a.email} items={[
+                          { key: "hapus", label: "Hapus akun", icon: "trash-2", tone: "danger",
+                            disabled: busyId === a.id, onSelect: () => void remove(a) },
+                        ]} />
+                      </>
+                    }>
+                      <div className="kl-account">
+                        <div className="kl-account-head">
+                          <span className="kl-account-email">{a.email}</span>
+                          <StatusPill status={a.disabled ? "stopped" : "done"} size="sm">
+                            {a.disabled ? "nonaktif" : "aktif"}
+                          </StatusPill>
+                        </div>
+                        <div className="kl-account-projects">
+                          {(projects ?? []).map((p) => (
+                            <Checkbox key={p.id} aria-label={`${a.email} · ${p.name}`} label={p.name}
+                              checked={a.projects.includes(p.id)} disabled={busyId === a.id || !projectsReady}
+                              onChange={(on) => void patch(a, { projects: withProject(a.projects, p.id, on) },
+                                on ? `Akses ${p.name} diberikan` : `Akses ${p.name} dicabut`)} />
+                          ))}
+                        </div>
+                      </div>
+                    </DenseRow>
+                  ))}
+                </RowList>
+              </>
             )}
         {/* Galat perubahan akses ditampilkan di sini (bukan toast saja) supaya tak hilang sebelum dibaca. */}
-        {actionErr && <Callout tone="err" role="alert" style={{ marginTop: 10 }}>{actionErr}</Callout>}
+        {actionErr && <Callout tone="err" role="alert">{actionErr}</Callout>}
       </Card>
       {dialog}
     </>

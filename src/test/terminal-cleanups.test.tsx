@@ -39,6 +39,8 @@ const push = (m: unknown) => act(() => { ev.handler?.(m); });
 
 beforeEach(() => {
   localStorage.clear();
+  // Uji sel grid (tombol × per sel, pelepasan sel); default layar kini "Fokus" (Fase 3E).
+  localStorage.setItem("hn.ui.v1.terminal.view", JSON.stringify("grid"));
   listTerminals.mockReset(); deleteTerminal.mockReset();
   listTerminals.mockResolvedValue([]);
 });

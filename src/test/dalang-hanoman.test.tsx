@@ -1,11 +1,11 @@
 import React from "react";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { DalangHanomanScreen } from "../src/screens/DalangHanomanScreen";
 import { HN_NAV } from "../src/ds/shell";
-// Status koneksi nyata dikendalikan test lewat objek hoisted (ticker harus mencerminkannya).
+// Status koneksi nyata dikendalikan test lewat objek hoisted (baris status harus mencerminkannya).
 const { conn } = vi.hoisted(() => ({ conn: { connected: true, since: 0, paused: false } }));
 vi.mock("../src/api/live", () => ({ useEventsStatus: () => conn }));
 import type { TerminalSession } from "../src/api/client";
@@ -33,13 +33,13 @@ function spec(over: { id: string; startedAt?: Date | null; stage?: string }): Sp
 const noop = () => {};
 const projects = [project({ id: "a", name: "alpha" }), project({ id: "b", name: "beta" }), project({ id: "c", name: "gamma" })];
 
-describe("Dalang Hanoman — menu & layar panggung orkestrasi", () => {
+describe("Dalang Hanoman — menu & papan status", () => {
   it("terdaftar di HN_NAV sebagai 'Dalang Hanoman' (cabang App dijaga changelog-nav.test)", () => {
     const item = HN_NAV.find((n) => n.key === "dalang");
     expect(item?.label).toBe("Dalang Hanoman");
   });
 
-  it("SEMUA project tampil: sesi hidup menyala (klik → fokus sesi), tanpa sesi = wayang redup", () => {
+  it("ringkasan satu baris; yang menunggu di atas; tiap project tampil sekali", () => {
     const onOpenSession = vi.fn();
     const onOpenProject = vi.fn();
     render(<DalangHanomanScreen projects={projects}
@@ -50,29 +50,37 @@ describe("Dalang Hanoman — menu & layar panggung orkestrasi", () => {
         session({ id: "s3", projectId: "c", exited: true, exitCode: 0 }),
       ]}
       onOpenSession={onOpenSession} onOpenProject={onOpenProject} onGoto={noop} onExit={noop} />);
-    // Hero rig ber-sendi: badan + 4 lengan terpisah + 4 jangkar tangan untuk benang.
-    expect(document.querySelector('img[src*="hero-rig-body"]')).toBeTruthy();
-    expect(document.querySelectorAll(".hn-dlg-rig-arm")).toHaveLength(4);
-    expect(document.querySelectorAll("[data-hand]")).toHaveLength(4);
-    const list = screen.getByRole("list", { name: "Wayang project" });
-    expect(list.querySelectorAll(".hn-dlg-prj")).toHaveLength(3);          // semua tampil
-    expect(list.querySelectorAll("[data-puppet]")).toHaveLength(2);        // benang emas mengalir ke yang hidup; sisanya benang kendur
-    expect(list.querySelectorAll('.hn-dlg-prj[data-waiting]')).toHaveLength(1);
-    expect(list.querySelectorAll(".hn-dlg-prj--off")).toHaveLength(1);     // gamma redup, tetap wayang
-    fireEvent.click(screen.getByRole("button", { name: /Buka terminal — alpha, SPEC-1 · Dikerjakan/ }));
-    expect(onOpenSession).toHaveBeenCalledWith("s1");
-    fireEvent.click(screen.getByRole("button", { name: "Buka project gamma" }));
+    expect(screen.getByText("2 sesi berjalan · 1 menunggu jawabanmu · 3 project")).toBeTruthy();
+
+    const waiting = screen.getByRole("heading", { name: "Menunggu jawabanmu" }).parentElement!;
+    const waitRow = within(waiting).getByRole("button", { name: /beta/ });
+    expect(waitRow.textContent).toContain("Jawab");
+    fireEvent.click(waitRow);
+    expect(onOpenSession).toHaveBeenCalledWith("s2");
+
+    const running = screen.getByRole("button", { name: /alpha/ });
+    expect(running.textContent).toContain("SPEC-1");
+    expect(running.textContent).toContain("Dikerjakan");
+    fireEvent.click(running);
+    expect(onOpenSession).toHaveBeenLastCalledWith("s1");
+
+    // gamma: sesinya sudah exited → baris redup, klik membuka project
+    expect(document.querySelectorAll(".hn-dlg-row--off")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: /gamma/ }));
     expect(onOpenProject).toHaveBeenCalled();
+    // setiap project tepat satu baris (beta hanya di seksi menunggu)
+    expect(screen.getAllByRole("button", { name: /alpha|beta|gamma/ })).toHaveLength(3);
   });
 
-  it("kelir sunyi → semua wayang redup tampil, blencong padam, ✕/Esc keluar, perintah → terminal", () => {
+  it("tanpa sesi: semua project redup, tanpa seksi menunggu, keluar via tombol dan Esc", () => {
     const onGoto = vi.fn();
     const onExit = vi.fn();
     render(<DalangHanomanScreen projects={projects} backlog={[]} sessions={[]}
       onOpenSession={noop} onOpenProject={noop} onGoto={onGoto} onExit={onExit} />);
-    expect(document.querySelectorAll(".hn-dlg-prj--off")).toHaveLength(3);
-    expect(document.querySelector(".hn-dlg-blencong[data-lit]")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /pusat kendali sesi/ }));
+    expect(screen.getByText("Tidak ada sesi berjalan · 3 project")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Menunggu jawabanmu" })).toBeNull();
+    expect(document.querySelectorAll(".hn-dlg-row--off")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "Buka terminal" }));
     expect(onGoto).toHaveBeenCalledWith("terminal");
     fireEvent.click(screen.getByRole("button", { name: /Keluar dari panggung/ }));
     expect(onExit).toHaveBeenCalledTimes(1);
@@ -80,38 +88,62 @@ describe("Dalang Hanoman — menu & layar panggung orkestrasi", () => {
     expect(onExit).toHaveBeenCalledTimes(2);
   });
 
-  it("donut distribusi backlog dihitung dari stage nyata", () => {
-    render(<DalangHanomanScreen projects={[]} sessions={[]}
-      backlog={[
-        spec({ id: "s1", stage: "done" }), spec({ id: "s2", stage: "done" }),
-        spec({ id: "s3", stage: "executing" }), spec({ id: "s4", stage: "planned" }), spec({ id: "s5" }),
-      ]}
+  it("tanpa project: satu kalimat panggung sunyi, tanpa daftar", () => {
+    render(<DalangHanomanScreen projects={[]} backlog={[]} sessions={[]}
       onOpenSession={noop} onOpenProject={noop} onGoto={noop} onExit={noop} />);
-    const leg = document.querySelector(".hn-dlg-leg")!;
-    expect(leg.textContent).toContain("Selesai 2");
-    expect(leg.textContent).toContain("Dikerjakan 1");
-    expect(document.querySelector(".hn-dlg-donut-c b")!.textContent).toBe("5");
+    expect(screen.getByText("Panggung sunyi — belum ada project di workspace.")).toBeTruthy();
+    expect(document.querySelectorAll(".hn-dlg-row")).toHaveLength(0);
   });
 
-  it("kontrak design system: layar tanpa warna literal (semua lewat kelas/token)", () => {
+  it("papan senyap: tanpa KPI ganda, donut, grafik, aktivitas, dan jam", () => {
+    render(<DalangHanomanScreen projects={projects}
+      backlog={[spec({ id: "s1", stage: "done" }), spec({ id: "s3", stage: "executing" })]}
+      sessions={[]} onOpenSession={noop} onOpenProject={noop} onGoto={noop} onExit={noop} />);
+    expect(document.querySelector(".hn-dlg-kpi")).toBeNull();
+    expect(document.querySelector(".hn-dlg-donut")).toBeNull();
+    expect(document.querySelector(".hn-dlg-chart")).toBeNull();
+    expect(document.querySelector(".hn-dlg-card")).toBeNull();
+    expect(document.querySelector(".hn-dlg-hud")).toBeNull();
+    expect(document.querySelector(".hn-dlg-rig-body")).toBeNull();
+  });
+
+  it("wayang sebagai ikon kecil (SVG, tanpa gambar besar)", () => {
+    render(<DalangHanomanScreen projects={[projects[0]!]} backlog={[]}
+      sessions={[session({ id: "s1", projectId: "a" })]}
+      onOpenSession={noop} onOpenProject={noop} onGoto={noop} onExit={noop} />);
+    const glyph = document.querySelector(".hn-dlg-glyph svg");
+    expect(glyph).toBeTruthy();
+    expect(glyph!.getAttribute("height")).toBe("24");
+    expect(document.querySelectorAll("img")).toHaveLength(0);
+  });
+
+  it("kontrak design system: layar dan CSS-nya tanpa warna literal", () => {
     const src = read("src/screens/DalangHanomanScreen.tsx");
     expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(src).not.toMatch(/\b(rgba?|hsla?)\(/);
+    const css = read("src/screens/styles/dalang.css");
+    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(css).not.toMatch(/\b(rgba?|hsla?)\(/);
     // sumber hidup wajib sessions WS, bukan ProjectView.session yang basi
     expect(src).not.toMatch(/\.session\.(status|phase|flow)/);
+  });
+
+  it("tanpa timer dan animasi: pet tetap satu-satunya elemen yang bergerak", () => {
+    const src = read("src/screens/DalangHanomanScreen.tsx");
+    expect(src).not.toMatch(/setInterval|setTimeout|requestAnimationFrame|performance\.now|matchMedia/);
+    const css = read("src/screens/styles/dalang.css");
+    expect(css).not.toMatch(/animation|@keyframes|transition/);
   });
 });
 
 describe("Dalang Hanoman — jalan keluar, status koneksi, semantik daftar", () => {
   const base = { projects, backlog: [] as Spec[], sessions: [] as TerminalSession[], onOpenSession: noop, onOpenProject: noop, onGoto: noop };
 
-  beforeEach(() => { conn.connected = true; });
-  afterEach(() => { delete (window as { matchMedia?: unknown }).matchMedia; });
+  beforeEach(() => { conn.connected = true; conn.paused = false; });
 
-  it("tombol keluar berada di luar .hn-dlg-chips (agar tampil di mobile)", () => {
+  it("tombol keluar ada di header (bukan di wadah yang disembunyikan di ponsel)", () => {
     render(<DalangHanomanScreen {...base} onExit={noop} />);
-    expect(document.querySelector(".hn-dlg-chips .hn-dlg-exit")).toBeNull();
-    expect(document.querySelector(".hn-dlg-top > .hn-dlg-exit")).not.toBeNull();
+    expect(document.querySelector(".hn-dlg-top > .hn-dlg-actions > .hn-dlg-exit")).not.toBeNull();
   });
 
   it("dengan `previous`, tombol keluar kembali ke halaman sebelumnya", () => {
@@ -122,23 +154,26 @@ describe("Dalang Hanoman — jalan keluar, status koneksi, semantik daftar", () 
     expect(onExit).not.toHaveBeenCalled();
   });
 
-  it("ticker mencerminkan status koneksi nyata, bukan teks tetap", () => {
-    // Gerak dimatikan agar ticker menampilkan baris pertamanya secara statis.
-    window.matchMedia = ((q: string) => ({ matches: true, media: q, onchange: null,
-      addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
+  it("status koneksi mencerminkan socket nyata: terhubung, jeda, atau terputus", () => {
     conn.connected = false;
-    const { container, unmount } = render(<DalangHanomanScreen {...base} onExit={noop} />);
-    expect(container.querySelector(".hn-dlg-boot")!.textContent).toContain("KONEKSI TERPUTUS");
-    unmount();
+    const first = render(<DalangHanomanScreen {...base} onExit={noop} />);
+    expect(first.container.querySelector(".hn-dlg-link")!.textContent).toContain("Koneksi terputus · menyambung ulang");
+    first.unmount();
+
     conn.connected = true;
-    const again = render(<DalangHanomanScreen {...base} onExit={noop} />);
-    expect(again.container.querySelector(".hn-dlg-boot")!.textContent).toContain("HANOMAN TERHUBUNG");
-    expect(again.container.textContent).not.toContain("SEMUA SISTEM NORMAL");
+    const second = render(<DalangHanomanScreen {...base} onExit={noop} />);
+    expect(second.container.querySelector(".hn-dlg-link")!.textContent).toContain("Terhubung");
+    second.unmount();
+
+    conn.connected = false; conn.paused = true;
+    const third = render(<DalangHanomanScreen {...base} onExit={noop} />);
+    expect(third.container.querySelector(".hn-dlg-link")!.textContent).toContain("Jeda · tab tersembunyi");
+    expect(third.container.textContent).not.toContain("SEMUA SISTEM NORMAL");
   });
 
-  it("daftar wayang memakai listitem di tiap kartu", () => {
+  it("daftar project memakai listitem di tiap baris", () => {
     render(<DalangHanomanScreen {...base} onExit={noop} />);
-    const list = screen.getByRole("list", { name: "Wayang project" });
-    expect(within(list).getAllByRole("listitem")).toHaveLength(3);
+    const list = document.querySelector(".hn-dlg-list")!;
+    expect(within(list as HTMLElement).getAllByRole("listitem")).toHaveLength(3);
   });
 });

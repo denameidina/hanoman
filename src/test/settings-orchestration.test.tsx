@@ -31,7 +31,8 @@ beforeEach(() => {
 
 const open = async () => {
   render(<SettingsScreen me={me} onLoggedOut={() => {}} onToast={() => {}} />);
-  fireEvent.click(screen.getByText("Orkestrasi"));
+  // Orkestrasi kini kartu di niat "Agen & model" (sebelumnya tab sendiri).
+  fireEvent.click(screen.getByRole("button", { name: "Agen & model" }));
   return screen.findByTestId("orch-flow-feature");
 };
 

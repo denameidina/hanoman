@@ -17,10 +17,14 @@ const spec = (over: Partial<Spec> = {}) =>
 const envelope = (items: Spec[]) => ({ items, total: items.length, page: 1, pageSize: 20 });
 const lastCall = () => vi.mocked(api.listSpecs).mock.calls.at(-1)![0]!;
 
+// Rentang tanggal ada di popover "Filter" (progressive disclosure): buka dulu.
+const openFilter = () => fireEvent.click(screen.getByRole("button", { name: /^Filter/ }));
+
 function backlog(items: Spec[] = [spec()]) {
   vi.mocked(api.listSpecs).mockResolvedValue(envelope(items));
   render(<BacklogScreen backlog={items} projects={[{ id: "p", name: "p" }] as never}
     projectFilter="all" onProjectFilter={() => {}} onStart={() => {}} />);
+  openFilter();
 }
 
 beforeEach(() => { vi.mocked(api.listSpecs).mockReset(); });
@@ -28,7 +32,7 @@ beforeEach(() => { vi.mocked(api.listSpecs).mockReset(); });
 // SPEC-408 · ADR-0090 · filter dikirim ke server (ADR-0038: penyaringan di layer response),
 // jadi yang diuji adalah PARAM yang menyeberang, bukan jumlah baris yang dirender klien.
 describe("filter rentang tanggal backlog (SPEC-408)", () => {
-  it("tiga kontrolnya ada di baris penyaring", () => {
+  it("tiga kontrolnya ada di popover Filter", () => {
     backlog();
     expect(screen.getByLabelText("Filter tanggal berdasarkan")).toBeTruthy();
     expect(screen.getByLabelText("Tanggal dari")).toBeTruthy();
@@ -68,15 +72,22 @@ describe("filter rentang tanggal backlog (SPEC-408)", () => {
     expect(lastCall().dateField).toBe("created");
   });
 
+  it("rentang aktif tampil sebagai chip yang bisa dilepas", () => {
+    backlog();
+    fireEvent.change(screen.getByLabelText("Tanggal dari"), { target: { value: "2026-07-01" } });
+    expect(screen.getByRole("button", { name: /Hapus filter Tanggal dibuat/ })).toBeInTheDocument();
+  });
+
   it("Reset filter mengosongkan tanggal DAN mengembalikan sumbu ke Dibuat", async () => {
     // server mengembalikan 0 item → StateBlock "Tidak ada spec untuk filter ini" muncul
-    // (prop `backlog` tetap terisi, itulah cabang yang menampilkan tombol Reset).
+    // (prop `backlog` tetap terisi). Reset ada di baris chip DAN di StateBlock: ambil yang pertama.
     vi.mocked(api.listSpecs).mockResolvedValue(envelope([]));
     render(<BacklogScreen backlog={[spec()]} projects={[{ id: "p", name: "p" }] as never}
       projectFilter="all" onProjectFilter={() => {}} onStart={() => {}} />);
+    openFilter();
     fireEvent.change(screen.getByLabelText("Tanggal dari"), { target: { value: "2026-07-01" } });
     fireEvent.change(screen.getByLabelText("Filter tanggal berdasarkan"), { target: { value: "started" } });
-    fireEvent.click(await screen.findByText("Reset filter"));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Reset filter" }))[0]!);
     expect((screen.getByLabelText("Tanggal dari") as HTMLInputElement).value).toBe("");
     expect((screen.getByLabelText("Filter tanggal berdasarkan") as HTMLSelectElement).value).toBe("created");
     await waitFor(() => expect(lastCall().from).toBeUndefined());

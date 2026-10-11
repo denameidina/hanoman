@@ -9,6 +9,8 @@ import { buildFileTree, TreeRow, TreeRoot } from "./file-tree";
 import { DiffView } from "./diff-view";
 import { emojify, renderMessage, gravatarUrl } from "./git-graph-render";
 import { failureMessage } from "../lib/report-error";
+import { Menu, type MenuItem } from "./ide-menu";
+import "./styles/ide.css";
 
 type Toast = (msg: string, tone: "ok" | "warn" | "err" | "info", icon?: string) => void;
 
@@ -110,7 +112,7 @@ function edgePath(e: Edge, style: "rounded" | "angular", height: number): string
 function RowSvg({ row, edges, maxLanes, style, palette, height }: { row: GraphRow; edges: Edge[]; maxLanes: number; style: "rounded" | "angular"; palette: string[]; height: number }) {
   const cx = LANE_W / 2 + row.lane * LANE_W;
   return (
-    <svg width={maxLanes * LANE_W} height={height} style={{ flex: "0 0 auto" }}>
+    <svg aria-hidden="true" width={maxLanes * LANE_W} height={height} style={{ flex: "0 0 auto" }}>
       {edges.map((e, i) => (
         <path key={i} d={edgePath(e, style, height)} fill="none" stroke={laneColor(e.colorLane, palette)} strokeWidth={1.5} />
       ))}
@@ -118,58 +120,6 @@ function RowSvg({ row, edges, maxLanes, style, palette, height }: { row: GraphRo
     </svg>
   );
 }
-
-function Menu({ x, y, items, onClose, returnFocus }: { x: number; y: number; items: { label: string; run: () => void }[]; onClose: () => void; returnFocus?: HTMLElement | null }) {
-  const rootRef = React.useRef<HTMLDivElement>(null);
-  const closeRef = React.useRef(onClose);
-  closeRef.current = onClose;
-  React.useLayoutEffect(() => {
-    const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previous = active && active !== document.body ? active : returnFocus;
-    rootRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
-    return () => previous?.focus();
-  }, []);
-  React.useEffect(() => {
-    const outside = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) closeRef.current();
-    };
-    window.addEventListener("pointerdown", outside);
-    return () => window.removeEventListener("pointerdown", outside);
-  }, []);
-  const onKeyDown = (event: React.KeyboardEvent) => {
-    const controls = Array.from(rootRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
-    const current = Math.max(0, controls.indexOf(document.activeElement as HTMLButtonElement));
-    let next: number | null = null;
-    if (event.key === "Escape") closeRef.current();
-    else if (event.key === "ArrowDown") next = (current + 1) % controls.length;
-    else if (event.key === "ArrowUp") next = (current - 1 + controls.length) % controls.length;
-    else if (event.key === "Home") next = 0;
-    else if (event.key === "End") next = controls.length - 1;
-    else return;
-    event.preventDefault();
-    if (next !== null) controls[next]?.focus();
-  };
-  const safe = (name: string) => Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
-  const safeLeft = safe("--safe-left"), safeRight = safe("--safe-right");
-  const safeTop = safe("--safe-top"), safeBottom = safe("--safe-bottom");
-  const menuHeight = Math.min(360, items.length * 44 + 8, window.innerHeight - safeTop - safeBottom - 16);
-  const left = Math.max(8 + safeLeft, Math.min(x, window.innerWidth - safeRight - 228));
-  const top = Math.max(8 + safeTop, Math.min(y, window.innerHeight - safeBottom - menuHeight - 8));
-  return (
-    <div ref={rootRef} role="menu" onKeyDown={onKeyDown} style={{ position: "fixed", left, top, zIndex: 150, background: "var(--surface-card)",
-      border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", boxShadow: "var(--shadow-lg)",
-      padding: 4, minWidth: 180, maxWidth: "calc(100vw - var(--safe-left) - var(--safe-right) - 16px)",
-      maxHeight: "calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px)", overflowY: "auto" }}>
-      {items.map((it) => (
-        <button role="menuitem" key={it.label} onClick={() => { it.run(); closeRef.current(); }} style={{ display: "block", width: "100%", textAlign: "left",
-          padding: "7px 10px", border: "none", background: "transparent", cursor: "pointer",
-          fontFamily: "var(--font-ui)", fontSize: 12.5, color: "var(--text-body)", borderRadius: 4 }}>{it.label}</button>
-      ))}
-    </div>
-  );
-}
-
-type MenuItem = { label: string; run: () => void };
 
 // Item context-menu untuk satu commit. Aksi hapus branch sadar local vs origin (SPEC-206):
 // ref `origin/<b>` dikelompokkan dengan branch lokal `<b>` bila keduanya menunjuk commit ini.
@@ -200,65 +150,74 @@ function menuItems(c: GraphCommit, current: string, ctl: Ctl): MenuItem[] {
       ? `Perubahan tak ter-commit di ${ctl.dirty.length} berkas dibuang: ${fileList(ctl.dirty)}.`
       : "Tak ada perubahan tak ter-commit yang ikut dibuang.",
   ];
-  return [
-    { label: `Checkout ${sha7}`, run: () => act({ op: "checkout", ref: c.sha }) },
-    { label: "Merge (fast-forward bila bisa)", run: () => merge(c.sha) },
-    { label: "Merge tanpa fast-forward", run: () => merge(c.sha, { ff: "no-ff" }) },
-    { label: "Merge fast-forward saja", run: () => merge(c.sha, { ff: "ff-only" }) },
-    { label: "Cherry-pick", run: () => act({ op: "cherry-pick", sha: c.sha }) },
-    { label: "Revert", run: () => act({ op: "revert", sha: c.sha }) },
-    // SPEC-233 · rebase current ke commit ini / buang commit ini (isolasi + konflik → sesi claude)
-    { label: "Rebase current → sini", run: () => rebase(c.sha) },
-    { label: "Drop commit…", run: () => guard({
-      title: `Drop commit ${sha7}?`, eyebrow: c.subject, tone: "danger", icon: "trash-2",
-      message: "Commit ini dibuang dari riwayat branch.",
-      impact: ["Riwayat branch ditulis ulang tanpa commit ini; pemulihannya hanya lewat reflog."],
-      confirmLabel: "Drop commit",
-    }, () => drop(c.sha)) },
-    // SPEC-233 · reset branch current ke commit ini (soft/mixed/hard). hard ireversibel → dialog dampak.
-    { label: "Reset current → sini (soft)", run: () => act({ op: "reset", sha: c.sha, mode: "soft" }) },
-    { label: "Reset current → sini (mixed)", run: () => act({ op: "reset", sha: c.sha, mode: "mixed" }) },
-    { label: "Reset current → sini (hard)", run: () => guard({
-      title: `Reset ${current || "branch"} ke ${sha7} secara hard?`, eyebrow: "Reset hard", tone: "danger", icon: "rotate-ccw",
-      message: "Reset hard memindahkan branch dan membuang perubahan tak ter-commit.",
-      impact: resetHardImpact, confirmLabel: "Reset hard",
-    }, () => act({ op: "reset", sha: c.sha, mode: "hard" })) },
-    { label: "Salin hash", run: () => copy(c.sha) },
-    { label: "Salin subject", run: () => copy(c.subject) },
-    { label: "Buat branch di sini…", run: () => ask({
+  // Audit UI/UX 2026-10 (3H) · menu commit dikelompokkan, bukan >20 item datar. Urutannya: navigasi
+  // paling sering, lalu cabang & tag, dan aksi yang menulis ulang riwayat (cherry-pick, revert,
+  // reset, drop) di grup Lanjutan paling bawah. Reset hard & drop tetap lewat dialog dampak.
+  const navigasi: MenuItem[] = [
+    { label: `Checkout ${sha7}`, group: "Navigasi", run: () => act({ op: "checkout", ref: c.sha }) },
+    { label: "Salin hash", group: "Navigasi", run: () => copy(c.sha) },
+    { label: "Salin subject", group: "Navigasi", run: () => copy(c.subject) },
+    // Perbandingan lewat menu: tandai commit pertama, lalu bandingkan dengan commit kedua.
+    ...(cmp.from === null
+      ? [{ label: "Tandai untuk dibandingkan", group: "Navigasi", run: () => cmp.mark(c.sha) }]
+      : cmp.from === c.sha
+        ? [{ label: "Batal tandai perbandingan", group: "Navigasi", run: () => cmp.mark(null) }]
+        : [{ label: `Bandingkan dengan ${cmp.from.slice(0, 7)}`, group: "Navigasi", run: () => cmp.compare(cmp.from as string, c.sha) }]),
+  ];
+  const cabang: MenuItem[] = [
+    { label: "Merge (fast-forward bila bisa)", group: "Cabang & tag", run: () => merge(c.sha) },
+    { label: "Merge tanpa fast-forward", group: "Cabang & tag", run: () => merge(c.sha, { ff: "no-ff" }) },
+    { label: "Merge fast-forward saja", group: "Cabang & tag", run: () => merge(c.sha, { ff: "ff-only" }) },
+    // SPEC-233 · rebase current ke commit ini (isolasi + konflik → sesi claude)
+    { label: "Rebase current → sini", group: "Cabang & tag", run: () => rebase(c.sha) },
+    { label: "Buat branch di sini…", group: "Cabang & tag", run: () => ask({
       title: `Branch baru di ${sha7}`, label: "Nama branch baru", placeholder: "mis. fitur/login", submit: "Buat branch",
       onSubmit: (name) => { void act({ op: "branch", name, at: c.sha, checkout: true }); },
     }) },
     // SPEC-233 · buat tag di commit ini. Pesan kosong = lightweight; terisi = annotated.
     // Dorong ke origin adalah NILAI form (bukan izin), jadi ia checkbox di dialog — bukan confirm.
-    { label: "Tambah tag…", run: () => ask({
+    { label: "Tambah tag…", group: "Cabang & tag", run: () => ask({
       title: `Tag baru di ${sha7}`, label: "Nama tag", placeholder: "mis. v1.2.0", submit: "Buat tag",
       second: { label: "Pesan (opsional)", placeholder: "mis. rilis stabil", hint: "Kosong = tag ringan tanpa pesan.", pushLabel: "Dorong tag ke origin" },
       onSubmit: (name, extra) => {
         void act({ op: "tag", name, message: extra?.message || undefined, at: c.sha, push: extra?.push ?? false });
       },
     }) },
-    // Perbandingan lewat menu: tandai commit pertama, lalu bandingkan dengan commit kedua.
-    ...(cmp.from === null
-      ? [{ label: "Tandai untuk dibandingkan", run: () => cmp.mark(c.sha) }]
-      : cmp.from === c.sha
-        ? [{ label: "Batal tandai perbandingan", run: () => cmp.mark(null) }]
-        : [{ label: `Bandingkan dengan ${cmp.from.slice(0, 7)}`, run: () => cmp.compare(cmp.from as string, c.sha) }]),
     // Merge branch ini lalu hapus (local + origin bila ada). Hanya branch lokal selain yang aktif.
-    ...locals.filter((r) => r !== current).map((r) => ({
+    ...locals.filter((r) => r !== current).map((r): MenuItem => ({
       label: `Merge ${r} lalu hapus (local${origins.includes(r) ? " + origin" : ""})`,
+      group: "Cabang & tag",
       run: () => merge(r, { deleteBranch: r }),
     })),
     // Hapus mandiri per branch: local &/atau origin. Local tak boleh branch aktif; origin selalu boleh.
-    ...names.flatMap((r) => {
+    ...names.flatMap((r): MenuItem[] => {
       const localOk = locals.includes(r) && r !== current, hasOrigin = origins.includes(r);
       const items: MenuItem[] = [];
-      if (localOk && hasOrigin) items.push({ label: `Hapus ${r} (local + origin)`, run: () => act({ op: "delete-branch", name: r, remote: true }) });
-      if (localOk) items.push({ label: `Hapus ${r} (local)`, run: () => act({ op: "delete-branch", name: r }) });
-      if (hasOrigin) items.push({ label: `Hapus origin/${r}`, run: () => act({ op: "delete-branch", name: r, local: false, remote: true }) });
+      if (localOk && hasOrigin) items.push({ label: `Hapus ${r} (local + origin)`, group: "Cabang & tag", run: () => act({ op: "delete-branch", name: r, remote: true }) });
+      if (localOk) items.push({ label: `Hapus ${r} (local)`, group: "Cabang & tag", run: () => act({ op: "delete-branch", name: r }) });
+      if (hasOrigin) items.push({ label: `Hapus origin/${r}`, group: "Cabang & tag", run: () => act({ op: "delete-branch", name: r, local: false, remote: true }) });
       return items;
     }),
   ];
+  const lanjutan: MenuItem[] = [
+    { label: "Cherry-pick", group: "Lanjutan", run: () => act({ op: "cherry-pick", sha: c.sha }) },
+    { label: "Revert", group: "Lanjutan", run: () => act({ op: "revert", sha: c.sha }) },
+    // SPEC-233 · reset branch current ke commit ini (soft/mixed/hard). hard ireversibel → dialog dampak.
+    { label: "Reset current → sini (soft)", group: "Lanjutan", run: () => act({ op: "reset", sha: c.sha, mode: "soft" }) },
+    { label: "Reset current → sini (mixed)", group: "Lanjutan", run: () => act({ op: "reset", sha: c.sha, mode: "mixed" }) },
+    { label: "Reset current → sini (hard)", group: "Lanjutan", run: () => guard({
+      title: `Reset ${current || "branch"} ke ${sha7} secara hard?`, eyebrow: "Reset hard", tone: "danger", icon: "rotate-ccw",
+      message: "Reset hard memindahkan branch dan membuang perubahan tak ter-commit.",
+      impact: resetHardImpact, confirmLabel: "Reset hard",
+    }, () => act({ op: "reset", sha: c.sha, mode: "hard" })) },
+    { label: "Drop commit…", group: "Lanjutan", run: () => guard({
+      title: `Drop commit ${sha7}?`, eyebrow: c.subject, tone: "danger", icon: "trash-2",
+      message: "Commit ini dibuang dari riwayat branch.",
+      impact: ["Riwayat branch ditulis ulang tanpa commit ini; pemulihannya hanya lewat reflog."],
+      confirmLabel: "Drop commit",
+    }, () => drop(c.sha)) },
+  ];
+  return [...navigasi, ...cabang, ...lanjutan];
 }
 
 // SPEC-233 · menu klik-kanan pada pill branch. Local vs origin dibedakan prefix `origin/`.
@@ -297,13 +256,15 @@ function branchMenuItems(ref: string, current: string, allRefs: string[], act: (
   return items;
 }
 
-export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDrop, onOpenFile, onToast }:
+export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDrop, onOpenFile, onToast, onOpenCabang }:
   { projectId: string; onRunGit: (op: GitOp) => Promise<unknown>;
     onMerge: (source: string, opts?: { ff?: "no-ff" | "ff-only"; deleteBranch?: string }) => Promise<void>;
     onRebase: (onto: string) => Promise<void>;
     onPull: (source: string) => Promise<void>;
     onDrop: (sha: string) => Promise<void>;
-    onOpenFile: (path: string, ref: string) => void; onToast?: Toast }) {
+    onOpenFile: (path: string, ref: string) => void; onToast?: Toast;
+    /** Tautan "Kelola di Cabang": satu-satunya tempat hapus branch utama ada di tab Cabang. */
+    onOpenCabang?: () => void }) {
   const [state, setState] = React.useState<"loading" | "ready" | "error">("loading");
   // Dialog DS untuk input teks (form kecil) dan konfirmasi destruktif — keduanya dirender di bawah.
   const [ask, setAsk] = React.useState<Ask | null>(null);
@@ -389,6 +350,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
   const setView = React.useCallback((patch: Partial<typeof gopts>) => setGopts((o) => ({ ...o, ...patch, limit: PAGE })), []);
   const [muted, setMuted] = React.useState(true);
   const [style, setStyle] = React.useState<"rounded" | "angular">("rounded");
+  const [showView, setShowView] = React.useState(false);   // disclosure "Tampilan" (tak persisten)
   const localBranches = React.useMemo(() => [...new Set(rows.flatMap((r) => r.commit.refs).filter((x) => !x.startsWith("origin/")))].sort(), [rows]);
   // SPEC-233 · preferensi dari CONFIG_REGISTRY grup gitGraph (ADR-0049): warna/emoji/markdown/issue/avatar.
   const [cfg, setCfg] = React.useState<Record<string, string>>({});
@@ -599,7 +561,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
           )}
         </div>
         {/* SPEC-233 · kontrol tampilan: filter branch, show/hide remote/tag, muted, style */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "6px 12px", borderBottom: "1px solid var(--border-hair)", fontSize: 12 }}>
+        <div className="hn-ide-graph-bar">
           <select aria-label="Filter branch" value={gopts.branch} onChange={(e) => setView({ branch: e.target.value })}
             style={{ fontSize: 12, padding: "3px 6px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)", color: "var(--text-body)" }}>
             <option value="">semua branch</option>
@@ -610,15 +572,22 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
           {/* SPEC-879 · `input` telanjang direntangkan aturan mobile `input { min-height:
               var(--touch-target) }` jadi kotak biru 44×44; `Checkbox` DS menaruh kotak 18×18 di
               DALAM area sentuh itu. */}
-          <Checkbox checked={gopts.showRemote} onChange={(next) => setView({ showRemote: next })} label="remote" />
-          <Checkbox checked={gopts.showTags} onChange={(next) => setView({ showTags: next })} label="tag" />
-          <Checkbox checked={muted} onChange={(next) => setMuted(next)} label="redupkan merge" />
-          <button onClick={() => setStyle((s) => (s === "rounded" ? "angular" : "rounded"))}
-            style={{ border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)", cursor: "pointer", padding: "3px 8px", fontSize: 12, color: "var(--text-muted)" }}>
-            gaya: {style === "rounded" ? "lengkung" : "siku"}
-          </button>
+          <Button size="sm" variant="ghost" leftIcon="eye" aria-expanded={showView} aria-controls="ide-graph-view"
+            onClick={() => setShowView((v) => !v)}>Tampilan</Button>
           <LiveConnectionBadge />
         </div>
+        {/* Audit UI/UX 2026-10 (3H) · pengaturan tampilan disembunyikan di balik "Tampilan" (progressive
+            disclosure): bar di atas hanya memuat filter dan status, bukan lima kontrol yang setara bobotnya. */}
+        {showView && (
+          <div id="ide-graph-view" role="group" aria-label="Tampilan graph" className="hn-ide-graph-view">
+            <Checkbox checked={gopts.showRemote} onChange={(next) => setView({ showRemote: next })} label="remote" />
+            <Checkbox checked={gopts.showTags} onChange={(next) => setView({ showTags: next })} label="tag" />
+            <Checkbox checked={muted} onChange={(next) => setMuted(next)} label="redupkan merge" />
+            <Button size="sm" variant="ghost" onClick={() => setStyle((s) => (s === "rounded" ? "angular" : "rounded"))}>
+              Gaya: {style === "rounded" ? "lengkung" : "siku"}
+            </Button>
+          </div>
+        )}
         {/* SPEC-233 · stash sebagai chip di puncak; klik-kanan → apply/pop/drop/branch/copy */}
         {stashes.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "6px 12px", borderBottom: "1px solid var(--border-hair)" }}>
@@ -642,19 +611,18 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             yang menempel pada `<main>` yang menggulir tegak. */}
         {body ?? (<>
         <LocalOverflow data-testid="ide-graph-rows">
-          <div style={{ minWidth: maxLanes * LANE_W + GRAPH_ROW_MIN }}>
+          <div role="list" aria-label="Riwayat commit" style={{ minWidth: maxLanes * LANE_W + GRAPH_ROW_MIN }}>
             {/* SPEC-233 · baris uncommitted changes (lingkaran terbuka) di puncak bila working tree kotor */}
             {status && !status.clean && (() => {
               const n = status.staged.length + status.unstaged.length + status.untracked.length;
               const first = status.unstaged[0] ?? status.untracked[0] ?? status.staged[0];
               return (
-                <div onClick={() => { if (first) onOpenFile(first, ""); }}
+                <div role="listitem" className="hn-ide-graph-row" onClick={() => { if (first) onOpenFile(first, ""); }}
                   onContextMenu={(e) => { e.preventDefault(); setUncMenu({ x: e.clientX, y: e.clientY, anchor: e.currentTarget }); }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bone-100)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                   style={{ display: "flex", alignItems: "center", gap: 10, height: graphRowHeight, padding: "0 12px",
                     cursor: "pointer", borderBottom: "1px solid var(--border-hair)" }}>
-                  <svg width={maxLanes * LANE_W} height={graphRowHeight} style={{ flex: "0 0 auto" }}>
+                  {/* Lane SVG hanya gambar: maknanya ikut di teks baris (subject, merge, HEAD). */}
+                  <svg aria-hidden="true" width={maxLanes * LANE_W} height={graphRowHeight} style={{ flex: "0 0 auto" }}>
                     <circle cx={LANE_W / 2} cy={graphRowHeight / 2} r={DOT} fill="none" stroke={laneColor(0)} strokeWidth={1.5} />
                   </svg>
                   <button type="button" onClick={(event) => { event.stopPropagation(); if (first) onOpenFile(first, ""); }}
@@ -675,14 +643,15 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
               const sel = detail?.sha === c.sha;
               const hit = findHits.includes(c.sha);
               const activeHit = findHits[findIdx] === c.sha;
-              const rowBg = sel ? "var(--brass-100)" : activeHit ? "var(--brass-300)" : hit ? "var(--bone-100)" : "transparent";
+              // Warna latar hanya untuk keadaan terpilih/ditemukan; hover ditangani CSS (`.hn-ide-graph-row:hover`),
+              // jadi baris biasa tak membawa latar inline yang menimpanya.
+              const rowBg = sel ? "var(--brass-100)" : activeHit ? "var(--brass-300)" : hit ? "var(--bone-100)" : undefined;
               return (
-                <div key={c.sha} ref={(el) => { if (el) rowRefs.current.set(c.sha, el); }}
+                <div key={c.sha} ref={(el) => { if (el) rowRefs.current.set(c.sha, el); }} role="listitem"
+                  className="hn-ide-graph-row"
                   onClick={(e) => onRowClick(e, c.sha)}
                   onContextMenu={(e) => openMenu(e, c)}
                   title={compareFrom ? "Ctrl/Cmd-klik untuk bandingkan dengan commit pertama" : "Ctrl/Cmd-klik untuk mulai compare"}
-                  onMouseEnter={(e) => { if (!sel && !activeHit) e.currentTarget.style.background = "var(--bone-100)"; }}
-                  onMouseLeave={(e) => { if (!sel && !activeHit) e.currentTarget.style.background = hit ? "var(--bone-100)" : "transparent"; }}
                   style={{ display: "flex", alignItems: "center", gap: 10, height: graphRowHeight, padding: "0 12px",
                     cursor: "pointer", borderBottom: "1px solid var(--border-hair)",
                     background: rowBg }}>
@@ -881,7 +850,9 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
         { label: "Salin nama stash", run: () => { const s = stashMenu.s; setStashMenu(null); void navigator.clipboard?.writeText(s.ref); } },
       ]} />}
       {branchMenu && <Menu x={branchMenu.x} y={branchMenu.y} returnFocus={branchMenu.anchor} onClose={() => setBranchMenu(null)}
-        items={branchMenuItems(branchMenu.ref, current, allRefs, act, mergeAct, rebaseAct, pullAct, prAct, archiveAct, setAsk)} />}
+        items={[...branchMenuItems(branchMenu.ref, current, allRefs, act, mergeAct, rebaseAct, pullAct, prAct, archiveAct, setAsk),
+          // "Satu tempat utama" hapus branch = tab Cabang; menu ini hanya menautkan ke sana.
+          ...(onOpenCabang ? [{ label: "Kelola di tab Cabang", run: () => { setBranchMenu(null); onOpenCabang(); } }] : [])]} />}
       {ask && <GitAskDialog ask={ask} onClose={() => setAsk(null)} />}
       {dialog}
 

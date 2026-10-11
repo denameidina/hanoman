@@ -1,5 +1,6 @@
 // Audit UI/UX 2026-10 (1F) · IDE: Edit tak boleh menimpa working tree dengan isi ref lain,
 // draft kotor dijaga saat pindah berkas, dan Hapus/Ganti nama mengikuti entri yang DIKLIK di pohon.
+// Audit UI/UX 2026-10 (3H): pohon & aksinya kini di tab Berkas; Hapus lewat menu konteks baris.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { IdeScreen } from "../src/screens/IdeScreen";
@@ -13,7 +14,12 @@ function mountIde(files: string[]) {
   vi.spyOn(api, "listBranches").mockResolvedValue({ branches: ["main", "feat"], remotes: [] });
   vi.spyOn(api, "ideWorkingStatus").mockResolvedValue({ branch: "main", staged: [], unstaged: [], untracked: [], clean: true } as any);
   vi.spyOn(api, "ideFile").mockImplementation(async (_p, path) => fileOf(path));
+  vi.spyOn(api, "worktrees").mockResolvedValue({ repoDir: "/r", worktrees: [] });
   return render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+}
+async function openBerkas() {
+  const list = await screen.findByRole("tablist", { name: "Bagian IDE" });
+  fireEvent.click(within(list).getByRole("tab", { name: "Berkas" }));
 }
 
 beforeEach(() => { vi.restoreAllMocks(); });
@@ -21,6 +27,7 @@ beforeEach(() => { vi.restoreAllMocks(); });
 describe("IDE · guard edit & target", () => {
   it("Edit nonaktif saat ref lain (bukan working tree) dipilih", async () => {
     mountIde(["README.md", "CHANGELOG.md"]);
+    await openBerkas();
     fireEvent.change(await screen.findByLabelText("Ref yang dilihat"), { target: { value: "feat" } });
     fireEvent.click(await screen.findByText("README.md"));
     await waitFor(() => expect(screen.getByRole("button", { name: /^edit$/i })).toBeDisabled());
@@ -28,6 +35,7 @@ describe("IDE · guard edit & target", () => {
 
   it("draft kotor: memilih berkas lain meminta konfirmasi; Lanjut mengedit mempertahankan draft", async () => {
     mountIde(["README.md", "CHANGELOG.md"]);
+    await openBerkas();
     fireEvent.click(await screen.findByText("README.md"));
     await waitFor(() => expect(screen.getByRole("button", { name: /^edit$/i })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: /^edit$/i }));
@@ -42,10 +50,10 @@ describe("IDE · guard edit & target", () => {
 
   it("Hapus memakai folder yang diklik di pohon, bukan berkas yang sedang terbuka", async () => {
     mountIde(["src/a.ts", "README.md"]);
+    await openBerkas();
     fireEvent.click(await screen.findByText("README.md"));
-    fireEvent.click(screen.getByText("src/"));
-    expect(screen.getByTestId("ide-entry-target")).toHaveTextContent("src/");
-    fireEvent.click(screen.getByRole("button", { name: /^hapus$/i }));
+    fireEvent.contextMenu(screen.getByRole("treeitem", { name: "src/" }));
+    fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Hapus folder…" }));
     const dialog = within(await screen.findByRole("dialog"));
     expect(dialog.getByText("Hapus folder beserta isinya?")).toBeInTheDocument();
   });

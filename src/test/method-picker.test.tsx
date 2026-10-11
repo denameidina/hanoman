@@ -87,7 +87,7 @@ describe("SettingsScreen · picker Metode default (SPEC-734)", () => {
 
   const openSesi = () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "Sesi" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sesi harian" }));
   };
 
   beforeEach(() => {

@@ -31,44 +31,70 @@ function mountIde() {
   vi.spyOn(api, "ideTree").mockResolvedValue({ ref: "", files: ["src/ds/a.ts", "README.md"] });
   vi.spyOn(api, "listBranches").mockResolvedValue({ branches: ["main"], remotes: [] });
   vi.spyOn(api, "ideWorkingStatus").mockResolvedValue({ branch: "main", staged: [], unstaged: [] });
+  vi.spyOn(api, "worktrees").mockResolvedValue({ repoDir: "/r", worktrees: [] });
   return render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
 }
+/** Buka tab Berkas (default-nya Perubahan) dan tunggu pohonnya. */
+async function openBerkas() {
+  const list = await screen.findByRole("tablist", { name: "Bagian IDE" });
+  fireEvent.click(within(list).getByRole("tab", { name: "Berkas" }));
+  return screen.findByText("README.md");
+}
+/** Menu konteks baris pohon (klik-kanan pada treeitem). */
+function contextMenuOn(name: string) {
+  fireEvent.contextMenu(screen.getByRole("treeitem", { name }));
+  return within(screen.getByRole("menu"));
+}
 
-describe("Explorer · buat & unggah", () => {
+describe("Berkas · buat & unggah", () => {
   beforeEach(() => vi.restoreAllMocks());
 
   it("tujuan default root, berubah mengikuti folder terpilih", async () => {
     mountIde();
-    expect(await screen.findByText("→ root")).toBeInTheDocument();
+    expect(await openBerkas()).toBeInTheDocument();
+    expect(screen.getByTestId("ide-entry-dest")).toHaveTextContent("→ root");
     fireEvent.click(screen.getByText("src/"));
     expect(await screen.findByText("→ src")).toBeInTheDocument();
   });
 
-  it("File baru membuat berkas di folder terpilih lalu memuat ulang pohon", async () => {
+  it("Berkas baru membuat berkas di folder terpilih lalu memuat ulang pohon", async () => {
     const create = vi.spyOn(api, "ideCreateEntry").mockResolvedValue({ path: "src/Baru.tsx" });
     mountIde();
-    fireEvent.click(await screen.findByText("src/"));
-    fireEvent.click(screen.getByRole("button", { name: /file baru/i }));
+    await openBerkas();
+    fireEvent.click(screen.getByText("src/"));
+    fireEvent.click(screen.getByRole("button", { name: /berkas baru/i }));
     fireEvent.change(screen.getByLabelText("Nama berkas"), { target: { value: "Baru.tsx" } });
     fireEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
     await waitFor(() => expect(create).toHaveBeenCalledWith("p1", "src/Baru.tsx", "file"));
     await waitFor(() => expect(api.ideTree).toHaveBeenCalledTimes(2));
   });
 
-  it("Folder baru mengirim kind dir", async () => {
+  it("Folder baru di menu ⋯ mengirim kind dir", async () => {
     const create = vi.spyOn(api, "ideCreateEntry").mockResolvedValue({ path: "kosong" });
     mountIde();
-    await screen.findByText("README.md");
-    fireEvent.click(screen.getByRole("button", { name: /folder baru/i }));
+    await openBerkas();
+    fireEvent.click(screen.getByRole("button", { name: "Aksi lain berkas" }));
+    fireEvent.click(await screen.findByRole("button", { name: /folder baru/i }));
     fireEvent.change(screen.getByLabelText("Nama folder"), { target: { value: "kosong" } });
     fireEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
     await waitFor(() => expect(create).toHaveBeenCalledWith("p1", "kosong", "dir"));
   });
 
+  it("menu konteks folder menawarkan Berkas baru di folder itu", async () => {
+    const create = vi.spyOn(api, "ideCreateEntry").mockResolvedValue({ path: "src/ds/Baru.ts" });
+    mountIde();
+    await openBerkas();
+    fireEvent.click(screen.getByText("src/"));
+    fireEvent.click(contextMenuOn("src/").getByRole("menuitem", { name: "Berkas baru di src/" }));
+    fireEvent.change(screen.getByLabelText("Nama berkas"), { target: { value: "Baru.ts" } });
+    fireEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
+    await waitFor(() => expect(create).toHaveBeenCalledWith("p1", "src/Baru.ts", "file"));
+  });
+
   it("unggah berkas memakai webkitRelativePath bila ada", async () => {
     const up = vi.spyOn(api, "ideUpload").mockResolvedValue({ written: ["a.txt"], skipped: [] });
     mountIde();
-    await screen.findByText("README.md");
+    await openBerkas();
     const input = document.querySelector('input[type="file"]:not([webkitdirectory])') as HTMLInputElement;
     const f = new File(["A"], "a.txt");
     Object.defineProperty(f, "webkitRelativePath", { value: "" });
@@ -82,7 +108,7 @@ describe("Explorer · buat & unggah", () => {
       .mockResolvedValueOnce({ written: ["b.txt"], skipped: [{ path: "a.txt", reason: "exists" }] })
       .mockResolvedValueOnce({ written: ["a.txt"], skipped: [] });
     mountIde();
-    await screen.findByText("README.md");
+    await openBerkas();
     const input = document.querySelector('input[type="file"]:not([webkitdirectory])') as HTMLInputElement;
     const fa = new File(["A"], "a.txt"), fb = new File(["B"], "b.txt");
     Object.defineProperty(input, "files", { value: [fa, fb] });
@@ -92,28 +118,30 @@ describe("Explorer · buat & unggah", () => {
   });
 });
 
-describe("Explorer · drop", () => {
+describe("Berkas · drop", () => {
   beforeEach(() => vi.restoreAllMocks());
 
   it("drop berkas mengunggahnya ke tujuan yang aktif", async () => {
     const up = vi.spyOn(api, "ideUpload").mockResolvedValue({ written: ["src/a.txt"], skipped: [] });
     mountIde();
-    fireEvent.click(await screen.findByText("src/"));
+    await openBerkas();
+    fireEvent.click(screen.getByText("src/"));
     const f = new File(["A"], "a.txt");
     fireEvent.drop(screen.getByTestId("ide-tree-scroll"), { dataTransfer: { items: [], files: [f] } });
     await waitFor(() => expect(up).toHaveBeenCalledWith("p1", "src", [{ path: "a.txt", file: f }], false));
   });
 });
 
-describe("Explorer · rename & hapus", () => {
+describe("Berkas · ganti nama & hapus lewat menu konteks", () => {
   beforeEach(() => vi.restoreAllMocks());
 
-  it("rename berkas terpilih memindahkan seleksi viewer", async () => {
+  it("ganti nama berkas memindahkan seleksi viewer", async () => {
     vi.spyOn(api, "ideFile").mockResolvedValue({ path: "README.md", content: "# hi", binary: false, truncated: false });
     const ren = vi.spyOn(api, "ideRenameEntry").mockResolvedValue({ from: "README.md", to: "BACA.md" });
     mountIde();
-    fireEvent.click(await screen.findByText("README.md"));
-    fireEvent.click(screen.getByRole("button", { name: /ganti nama/i }));
+    await openBerkas();
+    fireEvent.click(screen.getByText("README.md"));
+    fireEvent.click(contextMenuOn("README.md").getByRole("menuitem", { name: "Ganti nama…" }));
     fireEvent.change(screen.getByLabelText("Path baru"), { target: { value: "BACA.md" } });
     fireEvent.click(screen.getByRole("button", { name: /^simpan$/i }));
     await waitFor(() => expect(ren).toHaveBeenCalledWith("p1", "README.md", "BACA.md"));
@@ -124,9 +152,9 @@ describe("Explorer · rename & hapus", () => {
     const del = vi.spyOn(api, "ideDeleteEntry").mockResolvedValue({ path: "README.md", kind: "file" });
     vi.spyOn(api, "ideFile").mockResolvedValue({ path: "README.md", content: "# hi", binary: false, truncated: false });
     mountIde();
-    fireEvent.click(await screen.findByText("README.md"));
-    fireEvent.click(screen.getByRole("button", { name: /^hapus$/i }));
-    // "Hapus" ada di toolbar DAN di dialog — ruang lingkupnya wajib dialog.
+    await openBerkas();
+    fireEvent.click(contextMenuOn("README.md").getByRole("menuitem", { name: "Hapus berkas…" }));
+    // Tombol "Hapus" di dialog konfirmasi — ruang lingkupnya wajib dialog.
     const dialog = within(await screen.findByRole("dialog"));
     fireEvent.click(dialog.getByRole("button", { name: "Hapus" }));
     await waitFor(() => expect(del).toHaveBeenCalledWith("p1", "README.md"));
@@ -135,8 +163,8 @@ describe("Explorer · rename & hapus", () => {
   it("hapus folder menuntut nama diketik ulang", async () => {
     const del = vi.spyOn(api, "ideDeleteEntry").mockResolvedValue({ path: "src", kind: "dir" });
     mountIde();
-    fireEvent.click(await screen.findByText("src/"));
-    fireEvent.click(screen.getByRole("button", { name: /^hapus$/i }));
+    await openBerkas();
+    fireEvent.click(contextMenuOn("src/").getByRole("menuitem", { name: "Hapus folder…" }));
     const dialog = within(await screen.findByRole("dialog"));
     const konfirm = dialog.getByRole("button", { name: "Hapus" });
     expect(konfirm).toBeDisabled();
@@ -149,8 +177,9 @@ describe("Explorer · rename & hapus", () => {
     vi.spyOn(api, "ideDeleteEntry").mockResolvedValue({ path: "README.md", kind: "file" });
     vi.spyOn(api, "ideFile").mockResolvedValue({ path: "README.md", content: "# hi", binary: false, truncated: false });
     mountIde();
-    fireEvent.click(await screen.findByText("README.md"));
-    fireEvent.click(screen.getByRole("button", { name: /^hapus$/i }));
+    await openBerkas();
+    fireEvent.click(screen.getByText("README.md"));
+    fireEvent.click(contextMenuOn("README.md").getByRole("menuitem", { name: "Hapus berkas…" }));
     const dialog = within(await screen.findByRole("dialog"));
     fireEvent.click(dialog.getByRole("button", { name: "Hapus" }));
     expect(await screen.findByText(/pilih file dari pohon/i)).toBeInTheDocument();

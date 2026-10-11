@@ -295,7 +295,10 @@ di Terminal; persist Settings yang jujur; label ramah Portal.
   ADR-0160). Tanpa redirect: path setiap section tak berubah, jadi tautan lama tetap membuka layar yang sama.
   `HN_NAV` dan `routes.test.ts` tetap valid; yang berubah hanya isi sidebar. Rincian:
   [frontend-implementation § Fase 3A](frontend-implementation.md#audit-uiux-2026-10--fase-3a--navigasi-8-hub-bergrup-adr-0205).
-- [ ] Redesign per layar sesuai urutan usulan: Overview → Settings → Backlog/Tim → Terminal → Triase/Lead →
+- [x] Terminal (Fase 3E): default **Fokus** berisi rail sesi bertanda status dan satu pane; Grid tetap opsional
+  dan memakai workspace kanonik. Menu ⋯ per sesi (Tutup dikonfirmasi), toolbar ≤ 6 kontrol, dan laci mobile.
+  Rincian: [frontend-implementation § Fase 3E](frontend-implementation.md#audit-uiux-2026-10--fase-3e--terminal-rail-sesi-dan-mode-fokus).
+- [ ] Redesign per layar sesuai urutan usulan: Overview → Settings → Backlog/Tim → Triase/Lead →
   Klien → IDE → Scheduler → VPS → Skills → Review → Portal → Onboarding.
 
 ### Tindak lanjut Fase 1 (belum selesai)

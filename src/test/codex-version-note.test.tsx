@@ -30,7 +30,7 @@ beforeEach(() => {
 
 const openModel = () => {
   render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sesi harian" }));
 };
 
 describe("SPEC-339 · catatan versi codex", () => {

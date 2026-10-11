@@ -12,12 +12,23 @@ vi.mock("../src/api/client", () => ({
 
     getSettings: vi.fn(), putSettings: vi.fn(), getCodexVersion: vi.fn(),
     getLeadConfig: vi.fn(), putLeadConfig: vi.fn(),
+    // Bagian Telegram memuat status & kredensialnya sendiri (Integrasi & akses · Telegram).
+    getTelegramStatus: vi.fn().mockResolvedValue({
+      configured: false, enabled: false, running: false, readiness: "belum", botUsername: null,
+      allowlistCount: 0, agentTokenConfigured: false, missingCapabilities: [], lastUpdateAt: null, lastError: null,
+    }),
+    getTelegramCredentials: vi.fn().mockResolvedValue({ fields: [] }),
   },
   ApiError: class extends Error { status = 0 },
 }));
 
+import { afterEach } from "vitest";
 import { SettingsScreen } from "../src/screens/SettingsScreen";
 import { api } from "../src/api/client";
+
+// Tautan langsung ke bagian Telegram (deep link `#bagian=telegram`) — bukan klik niat, karena
+// niat "Integrasi & akses" membuka bagian pertamanya (Akses AI Agent) yang memanggil API lain.
+afterEach(() => { history.replaceState(null, "", window.location.pathname); });
 
 const me: any = { id: "u1", email: "dena@nafanesia.id", createdAt: "x" };
 const ENGINE = { enabled: false, agent: "claude", model: "claude-opus-5", effort: "xhigh" };
@@ -46,16 +57,18 @@ beforeEach(() => {
   vi.mocked(api.putLeadConfig).mockImplementation(async (c: any) => c);
 });
 
+// Agen operator Telegram kini di bagian Telegram (satu tempat dengan kredensialnya), bukan di Agen & model.
 const openModel = () => {
+  history.replaceState(null, "", "#bagian=telegram");
   render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
 };
 
 describe("SPEC-492 · kartu agen operator Telegram", () => {
-  it("kartu ada di tab Model sesi, bersebelahan dengan kartu lead", async () => {
+  it("kartu ada di bagian Telegram, satu tempat dengan kredensialnya", async () => {
     openModel();
     expect(await screen.findByText("Agen operator Telegram")).toBeInTheDocument();
-    expect(screen.getByText("Agen hanoman-lead")).toBeInTheDocument();
+    expect(screen.getByText("Kredensial Telegram")).toBeInTheDocument();
+    expect(screen.queryByText("Agen hanoman-lead")).toBeNull();
   });
 
   // Opt-in mati = warisan penuh, dan kartunya HARUS menyebut nilai warisannya (pelajaran SPEC-383).

@@ -28,20 +28,17 @@ describe("state tampilan PRD", () => {
     onNewPrd: () => {}, onTakeToBacklog: () => {}, onStartBreakdown: () => {}, onMaterialize: () => {},
   };
 
-  it("filter status bertahan lintas unmount/remount", async () => {
+  // Redesign 3P: select filter status dibuang. Status kini indeks lipat per grup; tak ada lagi
+  // filter status yang disimpan, dan penghitung "filter aktif" hanya menghitung pilihan project.
+  it("tanpa select status: tak ada filter status tersimpan", async () => {
     render(<PrdScreen {...(props as any)} />);
-    fireEvent.change(screen.getByLabelText("Status PRD"), { target: { value: "draft" } });
-    await waitFor(() => expect(readUiState(uiKey("prd", "status"), "all")).toBe("draft"));
+    expect(screen.queryByLabelText("Status PRD")).toBeNull();
+    expect(readUiState(uiKey("prd", "status"), "all")).toBe("all");
     cleanup();
-    render(<PrdScreen {...(props as any)} />);
-    expect((screen.getByLabelText("Status PRD") as HTMLSelectElement).value).toBe("draft");
   });
 
-  it("Reset tampilan mengembalikan status ke semua", () => {
-    render(<PrdScreen {...(props as any)} />);
-    fireEvent.change(screen.getByLabelText("Status PRD"), { target: { value: "draft" } });
+  it("penghitung filter aktif mengikuti pilihan project saja", () => {
+    render(<PrdScreen {...(props as any)} projectFilter="erp" />);
     expect(screen.getByText("1 filter aktif")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Reset tampilan" }));
-    expect((screen.getByLabelText("Status PRD") as HTMLSelectElement).value).toBe("all");
   });
 });

@@ -26,6 +26,8 @@ vi.mock("../src/api/client", () => ({
     getSchedulerQueue: (p?: never) => getSchedulerQueue(p ?? {}),
     putSchedulerConfig: vi.fn(),
     updateProject: vi.fn(),
+    getSettings: vi.fn(async () => ({})),
+    putSettings: vi.fn(),
   },
 }));
 

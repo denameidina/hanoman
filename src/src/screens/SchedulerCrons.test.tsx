@@ -41,6 +41,10 @@ const props = { projects, onProjectChanged: vi.fn(), onToast: vi.fn() };
 
 beforeEach(() => { vi.clearAllMocks(); });
 
+// Fase 3I · setiap aksi cron ada di menu ⋯ barisnya (tabel/kartu), bukan tombol sebaris.
+const openRowMenu = (name = "Cek error pagi") => fireEvent.click(screen.getByRole("button", { name: `Aksi untuk cron ${name}` }));
+const menuItem = (name: RegExp | string) => fireEvent.click(screen.getByRole("button", { name }));
+
 describe("SchedulerCrons", () => {
   it("menampilkan cron dengan jadwal terbaca manusia", async () => {
     render(<SchedulerCrons {...props} />);
@@ -76,17 +80,29 @@ describe("SchedulerCrons", () => {
     expect(createCron.mock.calls[0]![0]).toMatchObject({ name: "Audit docs", expr: "30 9 * * *", project: "p1" });
   });
 
-  it("tombol jalankan sekarang memanggil api.runCronNow", async () => {
+  it("menu ⋯ berisi Ubah, Jalankan sekarang, Riwayat, dan Hapus", async () => {
     render(<SchedulerCrons {...props} />);
     await screen.findByText("Cek error pagi");
-    fireEvent.click(screen.getByRole("button", { name: /Jalankan sekarang/i }));
+    openRowMenu();
+    const dialog = screen.getByRole("dialog", { name: "Cek error pagi" });
+    for (const name of ["Ubah", "Jalankan sekarang", "Riwayat", "Hapus"]) {
+      expect(within(dialog).getByRole("button", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("menu Jalankan sekarang memanggil api.runCronNow", async () => {
+    render(<SchedulerCrons {...props} />);
+    await screen.findByText("Cek error pagi");
+    openRowMenu();
+    menuItem("Jalankan sekarang");
     await waitFor(() => expect(runCronNow).toHaveBeenCalledWith("c1"));
   });
 
   it("riwayat run menampilkan hasil beserta alasannya", async () => {
     render(<SchedulerCrons {...props} />);
     await screen.findByText("Cek error pagi");
-    fireEvent.click(screen.getByRole("button", { name: /Riwayat/i }));
+    openRowMenu();
+    menuItem("Riwayat");
     expect(await screen.findByText(/cap penuh/)).toBeTruthy();
   });
 
@@ -102,7 +118,8 @@ describe("SchedulerCrons", () => {
   it("hapus cron meminta konfirmasi dulu dan baru menghapus setelah disetujui", async () => {
     render(<SchedulerCrons {...props} />);
     await screen.findByText("Cek error pagi");
-    fireEvent.click(screen.getByRole("button", { name: /^Hapus$/ }));
+    openRowMenu();
+    menuItem("Hapus");
     expect(screen.getByRole("dialog")).toHaveTextContent("Hapus cron ini?");
     expect(screen.getByRole("dialog")).toHaveTextContent("tidak bisa dibatalkan");
     expect(deleteCron).not.toHaveBeenCalled();
@@ -119,14 +136,52 @@ describe("SchedulerCrons", () => {
     expect(screen.getByRole("button", { name: /coba lagi/i })).toBeTruthy();
   });
 
-  // Audit 1G · tombol Riwayat menyatakan keadaan bukanya.
-  it("tombol Riwayat menyatakan aria-expanded", async () => {
+  // Fase 3I · menu Riwayat membuka riwayat run di bawah baris, dan labelnya berganti menjadi sembunyikan.
+  it("menu Riwayat membuka riwayat dan labelnya berubah menjadi Sembunyikan", async () => {
     render(<SchedulerCrons {...props} />);
     await screen.findByText("Cek error pagi");
-    const riwayat = screen.getByRole("button", { name: /Riwayat/i });
-    expect(riwayat.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(riwayat);
-    expect(riwayat.getAttribute("aria-expanded")).toBe("true");
+    openRowMenu();
+    menuItem("Riwayat");
+    expect(await screen.findByText(/cap penuh/)).toBeTruthy();
+    openRowMenu();
+    expect(screen.getByRole("button", { name: "Sembunyikan riwayat" })).toBeInTheDocument();
+  });
+
+  // Fase 3I · jam server ditampilkan dalam zonanya, dan zona itu disebut terang-terangan.
+  it("jam dari server ditampilkan dalam zona server, dan zonanya disebut", async () => {
+    render(<SchedulerCrons {...props} timeZone="Asia/Jakarta" />);
+    await screen.findByText("Cek error pagi");
+    expect(screen.getByText("Asia/Jakarta")).toBeInTheDocument();
+    // 2026-08-12T00:00Z = 07.00 WIB; kolom "Berikutnya" memakainya.
+    expect(screen.getAllByText(/07\.00/).length).toBeGreaterThan(0);
+  });
+
+  it("preview form dihitung hanya bila zona browser sama dengan zona server", async () => {
+    const browser = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    render(<SchedulerCrons {...props} timeZone={browser} />);
+    await screen.findByText("Cek error pagi");
+    fireEvent.click(screen.getByRole("button", { name: /Cron baru/i }));
+    expect((await screen.findByTestId("cron-next-preview")).textContent).toMatch(/^Perkiraan jalan berikutnya/);
+  });
+
+  it("zona server berbeda dari browser: preview tak dihitung ulang, dan batasnya dijelaskan", async () => {
+    const browser = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const other = browser === "Asia/Jakarta" ? "UTC" : "Asia/Jakarta";
+    render(<SchedulerCrons {...props} timeZone={other} />);
+    await screen.findByText("Cek error pagi");
+    fireEvent.click(screen.getByRole("button", { name: /Cron baru/i }));
+    const preview = await screen.findByTestId("cron-next-preview");
+    expect(preview.textContent).toContain(`zona server ${other}`);
+    expect(preview.textContent).not.toMatch(/Perkiraan jalan berikutnya/);
+  });
+
+  // Fase 3I · form memakai dua tab; pilihan lanjutan hanya di tab Lanjutan.
+  it("form cron memiliki tab Dasar dan Lanjutan", async () => {
+    render(<SchedulerCrons {...props} />);
+    await screen.findByText("Cek error pagi");
+    fireEvent.click(screen.getByRole("button", { name: /Cron baru/i }));
+    expect(await screen.findByRole("tab", { name: /^Dasar/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: /^Lanjutan/ })).toBeInTheDocument();
   });
 
   // Audit 1G · kolom jam boleh kosong saat diketik; dijepit ke nilai sah saat blur.

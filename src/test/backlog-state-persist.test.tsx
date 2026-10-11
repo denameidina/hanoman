@@ -22,6 +22,8 @@ const props = {
   backlog: [] as any[], projects, pageSize: 20,
   projectFilter: "all", onProjectFilter: () => {},
 };
+// Filter lanjutan ada di popover "Filter" (progressive disclosure): buka sebelum mengakses kontrolnya.
+const openFilter = () => fireEvent.click(screen.getByRole("button", { name: /^Filter/ }));
 
 beforeEach(() => localStorage.clear());
 
@@ -31,7 +33,8 @@ describe("state tampilan Backlog", () => {
     vi.mocked(api.listSpecs).mockClear();
     render(<BacklogScreen {...(props as any)} />);
     await waitFor(() => expect(api.listSpecs).toHaveBeenCalled());
-    expect(vi.mocked(api.listSpecs).mock.calls.at(-1)![0]).toMatchObject({ page: 3 });
+    // Paginasi dilakukan klien atas himpunan penuh: halaman tak dikirim ke server.
+    expect(vi.mocked(api.listSpecs).mock.calls.at(-1)![0]).not.toHaveProperty("page");
     expect(readUiState(uiKey("backlog", "page"), 1)).toBe(3);
   });
 
@@ -44,58 +47,64 @@ describe("state tampilan Backlog", () => {
     render(<BacklogScreen {...(props as any)} />);
     await waitFor(() => expect(api.listSpecs).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 400));
-    expect(vi.mocked(api.listSpecs).mock.calls.at(-1)![0]).toMatchObject({ q: "invoice", page: 3 });
+    expect(vi.mocked(api.listSpecs).mock.calls.at(-1)![0]).toMatchObject({ q: "invoice" });
+    expect(readUiState(uiKey("backlog", "page"), 1)).toBe(3);
   });
 
   it("ganti penyaring TETAP mengembalikan daftar ke halaman 1 (AC-15)", async () => {
     writeUiState(uiKey("backlog", "page"), 3);
     vi.mocked(api.listSpecs).mockClear();
     render(<BacklogScreen {...(props as any)} />);
-    fireEvent.change(screen.getByLabelText("Filter stage"), { target: { value: "executing" } });
-    await waitFor(() =>
-      expect(vi.mocked(api.listSpecs).mock.calls.at(-1)![0]).toMatchObject({ page: 1, stage: "executing" }));
+    fireEvent.click(screen.getByRole("tab", { name: /Dikerjakan/ }));
+    await waitFor(() => expect(readUiState(uiKey("backlog", "page"), 3)).toBe(1));
   });
 
-  it("kata kunci, stage, dan prioritas bertahan lintas unmount/remount", async () => {
+  it("kata kunci, tahap, dan prioritas bertahan lintas unmount/remount", async () => {
     render(<BacklogScreen {...(props as any)} />);
     fireEvent.change(screen.getByLabelText("Cari backlog"), { target: { value: "invoice" } });
-    fireEvent.change(screen.getByLabelText("Filter stage"), { target: { value: "executing" } });
+    fireEvent.click(screen.getByRole("tab", { name: /Dikerjakan/ }));
+    openFilter();
     fireEvent.change(screen.getByLabelText("Filter prioritas"), { target: { value: "tinggi" } });
     await waitFor(() => expect(readUiState(uiKey("backlog", "q"), "")).toBe("invoice"));
 
     cleanup();
     render(<BacklogScreen {...(props as any)} />);
     expect((screen.getByLabelText("Cari backlog") as HTMLInputElement).value).toBe("invoice");
-    expect((screen.getByLabelText("Filter stage") as HTMLSelectElement).value).toBe("executing");
+    expect(screen.getByRole("tab", { name: /Dikerjakan/ })).toHaveAttribute("aria-selected", "true");
+    openFilter();
     expect((screen.getByLabelText("Filter prioritas") as HTMLSelectElement).value).toBe("tinggi");
   });
 
   it("rentang tanggal bertahan", async () => {
     render(<BacklogScreen {...(props as any)} />);
+    openFilter();
     fireEvent.change(screen.getByLabelText("Tanggal dari"), { target: { value: "2026-08-01" } });
     await waitFor(() => expect(readUiState(uiKey("backlog", "from"), "")).toBe("2026-08-01"));
     cleanup();
     render(<BacklogScreen {...(props as any)} />);
+    openFilter();
     expect((screen.getByLabelText("Tanggal dari") as HTMLInputElement).value).toBe("2026-08-01");
   });
 
-  it("lencana filter aktif menyala dan Reset tampilan mengembalikan default", () => {
+  it("filter aktif tampil sebagai chip dan Reset filter mengembalikan default", () => {
     render(<BacklogScreen {...(props as any)} />);
-    expect(screen.queryByText(/filter aktif/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reset filter" })).toBeNull();
+    openFilter();
     fireEvent.change(screen.getByLabelText("Filter prioritas"), { target: { value: "tinggi" } });
-    expect(screen.getByText("1 filter aktif")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Hapus filter Prioritas: Tinggi" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Reset tampilan" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset filter" }));
     expect((screen.getByLabelText("Filter prioritas") as HTMLSelectElement).value).toBe("all");
-    expect(screen.queryByText(/filter aktif/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Hapus filter/ })).toBeNull();
     expect(readUiState(uiKey("backlog", "prio"), "all")).toBe("all");
   });
 
   it("mode tampilan bertahan", () => {
     render(<BacklogScreen {...(props as any)} />);
-    fireEvent.click(screen.getByText("List"));
+    fireEvent.click(screen.getByRole("button", { name: "Papan" }));
     cleanup();
     render(<BacklogScreen {...(props as any)} />);
-    expect(readUiState(uiKey("backlog", "view"), "grid")).toBe("list");
+    expect(readUiState(uiKey("backlog", "view"), "list")).toBe("board");
+    expect(screen.getByRole("button", { name: "Papan" })).toHaveAttribute("aria-pressed", "true");
   });
 });

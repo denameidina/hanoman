@@ -4,9 +4,13 @@
 //    pengguna sedang mengubahnya (snapshot live yang datang saat Pause/Stop tak menghapus ketikan).
 //  - `clampNumber`: kolom angka boleh kosong saat diketik; nilainya dijepit saat blur/Enter.
 //  - `agoLabel` / `untilLabel`: waktu relatif dalam bahasa biasa ("5 menit lalu").
+// Audit UI/UX 2026-10 · Fase 3I — tambahan aditif untuk hub Otonom:
+//  - `fmtAt` / `browserTimeZone`: jam ABSOLUT dalam zona server (ADR-0204), bukan zona browser.
+//  - Gaya `InlineError` pindah ke kelas `hn-sched-error` (`styles/scheduler.css`), dipakai LeadScreen juga.
 import React from "react";
 import { Button } from "../ds";
 import { relativeTime } from "../lib/time-format";
+import "./styles/scheduler.css";
 
 export function agoLabel(iso: string | null, now = Date.now()): string {
   return relativeTime(iso, now) || "—";
@@ -29,12 +33,35 @@ export function clampNumber(raw: string, min: number, max: number, fallback: num
   return Math.min(max, Math.max(min, v));
 }
 
+/** Zona waktu browser ini. Dipakai bila server belum melaporkan zonanya (respons lama). */
+export function browserTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+/**
+ * Jam absolut (tanggal + jam, id-ID) dalam `timeZone`. Dipakai untuk waktu INSTAN dari server
+ * (jatuh tempo, jalan berikutnya, riwayat): instan itu sama di mana pun, yang berubah hanya cara
+ * menampilkannya. Zona kosong → zona browser. "—" untuk nilai kosong atau tak valid.
+ */
+export function fmtAt(iso: string | null | undefined, timeZone?: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const opts: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
+  try {
+    return new Intl.DateTimeFormat("id-ID", timeZone ? { ...opts, timeZone } : opts).format(d);
+  } catch (err) {
+    // Zona yang tak dikenal Intl tak boleh menjatuhkan render layar: jam tetap tampil, di zona browser.
+    if (err instanceof RangeError) return new Intl.DateTimeFormat("id-ID", opts).format(d);
+    throw err;
+  }
+}
+
 /** Galat muat yang tampil sebagai galat dengan jalan keluar. Pemanggil memutuskan kapan dipakai. */
 export function InlineError({ message, onRetry, busy = false }: { message: string; onRetry: () => void; busy?: boolean }) {
   return (
-    <div role="alert" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "6px 0",
-      fontSize: "var(--text-sm)", color: "var(--clay-500)" }}>
-      <span style={{ flex: 1, minWidth: 0 }}>{message}</span>
+    <div role="alert" className="hn-sched-error">
+      <span className="hn-sched-error-text">{message}</span>
       <Button size="sm" variant="secondary" leftIcon="rotate-ccw" disabled={busy} onClick={onRetry}>Coba lagi</Button>
     </div>
   );

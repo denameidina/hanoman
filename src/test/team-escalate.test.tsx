@@ -109,7 +109,9 @@ describe("TeamScreen · wiring eskalasi", () => {
       page(p.status === "doing" ? [task()] : []) as any);
     render(<TeamScreen projects={projects} projectFilter="all"
       onProjectFilter={() => {}} onToast={() => {}} />);
-    fireEvent.click(await screen.findByRole("button", { name: /kirim ke backlog/i }));
+    // Aksi kartu ada di menu "Ubah tugas", bukan tombol sejajar.
+    fireEvent.click(await screen.findByRole("button", { name: /^Ubah tugas/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Kirim ke Backlog" }));
     expect(await screen.findByLabelText(/source/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/prioritas/i)).toBeInTheDocument();
   });
@@ -121,8 +123,12 @@ describe("TeamScreen · wiring eskalasi", () => {
     const spy = vi.spyOn(api, "unlinkTaskSpec").mockResolvedValue(task({ specId: null }));
     render(<TeamScreen projects={projects} projectFilter="all"
       onProjectFilter={() => {}} onToast={() => {}} />);
-    fireEvent.click(await screen.findByRole("button", { name: /lepas tautan/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Ubah tugas/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Lepas tautan" }));
     await waitFor(() => expect(spy).toHaveBeenCalledWith("t1"));
-    await waitFor(() => expect(screen.queryByText("SPEC-9 · executing")).toBeNull());
+    // Tautan sudah lepas: menu kini menawarkan eskalasi lagi, dan label tautan hilang.
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^Ubah tugas/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /^Ubah tugas/ }));
+    expect(await screen.findByRole("button", { name: "Kirim ke Backlog" })).toBeInTheDocument();
   });
 });

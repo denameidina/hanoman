@@ -22,7 +22,11 @@ vi.mock("../src/api/client", () => ({
 
 // Tanda tangan nyata: SettingsScreen({ onToast?, me, onLoggedOut }) — SettingsScreen.tsx:542
 const props = { me: { id: "u1", email: "a@b.c", role: "admin", createdAt: "" } as never, onLoggedOut: () => {} };
-const openTab = () => fireEvent.click(screen.getByRole("button", { name: /Setup awal/ }));
+// Setup awal ada di niat "Lanjutan" (tertutup default): buka dulu niatnya.
+const openTab = () => {
+  fireEvent.click(screen.getByRole("button", { name: "Lanjutan" }));
+  fireEvent.click(screen.getByRole("button", { name: /Setup awal/ }));
+};
 
 beforeEach(() => {
   vi.clearAllMocks();

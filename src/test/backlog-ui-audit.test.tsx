@@ -9,8 +9,8 @@ import { BacklogScreen } from "../src/screens/BacklogScreen";
 import { api } from "../src/api/client";
 import type { Spec } from "../src/screens/types";
 
-// Audit UI/UX 2026-10 · Backlog: label konsisten, prioritas satu sumber, StageBar sebagai progressbar,
-// CTA jalankan agen untuk item belum selesai, indikator muat ringan, dan hint drag yang terlihat.
+// Audit UI/UX 2026-10 · Backlog: label konsisten, prioritas satu sumber, StageBar sebagai progressbar
+// (di detail), CTA jalankan agen untuk semua tahap, indikator muat ringan, dan hint drag yang terlihat.
 const spec = (over: Partial<Spec> = {}) =>
   ({ id: "SPEC-1", projectId: "p", title: "judul", source: "brief", stage: "brainstorming",
      priority: "sedang", author: "a", objective: "o", payload: {}, branchFrom: null, baseSha: null,
@@ -21,31 +21,32 @@ const screenWith = (backlog: Spec[], extra: Record<string, unknown> = {}) =>
   render(<BacklogScreen backlog={backlog} projects={projects} projectFilter="all"
     onProjectFilter={() => {}} {...extra} />);
 
-describe("prioritas: satu helper label untuk grid dan board", () => {
-  it("'tinggi' tampil sebagai 'Tinggi' dengan tooltip, di grid maupun board", () => {
+describe("prioritas: satu helper label untuk daftar dan papan", () => {
+  it("'tinggi' tampil sebagai titik dengan nama aksesibel 'Prioritas Tinggi', di daftar maupun papan", () => {
     screenWith([spec({ priority: "tinggi" })]);
-    expect(screen.getByTitle("Prioritas Tinggi").textContent).toBe("Tinggi");
-    fireEvent.click(screen.getByRole("tab", { name: "Board" }));
-    expect(screen.getByTitle("Prioritas Tinggi").textContent).toBe("Tinggi");
+    expect(screen.getByTitle("Prioritas Tinggi")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Papan" }));
+    expect(screen.getByTitle("Prioritas Tinggi")).toBeInTheDocument();
   });
 });
 
 describe("StageBar: tahap sebagai progressbar yang dibaca pembaca layar", () => {
   it("nama aksesibel 'Status <tahap>', nilai = indeks tahap, teks nilai = nama tahap", () => {
-    screenWith([spec({ stage: "objective" })]);
-    const bar = screen.getByRole("progressbar", { name: "Status Objective" });
+    screenWith([spec({ id: "SPEC-7", title: "bertahap", stage: "objective" })]);
+    fireEvent.click(screen.getByText("bertahap"));          // progres penuh ada di detail
+    const bar = within(screen.getByRole("dialog")).getByRole("progressbar", { name: "Status Objective" });
     expect(bar).toHaveAttribute("aria-valuenow", "1");
     expect(bar).toHaveAttribute("aria-valuemax", "5");
     expect(bar).toHaveAttribute("aria-valuetext", "Objective");
   });
 });
 
-describe("detail item belum selesai punya CTA jalankan agen", () => {
-  it("item planned: 'Lanjutkan' di detail memanggil onStart", () => {
+describe("detail: CTA jalankan agen untuk semua tahap", () => {
+  it("item planned: 'Jalankan' di detail memanggil onStart", () => {
     const onStart = vi.fn();
     screenWith([spec({ id: "SPEC-2", title: "wip", stage: "planned" })], { onStart });
     fireEvent.click(screen.getByText("wip"));
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Lanjutkan" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Jalankan" }));
     expect(onStart).toHaveBeenCalledOnce();
     expect(onStart.mock.calls[0]![0].id).toBe("SPEC-2");
   });
@@ -59,18 +60,18 @@ describe("detail item belum selesai punya CTA jalankan agen", () => {
     expect(onOpenRun).toHaveBeenCalledOnce();
   });
 
-  it("item selesai tak menampilkan CTA jalankan agen di detail", () => {
+  it("item selesai tetap punya 'Jalankan' (lanjut sisa kerja), tanpa 'Mulai' atau 'Lanjutkan'", () => {
     screenWith([spec({ id: "SPEC-4", title: "beres", stage: "done" })], { onStart: vi.fn() });
     fireEvent.click(screen.getByText("beres"));
     const dialog = within(screen.getByRole("dialog"));
     expect(dialog.queryByRole("button", { name: "Lanjutkan" })).toBeNull();
     expect(dialog.queryByRole("button", { name: "Mulai" })).toBeNull();
-    expect(dialog.getByRole("button", { name: "Buka sesi lagi" })).toBeTruthy();
+    expect(dialog.getByRole("button", { name: "Jalankan" })).toBeTruthy();
   });
 });
 
-describe("kartu: satu aksi utama, sisanya di menu ⋯", () => {
-  it("Dokumen, Tandai selesai, dan Review perubahan ada di menu, bukan sejajar di kartu", () => {
+describe("baris dan kartu: satu aksi utama, sisanya di menu ⋯", () => {
+  it("Dokumen, Tandai selesai, dan Review perubahan ada di menu, bukan sejajar", () => {
     screenWith([spec({ id: "SPEC-5", title: "kartu" })], { onOpenReview: vi.fn(), onMarkDone: vi.fn() });
     expect(screen.queryByRole("button", { name: "Lihat dokumen" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Tandai selesai" })).toBeNull();
@@ -98,20 +99,50 @@ describe("indikator muat saat refetch: ringan, daftar lama tetap tampil", () => 
   });
 });
 
-describe("board: hint drag terlihat di layar", () => {
+describe("papan: hint drag terlihat di layar", () => {
   it("menjelaskan seret ke Brainstorm, bukan hanya lewat title kartu", () => {
     screenWith([spec()]);
-    fireEvent.click(screen.getByRole("tab", { name: "Board" }));
+    fireEvent.click(screen.getByRole("button", { name: "Papan" }));
     expect(screen.getByTestId("board-drag-hint")).toHaveTextContent(
       "Seret kartu dari kolom Backlog ke Brainstorm untuk memulai sesi");
   });
 });
 
-describe("tab sumber dengan istilah teknis punya keterangan", () => {
-  it("tab Audit menjelaskan apa itu audit dan jalan lanjutnya", () => {
+describe("sumber dengan istilah teknis punya keterangan", () => {
+  it("sumber Audit (dipilih di popover Filter) menjelaskan apa itu audit dan jalan lanjutnya", () => {
     screenWith([spec()]);
     expect(screen.queryByTestId("backlog-tab-hint")).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: "Audit" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Filter/ }));
+    fireEvent.change(screen.getByLabelText("Filter sumber"), { target: { value: "audit" } });
     expect(screen.getByTestId("backlog-tab-hint")).toHaveTextContent(/Audit: hasil pemeriksaan project/);
+  });
+});
+
+describe("muat pertama: skeleton, bukan layar kosong palsu", () => {
+  it("daftar yang belum pernah termuat tampil sebagai skeleton sampai server menjawab", async () => {
+    let resolve!: (v: unknown) => void;
+    vi.mocked(api.listSpecs).mockReturnValue(new Promise((r) => { resolve = r; }) as never);
+    screenWith([]);
+    expect(screen.getByText("Memuat backlog")).toBeInTheDocument();
+    expect(screen.queryByText("Backlog masih kosong")).toBeNull();
+    resolve({ items: [], total: 0, page: 1, pageSize: 20 });
+    await waitFor(() => expect(screen.getByText("Backlog masih kosong")).toBeInTheDocument());
+  });
+});
+
+// Perubahan prioritas reversibel: lewat toast dengan "Urungkan". Hapus tetap lewat konfirmasi (diuji
+// di backlog-delete-confirm.test.tsx), jadi tak ada urung di jalur itu.
+describe("ubah prioritas di detail bisa diurungkan", () => {
+  it("memilih prioritas baru lalu Urungkan mengembalikan prioritas semula", () => {
+    const onEditSpec = vi.fn();
+    const editable = spec({ id: "SPEC-20", title: "bisa diubah", stage: "brainstorming", baseSha: null,
+      priority: "sedang", payload: { context: "c", outcome: "o", constraints: "", priority: "sedang" } });
+    screenWith([editable], { onEditSpec, onStart: vi.fn() });
+    fireEvent.click(screen.getByText("bisa diubah"));
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByLabelText("Prioritas item ini"), { target: { value: "tinggi" } });
+    expect(onEditSpec).toHaveBeenLastCalledWith(expect.objectContaining({ id: "SPEC-20" }), { priority: "tinggi" });
+    fireEvent.click(screen.getByRole("button", { name: "Urungkan" }));
+    expect(onEditSpec).toHaveBeenLastCalledWith(expect.objectContaining({ id: "SPEC-20" }), { priority: "sedang" });
   });
 });

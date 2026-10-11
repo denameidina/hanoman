@@ -52,7 +52,7 @@ type LinkState =
 export const TerminalPane = React.memo(TerminalPaneImpl);
 
 function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
-  predict = true, diag = false, mode = "local", hidden = false, onForget, label }: {
+  predict = true, diag = false, mode = "local", hidden = false, onForget, label, composer = false }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
@@ -78,6 +78,9 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   onForget?: () => void;
   /** Nama sel untuk judul konfirmasi "Hapus sel" (mis. project · spec). Absen = id sesi saja. */
   label?: string;
+  // Audit UI/UX 2026-10 · Fase 3E: pane fokus selalu menampilkan composer sebagai aksi utama di
+  // bawah pane. Grid tetap memakai perilaku lama (composer hanya saat papan tombol/dikte aktif).
+  composer?: boolean;
 }) {
   const wsTarget = useWsTarget(`terminal:${sessionId}`);
   const instance = useInstance();
@@ -143,7 +146,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   const voiceAppend = React.useRef<(t: string) => void>(() => {});
   const [draft, setDraft] = React.useState(false);
   const voice = useVoiceInput({ enabled: canWrite, onFinalText: (t) => voiceAppend.current(t) });
-  const showComposer = canWrite && (showKeys || voice.status === "listening" || draft);
+  const showComposer = canWrite && (composer || showKeys || voice.status === "listening" || draft);
 
   React.useEffect(() => {
     const el = host.current;
@@ -920,11 +923,14 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
           </div>
         )}
       </div>
-      <VoiceControls voice={voice} />
-      {showComposer && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
-        external={composerDrain} linkState={link.state} queue={queue}
-        voiceAppend={voiceAppend} onDraft={setDraft} />}
-      {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
+      {/* Dock bawah: dikte, composer, dan papan tombol satu blok. Kosong = tak tampil (CSS :empty). */}
+      <div className="hn-terminal-dock">
+        <VoiceControls voice={voice} />
+        {showComposer && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
+          external={composerDrain} linkState={link.state} queue={queue}
+          voiceAppend={voiceAppend} onDraft={setDraft} />}
+        {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
+      </div>
       {dialog}
     </div>
   );

@@ -2,7 +2,7 @@
 // modul yang di-mock pertama kali dievaluasi — itu terjadi sebelum import di bawahnya selesai.
 import { eventsStub } from "./helpers/events-stub";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
 const listSessionHistory = vi.fn();
 const sessionTranscript = vi.fn();
@@ -60,6 +60,13 @@ beforeEach(() => {
 
 const projects = [{ id: "p1", name: "hanoman" }];
 
+// Audit UI/UX 2026-10 · Fase 3E: "Riwayat sesi" pindah dari toolbar ke menu "Buka…".
+async function openRiwayat() {
+  fireEvent.click(await screen.findByRole("button", { name: "Buka…" }));
+  const menu = await screen.findByRole("dialog", { name: "Buka sesi" });
+  fireEvent.click(within(menu).getByRole("button", { name: "Riwayat sesi" }));
+}
+
 describe("Riwayat di Terminal (SPEC-362)", () => {
   it.each(["spec", "reverse"])("shows rejection and manually retries %s history with the same context", async (kind) => {
     const start = kind === "spec" ? startSession : createTerminalFlow;
@@ -71,7 +78,7 @@ describe("Riwayat di Terminal (SPEC-362)", () => {
     listSessionHistory.mockResolvedValue({ items: [row({ kind, ...(kind === "reverse" ? { specId: null, flow: "reverse" } : {}) })],
       total: 1, page: 1, pageSize: 20 });
     render(<TerminalScreen projects={projects} backlog={[]} />);
-    fireEvent.click(await screen.findByText("Riwayat"));
+    await openRiwayat();
     fireEvent.click(await screen.findByText("History session terminal"));
     fireEvent.click(await screen.findByText("Mulai lagi"));
     const alert = await screen.findByRole("alert", {}, { timeout: 1000 });
@@ -95,7 +102,7 @@ describe("Riwayat di Terminal (SPEC-362)", () => {
   it("tombol Riwayat membuka modal & memuat halaman pertama", async () => {
     listSessionHistory.mockResolvedValue({ items: [row()], total: 1, page: 1, pageSize: 20 });
     render(<TerminalScreen projects={projects} backlog={[]} />);
-    fireEvent.click(await screen.findByText("Riwayat"));
+    await openRiwayat();
     expect(await screen.findByText("Riwayat sesi")).toBeTruthy();
     await waitFor(() => expect(listSessionHistory).toHaveBeenCalled());
   });
@@ -105,7 +112,7 @@ describe("Riwayat di Terminal (SPEC-362)", () => {
   it("Mulai lagi sesi backlog memanggil startSession dengan spec + flow + agen tersimpan", async () => {
     listSessionHistory.mockResolvedValue({ items: [row()], total: 1, page: 1, pageSize: 20 });
     render(<TerminalScreen projects={projects} backlog={[]} />);
-    fireEvent.click(await screen.findByText("Riwayat"));
+    await openRiwayat();
     fireEvent.click(await screen.findByText("History session terminal"));
     fireEvent.click(await screen.findByText("Mulai lagi"));
     await waitFor(() => expect(startSession).toHaveBeenCalledWith({ spec: "SPEC-362", flow: "feature", agent: "claude" }));
@@ -115,7 +122,7 @@ describe("Riwayat di Terminal (SPEC-362)", () => {
     listSessionHistory.mockResolvedValue({ items: [row({ agent: "codex", model: "gpt-5.6-terra", effort: "low" })],
       total: 1, page: 1, pageSize: 20 });
     render(<TerminalScreen projects={projects} backlog={[]} />);
-    fireEvent.click(await screen.findByText("Riwayat"));
+    await openRiwayat();
     fireEvent.click(await screen.findByText("History session terminal"));
     fireEvent.click(await screen.findByText("Mulai lagi"));
     await waitFor(() => expect(startSession).toHaveBeenCalledWith({
@@ -130,7 +137,7 @@ describe("Riwayat di Terminal (SPEC-362)", () => {
         agent: "codex", model: "gpt-5.6-terra", effort: "low" })],
       total: 1, page: 1, pageSize: 20 });
     render(<TerminalScreen projects={projects} backlog={[]} />);
-    fireEvent.click(await screen.findByText("Riwayat"));
+    await openRiwayat();
     await waitFor(() => expect(screen.getAllByText("hanoman").some((el) => el.closest("button"))).toBe(true));
     fireEvent.click(screen.getAllByText("hanoman").find((el) => el.closest("button"))!);
     fireEvent.click(await screen.findByText("Mulai lagi"));
@@ -142,7 +149,7 @@ describe("Riwayat di Terminal (SPEC-362)", () => {
     listSessionHistory.mockResolvedValue({
       items: [row({ kind: "shell", specId: null, title: null, flow: null })], total: 1, page: 1, pageSize: 20 });
     render(<TerminalScreen projects={projects} backlog={[]} />);
-    fireEvent.click(await screen.findByText("Riwayat"));
+    await openRiwayat();
     // "hanoman" juga jadi <option> di picker project toolbar — baris riwayat adalah yang di dalam
     // <button>. Sesi shell tak punya judul/spec, jadi nama project memang label barisnya.
     await waitFor(() => expect(screen.getAllByText("hanoman").some((el) => el.closest("button"))).toBe(true));

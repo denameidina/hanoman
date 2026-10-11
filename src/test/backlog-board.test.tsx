@@ -64,7 +64,8 @@ function board(specs: Spec[], activeSpecs?: Set<string>) {
   render(<BacklogScreen backlog={specs} projects={[{ id: "p", name: "p" }] as never}
     activeSpecs={activeSpecs} onStart={onStart}
     projectFilter="all" onProjectFilter={() => {}} />);
-  fireEvent.click(screen.getByText("Board"));
+  // Papan adalah tampilan sekunder: ikon di baris alat, bernama "Papan".
+  fireEvent.click(screen.getByRole("button", { name: "Papan" }));
   return onStart;
 }
 
@@ -132,8 +133,8 @@ describe("source audit (SPEC-237)", () => {
     render(<BacklogScreen backlog={[spec({ id: "SPEC-237", title: "audit funnel", source: "audit" })]}
       projects={[{ id: "p", name: "p" }] as never}
       projectFilter="all" onProjectFilter={() => {}} onStart={() => {}} />);
-    // "Audit" muncul di tab filter DAN badge kartu → >1; brief hanya di tab (=1).
-    expect(screen.getAllByText("Audit").length).toBeGreaterThan(1);
+    // Asal item tampil sebagai teks meta di baris ("Audit"); tak ada lagi tab sumber di baris alat.
+    expect(screen.getByText("Audit")).toBeInTheDocument();
     expect(screen.queryByText("feature brief")).toBeNull();
   });
   it("SpecDetail audit menampilkan 'Jadikan Finding QA' → memanggil onPromoteToQa", async () => {
@@ -200,35 +201,43 @@ describe("board drag (jsdom)", () => {
   });
 });
 
-// SPEC-198 · daftar grid/list didorong server: item + total datang dari envelope, bukan slice klien.
+// Daftar didorong server: himpunan terfilter penuh (tanpa page/limit), lalu segmen tahap dihitung
+// dari himpunan yang sama dengan daftarnya. Total = jumlah item yang diterima, bukan envelope.
 describe("server-driven fetch (SPEC-198)", () => {
-  it("fetch halaman terfilter via API lalu render item + total dari server", async () => {
+  it("fetch himpunan terfilter via API lalu render item dari server", async () => {
     vi.mocked(api.listSpecs).mockResolvedValue({
-      items: [spec({ id: "SPEC-77", title: "dari server" })], total: 42, page: 1, pageSize: 20,
+      items: [spec({ id: "SPEC-77", title: "dari server" })], total: 1, page: 1, pageSize: 1,
     });
     render(<BacklogScreen backlog={[]} projects={[{ id: "p", name: "p" }] as never}
       projectFilter="all" onProjectFilter={() => {}} onStart={() => {}} />);
     expect(await screen.findByText("dari server")).toBeTruthy();   // item dari server, bukan prop
-    expect(screen.getByText("42 spec")).toBeTruthy();              // total dari envelope
+    // Segmen "Semua" membawa hitungan himpunan yang sama dengan daftar.
+    expect(screen.getByRole("tab", { name: /Semua\s*1/ })).toBeInTheDocument();
     const params = vi.mocked(api.listSpecs).mock.calls[0]![0];
-    expect(params).toMatchObject({ page: 1, limit: 20 });
+    expect(params).not.toHaveProperty("page");
+    expect(params).not.toHaveProperty("limit");
   });
 });
 
 describe("responsive backlog controls (SPEC-763)", () => {
-  it("keeps toolbar, filters, view modes, grid, and board overflow reachable", () => {
+  it("keeps toolbar, filters, view modes, list, and board overflow reachable", async () => {
     render(<BacklogScreen backlog={[spec({ title: "responsive item" })]} projects={[{ id: "p", name: "P" }] as never}
       projectFilter="all" onProjectFilter={() => {}} onStart={() => {}} />);
     const controls = screen.getByRole("region", { name: "Kontrol backlog" });
-    expect(controls).toHaveClass("hn-backlog-controls");
-    expect(screen.getByRole("tablist", { name: "Sumber backlog" })).toBeInTheDocument();
-    expect(screen.getByRole("tablist", { name: "Mode tampilan" })).toBeInTheDocument();
-    for (const label of ["Cari backlog", "Filter project", "Filter stage", "Filter prioritas", "Filter tanggal berdasarkan", "Tanggal dari", "Tanggal sampai"]) {
+    expect(controls).toHaveClass("hn-bl-toolbar");
+    expect(screen.getByRole("tablist", { name: "Tahap backlog" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Mode tampilan" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Cari backlog")).toBeInTheDocument();
+    // Filter lanjutan ada di popover "Filter", tertutup sampai dibuka.
+    fireEvent.click(screen.getByRole("button", { name: /^Filter/ }));
+    for (const label of ["Filter sumber", "Filter project", "Filter prioritas", "Filter tanggal berdasarkan", "Tanggal dari", "Tanggal sampai"]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
-    expect(screen.getByTestId("backlog-scroll")).toHaveClass("hn-backlog-grid");
-    fireEvent.click(screen.getByRole("tab", { name: "Board" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Filter/ }));   // tutup lagi
+    expect(screen.getByTestId("backlog-scroll")).toHaveClass("hn-bl-list-scroll");
+    fireEvent.click(screen.getByRole("button", { name: "Papan" }));
     expect(screen.getByTestId("backlog-board")).toHaveClass("hn-board-local-overflow");
+    fireEvent.click(screen.getByRole("button", { name: "Daftar" }));
     expect(screen.getByText("Mulai")).toBeInTheDocument();
   });
 });

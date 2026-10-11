@@ -1,107 +1,118 @@
-/* OverviewScreen — ringkasan workspace. Pekerjaan yang berjalan adalah sesi claude di
-   tmux, bukan baris Run (SPEC-162): tak ada progress %, tak ada estimasi biaya.
-   Setiap angka hanya tampil di satu tempat (judul/eyebrow kartu); tak ada KPI yang
-   mengulang kartu di bawahnya (audit 2026-10, Overview: duplikasi). */
+/* OverviewScreen — "Hari ini" (Audit UI/UX 2026-10 · Fase 3B). Satu kolom tanpa KPI strip dan tanpa hero:
+   status satu kalimat + CTA kontekstual, sesi berjalan (yang menunggu jawabanmu di atas), perlu perhatian,
+   daftar project ringkas, aktivitas terbaru (maks 5), dan satu strip limit bertab. Tiap angka dihitung
+   sekali di sini; kalimat status dan seksi memakai hitungan yang sama. Pekerjaan yang berjalan adalah sesi
+   claude di tmux (SPEC-162), jadi tak ada progress % atau estimasi biaya. Susunan lewat styles/overview.css. */
 import React from "react";
-import { Card, StatusPill, Badge, ProgressBar, Icon, Button, StateBlock, Tabs } from "../ds";
+import { Button, DenseRow, PageHeader, ProgressBar, RowList, StateBlock, StatusPill, Tabs } from "../ds";
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, SpecSlim } from "./types";
 import { LimitWindows } from "./LimitIndicator";
-import { DalangStage, FLOW_LABEL, STAGE_LABEL } from "./DalangStage";
-import { DOC_STATUS_LABEL, labelOf } from "../lib/labels";
+import { DOC_STATUS_LABEL, FLOW_LABEL, STAGE_LABEL, labelOf } from "../lib/labels";
+import { relativeTime } from "../lib/time-format";
 import { useLimits } from "../api/limits";
 import { useCodexLimits } from "../api/codex-limits";
+import "./styles/overview.css";
 
-// Kata status dokumen dipusatkan di lib/labels.ts — dipakai pill, badge, dan judul baris.
-function oCovTone(s: string) { return s === "broken" ? "err" : s === "drift" ? "warn" : "ok"; }
-// Sesi tak punya status "failed" yang terbaca dari luar — yang gagal terlihat di terminalnya.
-function oAttention(p: ProjectVM): "high" | "low" | "none" {
-  if (p.docStatus === "broken") return "high";
-  if (p.docStatus === "drift") return "low";
-  return "none";
+/** Batas baris "Aktivitas terbaru" (audit: maks 5). */
+const ACTIVITY_MAX = 5;
+
+// Dokumen rusak perlu tindakan; drift hanya tidak sinkron. Sesi tak punya status "gagal" yang terbaca dari luar.
+function attentionOf(p: ProjectVM): "high" | "low" | "none" {
+  return p.docStatus === "broken" ? "high" : p.docStatus === "drift" ? "low" : "none";
 }
-const O_ATT: Record<string, { bar: string; tint: string; text: string; label: string; reason: string }> = {
-  high: { bar: "var(--clay-500)", tint: "var(--clay-100)", text: "var(--clay-600)", label: "Dokumentasi belum sesuai",
-    reason: "Dokumen belum memenuhi standar" },
-  low: { bar: "var(--amber-500)", tint: "var(--amber-100)", text: "var(--status-warn)", label: "Dokumentasi tidak sinkron",
-    reason: "Sebagian kategori dokumen belum ter-index" },
+const ATTENTION_REASON: Record<string, string> = {
+  broken: "Dokumen belum memenuhi standar",
+  drift: "Sebagian kategori dokumen belum terindeks",
 };
+function coverageTone(status: string): "err" | "warn" | "ok" {
+  return status === "broken" ? "err" : status === "drift" ? "warn" : "ok";
+}
 
-// Urutan sesi hidup: yang sudah lebih lama mulai di atas; sesi tanpa waktu mulai di bawah, lalu per id.
-function sortLive(live: TerminalSession[], backlog: SpecSlim[]): TerminalSession[] {
-  const startedById = new Map(backlog.map((x) => [x.id, x.startedAt] as const));
+// Menunggu manusia: cermin pet-state.ts dan Terminal (decision && !deciding). Yang deciding dilayani lead.
+const isWaiting = (s: TerminalSession) => !!s.decision && !s.deciding;
+
+// Yang menunggu di atas; lalu yang lebih lama mulai; sesi tanpa waktu mulai di bawah; lalu per id.
+function sortLive(live: TerminalSession[], specById: Map<string, SpecSlim>): TerminalSession[] {
   const startOf = (s: TerminalSession) => {
-    const ms = s.specId && startedById.get(s.specId) ? Date.parse(startedById.get(s.specId)!) : NaN;
+    const started = s.specId ? specById.get(s.specId)?.startedAt : null;
+    const ms = started ? Date.parse(started) : Number.NaN;
     return Number.isNaN(ms) ? Number.POSITIVE_INFINITY : ms;
   };
-  return [...live].sort((a, b) => (startOf(a) - startOf(b)) || a.id.localeCompare(b.id));
+  return [...live].sort((a, b) => (Number(!isWaiting(a)) - Number(!isWaiting(b)))
+    || (startOf(a) - startOf(b)) || a.id.localeCompare(b.id));
+}
+
+/** Seksi Overview: judul <h3> yang dirujuk aria-labelledby, aksi opsional di kanan judul. */
+function Section({ id, title, meta, actions, children }: {
+  id: string; title: string; meta?: string; actions?: React.ReactNode; children: React.ReactNode;
+}) {
+  return (
+    <section className="hn-ov-section" aria-labelledby={id}>
+      <header className="hn-ov-head">
+        <div className="hn-ov-head-text">
+          <h3 id={id} className="hn-ov-title">{title}</h3>
+          {meta && <span className="hn-ov-meta">{meta}</span>}
+        </div>
+        {actions && <div className="hn-ov-head-actions">{actions}</div>}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function LiveRow({ s, name, spec, now, onOpen }: {
+  s: TerminalSession; name: string; spec: SpecSlim | undefined; now: number; onOpen: (id: string) => void;
+}) {
+  const waiting = isWaiting(s);
+  const fase = waiting ? "Menunggu jawabanmu"
+    : spec ? labelOf(STAGE_LABEL, spec.stage) : s.flow ? labelOf(FLOW_LABEL, s.flow) : "Sesi";
+  const started = relativeTime(spec?.startedAt, now);
+  return (
+    <DenseRow onClick={() => onOpen(s.id)}
+      actions={waiting ? <Button size="sm" variant="secondary" onClick={() => onOpen(s.id)}>Jawab</Button> : undefined}>
+      <StatusPill status={waiting ? "awaiting" : "running"} variant="dot" size="sm">{fase}</StatusPill>
+      <span className="hn-ov-name" title={name}>{name}</span>
+      <span className="hn-ov-meta">{[spec?.id, started && `dimulai ${started}`].filter(Boolean).join(" · ")}</span>
+    </DenseRow>
+  );
 }
 
 function AttnRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }) {
-  const att = oAttention(p);
-  const meta = O_ATT[att]!;
   return (
-    // SPEC-763 · tanpa `hn-dense-row` tombol "Buka dokumen" menahan lebarnya di 390px dan menyisakan
-    // ~67px untuk nama project — terukur: `crm-tumbuh-ai` pecah jadi 3 baris (4 karakter/baris).
-    <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 4px", borderBottom: "1px solid var(--border-hair)", borderLeft: `3px solid ${meta.bar}`, paddingLeft: 12 }}>
-      <div className="hn-grow" style={{ minWidth: 0, flex: 1 }}>
-        <div className="hn-wrap-mobile" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Icon name="box" size={13} color="var(--text-muted)" />
-          <span title={p.name} style={{ fontFamily: "var(--font-mono)", fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)" }}>{p.name}</span>
-          <Badge tone={att === "high" ? "err" : "warn"} size="sm">{meta.label}</Badge>
-        </div>
-        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{meta.reason} · {p.coverage}% ter-index</div>
-      </div>
-      <Button size="sm" variant="secondary" leftIcon="book-open" onClick={() => onOpen(p)}>Buka dokumen</Button>
-    </div>
+    <DenseRow onClick={() => onOpen(p)}>
+      <StatusPill status={p.docStatus} variant="dot" size="sm">{labelOf(DOC_STATUS_LABEL, p.docStatus)}</StatusPill>
+      <span className="hn-ov-name" title={p.name}>{p.name}</span>
+      <span className="hn-ov-meta">{ATTENTION_REASON[p.docStatus] ?? ""}</span>
+    </DenseRow>
   );
 }
 
-/* Baris sesi = sesi tmux HIDUP dari siaran WS, bukan `ProjectView.session` yang hanya dimuat saat
-   login. Label tahap memakai `Spec.stage` (overlay live) — fase sesi tak ada di wire ini. Baris
-   memakai <button> asli: klik dan Enter/Spasi datang gratis, dan konsisten dengan baris lain. */
-function LiveSessionRow({ s, name, stage, onOpenSession }: {
-  s: TerminalSession; name: string; stage: string | null; onOpenSession: (id: string) => void;
-}) {
+function PrjRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }) {
   return (
-    <button type="button" className="hn-dense-row" onClick={() => onOpenSession(s.id)} style={rowBtn}>
-      <StatusPill status="running" size="sm">{stage ?? (s.flow ? labelOf(FLOW_LABEL, s.flow) : "Sesi")}</StatusPill>
-      <span className="hn-grow" title={name} style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{s.specId ?? ""}</span>
-    </button>
-  );
-}
-
-const rowBtn: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "12px 4px",
-  background: "none", border: 0, borderBottom: "1px solid var(--border-hair)", cursor: "pointer",
-  textAlign: "left", font: "inherit", color: "inherit",
-};
-
-function CoverageRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }) {
-  return (
-    <button type="button" className="hn-grid-mobile" onClick={() => onOpen(p)}
-      style={{ ...rowBtn, display: "grid", gridTemplateColumns: "92px minmax(0, 1fr) 136px", alignItems: "center", gap: 12, padding: "9px 4px" }}>
-      <span title={p.name} style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-      <ProgressBar value={p.coverage} tone={oCovTone(p.docStatus)} size="sm" />
-      {/* kolom 136px memuat "Sesuai standar" (~121px dengan dot & padding); justifySelf:end bikin
-          pill seukuran konten & rata kanan — bukan stretch yang bikin teks tumpah dari pill. */}
-      <StatusPill status={p.docStatus} size="sm" style={{ justifySelf: "end" }}>{labelOf(DOC_STATUS_LABEL, p.docStatus)}</StatusPill>
-    </button>
-  );
-}
-
-function MiniStat({ icon, label, value, tone }: { icon: string; label: string; value: React.ReactNode; tone?: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-md)", background: "var(--bone-100)" }}>
-      <span style={{ width: 30, height: 30, borderRadius: "var(--radius-sm)", flex: "0 0 auto", background: "var(--surface-card)", border: "1px solid var(--border-hair)", color: tone || "var(--text-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-        <Icon name={icon} size={15} />
+    <DenseRow onClick={() => onOpen(p)}>
+      <span className="hn-ov-name" title={p.name}>{p.name}</span>
+      <span className="hn-ov-cov">
+        <ProgressBar className="hn-ov-bar" value={p.coverage} tone={coverageTone(p.docStatus)} size="sm"
+          aria-label={`Cakupan dokumen ${p.name}`} valueText={`${p.coverage}%`} />
+        <span className="hn-ov-pct">{p.coverage}%</span>
       </span>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 600, color: "var(--text-strong)", lineHeight: 1 }}>{value}</div>
-        <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 3 }}>{label}</div>
-      </div>
-    </div>
+      <span className="hn-ov-prj-status">
+        <StatusPill status={p.docStatus} variant="dot" size="sm">{labelOf(DOC_STATUS_LABEL, p.docStatus)}</StatusPill>
+      </span>
+      <span className="hn-ov-meta hn-ov-prj-meta">{p.backlog} item terbuka</span>
+    </DenseRow>
+  );
+}
+
+function ActRow({ p, live, onOpen }: { p: ProjectVM; live: boolean; onOpen: (p: ProjectVM) => void }) {
+  return (
+    <DenseRow onClick={() => onOpen(p)}>
+      <StatusPill status={live ? "running" : "idle"} variant="dot" size="sm">{live ? "Berjalan" : "Diam"}</StatusPill>
+      <span className="hn-ov-name" title={p.name}>{p.name}</span>
+      <span className="hn-ov-activity" title={p.activity}>{p.activity}</span>
+      <span className="hn-ov-mono" title={p.commit}>{p.commit}</span>
+    </DenseRow>
   );
 }
 
@@ -114,112 +125,115 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
   const limits = useLimits();
   const codexLimits = useCodexLimits();   // SPEC-338 · kartu limit codex (grup siar terpisah)
   const [limitTab, setLimitTab] = React.useState<"claude" | "codex">("claude");
+  const now = Date.now();
 
-  // Sesi hidup dari siaran WS `t:"sessions"` — `ProjectView.session` basi sejak login.
-  const live = sortLive(sessions.filter((s) => !s.exited), backlog);
-  const liveProjects = new Set(live.map((s) => s.projectId));
-  const attention = projects.filter((p) => oAttention(p) !== "none")
-    .sort((a, b) => (oAttention(a) === "high" ? 0 : 1) - (oAttention(b) === "high" ? 0 : 1));
-  const coverageSorted = [...projects].sort((a, b) => a.coverage - b.coverage);
+  // Tanpa project tak ada yang bisa diringkas: satu jalan masuk, bukan kartu kosong "0/0".
+  if (projects.length === 0) {
+    return (
+      <div className="hn-ov">
+        <PageHeader title="Hari ini" description="Belum ada project di workspace." />
+        <Section id="ov-start" title="Selamat datang di hanoman" meta="mulai di sini">
+          <StateBlock kind="empty" illustration="PST-001" illustrationDecorative
+            title="Buat project pertama"
+            hint="hanoman mengerjakan backlog di dalam sebuah project. Tambahkan project (folder repo) dulu; dokumen, backlog, dan sesi Claude Code-nya akan tampil di sini."
+            action={() => (onCreateProject ? onCreateProject() : onGoto("projects"))} actionLabel="Buat project pertama" />
+        </Section>
+      </div>
+    );
+  }
+
+  const specById = new Map(backlog.map((s) => [s.id, s] as const));
+  const liveAll = sessions.filter((s) => !s.exited);
+  const live = sortLive(liveAll, specById);
+  const waiting = live.filter(isWaiting);
+  const liveProjects = new Set(liveAll.map((s) => s.projectId));
+  const nameById = new Map(projects.map((p) => [p.id, p.name] as const));
+  const attention = projects.filter((p) => attentionOf(p) !== "none")
+    .sort((a, b) => (attentionOf(a) === "high" ? 0 : 1) - (attentionOf(b) === "high" ? 0 : 1));
+  const byCoverage = [...projects].sort((a, b) => a.coverage - b.coverage);
+  const activity = [...projects]
+    .sort((a, b) => Number(liveProjects.has(b.id)) - Number(liveProjects.has(a.id)))
+    .slice(0, ACTIVITY_MAX);
   const briefN = backlog.filter((s) => s.source === "brief").length;
   const qaN = backlog.filter((s) => s.source === "qa").length;
   const hiPrio = backlog.filter((s) => s.priority === "tinggi").length;
 
-  // Tanpa project tak ada yang bisa diringkas: tampilkan jalan masuk, bukan kartu kosong "0/0".
-  if (projects.length === 0) {
-    return (
-      <Card eyebrow="mulai di sini" title="Selamat datang di hanoman">
-        <StateBlock kind="empty" illustration="PST-001" illustrationDecorative
-          title="Buat project pertama"
-          hint="hanoman mengerjakan backlog di dalam sebuah project. Tambahkan project (folder repo) dulu; dokumen, backlog, dan sesi Claude Code-nya akan tampil di sini."
-          action={() => (onCreateProject ? onCreateProject() : onGoto("projects"))} actionLabel="Buat project pertama" />
-      </Card>
-    );
-  }
+  // Satu kalimat status. Angkanya sama dengan seksi di bawahnya (satu hitungan, bukan dua).
+  const summary = [
+    live.length === 0 ? "Tidak ada sesi berjalan" : `${live.length} sesi berjalan`,
+    waiting.length > 0 ? `${waiting.length} menunggu jawabanmu` : null,
+    attention.length > 0 ? `${attention.length} perlu perhatian` : null,
+  ].filter(Boolean).join(" · ");
 
-  // Limit: satu kartu. Bila codex pernah melapor kuota, tab Claude/Codex; eyebrow mengikuti tab.
+  // CTA primer kontekstual: jawab yang menunggu lebih dulu, lalu backlog.
+  const primary = waiting.length > 0
+    ? <Button variant="primary" leftIcon="hand" onClick={() => onOpenSession(waiting[0]!.id)}>Jawab sesi yang menunggu</Button>
+    : <Button variant="primary" leftIcon="list-checks" onClick={() => onGoto("backlog")}>Buka backlog</Button>;
+
+  // Limit: satu seksi. Bila codex pernah melapor kuota, tab Claude/Codex; meta mengikuti tab.
   // Codex sengaja "tercatat" (angka dari sesi terakhir), Claude "langsung" (siaran realtime).
   const codexOn = codexLimits.status !== "unavailable";
   const tab = codexOn ? limitTab : "claude";
-  const limitEyebrow = tab === "codex"
+  const limitMeta = tab === "codex"
     ? `tercatat · Codex${codexLimits.plan ? ` · ${codexLimits.plan}` : ""}`
     : "langsung · Claude";
 
-  const activity = projects.map((p) => ({ project: p, text: p.activity, commit: p.commit, live: liveProjects.has(p.id) }));
-  const stageOf = (s: TerminalSession) => {
-    const spec = s.specId ? backlog.find((x) => x.id === s.specId) : undefined;
-    return spec ? labelOf(STAGE_LABEL, spec.stage) : null;
-  };
-
   return (
-    <div>
-      <DalangStage projects={projects} backlog={backlog} sessions={sessions}
-        onOpenSession={onOpenSession} onOpenProject={onOpenProject} />
-      <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1.35fr 1fr", gap: 20, alignItems: "start", marginTop: 20 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <Card eyebrow={`dokumen · ${attention.length} project`} title="Perlu perhatian"
-            actions={<Button size="sm" variant="ghost" leftIcon="layout-grid" onClick={() => onGoto("projects")}>Semua project</Button>}>
-            {attention.length === 0
-              ? <StateBlock kind="empty" compact icon="book-open" title="Dokumen sudah sesuai standar"
-                  hint="Semua project tidak punya masalah dokumen yang perlu ditindak." />
-              : <div style={{ marginTop: 4 }}>{attention.map((p) => <AttnRow key={p.id} p={p} onOpen={onOpenProject} />)}</div>}
-          </Card>
-          <Card eyebrow={`sesi · ${live.length} berjalan`} title="Claude Code sedang jalan"
-            actions={<Button size="sm" variant="ghost" leftIcon="terminal" onClick={() => onGoto("terminal")}>Buka Terminal</Button>}>
-            {live.length === 0
-              ? <StateBlock kind="empty" compact icon="terminal" title="Tidak ada sesi aktif"
-                  hint="Mulai sebuah backlog item untuk membuka sesi Claude Code interaktif." />
-              : <ul data-testid="live-list" style={{ listStyle: "none", margin: "4px 0 0", padding: 0 }}>
-                  {live.map((s) => {
-                    const name = projects.find((p) => p.id === s.projectId)?.name ?? s.projectId;
-                    return <li key={s.id}><LiveSessionRow s={s} name={name} stage={stageOf(s)} onOpenSession={onOpenSession} /></li>;
-                  })}
-                </ul>}
-          </Card>
+    <div className="hn-ov">
+      <PageHeader title="Hari ini" description={summary}
+        actions={<>{primary}<Button variant="ghost" leftIcon="drama" onClick={() => onGoto("dalang")}>Buka panggung</Button></>} />
+
+      <Section id="ov-live" title="Sesi berjalan"
+        actions={<Button size="sm" variant="ghost" leftIcon="terminal" onClick={() => onGoto("terminal")}>Buka Terminal</Button>}>
+        {live.length === 0
+          ? <StateBlock kind="empty" compact icon="terminal" title="Tidak ada sesi aktif"
+              hint="Mulai sebuah backlog item untuk membuka sesi Claude Code interaktif." />
+          : <RowList label="Sesi berjalan">
+              {live.map((s) => (
+                <LiveRow key={s.id} s={s} name={nameById.get(s.projectId) ?? s.projectId}
+                  spec={s.specId ? specById.get(s.specId) : undefined} now={now} onOpen={onOpenSession} />
+              ))}
+            </RowList>}
+      </Section>
+
+      <Section id="ov-attn" title="Perlu perhatian">
+        {attention.length === 0
+          ? <StateBlock kind="empty" compact icon="book-open" title="Dokumen sudah sesuai standar"
+              hint="Semua project tidak punya masalah dokumen yang perlu ditindak." />
+          : <RowList label="Perlu perhatian">
+              {attention.map((p) => <AttnRow key={p.id} p={p} onOpen={onOpenProject} />)}
+            </RowList>}
+      </Section>
+
+      <Section id="ov-prj" title="Project"
+        actions={<Button size="sm" variant="ghost" leftIcon="layout-grid" onClick={() => onGoto("projects")}>Semua project</Button>}>
+        <RowList label="Project" className="hn-ov-prj">
+          {byCoverage.map((p) => <PrjRow key={p.id} p={p} onOpen={onOpenProject} />)}
+        </RowList>
+        <div className="hn-ov-foot">
+          {/* Angka backlog membuka layarnya (aturan minimalis: tiap KPI membuka layar relevan). */}
+          <Button size="sm" variant="ghost" leftIcon="list-checks" onClick={() => onGoto("backlog")}>
+            Backlog: {briefN} dari brief · {qaN} dari QA · {hiPrio} prioritas tinggi
+          </Button>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <Card eyebrow={limitEyebrow} title="Limit langganan">
-            {codexOn && (
-              <Tabs aria-label="Sumber limit" value={tab}
-                tabs={[{ value: "claude", label: "Claude" }, { value: "codex", label: "Codex" }]}
-                onChange={(v) => setLimitTab(v === "codex" ? "codex" : "claude")} />
-            )}
-            <div style={{ marginTop: 10 }}>
-              <LimitWindows dto={tab === "codex" ? codexLimits : limits} />
-            </div>
-          </Card>
-          <Card eyebrow="dokumen" title="Cakupan dokumen"
-            actions={<Button size="sm" variant="ghost" leftIcon="book-open" onClick={() => onGoto("docs")}>Dokumen</Button>}>
-            <div style={{ marginTop: 4 }}>{coverageSorted.map((p) => <CoverageRow key={p.id} p={p} onOpen={onOpenProject} />)}</div>
-          </Card>
-          <Card eyebrow="dari brief sampai eksekusi" title="Backlog"
-            actions={<Button size="sm" variant="ghost" leftIcon="list-checks" onClick={() => onGoto("backlog")}>Buka</Button>}>
-            <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 6 }}>
-              <MiniStat icon="lightbulb" label="dari brief" value={briefN} tone="var(--brass-700)" />
-              <MiniStat icon="bug" label="dari QA" value={qaN} tone="var(--clay-500)" />
-              <MiniStat icon="flame" label="prioritas tinggi" value={hiPrio} tone="var(--clay-500)" />
-            </div>
-          </Card>
+      </Section>
+
+      <Section id="ov-act" title="Aktivitas terbaru">
+        <RowList label="Aktivitas terbaru">
+          {activity.map((p) => <ActRow key={p.id} p={p} live={liveProjects.has(p.id)} onOpen={onOpenProject} />)}
+        </RowList>
+      </Section>
+
+      <Section id="ov-limit" title="Limit langganan" meta={limitMeta}>
+        {codexOn && (
+          <Tabs aria-label="Sumber limit" value={tab}
+            tabs={[{ value: "claude", label: "Claude" }, { value: "codex", label: "Codex" }]}
+            onChange={(v) => setLimitTab(v === "codex" ? "codex" : "claude")} />
+        )}
+        <div className="hn-ov-limit">
+          <LimitWindows dto={tab === "codex" ? codexLimits : limits} />
         </div>
-      </div>
-      <div style={{ marginTop: 20 }}>
-        <Card eyebrow="per project" title="Aktivitas terbaru">
-          {/* Daftar semantik: tiap baris membuka project-nya, sama seperti baris cakupan & perhatian. */}
-          <ul data-testid="activity-list" style={{ listStyle: "none", margin: "4px 0 0", padding: 0 }}>
-            {activity.map((a) => (
-              <li key={a.project.id}>
-                <button type="button" className="hn-dense-row" onClick={() => onOpenProject(a.project)}
-                  style={{ ...rowBtn, alignItems: "center", gap: 12, padding: "9px 4px" }}>
-                  <StatusPill status={a.live ? "running" : "idle"} size="sm">{a.live ? "Berjalan" : "Diam"}</StatusPill>
-                  <span title={a.project.name} style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", width: 120, flex: "0 0 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.project.name}</span>
-                  <span className="hn-grow" title={a.text} style={{ fontSize: 12.5, color: "var(--text-body)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.text}</span>
-                  <span title={a.commit} style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>{a.commit}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
+      </Section>
     </div>
   );
 }

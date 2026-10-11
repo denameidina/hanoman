@@ -1,6 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import { agoLabel, clampNumber, untilLabel, useServerDraft } from "../src/screens/sched-lead-shared";
+import { agoLabel, clampNumber, fmtAt, untilLabel, useServerDraft } from "../src/screens/sched-lead-shared";
 
 // Audit UI/UX 2026-10 · 1G · helper bersama Scheduler & Lead.
 
@@ -53,5 +53,23 @@ describe("useServerDraft", () => {
     act(() => result.current.setDraft({ a: "7" }));
     rerender({ s: { a: "1" } });
     expect(result.current.draft).toEqual({ a: "7" });
+  });
+});
+
+// Fase 3I · jam absolut dari server ditampilkan dalam zona server, bukan zona browser.
+describe("fmtAt (zona server)", () => {
+  // 00:00 UTC = 07:00 WIB (Asia/Jakarta, tanpa DST). Zona yang sama dengan instan = jam berbeda.
+  const iso = "2026-10-11T00:00:00Z";
+  it("menampilkan jam dalam zona yang diminta", () => {
+    expect(fmtAt(iso, "Asia/Jakarta")).toContain("07.00");
+    expect(fmtAt(iso, "UTC")).toContain("00.00");
+  });
+  it("kosong atau tak valid → strip '—'", () => {
+    expect(fmtAt(null)).toBe("—");
+    expect(fmtAt(undefined, "UTC")).toBe("—");
+    expect(fmtAt("bukan-tanggal", "UTC")).toBe("—");
+  });
+  it("zona yang tak dikenal Intl tak menjatuhkan render; jam tetap tampil", () => {
+    expect(fmtAt(iso, "Zona/Tidak-Ada")).toContain("2026");
   });
 });

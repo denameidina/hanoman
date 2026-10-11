@@ -16,12 +16,17 @@ vi.mock("../src/api/client", () => ({
     getSchedulerState, getSchedulerQueue, listCrons,
     putSchedulerConfig: vi.fn(), updateProject: vi.fn(),
     cancelSchedulerQueueItem: vi.fn(), requeueSchedulerQueueItem: vi.fn(),
+    // Orkestrasi di tab Setelan dibaca dari GET /settings; `{}` = tanpa orkestrasi tersimpan (default).
+    getSettings: vi.fn(async () => ({})), putSettings: vi.fn(),
   },
   ApiError: class extends Error {},
 }));
 vi.mock("../src/api/events", () => eventsStub);
 
 const { SchedulerScreen } = await import("../src/screens/SchedulerScreen");
+
+// Tab hub: panel tak aktif tak terlihat bagi getByRole, jadi tiap test membuka tab yang ia uji.
+const openTab = (name: RegExp) => fireEvent.click(screen.getByRole("tab", { name }));
 
 const STATE = {
   config: {
@@ -69,24 +74,27 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); });
 
 describe("SPEC-908 · SchedulerScreen live", () => {
-  it("nol poll HTTP saat WS mendukung — state 1×, tiap seksi antrean 1×", async () => {
+  it("nol poll HTTP saat WS mendukung — state 1×, antrean tab Antre 1×", async () => {
     setTopics(["schedulerState", "schedulerQueue"]);
     render(view());
     expect(await screen.findByText(/Judul satu/)).toBeTruthy();
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
     expect(getSchedulerState).toHaveBeenCalledTimes(1);
-    // Tiga seksi yang tampil (queued/done/failed) = tiga muat awal, bukan lebih. `canceled` ber-count
-    // nol dan disembunyikan (Audit 1G), jadi ia tak memuat apa pun dan tak berlangganan.
-    expect(getSchedulerQueue).toHaveBeenCalledTimes(3);
+    // Fase 3I · hanya tab Antre yang terbuka saat mount, jadi hanya ia yang memuat antrean. Riwayat
+    // dimuat saat tabnya dibuka (lihat test di bawah), bukan sebelumnya.
+    expect(getSchedulerQueue).toHaveBeenCalledTimes(1);
   });
 
-  it("seksi berlangganan dengan `status` masing-masing; seksi ber-count nol tak berlangganan", async () => {
+  it("Antre berlangganan `queued`; Riwayat berlangganan status chip-nya hanya saat dibuka", async () => {
     setTopics(["schedulerState", "schedulerQueue"]);
     render(view());
     await screen.findByText(/Judul satu/);
+    expect(allSubs("schedulerQueue")).toEqual([expect.objectContaining({ status: "queued", page: 1, limit: 10 })]);
+    openTab(/^riwayat/i);
+    await screen.findByText(/Judul tiga/);
+    // Chip awal = Gagal (satu-satunya yang berisi di STATE). Hanya status itu yang berlangganan.
     const subs = allSubs("schedulerQueue");
-    expect(subs).toHaveLength(3);
-    expect(subs.map((s) => s.status).sort()).toEqual(["done", "failed", "queued"]);
+    expect(subs.map((s) => s.status).sort()).toEqual(["failed", "queued"]);
     for (const s of subs) expect(s).toMatchObject({ page: 1, limit: 10 });
   });
 
@@ -96,14 +104,15 @@ describe("SPEC-908 · SchedulerScreen live", () => {
     setTopics(["schedulerState", "schedulerQueue"]);
     render(view());
     await screen.findByText(/Judul satu/);
-    fireEvent.change(screen.getByLabelText("Batas sesi berjalan"), { target: { value: "9" } });
+    openTab(/^setelan/i);
+    fireEvent.change(screen.getByLabelText("Batas sesi bersamaan"), { target: { value: "9" } });
     await act(async () => {
       emitTopic({
         t: "schedulerState", key: subKey("schedulerState", {}),
         state: { ...STATE, config: { ...STATE.config, paused: true } } as never,
       });
     });
-    expect(screen.getByLabelText("Batas sesi berjalan")).toHaveValue(9);
+    expect(screen.getByLabelText("Batas sesi bersamaan")).toHaveValue(9);
     expect(screen.getByText("Ada perubahan yang belum disimpan.")).toBeTruthy();
   });
 
@@ -124,7 +133,7 @@ describe("SPEC-908 · SchedulerScreen live", () => {
         state: { ...STATE, liveCount: 7 } as never,
       });
     });
-    expect(screen.getByText(/7 \/ 2 sesi hidup/)).toBeTruthy();
+    expect(screen.getByText(/7 dari 2 sesi/)).toBeTruthy();
     expect(screen.queryByText(/Memuat/i)).toBeNull();
   });
 
@@ -156,6 +165,8 @@ describe("SPEC-908 · SchedulerScreen live", () => {
     setTopics(["schedulerState", "schedulerQueue"]);
     render(view());
     await screen.findByText(/Judul satu/);
+    openTab(/^riwayat/i);
+    await screen.findByText(/Judul tiga/);
 
     // Kunci yang TAK ada pelanggannya (halaman 2) tak boleh mengubah apa pun.
     await act(async () => {

@@ -1,0 +1,186 @@
+/* IDE · Audit UI/UX 2026-10 (Fase 3H). Berkas ini memegang susunan yang dipindah dari layout inline
+   IdeScreen, GitGraph, dan CabangPanel. Nilai hanya dari token (warna, jarak, radius, skala teks).
+   Hover & fokus lewat kelas di sini, bukan mutasi style dari JS. Target sentuh ≥44px pada pointer kasar. */
+
+/* ---------------------------------------------------------------- Perubahan */
+.hn-ide-changes-bar {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-hair);
+}
+.hn-ide-changes-legend { flex: 1 1 200px; min-width: 0; font-size: var(--text-xs); color: var(--text-muted); }
+.hn-ide-changes-hint {
+  margin: 0; padding: var(--space-2) var(--space-3); font-size: var(--text-xs); color: var(--text-subtle);
+  border-bottom: 1px solid var(--border-hair);
+}
+.hn-ide-section-head {
+  display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-2);
+}
+.hn-ide-section-head .hn-eyebrow { flex: 1 1 auto; min-width: 0; }
+.hn-ide-view-toggle {
+  display: inline-flex; align-items: center; justify-content: center; padding: 3px; border: none;
+  border-radius: var(--radius-sm); background: transparent; cursor: pointer;
+}
+.hn-ide-view-toggle[aria-pressed="true"] { background: var(--brass-100); }
+.hn-ide-change-path {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-body);
+}
+.hn-ide-change-count { font-family: var(--font-mono); font-size: var(--text-2xs); flex: 0 0 auto; }
+.hn-ide-empty-line { padding: var(--space-1) var(--space-2); font-size: var(--text-xs); color: var(--text-subtle); }
+.hn-ide-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--space-2); }
+
+/* Pemisah panel berkas (keyboard + pointer). Hanya ada saat split; di mobile tak dirender. */
+.hn-ide-files-pane { position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.hn-ide-split {
+  position: absolute; top: 0; bottom: 0; right: -12px; width: 12px; z-index: 2;
+  display: flex; align-items: center; justify-content: center; cursor: col-resize; touch-action: none;
+}
+.hn-ide-split::before {
+  content: ""; width: 2px; height: 56px; border-radius: 2px; background: var(--border-hair);
+}
+.hn-ide-split:hover::before, .hn-ide-split:focus-visible::before { background: var(--brass-500); }
+.hn-ide-split:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; border-radius: 4px; }
+.hn-responsive-panels[data-split="false"] .hn-ide-split { display: none; }
+
+/* ---------------------------------------------------------------- Berkas */
+.hn-ide-files-bar {
+  display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap;
+  padding: var(--space-2) var(--space-2); border-bottom: 1px solid var(--border-hair);
+}
+.hn-ide-files-eyebrow { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hn-ide-dest {
+  flex: 1 1 auto; min-width: 0; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-subtle);
+}
+.hn-ide-tree-row { position: relative; display: flex; align-items: stretch; min-width: 0; }
+.hn-ide-tree-row > .hn-ide-tree-entry { flex: 1 1 auto; min-width: 0; }
+.hn-ide-row-more {
+  flex: 0 0 auto; width: 28px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: var(--radius-sm); background: transparent; cursor: pointer; opacity: 0.55;
+}
+.hn-ide-tree-row:hover .hn-ide-row-more,
+.hn-ide-tree-row:focus-within .hn-ide-row-more { opacity: 1; }
+.hn-ide-row-more:hover { background: var(--bone-200); }
+.hn-ide-viewer-bar {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-hair);
+}
+.hn-ide-viewer-path {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-strong);
+}
+.hn-ide-seg {
+  display: inline-flex; gap: 2px; background: var(--bone-100); border-radius: var(--radius-pill); padding: 2px;
+}
+.hn-ide-seg button {
+  padding: 4px 12px; border: none; cursor: pointer; border-radius: var(--radius-pill);
+  font-size: var(--text-xs); background: transparent; color: var(--text-muted); font-weight: 400;
+}
+.hn-ide-seg button[aria-pressed="true"] { background: var(--surface-card); color: var(--text-strong); font-weight: 600; }
+
+/* ---------------------------------------------------------------- Riwayat (git graph) */
+.hn-ide-graph-row:hover { background: var(--bone-100); }
+.hn-ide-graph-bar {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  padding: 6px var(--space-3); border-bottom: 1px solid var(--border-hair); font-size: var(--text-xs);
+}
+.hn-ide-graph-view {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  padding: 6px var(--space-3); border-bottom: 1px solid var(--border-hair); background: var(--surface-sunken);
+}
+
+/* Menu konteks bersama (commit, cabang, pohon berkas). */
+.hn-ide-menu-group + .hn-ide-menu-group { border-top: 1px solid var(--border-hair); margin-top: 4px; padding-top: 4px; }
+.hn-ide-menu-group-title {
+  padding: 6px 10px 2px; font-size: var(--text-2xs); color: var(--text-subtle);
+}
+.hn-ide-menu-item:hover, .hn-ide-menu-item:focus-visible { background: var(--bone-200); outline: none; }
+
+/* ---------------------------------------------------------------- Cabang */
+.hn-ide-cabang-bar {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-hair);
+}
+.hn-ide-cabang-title { flex: 1 1 200px; min-width: 0; }
+.hn-ide-cabang-opts {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-hair); background: var(--surface-sunken);
+}
+.hn-ide-cabang-banner {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-hair); font-size: var(--text-xs);
+}
+.hn-ide-cabang-banner-text { flex: 1 1 260px; min-width: 0; }
+.hn-ide-cabang-results { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-hair); font-size: var(--text-xs); }
+.hn-ide-cabang-results-sum { color: var(--text-strong); }
+.hn-ide-cabang-results-line { color: var(--text-muted); font-family: var(--font-mono); }
+.hn-ide-cabang-list { max-height: 620px; overflow: auto; }
+.hn-ide-cabang-pickall {
+  display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-hair);
+}
+.hn-ide-cabang-meta {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-width: 0;
+  font-size: var(--text-xs); color: var(--text-muted);
+}
+.hn-ide-cabang-branch { font-family: var(--font-mono); color: var(--brass-700); }
+.hn-ide-cabang-sha { font-family: var(--font-mono); color: var(--text-subtle); }
+.hn-ide-cabang-when { font-size: var(--text-2xs); color: var(--text-subtle); }
+.hn-ide-cabang-link {
+  padding: 0; border: 0; background: none; cursor: pointer; color: var(--brass-700); font: inherit;
+}
+.hn-ide-cabang-more { padding: var(--space-2); text-align: center; }
+
+/* ---------------------------------------------------------------- Ukuran sentuh & mobile */
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-ide-row-more { width: 44px; height: 44px; opacity: 1; }
+  .hn-ide-tree-row > .hn-ide-tree-entry { min-height: 44px; }
+  .hn-ide-menu-item { min-height: 44px; }
+  .hn-ide-split { width: 20px; right: -16px; }
+  .hn-ide-cabang-list .hn-dense-row button { min-height: 44px; }
+}
+@media (max-width: 767px) {
+  .hn-ide-files-bar { flex-wrap: nowrap; }
+  .hn-ide-files-eyebrow { display: none; }
+  .hn-ide-dest { font-size: var(--text-2xs); }
+  .hn-ide-viewer-bar { gap: var(--space-1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hn-ide-split::before { transition: none; }
+}
+
+/* ---------------------------------------------------------------- Kerangka tab & dialog */
+.hn-ide-screen { min-width: 0; }
+.hn-ide-scroll-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.hn-ide-section-gap { border-top: 1px solid var(--border-hair); margin: var(--space-1) 0; }
+.hn-ide-drop { outline: 2px dashed var(--brass-500); outline-offset: -4px; }
+.hn-ide-viewer-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.hn-ide-diff-pad { padding: var(--space-2) 0; }
+.hn-ide-truncated { padding: var(--space-2) var(--space-3); font-size: var(--text-2xs); color: var(--text-subtle); }
+.hn-ide-source-pre {
+  margin: 0; padding: var(--space-3) var(--space-3); font-family: var(--font-mono); font-size: var(--text-xs);
+  line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: var(--text-body);
+}
+.hn-ide-code-pre { margin: 0; padding: var(--space-3); overflow: auto; }
+.hn-ide-code { font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.7; }
+.hn-ide-md-pad { padding: var(--space-3) var(--space-3); }
+.hn-ide-editor {
+  width: 100%; min-height: clamp(240px, 50dvh, 560px); box-sizing: border-box; resize: vertical; border: none;
+  padding: var(--space-3); font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.7;
+  color: var(--text-body); background: var(--surface-card);
+}
+.hn-ide-muted-line { font-size: var(--text-xs); color: var(--text-subtle); margin-bottom: var(--space-2); }
+.hn-ide-warn-line { font-size: var(--text-xs); color: var(--clay-600); margin-bottom: var(--space-2); }
+.hn-ide-pre-msg {
+  font-family: var(--font-mono); font-size: var(--text-xs); white-space: pre-wrap; color: var(--text-muted);
+  margin: 0 0 var(--space-3);
+}
+.hn-ide-conflict-list { margin: 0; font-family: var(--font-mono); font-size: var(--text-xs); max-height: 220px; overflow: auto; }
+.hn-ide-remote-row { display: flex; align-items: center; gap: var(--space-2); padding: 5px 0; border-bottom: 1px solid var(--border-hair); }
+.hn-ide-remote-name { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 600; width: 90px; }
+.hn-ide-remote-url {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-muted);
+}
+.hn-ide-remote-add { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.hn-ide-changes-bar .hn-ide-changes-legend { min-width: 0; }

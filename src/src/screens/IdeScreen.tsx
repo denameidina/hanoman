@@ -1,5 +1,7 @@
-/* IdeScreen — IDE Visual (SPEC-182): Explorer (pohon file + editor highlight) & Git Graph,
-   satu toolbar (project + branch switcher). SPEC-234: section Staged/Changed + diff pane. */
+/* IdeScreen — IDE (SPEC-182 · Audit UI/UX 2026-10 · Fase 3H "Perubahan dulu").
+   Empat tab, tersimpan per project: Perubahan (default: Staged/Changed + diff) · Riwayat (git graph) ·
+   Cabang (branch & worktree dalam satu daftar) · Berkas (pohon, isi, editor, CRUD, unggah).
+   Toolbar atas ≤6 kontrol. Seleksi tunggal: `selKind` "file" → tab Berkas; staged/unstaged → Perubahan. */
 import React from "react";
 // ADR-0160 · `highlight.js/lib/core` + bahasa yang memang dipetakan `langOf` di bawah, bukan paket
 // utuh: bundel penuh ±190 bahasa terukur 940 KB (312 KB gzip) — lebih besar dari seluruh sisa
@@ -21,21 +23,43 @@ for (const [name, def] of Object.entries({
   typescript: langTypescript, javascript: langJavascript, json: langJson, markdown: langMarkdown,
   css: langCss, xml: langXml, bash: langBash, python: langPython, yaml: langYaml, sql: langSql, diff: langDiff,
 })) hljs.registerLanguage(name, def);
-import { Card, Button, Select, Icon, StateBlock, Tabs, Badge, DocDownload, DocPreviewModal, isMarkdownPath, ResponsivePanels, Modal, Input, useConfirm } from "../ds";
-import { api, ApiError, type RepoFile, type ReviewFile, type WorkingStatus, type GitOp, type Remote, type IdeUploadResult } from "../api/client";
+import { Card, Button, Select, Icon, StateBlock, Tabs, Badge, DocDownload, DocPreviewModal, isMarkdownPath, ResponsivePanels,
+  Modal, Input, useConfirm, RowList, DenseRow, Text, OverflowActions, useResponsiveTier } from "../ds";
+import { api, ApiError, type RepoFile, type ReviewFile, type WorkingStatus, type GitOp, type Remote, type IdeUploadResult,
+  type ChangedFile } from "../api/client";
 import type { ProjectVM } from "./types";
 import { GitGraph } from "./GitGraph";
-import { BranchesPanel } from "./BranchesPanel";
-import { WorktreesPanel } from "./WorktreesPanel";
-import { buildFileTree, TreeRow, TreeRoot, ChangedSection } from "./file-tree";
+import { CabangPanel } from "./CabangPanel";
+import { buildFileTree, TreeRow, TreeRoot, type TreeMenu } from "./file-tree";
 import { readDroppedEntries } from "./drop-entries";
 import { DiffView } from "./diff-view";
+import { Menu, type MenuItem } from "./ide-menu";
 import { MarkdownView } from "../ds/markdown";
 import { usePersistedState, scoped, isStr, isBool, oneOf } from "../ui-state";
 import { failureMessage } from "../lib/report-error";
+import "./styles/ide.css";
+
+type IdeTab = "perubahan" | "riwayat" | "cabang" | "berkas";
+const IDE_TABS: readonly IdeTab[] = ["perubahan", "riwayat", "cabang", "berkas"];
+// Jalur lama: nilai tab yang tersimpan sebelum 3H (explorer/graph/branches/worktrees) tetap membuka
+// tempat yang sama. Peta, bukan objek: kunci seperti "constructor" tak boleh lolos sebagai tab.
+const LEGACY_TAB = new Map<string, IdeTab>([
+  ["explorer", "berkas"], ["graph", "riwayat"], ["branches", "cabang"], ["worktrees", "cabang"],
+]);
+function tabOf(v: string): IdeTab {
+  if ((IDE_TABS as readonly string[]).includes(v)) return v as IdeTab;
+  return LEGACY_TAB.get(v) ?? "perubahan";
+}
+
+const TREE_MIN = 220, TREE_MAX = 560, TREE_DEFAULT = 300;
+const isWidth = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const clampTree = (n: number) => Math.min(TREE_MAX, Math.max(TREE_MIN, Math.round(n)));
+const STATUS_TONE: Record<string, "ok" | "err" | "brass" | "warn"> = { A: "ok", D: "err", M: "brass" };
 
 /** Nama berkas/folder dari path relatif: segmen terakhir. */
 const baseName = (p: string) => p.split("/").pop() ?? p;
+/** Folder induk dari path relatif; kosong = root. */
+const parentOf = (p: string) => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
 /** Path `p` setelah `from` diganti nama ke `to`, bila `p` adalah `from` itu sendiri atau berada di bawahnya. */
 const remapPath = (p: string, from: string, to: string) =>
   p === from || p.startsWith(from + "/") ? to + p.slice(from.length) : p;
@@ -47,10 +71,6 @@ const langOf = (p: string): string => {
   return map[ext] ?? "";
 };
 
-// SPEC-240 · berkas markdown mendapat toggle Preview | Source (default preview).
-// SPEC-385 · predikatnya pindah ke `ds/markdown.tsx` (`isMarkdownPath`) karena kini dipakai
-// bersama Git Graph & Review.
-
 // Dialog "Paksa": muncul saat mutasi git balas 409. Mengulang op dengan force:true.
 function ForceDialog({ msg, onForce, onCancel }: { msg: string; onForce: () => void; onCancel: () => void }) {
   return (
@@ -58,9 +78,8 @@ function ForceDialog({ msg, onForce, onCancel }: { msg: string; onForce: () => v
       <Button size="sm" variant="ghost" onClick={onCancel}>Batal</Button>
       <Button size="sm" leftIcon="alert-triangle" onClick={onForce}>Paksa</Button>
     </>}>
-        <pre style={{ fontFamily: "var(--font-mono)", fontSize: 12, whiteSpace: "pre-wrap",
-          color: "var(--text-muted)", marginBottom: 12 }}>{msg}</pre>
-        <div style={{ fontSize: 12.5, color: "var(--clay-600)", marginBottom: 14 }}>
+        <pre className="hn-ide-pre-msg">{msg}</pre>
+        <div className="hn-ide-warn-line">
           Paksa bisa membuang perubahan tak ter-commit &amp; mengganggu sesi Claude yang jalan.
         </div>
     </Modal>
@@ -81,19 +100,19 @@ function RemotesModal({ projectId, onClose }: { projectId: string; onClose: () =
   React.useEffect(() => { reload(); }, [reload]);
   return (
     <Modal open title="Remote" onClose={onClose} width={560}>
-        {err && <div role="alert" style={{ fontSize: 12.5, color: "var(--clay-600)", marginBottom: 10 }}>{err}</div>}
-        {remotes.length === 0 && !err && <div style={{ fontSize: 12.5, color: "var(--text-subtle)", marginBottom: 10 }}>Belum ada remote.</div>}
+        {err && <div role="alert" className="hn-ide-warn-line">{err}</div>}
+        {remotes.length === 0 && !err && <div className="hn-ide-muted-line">Belum ada remote.</div>}
         {remotes.map((r) => (
-          <div key={r.name} className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid var(--border-hair)" }}>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: 600, width: 90 }}>{r.name}</span>
-            <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.fetch}</span>
+          <div key={r.name} className="hn-dense-row hn-ide-remote-row">
+            <span className="hn-ide-remote-name">{r.name}</span>
+            <span className="hn-grow hn-ide-remote-url">{r.fetch}</span>
             <Button size="sm" variant="ghost" leftIcon="trash-2" aria-label={`Hapus remote ${r.name}`}
               onClick={() => api.ideDeleteRemote(projectId, r.name)
                 .then((rs) => { setRemotes(rs); setErr(""); })
                 .catch((e: unknown) => setErr(failureMessage(`menghapus remote ${r.name}`, e)))} />
           </div>
         ))}
-        <div className="hn-stack-mobile" style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <div className="hn-stack-mobile hn-ide-remote-add">
           <Input size="sm" value={name} aria-label="Nama remote" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="origin" style={{ width: 100 }} />
           <Input size="sm" value={url} aria-label="URL remote" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUrl(e.target.value)} placeholder="https://github.com/org/repo.git" style={{ flex: 1 }} />
           <Button size="sm" leftIcon="plus" disabled={!name || !url}
@@ -105,19 +124,54 @@ function RemotesModal({ projectId, onClose }: { projectId: string; onClose: () =
   );
 }
 
+/** Daftar perubahan satu bagian (Staged atau Changed): RowList berbadge M/A/D, atau pohon. */
+function ChangeSection({ label, changed, selected, onSelect, view, onView, emptyText }: {
+  label: string; changed: ChangedFile[]; selected: string; onSelect: (p: string) => void;
+  view: "list" | "tree"; onView: (v: "list" | "tree") => void; emptyText: string;
+}) {
+  const tree = React.useMemo(() => buildFileTree(changed.map((c) => c.path)), [changed]);
+  const meta = React.useMemo(
+    () => Object.fromEntries(changed.map((c) => [c.path, c])) as Record<string, ChangedFile>, [changed]);
+  return (
+    <section aria-label={label}>
+      <div className="hn-ide-section-head">
+        <span className="hn-eyebrow">{label} · {changed.length}</span>
+        {changed.length > 0 && (["list", "tree"] as const).map((v) => (
+          <button key={v} type="button" className="hn-ide-view-toggle" aria-label={`${v === "list" ? "List" : "Tree"} ${label}`}
+            aria-pressed={view === v} onClick={() => onView(v)}>
+            <Icon name={v === "list" ? "list" : "folder-tree"} size={14}
+              color={view === v ? "var(--brass-700)" : "var(--text-subtle)"} />
+          </button>
+        ))}
+      </div>
+      {changed.length === 0 ? <div className="hn-ide-empty-line">{emptyText}</div>
+        : view === "tree"
+          ? <TreeRoot label={`Pohon ${label}`} nodes={tree}>
+              {tree.map((n) => <TreeRow key={n.path} node={n} selected={selected} onSelect={onSelect} meta={meta} defaultOpen />)}
+            </TreeRoot>
+          : <RowList label={`Berkas ${label}`}>
+              {changed.map((c) => (
+                <DenseRow key={c.path} selected={c.path === selected} onClick={() => onSelect(c.path)}>
+                  <Badge size="sm" tone={STATUS_TONE[c.status] ?? "brass"}>{c.status}</Badge>
+                  <span className="hn-ide-change-path">{c.path}</span>
+                  {!c.binary && <span className="hn-ide-change-count">+{c.add} −{c.del}</span>}
+                </DenseRow>
+              ))}
+            </RowList>}
+    </section>
+  );
+}
+
 export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTerminal }:
   { projects: ProjectVM[]; projectId: string; onProject: (id: string) => void;
     onToast?: (msg: string, tone: "ok" | "warn" | "err" | "info", icon?: string) => void;
     onGotoTerminal?: (sessionId?: string) => void }) {
-  // SPEC-740 · ADR-0115 · seluruh state tampilan IDE ber-scope project: tab, ref yang
-  // dilihat, berkas terpilih, dan mode tiap pane. `mode`/`draft` sengaja TIDAK persisten —
-  // draft editor bukan parameter tampilan, dan memulihkan mode edit tanpa draft-nya menyesatkan.
+  // SPEC-740 · ADR-0115 · seluruh state tampilan IDE ber-scope project. `mode`/`draft` sengaja TIDAK
+  // persisten — draft editor bukan parameter tampilan, dan memulihkan mode edit tanpa draft-nya menyesatkan.
   const ui = scoped("ide", projectId);
-  const [tab, setTab] = usePersistedState(ui, "tab", "explorer", isStr);
-  // SPEC-861 · baris Worktrees yang di-fokus saat datang dari badge kunci di tab Branches.
-  // SENGAJA tak persisten: sebuah worktree bisa lenyap di antara kunjungan, dan memulihkan
-  // fokus ke baris yang sudah tak ada menyorot baris yang salah.
-  const [wtFocus, setWtFocus] = React.useState("");
+  const [rawTab, setRawTab] = usePersistedState<string>(ui, "tab", "perubahan", isStr);
+  const tab = tabOf(rawTab);
+  const setTab = (next: IdeTab) => setRawTab(next);
   const [viewRef, setViewRef] = usePersistedState(ui, "viewRef", "", isStr);   // kosong = working tree
   const [branches, setBranches] = React.useState<{ branches: string[]; remotes: string[] }>({ branches: [], remotes: [] });
   const [files, setFiles] = React.useState<string[]>([]);
@@ -127,9 +181,10 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   const [ignored, setIgnored] = React.useState<Set<string>>(new Set());
   const [hidden, setHidden] = usePersistedState(ui, "hidden", false, isBool);
   const [treeState, setTreeState] = React.useState<"loading" | "ready" | "error">("loading");
+  // Satu seleksi untuk dua tab: "file" = berkas di Berkas; staged/unstaged = diff di Perubahan.
   const [selected, setSelected] = usePersistedState(ui, "selected", "", isStr);
   const [selKind, setSelKind] = usePersistedState<"file" | "staged" | "unstaged">(
-    ui, "selKind", "file", oneOf("file", "staged", "unstaged"));   // sumber seleksi → viewer vs diff
+    ui, "selKind", "file", oneOf("file", "staged", "unstaged"));
   const [file, setFile] = React.useState<RepoFile | null>(null);
   const [mode, setMode] = React.useState<"view" | "edit">("view");
   const [draft, setDraft] = React.useState("");
@@ -143,20 +198,23 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   const [diff, setDiff] = React.useState<ReviewFile | null>(null);
   const [diffTab, setDiffTab] = usePersistedState<"diff" | "source">(ui, "diffTab", "diff", oneOf("diff", "source"));
   const [showRemotes, setShowRemotes] = React.useState(false); // SPEC-233 · kelola remote
-  // SPEC-385 · ruang baca lebar untuk .md — di mode file toggle SPEC-240 tetap ada (preview
-  // sempit di samping tree), di mode diff inilah satu-satunya cara membacanya terender.
+  // SPEC-385 · ruang baca lebar untuk .md; di mode diff inilah satu-satunya cara membacanya terender.
   const [preview, setPreview] = React.useState(false);
+  // Panel mobile (selector) untuk tiap tab. Tak persisten: ia hanya soal ruang layar, bukan data.
   const [panel, setPanel] = React.useState<"files" | "viewer">("files");
-  // ADR-0121 · tujuan operasi berkas. SENGAJA tak persisten: folder bisa lenyap di antara
-  // kunjungan, dan memulihkan tujuan yang sudah tak ada membuat berkas mendarat entah di mana.
+  const [changesPanel, setChangesPanel] = React.useState<"daftar" | "diff">("daftar");
+  // Lebar panel berkas: split dipakai di tablet/desktop dan bisa diatur keyboard atau pointer.
+  const [treeW, setTreeW] = usePersistedState(ui, "treeW", TREE_DEFAULT, isWidth);
+  const tier = useResponsiveTier();
+  // ADR-0121 · tujuan operasi berkas. SENGAJA tak persisten: folder bisa lenyap di antara kunjungan.
   const [dirSel, setDirSel] = React.useState("");
   const [nameDialog, setNameDialog] = React.useState<
     { mode: "file" | "dir" | "rename"; value: string } | null>(null);
   const [conflict, setConflict] = React.useState<{ files: { path: string; file: File }[] } | null>(null);
   // Entri yang DIKLIK di pohon (berkas atau folder) — satu-satunya target Ganti nama & Hapus.
-  // Sengaja bukan berkas yang sedang dibuka: target yang tak kelihatan adalah sumber salah hapus.
   // Tak persisten, sama seperti dirSel (ADR-0121).
   const [treeSel, setTreeSel] = React.useState<{ path: string; kind: "file" | "dir" } | null>(null);
+  const [treeMenu, setTreeMenu] = React.useState<{ x: number; y: number; anchor: HTMLElement; path: string; kind: "file" | "dir" } | null>(null);
   const { confirm, dialog } = useConfirm();
   const [viewErr, setViewErr] = React.useState("");   // galat memuat isi berkas/diff yang dibuka
   const [viewNonce, setViewNonce] = React.useState(0); // naik = muat ulang isi berkas/diff
@@ -164,6 +222,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   const fileInput = React.useRef<HTMLInputElement>(null);
   const dirInput = React.useRef<HTMLInputElement>(null);
   const canPickDir = typeof HTMLInputElement !== "undefined" && "webkitdirectory" in HTMLInputElement.prototype;
+  const dragRef = React.useRef<{ x: number; w: number } | null>(null);
 
   const reloadTree = React.useCallback(() => {
     setTreeState("loading");
@@ -177,8 +236,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   /**
    * Membuka direktori terabaikan yang diruntuhkan server. Isinya digabung ke state pohon yang
    * sama — bukan disimpan terpisah — supaya seleksi, tujuan operasi berkas, dan buildFileTree
-   * bekerja atas satu daftar. Seluruh isi direktori terabaikan ikut terabaikan, jadi semuanya
-   * masuk `ignored` dan tampil redup seperti induknya.
+   * bekerja atas satu daftar.
    */
   const expandDir = React.useCallback(async (path: string) => {
     try {
@@ -217,6 +275,8 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     }
     return () => { alive = false; };
   }, [selected, selKind, projectId, viewRef, viewNonce]);
+  // Pratinjau modal tak ikut terbawa saat berpindah tab.
+  React.useEffect(() => { setPreview(false); }, [tab]);
 
   // Draft kotor = mode edit dengan isi yang berbeda dari berkas. Memilih berkas lain, mengganti
   // ref, atau membatalkan dari keadaan itu meminta konfirmasi — dulu draft hilang diam-diam.
@@ -231,9 +291,8 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
       confirmLabel: "Buang perubahan", cancelLabel: "Lanjut mengedit", tone: "danger", icon: "trash-2",
     }).then((ok) => { if (ok) { setMode("view"); run(); } });
   }
-  const selectFile = (p: string) => whenClean(() => { setSelKind("file"); setSelected(p); setPanel("viewer"); });
-  const selectStaged = (p: string) => whenClean(() => { setSelKind("staged"); setSelected(p); setPanel("viewer"); });
-  const selectChanged = (p: string) => whenClean(() => { setSelKind("unstaged"); setSelected(p); setPanel("viewer"); });
+  const selectStaged = (p: string) => whenClean(() => { setSelKind("staged"); setSelected(p); setChangesPanel("diff"); });
+  const selectChanged = (p: string) => whenClean(() => { setSelKind("unstaged"); setSelected(p); setChangesPanel("diff"); });
   /** Klik berkas di pohon: jadi target Ganti nama/Hapus sekaligus membukanya. */
   const pickTreeFile = (p: string) => whenClean(() => {
     setTreeSel({ path: p, kind: "file" }); setSelKind("file"); setSelected(p); setPanel("viewer");
@@ -317,6 +376,12 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   const underDir = (p: string) => (dirSel ? `${dirSel}/${p}` : p);
   const afterWrite = () => { reloadTree(); reloadStatus(); };
 
+  /** Buka dialog nama baru di `parent` (root bila kosong). Tujuannya ikut diset, bukan hanya dialognya. */
+  function openNameDialog(kind: "file" | "dir", parent: string) {
+    setDirSel(parent);
+    setNameDialog({ mode: kind, value: "" });
+  }
+
   async function createEntry(kind: "file" | "dir", name: string) {
     if (!name.trim()) return;
     const path = underDir(name.trim());
@@ -345,9 +410,8 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     setConflict(bentrok.size ? { files: list.filter((f) => bentrok.has(underDir(f.path))) } : null);
   }
 
-  // Target Ganti nama & Hapus = entri yang diklik di pohon (treeSel), BUKAN berkas yang terbuka:
-  // dulu berkas terbuka jadi target diam-diam walau operator mengklik folder lain. Diff dari
-  // Staged/Changed tak pernah jadi target — yang tampil di sana bisa berkas yang sudah terhapus.
+  // Target Ganti nama & Hapus = entri yang dipilih dari pohon (treeSel) atau dari menu konteksnya,
+  // BUKAN berkas yang terbuka. Diff dari Perubahan tak pernah jadi target.
   async function renameTarget(to: string) {
     const t = treeSel;
     if (!t || !to.trim()) return;
@@ -366,11 +430,12 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     }
   }
 
-  /** Hapus entri target lewat dialog DS: nama objeknya disebut, dampak terdaftar, aksi eksplisit. */
-  function requestDelete() {
-    const t = treeSel;
+  /** Hapus entri lewat dialog DS: nama objeknya disebut, dampak terdaftar, aksi eksplisit. */
+  function requestDelete(target: { path: string; kind: "file" | "dir" } | null = treeSel) {
+    const t = target;
     if (!t) return;
     const isDir = t.kind === "dir";
+    setTreeSel(t);
     void confirm({
       title: isDir ? "Hapus folder beserta isinya?" : "Hapus berkas?",
       eyebrow: t.path,
@@ -395,9 +460,26 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     } catch (e) { onToast?.(failureMessage(`menghapus ${baseName(t.path)}`, e), "err", "x-circle"); }
   }
 
+  // Menu konteks baris pohon: aksi berkas tinggal di sini (Berkas baru di folder itu, Ganti nama, Hapus).
+  const openTreeMenu: TreeMenu = (path, kind, anchor, pos) => {
+    const r = anchor.getBoundingClientRect();
+    setTreeMenu({ x: pos?.x ?? r.left, y: pos?.y ?? r.bottom, anchor, path, kind });
+  };
+  function treeMenuItems(t: { path: string; kind: "file" | "dir" }): MenuItem[] {
+    const parent = t.kind === "dir" ? t.path : parentOf(t.path);
+    const where = parent ? `${parent}/` : "root";
+    const items: MenuItem[] = [
+      { label: `Berkas baru di ${where}`, run: () => openNameDialog("file", parent) },
+    ];
+    if (t.kind === "dir") items.push({ label: `Folder baru di ${where}`, run: () => openNameDialog("dir", parent) });
+    items.push({ label: "Ganti nama…", run: () => { setTreeSel(t); setNameDialog({ mode: "rename", value: t.path }); } });
+    items.push({ label: t.kind === "dir" ? "Hapus folder…" : "Hapus berkas…", run: () => requestDelete(t) });
+    return items;
+  }
+
   const pickedFiles = (input: HTMLInputElement | null) => {
-    const files = Array.from(input?.files ?? []);
-    const list = files.map((f) => ({
+    const picked = Array.from(input?.files ?? []);
+    const list = picked.map((f) => ({
       path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name, file: f }));
     if (input) input.value = "";   // memilih berkas yang sama dua kali harus tetap memicu change
     return list;
@@ -411,262 +493,269 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
     catch { return file.content; }
   }, [file, selected]);
 
-  // SPEC-385 · sumber pratinjau mengikuti pane yang aktif: mode file = isi berkas di ref yang
-  // dilihat, mode diff = isi SESUDAH perubahan (bukan diff-nya). Unduhannya menunjuk endpoint
-  // yang sama dengan isinya, jadi yang diunduh persis yang dibaca.
-  const previewSrc = ((): { text: string; download: (f: "md" | "pdf") => string } | null => {
-    const isDiff = selKind !== "file";
-    const rf = isDiff ? diff : file;
-    if (!rf || rf.binary || rf.content === null || !isMarkdownPath(selected)) return null;
-    return {
-      text: rf.content,
-      download: isDiff
-        ? (f: "md" | "pdf") => api.ideFileDiffDownloadUrl(projectId, selected, selKind === "staged", f)
-        : (f: "md" | "pdf") => api.ideFileDownloadUrl(projectId, selected, viewRef, f),
-    };
-  })();
+  // Seleksi dibagi dua: berkas (Berkas) dan diff (Perubahan). Masing-masing hanya tampil di tab-nya.
+  const fileSel = selKind === "file" ? selected : "";
+  const diffSel = selKind !== "file" ? selected : "";
+  // SPEC-385 · pratinjau lebar per tab: diff menampilkan isi SESUDAH perubahan, berkas isi di ref-nya.
+  const diffPreview = diffSel && diff && !diff.binary && diff.content !== null && isMarkdownPath(diffSel)
+    ? { text: diff.content, download: (f: "md" | "pdf") => api.ideFileDiffDownloadUrl(projectId, diffSel, selKind === "staged", f) }
+    : null;
+  const filePreview = fileSel && file && !file.binary && file.content !== null && isMarkdownPath(fileSel)
+    ? { text: file.content, download: (f: "md" | "pdf") => api.ideFileDownloadUrl(projectId, fileSel, viewRef, f) }
+    : null;
+  const previewSrc = tab === "perubahan" ? diffPreview : tab === "berkas" ? filePreview : null;
+  const previewPath = tab === "perubahan" ? diffSel : fileSel;
 
+  const changedCount = (status?.staged.length ?? 0) + (status?.unstaged.length ?? 0);
   const toolbar = (
     <div className="hn-ide-toolbar">
       <Select size="sm" aria-label="Proyek" value={projectId} onChange={(e) => onProject(e.target.value)}
         options={projects.map((p) => ({ value: p.id, label: p.name }))} />
       <Select size="sm" aria-label="Ref yang dilihat" value={viewRef}
         onChange={(e) => { const next = e.target.value; whenClean(() => setViewRef(next)); }} options={refOptions} />
-      <Button size="sm" variant="secondary" leftIcon="git-branch" onClick={checkout} disabled={!viewRef}>Checkout</Button>
       {/* SPEC-233 · fetch --all --prune; ref-only → tak digerbang sesi */}
       <Button size="sm" variant="ghost" leftIcon="download-cloud" onClick={() => {
         void runGit({ op: "fetch", prune: true })
           .then(() => api.listBranches(projectId).then(setBranches))
           .catch((e: unknown) => gitFail("fetch", e));
       }}>Fetch</Button>
-      <Button size="sm" variant="ghost" leftIcon="git-branch" onClick={() => setShowRemotes(true)}>Remotes</Button>
+      {/* Entri terabaikan hanya ada di working tree — togglenya mati saat melihat ref. */}
+      <Button size="sm" variant={hidden ? "secondary" : "ghost"} leftIcon={hidden ? "eye" : "eye-off"}
+        disabled={!!viewRef} aria-pressed={hidden}
+        title={viewRef ? "Hanya di working tree" : "Tampilkan berkas & folder yang .gitignore sembunyikan"}
+        onClick={() => setHidden(!hidden)}>Tersembunyi</Button>
+      <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={afterWrite}>Muat ulang</Button>
+      <OverflowActions label="Aksi lain IDE" items={[
+        { key: "checkout", label: viewRef ? `Checkout ${viewRef}` : "Checkout", icon: "git-branch",
+          disabled: !viewRef, onSelect: () => void checkout() },
+        { key: "remotes", label: "Kelola remote", icon: "git-branch", onSelect: () => setShowRemotes(true) },
+      ]} />
     </div>
   );
 
-  const inDiff = selKind !== "file"; // pane kanan mode diff (dari Staged/Changed)
+  // Panel Perubahan: daftar di kiri (mobile: selector), diff di kanan.
+  const changesBody = (
+    <ResponsivePanels
+      ariaLabel="Panel perubahan"
+      active={changesPanel}
+      onActiveChange={(next) => setChangesPanel(next as "daftar" | "diff")}
+      masterWidth={320}
+      panels={[
+        { id: "daftar", label: "Daftar", className: "hn-panel-flex", content: (
+          <Card padding={0} fill>
+            <div className="hn-ide-changes-bar">
+              <Text size={12} tone="muted" as="span" className="hn-ide-changes-legend">
+                M diubah · A ditambah · D dihapus
+              </Text>
+              {/* Satu aksi primer. Commit belum bisa dibuat dari dashboard (tak ada endpoint tulisnya),
+                  jadi aksinya membawa ke sesi Terminal, tempat git commit dijalankan seperti biasa. */}
+              <Button size="sm" variant="primary" leftIcon="git-commit" disabled={!onGotoTerminal}
+                onClick={() => onGotoTerminal?.()}>Commit dari Terminal</Button>
+            </div>
+            <p className="hn-ide-changes-hint">
+              Commit dibuat dari sesi Terminal, supaya pesan commit dan hook git berjalan seperti biasa.
+            </p>
+            <div data-testid="ide-changes-scroll" className="hn-ide-scroll">
+              <ChangeSection label="Staged" changed={status?.staged ?? []}
+                selected={diffSel} onSelect={selectStaged}
+                view={stagedView} onView={setStagedView} emptyText="Tak ada file staged." />
+              <div className="hn-ide-section-gap" />
+              <ChangeSection label="Changed" changed={status?.unstaged ?? []}
+                selected={diffSel} onSelect={selectChanged}
+                view={changedView} onView={setChangedView} emptyText="Tak ada file berubah." />
+            </div>
+          </Card>
+        ) },
+        { id: "diff", label: "Diff", className: "hn-panel-flex", content: (
+          <Card padding={0} fill>
+            <div className="hn-ide-viewer-bar">
+              <Icon name="file-text" size={15} color="var(--text-muted)" />
+              <span className="hn-ide-viewer-path">{diffSel || "—"}</span>
+              {diff?.status && <Badge tone={STATUS_TONE[diff.status] ?? "brass"} size="sm">{diff.status}</Badge>}
+              <span className="hn-grow" />
+              {/* SPEC-385 · pane diff dulu hanya bisa membaca .md sebagai <pre> mentah */}
+              {diffPreview && (
+                <Button size="sm" variant="secondary" leftIcon="book-open" onClick={() => setPreview(true)}>Preview lebar</Button>
+              )}
+              <div className="hn-ide-seg">
+                {(["diff", "source"] as const).map((t) => (
+                  <button key={t} type="button" aria-pressed={diffTab === t} onClick={() => setDiffTab(t)}>{t}</button>
+                ))}
+              </div>
+            </div>
+            <div data-testid="doc-preview-scroll" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+              {!diffSel ? <StateBlock kind="empty" icon="file-text" title="Pilih file dari daftar Perubahan" />
+                : diff === null ? (viewErr
+                    ? <StateBlock kind="error" title="Diff belum bisa dibuka" hint={viewErr} action={() => setViewNonce((n) => n + 1)} />
+                    : <StateBlock kind="loading" title="Memuat…" hint={diffSel} />)
+                : diff.binary ? <StateBlock kind="empty" icon="file" title="Berkas biner" hint={diffSel} />
+                : diffTab === "diff" ? <div className="hn-ide-diff-pad"><DiffView diff={diff.diff ?? ""} />
+                    {diff.truncated && <div className="hn-ide-truncated">… dipotong pada 256 KB.</div>}</div>
+                : diff.content === null ? <StateBlock kind="empty" icon="trash-2" title="File dihapus" hint="Tak ada isi untuk ditampilkan." />
+                : <pre className="hn-ide-source-pre">{diff.content}</pre>}
+            </div>
+          </Card>
+        ) },
+      ]}
+    />
+  );
+
+  // Panel Berkas: pohon dengan satu baris kontrol (mobile: + menu ⋯), isi/editor di kanan.
+  const filesMore: MenuItem[] = [
+    { label: "Folder baru", run: () => openNameDialog("dir", dirSel) },
+    ...(canPickDir ? [{ label: "Unggah folder", run: () => dirInput.current?.click() }] : []),
+  ];
+  const filesBody = (
+    <ResponsivePanels
+      ariaLabel="Panel IDE"
+      active={panel}
+      onActiveChange={(next) => setPanel(next as "files" | "viewer")}
+      masterWidth={treeW}
+      panels={[
+        { id: "files", label: "Berkas", className: "hn-panel-flex", content: (
+          <div className="hn-ide-files-pane" style={{ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: 0 }}>
+            <Card padding={0} fill>
+              {/* ADR-0121 · satu baris kontrol. Tujuan unggah/buat wajib terlihat (→ folder). */}
+              <div className="hn-ide-files-bar">
+                <span className="hn-eyebrow hn-ide-files-eyebrow">berkas · {viewRef || "working tree"}</span>
+                <Button size="sm" variant="ghost" leftIcon="file-plus" onClick={() => openNameDialog("file", dirSel)}>Berkas baru</Button>
+                <Button size="sm" variant="ghost" leftIcon="upload" onClick={() => fileInput.current?.click()}>Unggah</Button>
+                <OverflowActions label="Aksi lain berkas" items={filesMore.map((m, i) => ({
+                  key: `more-${i}`, label: m.label, onSelect: m.run }))} />
+                <span data-testid="ide-entry-dest" className="hn-ide-dest">→ {dirSel || "root"}</span>
+                <input ref={fileInput} type="file" multiple hidden
+                  onChange={() => void runUpload(pickedFiles(fileInput.current))} />
+                <input ref={dirInput} type="file" hidden {...{ webkitdirectory: "" }}
+                  onChange={() => void runUpload(pickedFiles(dirInput.current))} />
+              </div>
+              <div data-testid="ide-tree-scroll"
+                onDragOver={(e) => { e.preventDefault(); setDropping(true); }}
+                onDragLeave={() => setDropping(false)}
+                onDrop={(e) => { e.preventDefault(); setDropping(false);
+                  void readDroppedEntries(e.dataTransfer).then((list) => runUpload(list)); }}
+                style={{ padding: 8, flex: "1 1 auto", minHeight: 0, overflow: "auto",
+                  outline: dropping ? "2px dashed var(--brass-500)" : "none", outlineOffset: -4 }}>
+                {treeState === "loading" ? <StateBlock kind="loading" compact title="Memuat file…" />
+                  : treeState === "error" ? <StateBlock kind="error" compact title="Gagal memuat file" action={() => reloadTree()} />
+                  : files.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Tak ada file" />
+                  : (
+                    <TreeRoot label="Pohon berkas" nodes={fileTree}>
+                      {fileTree.map((n) => (
+                        <TreeRow key={n.path} node={n} selected={fileSel}
+                          onSelect={pickTreeFile} dirSelected={dirSel} onSelectDir={pickTreeDir}
+                          ignored={ignored} onExpand={hidden ? expandDir : undefined} menu={openTreeMenu} />
+                      ))}
+                    </TreeRoot>
+                  )}
+              </div>
+            </Card>
+            {/* Pemisah lebar: keyboard (←/→, Shift untuk langkah besar, Home/End) dan pointer. */}
+            {tier !== "mobile" && (
+              <div role="separator" aria-orientation="vertical" aria-label="Lebar panel berkas" tabIndex={0}
+                aria-valuemin={TREE_MIN} aria-valuemax={TREE_MAX} aria-valuenow={treeW} className="hn-ide-split"
+                onKeyDown={(e) => {
+                  const step = e.shiftKey ? 48 : 16;
+                  const next = e.key === "ArrowLeft" ? treeW - step : e.key === "ArrowRight" ? treeW + step
+                    : e.key === "Home" ? TREE_MIN : e.key === "End" ? TREE_MAX : null;
+                  if (next === null) return;
+                  e.preventDefault(); setTreeW(clampTree(next));
+                }}
+                onPointerDown={(e) => { dragRef.current = { x: e.clientX, w: treeW }; e.currentTarget.setPointerCapture?.(e.pointerId); }}
+                onPointerMove={(e) => { const d = dragRef.current; if (d) setTreeW(clampTree(d.w + (e.clientX - d.x))); }}
+                onPointerUp={() => { dragRef.current = null; }}
+                onPointerCancel={() => { dragRef.current = null; }} />
+            )}
+          </div>
+        ) },
+        { id: "viewer", label: "Isi", className: "hn-panel-flex", content: (
+          <Card padding={0} fill>
+            <div className="hn-ide-viewer-bar">
+              <Icon name="file-text" size={15} color="var(--text-muted)" />
+              <span className="hn-ide-viewer-path">{fileSel || "—"}</span>
+              {file?.truncated && <Badge tone="warn" size="sm">terpotong</Badge>}
+              <span className="hn-grow" />
+              {mode === "view"
+                ? <div className="hn-ide-viewer-actions">
+                    {/* SPEC-240 · toggle Preview | Source hanya untuk .md */}
+                    {file && !file.binary && isMarkdownPath(fileSel) && (
+                      <div className="hn-ide-seg">
+                        {(["preview", "source"] as const).map((t) => (
+                          <button key={t} type="button" aria-pressed={mdView === t} onClick={() => setMdView(t)}>
+                            {t === "preview" ? "Preview" : "Source"}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {/* SPEC-385 · toggle di atas hanya memakai sisa lebar di samping pohon;
+                        tombol ini membuka dokumen yang sama di ruang baca lebar */}
+                    {filePreview && (
+                      <Button size="sm" variant="secondary" leftIcon="book-open" onClick={() => setPreview(true)}>Preview lebar</Button>
+                    )}
+                    {/* SPEC-361 · unduh berkas teks yang sedang dibuka (biner tak ditawari) */}
+                    <DocDownload href={(f) => api.ideFileDownloadUrl(projectId, fileSel, viewRef, f)}
+                      disabled={!file || file.binary} />
+                    {/* Edit hanya untuk working tree: isi ref lain tak boleh ditimpa draft-nya. */}
+                    <Button size="sm" variant="secondary" leftIcon="pencil" onClick={startEdit}
+                      disabled={!file || file.binary || !!viewRef}
+                      title={viewRef ? "Edit hanya di working tree — pilih working tree dulu" : undefined}>Edit</Button>
+                  </div>
+                : <div className="hn-ide-viewer-actions">
+                    {dirty && <Badge tone="warn" size="sm">belum disimpan</Badge>}
+                    <Button size="sm" variant="ghost" onClick={cancelEdit}>Batal</Button>
+                    <Button size="sm" leftIcon="check" onClick={() => void save()}>Simpan</Button>
+                  </div>}
+            </div>
+            <div data-testid="doc-preview-scroll" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+              {!fileSel ? <StateBlock kind="empty" icon="file-text" title="Pilih file dari pohon di kiri" />
+                : file === null ? (viewErr
+                    ? <StateBlock kind="error" title="Berkas belum bisa dibuka" hint={viewErr} action={() => setViewNonce((n) => n + 1)} />
+                    : <StateBlock kind="loading" title="Memuat…" hint={fileSel} />)
+                : file.binary ? <StateBlock kind="empty" icon="file" title="File biner" hint={fileSel} />
+                : mode === "edit"
+                  /* placeholder-exempt: isi berkas apa pun bahasanya — tak ada satu contoh yang benar lintas .ts/.json/.sh */
+                  ? <textarea aria-label={`Isi ${baseName(fileSel)}`} value={draft} spellCheck={false}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void save(); } }}
+                      className="hn-ide-editor" />
+                  : isMarkdownPath(fileSel) && mdView === "preview"
+                    ? <div className="hn-ide-md-pad"><MarkdownView text={file.content ?? ""} name={fileSel} /></div>
+                    : <pre className="hn-ide-code-pre">
+                        <code className="hljs hn-ide-code" dangerouslySetInnerHTML={{ __html: highlighted }} />
+                      </pre>}
+            </div>
+          </Card>
+        ) },
+      ]}
+    />
+  );
 
   return (
-    // SPEC-363 · hanya tab Explorer yang ikut rantai flex (dua pane-nya menggulir sendiri);
-    // Git Graph, Branches & Worktrees tetap tumbuh mengikuti isi seperti sebelumnya — graph bergantung
-    // pada `<main>` yang menggulir untuk auto-load `IntersectionObserver` (SPEC-351).
-    <div style={{ display: "flex", flexDirection: "column", gap: 16,
-      ...(tab === "explorer" ? { flex: "1 1 0", minHeight: 0 } : null) }}>
-      <div className="hn-ide-head" style={{ flex: "0 0 auto" }}>
-        <Tabs tabs={[{ value: "explorer", label: "Explorer" }, { value: "graph", label: "Git Graph" },
-          { value: "branches", label: "Branches" }, { value: "worktrees", label: "Worktrees" }]}
-          value={tab} onChange={setTab} />
+    // SPEC-363 · Perubahan dan Berkas memakai rantai flex (dua pane menggulir sendiri); Riwayat dan
+    // Cabang tetap tumbuh mengikuti isi — graph bergantung pada `<main>` yang menggulir (SPEC-351).
+    <div className="hn-ide-screen" style={{ display: "flex", flexDirection: "column", gap: 16,
+      ...(tab === "perubahan" || tab === "berkas" ? { flex: "1 1 0", minHeight: 0 } : null) }}>
+      <div className="hn-ide-head">
+        <Tabs aria-label="Bagian IDE" tabs={[
+          { value: "perubahan", label: "Perubahan", count: changedCount || undefined },
+          { value: "riwayat", label: "Riwayat" },
+          { value: "cabang", label: "Cabang" },
+          { value: "berkas", label: "Berkas" },
+        ]} value={tab} onChange={(v) => setTab(tabOf(v))} />
         {toolbar}
       </div>
 
-      {tab === "explorer" ? (
-        <ResponsivePanels
-          ariaLabel="Panel IDE"
-          active={panel}
-          onActiveChange={(next) => setPanel(next as "files" | "viewer")}
-          masterWidth={300}
-          panels={[
-            { id: "files", label: "Berkas", className: "hn-panel-flex", content: (
-          /* `fill` menjaga rantai flex Card agar pohon memakai scroller lokal. */
-          <Card padding={0} fill>
-            <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: "1px solid var(--border-hair)" }}>
-              <span className="hn-eyebrow" style={{ flex: 1 }}>perubahan{status?.branch ? ` · ${status.branch}` : ""}</span>
-              {/* Entri terabaikan hanya ada di working tree — sebuah commit tak pernah memuatnya,
-                  jadi togglenya mati saat sedang melihat ref, bukan berbohong dengan diam. */}
-              <Button size="sm" variant={hidden ? "secondary" : "ghost"} leftIcon={hidden ? "eye" : "eye-off"}
-                disabled={!!viewRef} aria-pressed={hidden}
-                title={viewRef ? "Hanya di working tree" : "Tampilkan berkas & folder yang .gitignore sembunyikan"}
-                onClick={() => setHidden(!hidden)}>Tersembunyi</Button>
-              <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={afterWrite}>Muat ulang</Button>
-            </div>
-            {/* ADR-0121 · aksi berkas. Label tujuan wajib terlihat: tanpa itu folder tujuan jadi
-                keadaan tersembunyi dan berkas mendarat di tempat yang tak diduga operator. */}
-            <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap",
-              padding: "8px 14px", borderBottom: "1px solid var(--border-hair)" }}>
-              <Button size="sm" variant="ghost" leftIcon="file-plus"
-                onClick={() => setNameDialog({ mode: "file", value: "" })}>File baru</Button>
-              <Button size="sm" variant="ghost" leftIcon="folder-plus"
-                onClick={() => setNameDialog({ mode: "dir", value: "" })}>Folder baru</Button>
-              <Button size="sm" variant="ghost" leftIcon="upload"
-                onClick={() => fileInput.current?.click()}>Unggah</Button>
-              {canPickDir && (
-                <Button size="sm" variant="ghost" leftIcon="folder-up"
-                  onClick={() => dirInput.current?.click()}>Unggah folder</Button>
-              )}
-              {/* Ganti nama & Hapus memakai entri yang diklik di pohon — labelnya disebut di baris bawah. */}
-              <Button size="sm" variant="ghost" leftIcon="pencil" disabled={!treeSel}
-                onClick={() => setNameDialog({ mode: "rename", value: treeSel?.path ?? "" })}>Ganti nama</Button>
-              {/* Hapus dipisah secara visual dari aksi biasa: ia satu-satunya tombol merah di baris ini. */}
-              <span aria-hidden="true" style={{ width: 1, alignSelf: "stretch", background: "var(--border-hair)", margin: "0 4px" }} />
-              <Button size="sm" variant="ghost" leftIcon="trash-2" disabled={!treeSel}
-                onClick={requestDelete}>Hapus</Button>
-              {/* SPEC-879 · label tujuan MENYERAP sisa lebar di baris mana pun ia mendarat, jadi
-                  ia terlihat secara konstruksi — bukan sebagai efek samping spacer yang boleh
-                  runtuh saat barisnya membungkus. */}
-              <span data-testid="ide-entry-dest" style={{ flex: "1 1 auto", minWidth: 0,
-                textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-subtle)" }}>
-                → {dirSel || "root"}
-              </span>
-              <input ref={fileInput} type="file" multiple hidden
-                onChange={() => void runUpload(pickedFiles(fileInput.current))} />
-              <input ref={dirInput} type="file" hidden {...{ webkitdirectory: "" }}
-                onChange={() => void runUpload(pickedFiles(dirInput.current))} />
-            </div>
-            {/* Label target ganti nama & hapus — terlihat, bukan tersirat dari berkas yang terbuka. */}
-            <div data-testid="ide-entry-target" style={{ flex: "0 0 auto", padding: "6px 14px", fontSize: 12,
-              color: "var(--text-muted)", borderBottom: "1px solid var(--border-hair)" }}>
-              {treeSel
-                ? <>Target ganti nama &amp; hapus: <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-strong)" }}>
-                    {treeSel.kind === "dir" ? `${treeSel.path}/` : treeSel.path}</span></>
-                : "Klik berkas atau folder di pohon untuk memilih target ganti nama atau hapus."}
-            </div>
-            <div data-testid="ide-tree-scroll"
-              onDragOver={(e) => { e.preventDefault(); setDropping(true); }}
-              onDragLeave={() => setDropping(false)}
-              onDrop={(e) => { e.preventDefault(); setDropping(false);
-                void readDroppedEntries(e.dataTransfer).then((list) => runUpload(list)); }}
-              style={{ padding: 8, flex: "1 1 auto", minHeight: 0, overflow: "auto",
-                outline: dropping ? "2px dashed var(--brass-500)" : "none", outlineOffset: -4 }}>
-              <ChangedSection label="Staged" changed={status?.staged ?? []}
-                selected={selKind === "staged" ? selected : ""} onSelect={selectStaged}
-                view={stagedView} onView={setStagedView} emptyText="Tak ada file staged." />
-              <div style={{ borderTop: "1px solid var(--border-hair)", margin: "6px 0" }} />
-              <ChangedSection label="Changed" changed={status?.unstaged ?? []}
-                selected={selKind === "unstaged" ? selected : ""} onSelect={selectChanged}
-                view={changedView} onView={setChangedView} emptyText="Tak ada file berubah." />
-              <div className="hn-eyebrow" style={{ padding: "6px 8px", marginTop: 8, borderTop: "1px solid var(--border-hair)" }}>
-                Berkas · {viewRef || "working tree"}
-              </div>
-              {treeState === "loading" ? <StateBlock kind="loading" compact title="Memuat file…" />
-                : treeState === "error" ? <StateBlock kind="error" compact title="Gagal memuat file" action={() => reloadTree()} />
-                : files.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Tak ada file" />
-                : (
-                  <TreeRoot label="Pohon berkas" nodes={fileTree}>
-                    {fileTree.map((n) => (
-                      <TreeRow key={n.path} node={n} selected={selKind === "file" ? selected : ""}
-                        onSelect={pickTreeFile} dirSelected={dirSel} onSelectDir={pickTreeDir}
-                        ignored={ignored} onExpand={hidden ? expandDir : undefined} />
-                    ))}
-                  </TreeRoot>
-                )}
-            </div>
-          </Card>
-            ) },
-            { id: "viewer", label: "Isi", className: "hn-panel-flex", content: (
-          <Card padding={0} fill>
-            <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border-hair)", flexWrap: "wrap" }}>
-              <Icon name="file-text" size={15} color="var(--text-muted)" />
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--text-strong)" }}>{selected || "—"}</span>
-              {!inDiff && file?.truncated && <Badge tone="warn" size="sm">terpotong</Badge>}
-              {inDiff && diff?.status && <Badge tone={diff.status === "D" ? "err" : diff.status === "A" ? "ok" : "brass"} size="sm">{diff.status}</Badge>}
-              <span style={{ flex: 1 }} />
-              {inDiff
-                ? <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {/* SPEC-385 · pane diff dulu hanya bisa membaca .md sebagai <pre> mentah */}
-                    {previewSrc && (
-                      <Button size="sm" variant="secondary" leftIcon="book-open"
-                        onClick={() => setPreview(true)}>Preview lebar</Button>
-                    )}
-                    <div style={{ display: "flex", gap: 2, background: "var(--bone-100)", borderRadius: "var(--radius-pill)", padding: 2 }}>
-                      {(["diff", "source"] as const).map((t) => (
-                        <button key={t} onClick={() => setDiffTab(t)} style={{
-                          padding: "4px 12px", border: "none", cursor: "pointer", borderRadius: "var(--radius-pill)",
-                          fontSize: 12, textTransform: "capitalize",
-                          background: diffTab === t ? "var(--surface-card)" : "transparent",
-                          color: diffTab === t ? "var(--text-strong)" : "var(--text-muted)", fontWeight: diffTab === t ? 600 : 400,
-                        }}>{t}</button>
-                      ))}
-                    </div>
-                  </div>
-                : mode === "view"
-                  ? <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {/* SPEC-240 · toggle Preview | Source hanya untuk .md */}
-                      {file && !file.binary && isMarkdownPath(selected) && (
-                        <div style={{ display: "flex", gap: 2, background: "var(--bone-100)", borderRadius: "var(--radius-pill)", padding: 2 }}>
-                          {(["preview", "source"] as const).map((t) => (
-                            <button key={t} onClick={() => setMdView(t)} style={{
-                              padding: "4px 12px", border: "none", cursor: "pointer", borderRadius: "var(--radius-pill)",
-                              fontSize: 12,
-                              background: mdView === t ? "var(--surface-card)" : "transparent",
-                              color: mdView === t ? "var(--text-strong)" : "var(--text-muted)", fontWeight: mdView === t ? 600 : 400,
-                            }}>{t === "preview" ? "Preview" : "Source"}</button>
-                          ))}
-                        </div>
-                      )}
-                      {/* SPEC-385 · toggle di atas hanya memakai sisa lebar di samping tree;
-                          tombol ini membuka dokumen yang sama di ruang baca lebar */}
-                      {previewSrc && (
-                        <Button size="sm" variant="secondary" leftIcon="book-open"
-                          onClick={() => setPreview(true)}>Preview lebar</Button>
-                      )}
-                      {/* SPEC-361 · unduh berkas teks yang sedang dibuka (biner tak ditawari) */}
-                      <DocDownload href={(f) => api.ideFileDownloadUrl(projectId, selected, viewRef, f)}
-                        disabled={!file || file.binary} />
-                      {/* Edit hanya untuk working tree: isi ref lain tak boleh ditimpa draft-nya. */}
-                      <Button size="sm" variant="secondary" leftIcon="pencil" onClick={startEdit}
-                        disabled={!file || file.binary || !!viewRef}
-                        title={viewRef ? "Edit hanya di working tree — pilih working tree dulu" : undefined}>Edit</Button>
-                    </div>
-                  : <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {dirty && <Badge tone="warn" size="sm">belum disimpan</Badge>}
-                      <Button size="sm" variant="ghost" onClick={cancelEdit}>Batal</Button>
-                      <Button size="sm" leftIcon="check" onClick={() => void save()}>Simpan</Button>
-                    </div>}
-            </div>
-            <div data-testid="doc-preview-scroll" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
-              {inDiff
-                ? (!selected ? <StateBlock kind="empty" icon="file-text" title="Pilih file dari Staged/Changed" />
-                    : diff === null ? (viewErr
-                        ? <StateBlock kind="error" title="Diff belum bisa dibuka" hint={viewErr} action={() => setViewNonce((n) => n + 1)} />
-                        : <StateBlock kind="loading" title="Memuat…" hint={selected} />)
-                    : diff.binary ? <StateBlock kind="empty" icon="file" title="Berkas biner" hint={selected} />
-                    : diffTab === "diff" ? <div style={{ padding: "10px 0" }}><DiffView diff={diff.diff ?? ""} />
-                        {diff.truncated && <div style={{ padding: "8px 12px", fontSize: 11, color: "var(--text-subtle)" }}>… dipotong pada 256 KB.</div>}</div>
-                    : diff.content === null ? <StateBlock kind="empty" icon="trash-2" title="File dihapus" hint="Tak ada isi untuk ditampilkan." />
-                    : <pre style={{ margin: 0, padding: "12px 16px", fontFamily: "var(--font-mono)", fontSize: 12.5,
-                        lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", color: "var(--text-body)" }}>{diff.content}</pre>)
-                : (!selected ? <StateBlock kind="empty" icon="file-text" title="Pilih file dari pohon di kiri" />
-                    : file === null ? (viewErr
-                        ? <StateBlock kind="error" title="Berkas belum bisa dibuka" hint={viewErr} action={() => setViewNonce((n) => n + 1)} />
-                        : <StateBlock kind="loading" title="Memuat…" hint={selected} />)
-                    : file.binary ? <StateBlock kind="empty" icon="file" title="File biner" hint={selected} />
-                    : mode === "edit"
-                      /* placeholder-exempt: isi berkas apa pun bahasanya — tak ada satu contoh yang benar lintas .ts/.json/.sh */
-                      ? <textarea aria-label={`Isi ${baseName(selected)}`} value={draft} spellCheck={false}
-                          onChange={(e) => setDraft(e.target.value)}
-                          onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void save(); } }}
-                          /* Outline fokus TIDAK dihapus: pengguna keyboard harus melihat di mana ia mengetik. */
-                          style={{
-                          width: "100%", minHeight: "clamp(240px, 50dvh, 560px)", boxSizing: "border-box", resize: "vertical", border: "none",
-                          padding: "16px 18px", fontFamily: "var(--font-mono)", fontSize: 12.5,
-                          lineHeight: 1.7, color: "var(--text-body)", background: "var(--surface-card)" }} />
-                      : isMarkdownPath(selected) && mdView === "preview"
-                        ? <div style={{ padding: "16px 20px" }}><MarkdownView text={file.content ?? ""} name={selected} /></div>
-                        : <pre style={{ margin: 0, padding: "16px 18px", overflow: "auto" }}>
-                            <code className="hljs" style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, lineHeight: 1.7 }}
-                              dangerouslySetInnerHTML={{ __html: highlighted }} />
-                          </pre>)}
-            </div>
-          </Card>
-            ) },
-          ]}
-        />
-      ) : tab === "graph" ? (
-        <GitGraph projectId={projectId} onRunGit={runGit} onMerge={mergeGraph}
-          onRebase={(onto) => graphIsolated("rebase", onto)} onPull={(src) => graphIsolated("pull", src)} onDrop={(sha) => graphIsolated("drop", sha)}
-          onToast={onToast}
-          onOpenFile={(p, ref) => whenClean(() => { setViewRef(ref); setSelKind("file"); setSelected(p); setPanel("viewer"); setTab("explorer"); })} />
-      ) : tab === "branches" ? (
-        /* SPEC-360 · ADR-0077 · bersihkan branch yang sudah ter-merge ke branch utamanya. */
-        <BranchesPanel projectId={projectId}
-          onOpenWorktree={(path) => { setWtFocus(path.split("/").pop() ?? ""); setTab("worktrees"); }} />
-      ) : (
-        /* SPEC-861 · ADR-0132 · worktree yang masih hidup + hapus worktree & branch-nya sekaligus. */
-        <WorktreesPanel projectId={projectId} focus={wtFocus} onOpenBranch={() => setTab("branches")} />
-      )}
+      {tab === "perubahan" ? changesBody
+        : tab === "riwayat" ? (
+          <GitGraph projectId={projectId} onRunGit={runGit} onMerge={mergeGraph}
+            onRebase={(onto) => graphIsolated("rebase", onto)} onPull={(src) => graphIsolated("pull", src)} onDrop={(sha) => graphIsolated("drop", sha)}
+            onToast={onToast}
+            onOpenFile={(p, ref) => whenClean(() => { setViewRef(ref); setSelKind("file"); setSelected(p); setPanel("viewer"); setTab("berkas"); })}
+            onOpenCabang={() => setTab("cabang")} />
+        ) : tab === "cabang" ? <CabangPanel projectId={projectId} />
+        : filesBody}
 
-      {preview && previewSrc && (
-        <DocPreviewModal path={selected} text={previewSrc.text} eyebrow={viewRef || status?.branch || projectId}
+      {previewSrc && preview && (
+        <DocPreviewModal path={previewPath} text={previewSrc.text} eyebrow={viewRef || status?.branch || projectId}
           download={previewSrc.download} onClose={() => setPreview(false)} />
       )}
       {nameDialog && (
@@ -692,13 +781,17 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
             <Button size="sm" leftIcon="alert-triangle"
               onClick={() => { const f = conflict.files; setConflict(null); void runUpload(f, true); }}>Timpa semua</Button>
           </>}>
-          <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 10 }}>
+          <div className="hn-ide-muted-line">
             Berkas berikut dilewati supaya perubahan yang belum di-commit tak hilang.
           </div>
-          <pre style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 12, maxHeight: 220, overflow: "auto" }}>
+          <pre className="hn-ide-conflict-list">
             {conflict.files.map((f) => underDir(f.path)).join("\n")}
           </pre>
         </Modal>
+      )}
+      {treeMenu && (
+        <Menu x={treeMenu.x} y={treeMenu.y} returnFocus={treeMenu.anchor} onClose={() => setTreeMenu(null)}
+          items={treeMenuItems({ path: treeMenu.path, kind: treeMenu.kind })} />
       )}
       {/* ADR-0121 · folder menuntut nama diketik ulang (requireText): penghapusannya rekursif dan
           yang belum di-commit tak bisa dipulihkan. Dialog DS lewat useConfirm (requestDelete). */}

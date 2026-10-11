@@ -1,125 +1,81 @@
-/* ProjectsScreen — multi-project monitor. Kolom "trigger" hilang bersama subsistem
-   trigger; yang berjalan adalah sesi claude di tmux (SPEC-162).
+/* ProjectsScreen — daftar project sebagai RowList yang diurut berdasar perhatian.
 
-   Audit 2026-10: (1) galat memuat daftar tampil sebagai blok error + "Coba lagi", tak lagi
-   menyamar sebagai daftar kosong, dan data lama tak ditimpa diam-diam; (2) empty state dibedakan
-   per sebab — pencarian, filter, halaman habis, belum ada project; (3) enum `kind` dan istilah
-   jargon dipetakan ke bahasa Indonesia biasa; (4) hapus dipindah dari baris ke menu ⋯ dan ke
-   layar detail; (5) tabel memakai semantik role=table/row/columnheader/cell. */
+   Audit 2026-10 (Fase 1): galat memuat tampil sebagai blok error + "Coba lagi" (bukan empty state);
+   empty state dibedakan per sebab (pencarian, halaman habis, filter perangkat, belum ada project).
+   Redesign 3P (Projects · daftar): StatStrip dibuang. Hitungannya pindah ke chip filter
+   (Semua · Perlu perhatian · Sesi berjalan). Kolom ringkas: Project · Status · Dokumen ·
+   Backlog terbuka. "Perlu perhatian" (dokumen drift/rusak) diurut paling atas.
+
+   Sumber data: daftar penuh `projects` (App memuat seluruh project) dipakai untuk tampilan default
+   dan untuk hitungan chip, sehingga urutan dan chip konsisten. Pencarian dan filter perangkat tetap
+   lewat API (SPEC-198/SPEC-880); di mode itu urutan berlaku per halaman yang dimuat. */
 import React from "react";
-import { Card, StatusPill, Badge, ProgressBar, Icon, OverflowActions, Select, StateBlock, Button, serverPage, Pager,
-  LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE } from "../ds";
+import { StatusPill, ProgressBar, OverflowActions, Select, StateBlock, Button, serverPage, Pager,
+  RowList, DenseRow, LIST_SCROLL_STYLE, LIST_SCREEN_STYLE, FIXED_ROW_STYLE } from "../ds";
 import { api } from "../api/client";
-import { usePersistedState, useScrollRestore, useResetOnChange, isNum, isStr } from "../ui-state";
-import { HandledByChips } from "./HandledByChips";
+import { usePersistedState, useScrollRestore, useResetOnChange, isNum, isStr, oneOf } from "../ui-state";
 import { PresenceChip } from "./PresenceChip";
 import type { DeviceTokenView } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 import { errorMessage } from "../lib/report-error";
 import { PROJECT_KIND_LABEL, labelOf } from "../lib/labels";
+import "./styles/projects.css";
 
 /** Enum `ProjectKind` → label Indonesia (lib/labels.ts). Nilai yang tak dikenal dirapikan, bukan mentah. */
 export const KIND_LABEL = PROJECT_KIND_LABEL;
 export const kindLabel = (kind: string): string => labelOf(PROJECT_KIND_LABEL, kind);
 
-function hnCovTone(s: string) { return s === "broken" ? "err" : s === "drift" ? "warn" : "ok"; }
-function hnAttention(p: ProjectVM): "high" | "low" | "none" {
-  if (p.docStatus === "broken") return "high";
-  if (p.docStatus === "drift") return "low";
-  return "none";
-}
-const HN_ATT: Record<string, { bar: string; tint: string; text: string }> = {
-  high: { bar: "var(--clay-500)", tint: "var(--clay-100)", text: "var(--clay-600)" },
-  low: { bar: "var(--amber-500)", tint: "var(--amber-100)", text: "var(--status-warn)" },
+type Chip = "all" | "attention" | "running";
+const CHIP_LABEL: Record<Chip, string> = { all: "Semua", attention: "Perlu perhatian", running: "Sesi berjalan" };
+const CHIP_ORDER: Chip[] = ["all", "attention", "running"];
+
+/** Dokumen yang drift atau rusak butuh perhatian operator. */
+export const needsAttention = (p: ProjectVM): boolean => p.docStatus !== "ok";
+export const isRunning = (p: ProjectVM): boolean => p.session.status === "running";
+const CHIP_MATCH: Record<Chip, (p: ProjectVM) => boolean> = {
+  all: () => true, attention: needsAttention, running: isRunning,
 };
 
-function StatStrip({ projects }: { projects: ProjectVM[] }) {
-  const activeRuns = projects.filter((p) => p.session.status === "running").length;
-  const backlog = projects.reduce((n, p) => n + p.backlog, 0);
-  const onConv = projects.filter((p) => p.docStatus === "ok").length;
-  const attention = projects.filter((p) => hnAttention(p) === "high").length;
-  const stats = [
-    { label: "Sesi berjalan", value: activeRuns, dot: "var(--brass-500)" },
-    { label: "Total item di backlog", value: backlog, dot: "var(--wind-600)" },
-    { label: "Dokumen sesuai", value: onConv + "/" + projects.length, dot: "var(--leaf-600)" },
-    { label: "Perlu perhatian", value: attention, dot: "var(--clay-600)" },
-  ];
-  return (
-    <div className="hn-stat-grid" style={{
-      display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1,
-      background: "var(--border-hair)", border: "1px solid var(--border-hair)",
-      borderRadius: "var(--radius-lg)", overflow: "hidden", marginBottom: 20,
-    }}>
-      {stats.map((s) => (
-        <div key={s.label} style={{ background: "var(--surface-card)", padding: "15px 18px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.dot }} />
-            <span style={{ fontFamily: "var(--font-display)", fontSize: 27, fontWeight: 600, color: "var(--text-strong)", lineHeight: 1 }}>{s.value}</span>
-          </div>
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>{s.label}</div>
-        </div>
-      ))}
-    </div>
-  );
+/** Rank perhatian: rusak (0) → drift (1) → sisanya (2). Sort JS stabil: urutan asal dijaga dalam rank. */
+export function attentionRank(p: ProjectVM): number {
+  if (p.docStatus === "broken") return 0;
+  if (p.docStatus === "drift") return 1;
+  return 2;
 }
+export const sortByAttention = (list: ProjectVM[]): ProjectVM[] =>
+  [...list].sort((a, b) => attentionRank(a) - attentionRank(b));
+
+function hnCovTone(s: string) { return s === "broken" ? "err" : s === "drift" ? "warn" : "ok"; }
 
 function ProjectRow({ p, onOpen, onDelete, presenceOn }:
   { p: ProjectVM; onOpen?: (p: ProjectVM) => void; onDelete?: (p: ProjectVM) => void;
     presenceOn?: string[] }) {
-  const att = hnAttention(p);
-  const running = p.session.status === "running";
-  const [hover, setHover] = React.useState(false);
+  const running = isRunning(p);
+  // Hapus bukan aksi baris utama: ia ada di menu ⋯ (dan di zona bahaya layar detail).
+  const actions = onDelete ? (
+    <OverflowActions label={`Aksi untuk project ${p.name}`} icon="ellipsis" items={[
+      { key: "delete", label: "Hapus project…", icon: "trash-2", tone: "danger", onSelect: () => onDelete(p) },
+    ]} />
+  ) : undefined;
   return (
-    <div
-      role="row"
-      className="hn-project-row"
-      onClick={onOpen ? () => onOpen(p) : undefined}
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{
-        display: "grid", gridTemplateColumns: "1.6fr 1fr 1.2fr 0.9fr 1.3fr 1.2fr",
-        alignItems: "center", gap: 12, padding: "11px 14px 11px 12px",
-        borderBottom: "1px solid var(--border-hair)",
-        borderLeft: `3px solid ${att === "none" ? "transparent" : HN_ATT[att]!.bar}`,
-        cursor: onOpen ? "pointer" : "default",
-        background: hover && onOpen ? "var(--bone-100)" : "transparent",
-        transition: "background 120ms ease",
-      }}>
-      <div role="cell" data-label="Project" style={{ minWidth: 0 }}>
-        <button type="button" className="hn-project-open" aria-label={`Buka project ${p.name}`} disabled={!onOpen}
-          onClick={(event) => { event.stopPropagation(); onOpen?.(p); }}
-          style={{ all: "unset", display: "block", width: "100%", cursor: onOpen ? "pointer" : "default" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-            <Icon name="box" size={13} color="var(--text-muted)" />
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)" }}>{p.name}</span>
-            <Badge tone={p.kind === "from-scratch" ? "brass" : "neutral"} size="sm">{kindLabel(p.kind)}</Badge>
-          </span>
-          <span style={{ display: "block", fontSize: 12, color: "var(--text-subtle)", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.desc}</span>
-        </button>
-      </div>
-      <div role="cell" data-label="Status" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, minWidth: 0 }}>
+    <DenseRow onClick={onOpen ? () => onOpen(p) : undefined} actions={actions}>
+      <span className="hn-prj-main">
+        <span className="hn-prj-name">{p.name}</span>
+        {/* Jenis project sebagai teks, bukan lencana: lencana per baris dibatasi dua (status + LIVE). */}
+        <span className="hn-prj-desc">{kindLabel(p.kind)}{p.desc ? ` · ${p.desc}` : ""}</span>
+      </span>
+      {/* Status + penanda LIVE lintas device (SPEC-919 · ADR-0147). Dua penanda per baris, tak lebih. */}
+      <span className="hn-prj-status">
         <StatusPill status={p.session.status} size="sm">{running && p.session.phase ? p.session.phase : undefined}</StatusPill>
-        {/* SPEC-919 · ADR-0147 · penanda LIVE lintas device — beda dari "Ditangani oleh" (ADR-0135)
-            yang penetapan MANUAL dan menyeberang sync. */}
         <PresenceChip names={presenceOn} />
-      </div>
-      <div role="cell" data-label="Dokumen" style={{ paddingRight: 8 }}><ProgressBar value={p.coverage} showLabel tone={hnCovTone(p.docStatus)} size="sm" /></div>
-      <div role="cell" data-label="Backlog" style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)" }}>{p.backlog} · {p.topStage}</div>
-      {/* SPEC-880 · ADR-0135 · penanda "ditangani oleh" — DISYNC, beda dari repoDir/binding. */}
-      <div role="cell" data-label="Ditangani oleh" style={{ minWidth: 0 }}><HandledByChips list={p.handledBy} /></div>
-      <div role="cell" data-label="Aktivitas" style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-subtle)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between" }}>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.activity}</span>
-        {/* Hapus bukan aksi baris: ia ada di menu ⋯ dan di layar detail. Wrapper stopPropagation
-            menutup klik di dalam menu (Modal ikut merambat lewat pohon React ke baris). */}
-        {onDelete && (
-          <span onClick={(e) => e.stopPropagation()}>
-            <OverflowActions label={`Aksi untuk project ${p.name}`} icon="ellipsis" items={[
-              { key: "delete", label: "Hapus project…", icon: "trash-2", onSelect: () => onDelete(p) },
-            ]} />
-          </span>
-        )}
-        {onOpen && <Icon name="chevron-right" size={14} color="var(--text-subtle)" />}
-      </div>
-    </div>
+      </span>
+      <span className="hn-prj-docs">
+        <ProgressBar value={p.coverage} showLabel tone={hnCovTone(p.docStatus)} size="sm" />
+      </span>
+      <span className="hn-prj-backlog">
+        <span className="hn-prj-num">{p.backlog}</span> terbuka
+      </span>
+    </DenseRow>
   );
 }
 
@@ -128,52 +84,74 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
     onDelete?: (p: ProjectVM) => void; pageSize?: number;
     search?: string; dataVersion?: number; onClearSearch?: () => void;
     presenceByProject?: Map<string, string[]> }) {
-  const cols = ["Project", "Status", "Dokumen", "Backlog", "Ditangani oleh", "Aktivitas"];
-  const tmpl = "1.6fr 1fr 1.2fr 0.9fr 1.3fr 1.2fr";
-  // SPEC-198 · search + paginasi via API. StatStrip tetap dari `projects` PENUH (statistik global).
-  // Baris = potongan server; seed dari prop utk render instan + tahan mock parsial di test.
-  const [rows, setRows] = React.useState<ProjectVM[]>(projects);
-  const [total, setTotal] = React.useState(projects.length);
-  // Audit 2026-10 · galat & muat ulang. `listError` = muat terakhir gagal; baris lama TETAP ada
-  // di `rows` (tak ditimpa kosong), dan `reloadKey` memicu muat ulang lewat "Coba lagi".
-  const [listError, setListError] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(false);
-  const [reloadKey, setReloadKey] = React.useState(0);
-  // SPEC-740 · ADR-0115 · nomor halaman & posisi scroll bertahan; `pageSize` tetap prop.
+  // SPEC-740 · ADR-0115 · nomor halaman, chip, dan posisi scroll bertahan.
   const [page, setPage] = usePersistedState("projects", "page", 1, isNum);
-  const listRef = useScrollRestore("projects", "scroll", rows.length > 0);
-  // SPEC-880 · ADR-0135 · katalog device instance ini. `[]` = instance ini bukan pemegang katalog
-  // (client) → filter tak punya arti di sini dan tak dirender. Panggilan opsional (`?.`) supaya
-  // test/mock lama yang cuma menyediakan `listProjects` tak jatuh.
+  const [chip, setChip] = usePersistedState<Chip>("projects", "chip", "all", oneOf<Chip>(...CHIP_ORDER));
+  // SPEC-880 · ADR-0135 · katalog device instance ini. `[]` = instance ini bukan pemegang katalog.
   const [devices, setDevices] = React.useState<DeviceTokenView[]>([]);
   const [handledBy, setHandledBy] = usePersistedState("projects", "handledBy", "", isStr);
   React.useEffect(() => {
     let alive = true;
-    // Katalog perangkat hanya memandu filter opsional: gagal memuatnya = filter tak ditawarkan,
-    // persis seperti instance tanpa katalog. Tak ada daftar project yang bergantung padanya.
+    // Katalog perangkat hanya memandu filter opsional: gagal memuatnya = filter tak ditawarkan.
     api.listDeviceTokens?.()
       .then((list) => { if (alive) setDevices(list); })
-      .catch(() => { /* filter opsional — lihat komentar di atas */ });
+      .catch(() => { if (alive) setDevices([]); });
     return () => { alive = false; };
   }, []);
-  // AC-15 · ganti pencarian/penyaring = kembali ke halaman 1, TAPI tidak saat mount: `page`
-  // ikut dipersistensi (SPEC-740 · ADR-0115).
-  useResetOnChange(JSON.stringify([search, handledBy]), () => setPage(1));
+
+  // Dua sumber data. Tampilan "Semua" tanpa filter perangkat memakai API (SPEC-198: galat, muat
+  // ulang, dan paginasi Fase 1). Chip aktif memakai daftar penuh dari App, supaya hitungan chip
+  // dan hasilnya selalu sama. Tanpa `pageSize` (pemakaian non-paginasi) daftar penuh dipakai apa adanya.
+  const clientMode = !pageSize || (chip !== "all" && !handledBy);
+  const serverMode = !clientMode;
+
+  // Seed dari prop penuh supaya baris tampil seketika; muatan server menggantinya begitu tiba (Fase 1).
+  const [serverRows, setServerRows] = React.useState<ProjectVM[]>(projects);
+  const [serverTotal, setServerTotal] = React.useState(projects.length);
+  // Audit 2026-10 · galat & muat ulang. Baris lama TETAP ada saat muat ulang gagal.
+  const [listError, setListError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [reloadKey, setReloadKey] = React.useState(0);
+
+  // AC-15 · ganti pencarian/penyaring/chip = kembali ke halaman 1, TAPI tidak saat mount.
+  useResetOnChange(JSON.stringify([search, handledBy, chip]), () => setPage(1));
   React.useEffect(() => {
-    if (!pageSize) { setRows(projects); setTotal(projects.length); setListError(null); return; }
+    if (!serverMode) { setListError(null); setLoading(false); return; }
     let alive = true;
     const p = api.listProjects?.({ q: search || undefined, handledBy: handledBy || undefined, page, limit: pageSize });
     if (!p) return;
     setLoading(true);
     p.then((r) => {
         if (!alive) return;
-        setRows(r.items as ProjectVM[]); setTotal(r.total); setListError(null);
+        setServerRows(r.items as ProjectVM[]); setServerTotal(r.total); setListError(null);
       })
       .catch((e: unknown) => { if (alive) setListError(errorMessage(e, "tidak diketahui")); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [search, handledBy, page, pageSize, dataVersion, projects, reloadKey]);
+  }, [serverMode, search, handledBy, page, pageSize, dataVersion, projects, reloadKey]);
+
+  const counts: Record<Chip, number> = {
+    all: projects.length,
+    attention: projects.filter(needsAttention).length,
+    running: projects.filter(isRunning).length,
+  };
+  const chipFilter = CHIP_MATCH[chip];
+
+  // Mode klien: seluruh daftar, dipangkas chip (dan pencarian nama bila ada), diurut perhatian,
+  // lalu dipaginasi di sini. Mode server: urutan perhatian berlaku pada halaman yang dimuat.
+  const needle = search.trim().toLowerCase();
+  const clientFiltered = sortByAttention(projects.filter((p) => chipFilter(p)
+    && (!pageSize || !needle || `${p.name} ${p.desc ?? ""}`.toLowerCase().includes(needle))));
+  const clientTotal = clientFiltered.length;
+  const clientPage = pageSize ? clientFiltered.slice((page - 1) * pageSize, page * pageSize) : clientFiltered;
+  const rows = serverMode ? sortByAttention(serverRows.filter(chipFilter)) : clientPage;
+  const total = serverMode ? serverTotal : clientTotal;
   const sp = serverPage(total, page, pageSize || total || 1);
+  // Pemulihan scroll hanya setelah baris ada (SPEC-740): kalau tidak, posisi lama hilang saat kosong.
+  const listRef = useScrollRestore("projects", "scroll", rows.length > 0);
+
+  // Daftar perangkat untuk filter: hanya bila instance ini memegang katalog (lihat komentar di atas).
+  const deviceOptions = devices.filter((d) => !d.revokedAt);
 
   const emptyBlock = (() => {
     if (loading && rows.length === 0) return <StateBlock kind="loading" title="Memuat daftar project…" />;
@@ -187,8 +165,12 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
         hint="Coba kata kunci lain, atau kosongkan pencarian."
         action={onClearSearch} actionLabel="Hapus pencarian" actionIcon="x" />
     );
-    // Halaman habis: total masih ada, tetapi halaman yang diminta kosong (mis. item terakhir
-    // di halaman ini sudah dihapus dari tempat lain). Jalan keluarnya kembali ke halaman 1.
+    if (chip !== "all" && projects.length > 0) return (
+      <StateBlock kind="empty" icon="filter" compact title={`Tak ada project “${CHIP_LABEL[chip].toLowerCase()}”`}
+        hint="Semua project sudah dalam keadaan sesuai untuk filter ini."
+        action={() => setChip("all")} actionLabel="Tampilkan semua" actionIcon="x" />
+    );
+    // Halaman habis: total masih ada, tetapi halaman yang diminta kosong.
     if (page > 1 && total > 0) return (
       <StateBlock kind="empty" icon="filter" compact title="Halaman ini sudah kosong"
         hint="Daftar berubah sejak halaman ini dibuka."
@@ -205,44 +187,42 @@ export function ProjectsScreen({ projects, onOpen, onDelete, pageSize, search = 
 
   return (
     <div style={LIST_SCREEN_STYLE}>
-      <div style={FIXED_ROW_STYLE}>
-        <StatStrip projects={projects} />
-        {/* SPEC-880 · disembunyikan di instance tanpa katalog device: pilihan yang tak bisa diisi
-            lebih buruk daripada tak ada pilihan. Device dicabut tak ditawarkan sebagai pilihan
-            BARU, tapi nilai tersimpan tetap tampil sebagai chip di barisnya. */}
-        {devices.some((d) => !d.revokedAt) && (
-          <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-            <span className="hn-eyebrow">Ditangani oleh</span>
-            <Select aria-label="Saring per perangkat" value={handledBy} style={{ minWidth: 180 }}
+      <div style={FIXED_ROW_STYLE} className="hn-prj-toolbar">
+        <div role="group" aria-label="Saring project" className="hn-prj-chips">
+          {CHIP_ORDER.map((c) => (
+            <button key={c} type="button" className="hn-prj-chip hn-touch-target" aria-pressed={chip === c}
+              onClick={() => setChip(c)}>
+              {CHIP_LABEL[c]}
+              <span className="hn-prj-chip-count">{counts[c]}</span>
+            </button>
+          ))}
+        </div>
+        {/* SPEC-880 · disembunyikan di instance tanpa katalog device. Nilai tersimpan tetap tampil. */}
+        {deviceOptions.length > 0 && (
+          <div className="hn-prj-device">
+            <Select aria-label="Saring per perangkat" value={handledBy} size="sm"
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setHandledBy(e.target.value)}
               options={[{ value: "", label: "Semua perangkat" },
-                ...devices.filter((d) => !d.revokedAt).map((d) => ({ value: d.id, label: d.name }))]} />
+                ...deviceOptions.map((d) => ({ value: d.id, label: d.name }))]} />
           </div>
         )}
       </div>
       {emptyBlock ?? (
-        <Card padding={0} fill>
+        <div className="hn-prj-list">
           {listError && (
-            <div role="alert" style={{ ...FIXED_ROW_STYLE, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
-              padding: "10px 14px", borderBottom: "1px solid var(--border-hair)", background: "var(--status-err-tint)",
-              fontSize: 12.5, color: "var(--text-body)" }}>
-              <span style={{ flex: 1, minWidth: 0 }}>Gagal memuat ulang — yang tampil adalah data terakhir yang berhasil dimuat.</span>
+            <div role="alert" className="hn-prj-stale">
+              <span className="hn-prj-stale-text">Gagal memuat ulang — yang tampil adalah data terakhir yang berhasil dimuat.</span>
               <Button size="sm" variant="secondary" leftIcon="rotate-ccw" onClick={() => setReloadKey((k) => k + 1)}>Coba lagi</Button>
             </div>
           )}
-          {/* Semantik tabel: header & baris membawa role sendiri, sehingga pembaca layar
-              mengumumkan kolom untuk tiap sel. Pemisah grup (rowgroup) membungkus baris saja. */}
-          <div role="table" aria-label="Daftar project" style={{ display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: 0 }}>
-            <div role="row" className="hn-project-header" style={{ ...FIXED_ROW_STYLE, display: "grid", gridTemplateColumns: tmpl, gap: 12, padding: "10px 14px 10px 15px", borderBottom: "1px solid var(--border-hair)" }}>
-              {cols.map((c) => <span role="columnheader" key={c} className="hn-eyebrow">{c}</span>)}
-            </div>
-            <div role="rowgroup" ref={listRef} data-testid="projects-scroll" style={LIST_SCROLL_STYLE}>
+          <div ref={listRef} data-testid="projects-scroll" style={LIST_SCROLL_STYLE}>
+            <RowList label="Daftar project">
               {rows.map((p) => <ProjectRow key={p.id} p={p} onOpen={onOpen} onDelete={onDelete}
                 presenceOn={presenceByProject?.get(p.id)} />)}
-            </div>
+            </RowList>
           </div>
           {pageSize && <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to} onPage={setPage} unit="project" />}
-        </Card>
+        </div>
       )}
     </div>
   );

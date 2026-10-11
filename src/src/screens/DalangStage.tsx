@@ -1,5 +1,7 @@
-/* DalangStage — hero Overview: Anoman sebagai DALANG yang mengendalikan wayang project.
-   Konsep: tiap sesi `claude` hidup = satu wayang yang sedang dimainkan di kelir
+/* DalangStage — panggung dalang: Anoman sebagai DALANG yang mengendalikan wayang project.
+   Audit UI/UX 2026-10 · Fase 3B: hero ini TAK LAGI dirender Overview ("Hari ini" memakai daftar
+   baris). Komponennya dipertahankan dan dipakai layar Dalang lewat `WayangSilhouette` (ikon 20–24px)
+   serta helper `isToday`/label di sini. Konsep: tiap sesi `claude` hidup = satu wayang yang sedang dimainkan di kelir
    (panel gelap terminal + rim brass); project tanpa sesi hidup = wayang parkir di debog.
    Referensi visual: internal/assets/concepts/dalang/ (ADR-0140 pipeline Codex).
    Sumber "hidup"-nya `sessions` (siaran WS `t:"sessions"`), BUKAN `ProjectView.session` —
@@ -34,7 +36,7 @@ export function isToday(iso: string | null | undefined): boolean {
 /* Siluet wayang kulit generik (bukan Anoman — Anoman-nya sang dalang): kepala profil +
    sumping, badan ramping, kain melebar, satu lengan ber-gapit. Digambar sekali, diwarnai
    lewat `fill`/`stroke` dari token pemanggil. */
-function WayangSilhouette({ height, color, rod }: { height: number; color: string; rod: string }) {
+export function WayangSilhouette({ height, color, rod }: { height: number; color: string; rod: string }) {
   return (
     <svg viewBox="0 0 64 128" width={(height * 64) / 128} height={height} aria-hidden="true" focusable="false">
       {/* gapit utama — tulang pegang dalang */}

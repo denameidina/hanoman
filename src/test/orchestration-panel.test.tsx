@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
 import { OrchestrationPanel } from "../src/screens/OrchestrationPanel";
@@ -27,5 +27,24 @@ describe("OrchestrationPanel · flow nonaktif", () => {
     render(<OrchestrationPanel orchestration={ORCHESTRATION_DEFAULTS} onChange={vi.fn()} />);
     const table = within(screen.getByTestId("orch-flow-feature")).getByRole("table");
     expect(table.closest(".hn-local-overflow")).not.toBeNull();
+  });
+});
+
+// Fase 3I · varian `accordion` (hub Otonom · Setelan): satu baris per flow yang bisa dibuka. Varian
+// default (kartu, dipakai Settings) tak boleh berubah.
+describe("OrchestrationPanel · varian accordion", () => {
+  it("tiap flow tertutup secara default dan dibuka lewat tombolnya", () => {
+    render(<OrchestrationPanel variant="accordion" orchestration={ORCHESTRATION_DEFAULTS} onChange={vi.fn()} />);
+    const head = within(screen.getByTestId("orch-flow-feature")).getByRole("button", { expanded: false });
+    expect(screen.queryByRole("switch", { name: "Orkestrasi feature" })).not.toBeInTheDocument();
+    fireEvent.click(head);
+    expect(head).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("switch", { name: "Orkestrasi feature" })).toBeInTheDocument();
+  });
+
+  it("varian default tetap kartu: tak ada baris yang bisa dibuka", () => {
+    render(<OrchestrationPanel orchestration={ORCHESTRATION_DEFAULTS} onChange={vi.fn()} />);
+    expect(within(screen.getByTestId("orch-flow-feature")).queryByRole("button", { expanded: false })).not.toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Orkestrasi feature" })).toBeInTheDocument();
   });
 });

@@ -65,7 +65,7 @@ describe("SettingsScreen · simpan dari tab basi (S5)", () => {
       .mockResolvedValueOnce(settings("claude-sonnet-5") as any)   // snapshot saat mount (basi)
       .mockResolvedValue(settings("sonnet") as any);               // DB sesudah seed alias
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: "Sesi" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sesi harian" }));
     fireEvent.click(await screen.findByRole("switch", { name: "Mode goal default" }));
     await waitFor(() => expect(api.putSettings).toHaveBeenCalled());
     expect(api.putSettings).toHaveBeenLastCalledWith(expect.objectContaining({

@@ -62,17 +62,39 @@ describe("ClientAccessPanel (SPEC-617)", () => {
     await waitFor(() => expect(api.updateClientAccount).toHaveBeenCalledWith("u1", { projects: ["p1", "p2"] }));
   });
 
-  // Hapus akun tak boleh terjadi dengan satu klik: dialog menyebut dampaknya dulu.
+  // Hapus akun tak boleh terjadi dengan satu klik: ia ada di menu ⋯, dan dialognya menyebut dampaknya dulu.
   it("menghapus akun hanya setelah dikonfirmasi lewat dialog yang menyebut dampaknya", async () => {
     render(<ClientAccessPanel />);
     await screen.findByText("klien@x.co");
-    fireEvent.click(screen.getByRole("button", { name: /^hapus$/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Aksi lain untuk klien@x.co" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Hapus akun" }));
     expect(api.deleteClientAccount).not.toHaveBeenCalled();
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/tak bisa dibatalkan/i)).toBeInTheDocument();
     expect(within(dialog).getByText(/1 project yang diberikan/i)).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Hapus akun" }));
     await waitFor(() => expect(api.deleteClientAccount).toHaveBeenCalledWith("u1"));
+  });
+
+  // Cabut akses: akun tetap ada, daftar project-nya dikosongkan, dan harus dikonfirmasi dulu.
+  it("cabut akses mengosongkan project akun hanya setelah dikonfirmasi", async () => {
+    vi.mocked(api.updateClientAccount).mockClear();
+    render(<ClientAccessPanel />);
+    await screen.findByText("klien@x.co");
+    fireEvent.click(screen.getByRole("button", { name: "Cabut akses" }));
+    expect(api.updateClientAccount).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/tak bisa lagi melihat project mana pun/i)).toBeInTheDocument();
+    expect(within(dialog).getByText("1 project dicabut dari akun ini.")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cabut akses" }));
+    await waitFor(() => expect(api.updateClientAccount).toHaveBeenCalledWith("u1", { projects: [] }));
+  });
+
+  it("cabut akses nonaktif bila akun tak punya project", async () => {
+    (api.listClientAccounts as any).mockResolvedValue({ items: [{ ...ACCOUNT, projects: [] }] });
+    render(<ClientAccessPanel />);
+    await screen.findByText("klien@x.co");
+    expect(screen.getByRole("button", { name: "Cabut akses" })).toBeDisabled();
   });
 
   it("gagal memuat akun tampil sebagai galat dengan Coba lagi, bukan 'Belum ada akun'", async () => {

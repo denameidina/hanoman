@@ -1,0 +1,157 @@
+/* Lead · kotak masuk operator (Audit UI/UX 2026-10 · Fase 3F).
+   Dua kolom di desktop (utama: menunggu kamu + riwayat; samping: kendali, project, pengaturan).
+   Satu kolom di bawah 1200px. Sentuh ≥44px pada pointer kasar. */
+
+.hn-lead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+.hn-lead-summary {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--text-strong);
+  font-weight: 500;
+}
+.hn-lead-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+@media (min-width: 1200px) {
+  .hn-lead-layout { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); }
+}
+.hn-lead-main,
+.hn-lead-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.hn-lead-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.hn-lead-h {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.hn-lead-hint { margin: 0; font-size: var(--text-xs); color: var(--text-muted); }
+
+/* Menunggu kamu: satu kartu per sesi. */
+.hn-lead-waits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.hn-lead-wait {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+}
+.hn-lead-wait-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.hn-lead-wait-title { flex: 1 1 auto; min-width: 0; font-size: var(--text-sm); font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
+.hn-lead-wait-question { margin: 0; font-size: var(--text-sm); color: var(--text-body); white-space: pre-wrap; }
+.hn-lead-options { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.hn-lead-options-multi { display: flex; flex-direction: column; gap: var(--space-1); }
+.hn-lead-wait-foot { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-2); }
+.hn-lead-note { margin: 0; font-size: var(--text-xs); color: var(--text-muted); }
+
+/* Riwayat: satu timeline dengan chip filter. */
+.hn-lead-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.hn-lead-chip {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+.hn-lead-chip:hover { background: var(--surface-sunken); color: var(--text-strong); }
+.hn-lead-chip[aria-pressed="true"] {
+  background: var(--brass-050);
+  border-color: var(--brass-600);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.hn-lead-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.hn-lead-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  min-width: 0;
+}
+.hn-lead-item-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.hn-lead-item-time { margin-left: auto; font-size: var(--text-xs); color: var(--text-muted); }
+.hn-lead-item-question { font-size: var(--text-sm); color: var(--text-subtle); white-space: pre-wrap; }
+.hn-lead-item-answer { font-size: var(--text-sm); color: var(--text-strong); font-weight: 500; white-space: pre-wrap; }
+.hn-lead-item-reason { font-size: var(--text-xs); color: var(--text-subtle); white-space: pre-wrap; }
+.hn-lead-item-meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font-size: var(--text-xs); color: var(--text-muted); }
+.hn-lead-item-foot { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); justify-content: space-between; }
+.hn-lead-refs { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.hn-lead-ref {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+  padding: 1px var(--space-2);
+}
+.hn-lead-change {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--border-hair);
+}
+.hn-lead-change-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.hn-lead-change-row .hn-lead-change-input { flex: 1 1 200px; min-width: 0; }
+
+.hn-lead-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* Kendali & lipatan samping. */
+.hn-lead-mode { display: flex; flex-direction: column; gap: var(--space-2); }
+.hn-lead-disclosure { border-top: 1px solid var(--border-hair); padding-top: var(--space-2); }
+.hn-lead-disclosure > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.hn-lead-disclosure[open] > summary { margin-bottom: var(--space-2); }
+.hn-lead-project-name { flex: 1 1 160px; min-width: 0; font-size: var(--text-sm); font-weight: 500; color: var(--text-strong); }
+.hn-lead-project-meta { font-size: var(--text-xs); color: var(--text-muted); }
+.hn-lead-settings { display: flex; flex-direction: column; gap: var(--space-3); }
+.hn-lead-settings-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+@media (min-width: 560px) {
+  .hn-lead-settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-lead-chip { min-height: 44px; }
+}

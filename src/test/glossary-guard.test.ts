@@ -96,10 +96,6 @@ const shown = files.flatMap((f) => shownTexts(f, readFileSync(f, "utf8")));
  */
 export const ALLOWLIST: { file: string; fragment: string; reason: string }[] = [
   // UTANG Fase 3 — copy di layar yang belum diredesain. Daftar lengkap ada di glossary.md.
-  { file: "src/src/screens/AutoMergeCard.tsx", fragment: "setelan basi",
-    reason: "UTANG Fase 3 (Backlog · auto-merge): 'basi' sebagai status; ganti kalimat dengan keadaan konkret." },
-  { file: "src/src/screens/DocsWorkspace.tsx", fragment: "Cakupan SoT",
-    reason: "UTANG Fase 3 (Docs): eyebrow memakai singkatan SoT; ganti dengan 'Cakupan dokumen'." },
   { file: "src/src/screens/LogsPanel.tsx", fragment: "Device",
     reason: "UTANG Fase 3 (Klien · log): aria-label 'Device' belum diganti 'Perangkat'; dibaca pembaca layar." },
   { file: "src/src/screens/PhasePlanPreview.tsx", fragment: "Pratinjau ini memakai Setting hub ini",
@@ -112,8 +108,6 @@ export const ALLOWLIST: { file: string; fragment: string; reason: string }[] = [
     reason: "UTANG Fase 3 (Konflik sinkron): 'Hub' sebagai nama server pusat; belum ada keputusan istilah." },
   { file: "src/src/screens/ReconcileModal.tsx", fragment: "di hub akan diganti dengan data",
     reason: "UTANG Fase 3 (Konflik sinkron): 'hub' di kalimat konfirmasi; belum ada keputusan istilah." },
-  { file: "src/src/screens/SettingsScreen.tsx", fragment: "SoT, ADR, plan, kode, riwayat git",
-    reason: "UTANG Fase 3 (Settings · lead): jargon SoT di kalimat bantuan; ganti 'dokumen proyek'." },
   { file: "src/src/screens/SyncButton.tsx", fragment: "Instance ini hub",
     reason: "UTANG Fase 3 (Sinkronisasi): 'hub' sebagai nama server pusat; belum ada keputusan istilah." },
   { file: "src/src/screens/SyncButton.tsx", fragment: "menyeberang ke hub pada sync berikutnya",

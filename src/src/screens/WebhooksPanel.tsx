@@ -155,9 +155,11 @@ export function WebhooksPanel({ onToast, onOpenDocs }:
           <Button size="sm" onClick={() => { setDraft({ ...EMPTY }); setSecretOnce(null); }}>
             <Icon name="plus" size={14} /> Tambah endpoint
           </Button>
-          <Button size="sm" variant="ghost" onClick={onOpenDocs}>
-            <Icon name="book-open" size={14} /> Dokumentasi webhook
-          </Button>
+          {onOpenDocs && (
+            <Button size="sm" variant="ghost" onClick={onOpenDocs}>
+              <Icon name="book-open" size={14} /> Dokumentasi webhook
+            </Button>
+          )}
         </div>
 
         {failed ? <StateBlock kind="error" compact title="Gagal memuat endpoint webhook"

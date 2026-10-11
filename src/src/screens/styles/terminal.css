@@ -1,0 +1,330 @@
+/* Terminal · Audit UI/UX 2026-10 · Fase 3E.
+   Toolbar ringkas, rail sesi, pane fokus, dan dock composer. Susunan lewat kelas; nilai dinamis
+   (ukuran font, track grid) tetap inline di TSX. Font dari skala token (--text-xs/sm). Kontrol
+   sentuh ≥ --touch-target pada pointer kasar. Diimpor oleh TerminalScreen.tsx (bukan app.css). */
+
+.hn-terminal-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.hn-terminal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Toggle Fokus | Grid: dua tombol bersegmen, status lewat aria-pressed. */
+.hn-terminal-seg {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.hn-terminal-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.hn-terminal-seg-btn + .hn-terminal-seg-btn {
+  border-left: 1px solid var(--border-hair);
+}
+
+.hn-terminal-seg-btn[aria-pressed="true"] {
+  background: var(--bone-200);
+  color: var(--text-strong);
+}
+
+.hn-terminal-seg-btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
+.hn-terminal-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.hn-terminal-status-warn {
+  color: var(--status-warn);
+}
+
+.hn-terminal-status-err {
+  color: var(--status-err);
+}
+
+/* Grid: baris chrome khusus grid (grup + tambah kolom/baris). */
+.hn-terminal-grid-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Mode fokus: rail di kiri, pane fokus di kanan. */
+.hn-terminal-focus {
+  display: flex;
+  gap: var(--space-3);
+  flex: 1 1 0;
+  min-height: 640px;
+  min-width: 0;
+}
+
+.hn-terminal-rail {
+  flex: 0 0 232px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  overflow: hidden;
+}
+
+.hn-terminal-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-hair);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.hn-terminal-rail-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.hn-terminal-rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.hn-terminal-rail-item {
+  border-bottom: 1px solid var(--border-hair);
+}
+
+.hn-terminal-rail-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-right: var(--space-1);
+}
+
+/* Pita tepi kiri = tone status (warna hanya untuk status, aturan minimalis #7). */
+.hn-terminal-rail-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+
+.hn-terminal-rail-row[data-tone="attention"]::before { background: var(--amber-600); }
+.hn-terminal-rail-row[data-tone="failed"]::before { background: var(--clay-600); }
+
+.hn-terminal-rail-row.is-focused {
+  background: var(--bone-200);
+}
+
+.hn-terminal-rail-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--text-body);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.hn-terminal-rail-main:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
+.hn-terminal-rail-name {
+  max-width: 100%;
+  font-size: var(--text-sm);
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hn-terminal-rail-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.hn-terminal-rail-time {
+  color: var(--text-subtle);
+}
+
+/* Pane fokus: kepala ringkas, lalu banner/strip, badan terminal, dan dock di bawah. */
+.hn-terminal-focus-main {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  overflow: hidden;
+}
+
+.hn-terminal-focus-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-hair);
+  background: var(--bone-200);
+}
+
+.hn-terminal-focus-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hn-terminal-focus-body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.hn-terminal-focus-placeholder {
+  flex: 1 1 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Dock: composer (aksi utama) + papan tombol satu blok di bawah pane. */
+.hn-terminal-dock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+.hn-terminal-dock:empty {
+  display: none;
+}
+
+/* Pemicu rail di kepala pane: hanya tampil di mobile (rail jadi laci). */
+.hn-terminal-rail-toggle {
+  display: none;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--text-strong);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hn-terminal-rail-toggle:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Isi menu "Buka…": baris aksi memakai kelas overflow item DS (app.css) dalam satu kolom. */
+.hn-terminal-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Mobile (<768px): rail jadi laci (Modal) dan pane memakai seluruh lebar. */
+@media (max-width: 767px) {
+  .hn-terminal-focus {
+    min-height: 0;
+    gap: 0;
+  }
+
+  .hn-terminal-rail {
+    display: none;
+  }
+
+  .hn-terminal-rail-toggle {
+    display: inline-flex;
+  }
+
+  .hn-terminal-focus-main {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .hn-terminal-focus-head {
+    background: transparent;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* Pointer kasar: setiap kontrol sentuh minimal --touch-target (44px). */
+@media (pointer: coarse) {
+  .hn-terminal-seg-btn,
+  .hn-terminal-rail-main,
+  .hn-terminal-rail-toggle {
+    min-height: var(--touch-target);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hn-terminal-rail-main,
+  .hn-terminal-seg-btn {
+    transition: none;
+  }
+}

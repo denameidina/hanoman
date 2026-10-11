@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, within } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 const PROJECT = {
@@ -65,7 +65,9 @@ describe("detail project (SPEC-146)", () => {
     await act(async () => { await Promise.resolve(); });
     fireEvent.click(screen.getAllByText("Projects")[0]!);
     fireEvent.click(screen.getAllByText("arta")[0]!);
-    fireEvent.click(await screen.findByText("Buka terminal"));
+    // Pintu kerja (redesign 3P): Backlog · Terminal · Dokumen, masing-masing satu tombol besar.
+    const doors = within(await screen.findByRole("region", { name: "Pintu kerja" }));
+    fireEvent.click(doors.getByRole("button", { name: /^Terminal\b/ }));
     expect(await screen.findByText("Belum ada sesi terminal")).toBeInTheDocument();
   });
 });

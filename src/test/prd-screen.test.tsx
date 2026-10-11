@@ -60,7 +60,7 @@ describe("PrdScreen", () => {
     fireEvent.click(screen.getByText("Jadwal Invoice"));
     await waitFor(() => expect(api.getPrd).toHaveBeenCalledWith("p1", "docs/prd/jadwal-invoice.md"));
     // SPEC-407 · tombolnya kini pemilih brief/goal — jalur brief adalah perilaku lama.
-    fireEvent.click(await screen.findByRole("button", { name: /take ke backlog/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /jadikan backlog/i }));
     fireEvent.click(await screen.findByText("Sebagai feature brief"));
     expect(onTake).toHaveBeenCalledWith(expect.objectContaining({
       project: "p1", title: "Jadwal Invoice", prdPath: "docs/prd/jadwal-invoice.md",
@@ -103,7 +103,7 @@ describe("PrdScreen", () => {
     expect(await screen.findByText("Jadwal Invoice")).toBeTruthy();
     expect(screen.getByText("Auth Device")).toBeTruthy();
     // header grup per project (di sidebar, bukan opsi dropdown yang juga bernama "Proyek B")
-    const list = screen.getByLabelText("Daftar PRD");
+    const list = screen.getByLabelText("Indeks PRD");
     expect(within(list).getByText("Proyek B")).toBeTruthy();
   });
 
@@ -112,7 +112,7 @@ describe("PrdScreen", () => {
     render(<PrdScreen projects={projects} {...base} projectFilter="all" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={onTake} />);
     fireEvent.click(await screen.findByText("Auth Device"));
     await waitFor(() => expect(api.getPrd).toHaveBeenCalledWith("p2", "docs/prd/auth.md"));
-    fireEvent.click(await screen.findByRole("button", { name: /take ke backlog/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /jadikan backlog/i }));
     fireEvent.click(await screen.findByText("Sebagai feature brief"));   // SPEC-407 · lewat pemilih
     expect(onTake).toHaveBeenCalledWith(expect.objectContaining({ project: "p2", prdPath: "docs/prd/auth.md" }));
   });
@@ -122,6 +122,7 @@ describe("PrdScreen", () => {
     const onStart = vi.fn();
     render(<PrdScreen projects={projects} {...base} onStartBreakdown={onStart} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
     fireEvent.click(await screen.findByText("Jadwal Invoice"));
+    fireEvent.click(await screen.findByRole("button", { name: /jadikan backlog/i }));
     fireEvent.click(await screen.findByRole("button", { name: /breakdown ke backlog/i }));
     expect(onStart).toHaveBeenCalledWith("p1", "docs/prd/jadwal-invoice.md");
   });
@@ -134,11 +135,15 @@ describe("PrdScreen", () => {
     const onMat = vi.fn(async () => 2);
     render(<PrdScreen projects={projects} {...base} onMaterialize={onMat} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
     fireEvent.click(await screen.findByText("Jadwal Invoice"));
-    // panel review muncul + judul usulan
-    expect(await screen.findByText("Endpoint jadwal")).toBeTruthy();
-    expect(screen.getByText("UI daftar")).toBeTruthy();
+    // usulan tampil sebagai panel lipat di halaman (ringkasan, baca-saja)
+    expect(await screen.findByText("Usulan breakdown · 2 item")).toBeTruthy();
+    expect(screen.getByText("Endpoint jadwal")).toBeTruthy();
+    // checklist yang bisa dipilih ada di dalam sheet "Jadikan backlog"
+    fireEvent.click(await screen.findByRole("button", { name: /jadikan backlog/i }));
+    const sheet = within(await screen.findByRole("dialog"));
+    expect(sheet.getByText("UI daftar")).toBeTruthy();
     // materialize dua item
-    fireEvent.click(screen.getByRole("button", { name: /buat 2 backlog/i }));
+    fireEvent.click(sheet.getByRole("button", { name: /buat 2 backlog/i }));
     await waitFor(() => expect(onMat).toHaveBeenCalledWith("p1", "docs/prd/jadwal-invoice.md",
       expect.arrayContaining([expect.objectContaining({ title: "Endpoint jadwal" })])));
   });
@@ -150,10 +155,13 @@ describe("PrdScreen", () => {
   it("lencana status muncul dengan hitungan turunannya", async () => {
     render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
     await waitFor(() => expect(screen.getByText("Jadwal Invoice")).toBeTruthy());
-    const list = within(screen.getByLabelText("Daftar PRD"));
-    expect(list.getByText("Draf")).toBeTruthy();          // specCount 0 → tanpa hitungan
-    expect(list.getByText("Dieskalasi 1/3")).toBeTruthy();
-    expect(list.getByText("Terwujud 2/2")).toBeTruthy();
+    const list = within(screen.getByLabelText("Indeks PRD"));
+    // Status jadi judul grup (dengan jumlah); progres turunan tampil di tiap item.
+    expect(list.getByText(/^Draf/, { selector: "summary" })).toBeTruthy();
+    expect(list.getByText(/^Dieskalasi/, { selector: "summary" })).toBeTruthy();
+    expect(list.getByText(/^Terwujud/, { selector: "summary" })).toBeTruthy();
+    expect(list.getByText("1/3 item selesai ·", { exact: false })).toBeTruthy();
+    expect(list.getByText("2/2 item selesai ·", { exact: false })).toBeTruthy();
   });
 
   it("lencana sesi hidup tak lagi berbunyi 'draft hidup'", async () => {
@@ -163,24 +171,13 @@ describe("PrdScreen", () => {
     expect(screen.queryByText("draft hidup")).toBeNull();
   });
 
-  it("filter status menyempitkan daftar", async () => {
+  it("indeks dikelompokkan per status, urutan Draf → Dieskalasi → Terwujud, dan grup terbuka", async () => {
     render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
     await waitFor(() => expect(screen.getByText("Jadwal Invoice")).toBeTruthy());
-    fireEvent.change(screen.getByLabelText("Status PRD"), { target: { value: "draft" } });
-    await waitFor(() => expect(screen.queryByText("Notifikasi Realtime")).toBeNull());
-    expect(screen.getByText("Jadwal Invoice")).toBeTruthy();
-    expect(screen.queryByText("Arsip Dokumen")).toBeNull();
-  });
-
-  it("filter tanpa hasil memberi empty state yang menyebut statusnya", async () => {
-    (api.listPrds as any).mockResolvedValueOnce({ items: [
-      { slug: "jadwal-invoice", name: "jadwal-invoice.md", path: "docs/prd/jadwal-invoice.md", title: "Jadwal Invoice", live: false, projectId: "p1", projectName: "P1", status: "draft", specCount: 0, doneCount: 0 },
-    ] });
-    render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}} onNewPrd={() => {}} onTakeToBacklog={() => {}} />);
-    await waitFor(() => expect(screen.getByText("Jadwal Invoice")).toBeTruthy());
-    fireEvent.change(screen.getByLabelText("Status PRD"), { target: { value: "terwujud" } });
-    await waitFor(() => expect(screen.getByText(/berstatus .terwujud./i)).toBeTruthy());
-    expect(screen.queryByText("Jadwal Invoice")).toBeNull();
+    expect(screen.queryByLabelText("Status PRD")).toBeNull();   // select filter status dibuang
+    const groups = Array.from(screen.getByLabelText("Indeks PRD").querySelectorAll<HTMLDetailsElement>("details.hn-prd-group"));
+    expect(groups.map((g) => g.querySelector("summary")?.textContent?.replace(/\d+$/, ""))).toEqual(["Draf", "Dieskalasi", "Terwujud"]);
+    expect(groups.every((g) => g.open)).toBe(true);
   });
 });
 
@@ -191,7 +188,7 @@ describe("PRD → backlog: brief atau goal (SPEC-407)", () => {
     render(<PrdScreen projects={projects} {...base} projectFilter="p1" onProjectFilter={() => {}}
       onNewPrd={() => {}} onTakeToBacklog={onTake} />);
     fireEvent.click(await screen.findByText("Jadwal Invoice"));
-    fireEvent.click(await screen.findByText("Take ke backlog"));
+    fireEvent.click(await screen.findByRole("button", { name: /jadikan backlog/i }));
   };
 
   it("pilihan goal mem-prefill kind goal + branch PRD-nya", async () => {

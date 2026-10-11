@@ -22,9 +22,17 @@ import { usePersistedState, isStr, isBool, isNum } from "../ui-state";
 import { clampFontSize, shouldCollapseToTabs, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
   FONT_MIN, FONT_MAX, MIN_PANE_WIDTH } from "./terminal-chrome";
 import { chipAccessibleName, chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";
+import { RAIL_PILL, SessionRail, type RailItem } from "./TerminalRail";
+import { isTerminalView, railStartedMs, railStatus, resolveFocus, sortRail, type TerminalView } from "./terminal-rail";
+import { relativeTime } from "../lib/time-format";
+import "./styles/terminal.css";
 
 // Default prop bernilai literal `[]` baru tiap render akan mematahkan memo `Cell`.
 const NO_BACKLOG: SpecSlim[] = [];
+
+// Dialog per sesi (dokumen, integrasi) dipegang layar, bukan sel: rail, pane fokus, dan sel grid
+// memakai satu menu yang sama (Audit UI/UX 2026-10 · Fase 3E).
+type SessionDialogKind = "docs" | "integrate" | "sessIntegrate";
 
 export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BACKLOG, focusSession, startedSession, onStartedSessionHandled, onStartBacklog, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, sessions: sessionsProp, setSessions: setSessionsProp }: {
   userId?: string;
@@ -89,6 +97,19 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // SPEC-362 · riwayat sesi. State-nya sekadar boolean: modal baru dirender saat diminta, jadi
   // tak ada request riwayat maupun elemen tambahan selama operator tak membukanya.
   const [historyOpen, setHistoryOpen] = React.useState(false);
+  // Audit UI/UX 2026-10 · Fase 3E · mode tampilan. "focus" (rail + satu pane) adalah default; "grid"
+  // memakai workspace kanonik (ADR-0118) apa adanya. Pilihan disimpan per browser (ADR-0115), dan
+  // workspace server tak ikut berubah saat mode berpindah.
+  const [view, setView] = usePersistedState<TerminalView>("terminal", "view", "focus", isTerminalView);
+  const focusMode = view === "focus";
+  // Sesi di pane fokus. Lokal dan tak dipersist: sesinya bisa sudah lenyap saat layar dibuka lagi.
+  const [focusId, setFocusId] = React.useState<string | null>(null);
+  // Sesi yang plan-nya sudah tuntas, dari verdict pane (SPEC-433). Rail memakainya untuk "Selesai".
+  const [finishedIds, setFinishedIds] = React.useState<ReadonlySet<string>>(() => new Set());
+  // Fase milik sesi di pane fokus; sessionId dicocokkan saat dibaca supaya fase sesi lama tak bocor.
+  const [focusPhases, setFocusPhases] = React.useState<{ sessionId: string; phases: Phase[] } | null>(null);
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [sessionDialog, setSessionDialog] = React.useState<{ kind: SessionDialogKind; sessionId: string } | null>(null);
   const launchAdmission = useLaunchAdmission();
   // Tutup sesi hidup menghentikan agen: selalu lewat dialog aplikasi, bukan confirm native.
   const { confirm: confirmKill, dialog } = useConfirm();
@@ -123,6 +144,20 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   const [activeCell, setActiveCell] = React.useState(0);
   const [requestedSession, setRequestedSession] = React.useState<string | null>(null);
   const handledFocus = React.useRef<string | null>(null);
+  // Sesi yang baru dibuka/dideeplink menjadi fokus DAN ditempatkan di grid (mode grid tetap utuh).
+  const openSession = (id: string) => { setFocusId(id); setRequestedSession(id); };
+  const markFinished = React.useCallback((id: string, done: boolean) => {
+    setFinishedIds((prev) => {
+      if (prev.has(id) === done) return prev;
+      const next = new Set(prev);
+      if (done) next.add(id); else next.delete(id);
+      return next;
+    });
+  }, []);
+  // Urutan rail dan sesi fokus DIHITUNG dari `sessions`; tak disimpan. Sesi fokus yang lenyap jatuh
+  // ke baris pertama rail, jadi tak perlu efek pembersihan.
+  const ordered = React.useMemo(() => sortRail(sessions, finishedIds), [sessions, finishedIds]);
+  const focused = resolveFocus(ordered, focusId);
 
   const [sessionsLoaded, setSessionsLoaded] = React.useState(false);
   // Gagal memuat daftar tampil sebagai galat ber-"Coba lagi", bukan daftar kosong yang menyamar
@@ -173,6 +208,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
     setSessions((current) => current.some((session) => session.id === startedSession.id)
       ? current
       : [...current, { ...startedSession, cwd: "", exited: false }]);
+    setFocusId(startedSession.id);
     setRequestedSession(startedSession.id);
     onStartedSessionHandled?.();
   }, [onStartedSessionHandled, sessionsLoaded, startedSession]);
@@ -186,6 +222,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
     if (!sessionsLoaded || handledFocus.current === focusSession) return;
     if (!sessions.some((s) => s.id === focusSession && !s.exited)) return;
     handledFocus.current = focusSession;
+    // Notifikasi/palet yang menunjuk sesi = buka sesi itu di fokus (deep link tetap berlaku di kedua mode).
+    setFocusId(focusSession);
     setRequestedSession(focusSession);
   }, [focusSession, sessions, sessionsLoaded]);
 
@@ -229,7 +267,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
       ? s
       : [...s, { id, projectId: project, cwd: "", exited: false }]));
     void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, id));
-    setRequestedSession(id);
+    openSession(id);
   }
 
   // SPEC-236 · terminal biasa non-claude: shell mentah di repoDir project terpilih. Cermin
@@ -239,7 +277,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
     const { id } = await api.createShell(project);
     setSessions((s) => [...s, { id, projectId: project, cwd: "", exited: false }]);
     void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, id));
-    setRequestedSession(id);
+    openSession(id);
   }
 
   // SPEC-179 · ambil backlog item tanpa pindah page. Di App, aksi ini membuka StartSessionModal
@@ -259,7 +297,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         ? s
         : [...s, { id, projectId: spec.projectId, specId: spec.id, flow, cwd: "", exited: false }]);
       void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, id));
-      setRequestedSession(id);
+      openSession(id);
       setPicking(false);
       setPickError(null);
     } catch (e) {
@@ -302,7 +340,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         ? s
         : [...s, { id: born.id, projectId: r.projectId, specId: r.specId ?? undefined, cwd: "", exited: false }]));
       void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, born.id));
-      setRequestedSession(born.id);
+      openSession(born.id);
       setHistoryOpen(false);
     } catch (e) {
       if (r.specId || (r.kind !== "shell" && r.kind !== "terminal")) {
@@ -361,13 +399,14 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // tiap render layar. Isinya membaca `latest` saat dipanggil, jadi tak pernah basi.
   const current = {
     killSession, requestKill, detach: (id: string) => { void mutateWorkspace((c) => W.detach(c, id)); }, markExited, setFullId,
+    openDialog: (kind: SessionDialogKind, sessionId: string) => setSessionDialog({ kind, sessionId }),
     props: { onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf },
   };
   const latest = React.useRef(current);
   latest.current = current;
   const cellHandlers = React.useRef(new Map<string, {
     onClose: () => void; onForget: () => void; onDetach: () => void; onExit: (code: number) => void;
-    onFullscreen: () => void;
+    onFullscreen: () => void; onDialog: (kind: SessionDialogKind) => void;
   }>());
   const handlersFor = (id: string) => {
     let h = cellHandlers.current.get(id);
@@ -376,11 +415,36 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         onClose: () => void latest.current.requestKill(id), onForget: () => latest.current.killSession(id),
         onDetach: () => latest.current.detach(id),
         onExit: (code) => latest.current.markExited(id, code), onFullscreen: () => latest.current.setFullId(id),
+        onDialog: (kind) => latest.current.openDialog(kind, id),
       };
       cellHandlers.current.set(id, h);
     }
     return h;
   };
+  // Fase pane fokus: satu handler per sesi, stabil, supaya TerminalPane (memo) tak render ulang tiap kali.
+  const phaseHandlers = React.useRef(new Map<string, (phases: Phase[], done: boolean) => void>());
+  const phasesFor = (id: string) => {
+    let h = phaseHandlers.current.get(id);
+    if (!h) {
+      h = (phases, done) => {
+        setFocusPhases({ sessionId: id, phases });
+        markFinished(id, done);
+      };
+      phaseHandlers.current.set(id, h);
+    }
+    return h;
+  };
+  // Menu ⋯ satu sumber untuk sel grid, baris rail, dan kepala pane fokus (Audit UI/UX · Fase 3E).
+  const menuFor = (s: TerminalSession) => sessionMenuItems(s, {
+    label: cellLabel(s, nameOf, titleOf),
+    canArrange: workspaceWritable,
+    specOf, onReview: onOpenReview, onSessionReview: onOpenSessionReview,
+    onIntegrate, onIntegrateSession,
+    onDialog: handlersFor(s.id).onDialog,
+    onDetach: handlersFor(s.id).onDetach,
+    onFullscreen: handlersFor(s.id).onFullscreen,
+    onKill: () => void requestKill(s.id),
+  });
   const stableProps = React.useRef({
     onOpenReview: (specId: string) => latest.current.props.onOpenReview?.(specId),
     onOpenSessionReview: (sid: string, title: string) => latest.current.props.onOpenSessionReview?.(sid, title),
@@ -395,7 +459,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
     void mutateWorkspace((current) => W.placeInActive(current, idx, id));
   };
   const placeFirst = (id: string) => {
-    setRequestedSession(id);
+    openSession(id);
     void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, id));
   };
   const detach = (id: string) => { void mutateWorkspace((current) => W.detach(current, id)); };
@@ -511,20 +575,18 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           aria-label={`${predict ? "Matikan" : "Nyalakan"} ketik responsif`}
           onClick={() => setPredict((on) => !on)}>{predict ? "Matikan" : "Nyalakan"}</Button>
       </div>
-      <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span className="hn-grow" id="terminal-reset-grid-hint" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
-          Kembalikan grid ke 1 kolom × 1 baris (sesi lain pindah ke "belum di grid")
-        </span>
-        <Button size="sm" variant="secondary" aria-describedby="terminal-reset-grid-hint"
-          disabled={!workspaceWritable || (layout.cols === 1 && layout.rows === 1)}
-          onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, () => L.emptyLayout()))}>
-          Reset grid
-        </Button>
-      </div>
-      {singlePane && (
-        <Select size="sm" aria-label="Project sesi baru" value={project}
-          onChange={(e) => setProject(e.target.value)}
-          options={projects.map((p) => ({ value: p.id, label: p.name }))} />
+      {/* Reset grid hanya berarti sesuatu di mode grid. Pemilih project pindah ke "Sesi baru". */}
+      {!focusMode && (
+        <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="hn-grow" id="terminal-reset-grid-hint" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+            Kembalikan grid ke 1 kolom × 1 baris (sesi lain pindah ke "belum di grid")
+          </span>
+          <Button size="sm" variant="secondary" aria-describedby="terminal-reset-grid-hint"
+            disabled={!workspaceWritable || (layout.cols === 1 && layout.rows === 1)}
+            onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, () => L.emptyLayout()))}>
+            Reset grid
+          </Button>
+        </div>
       )}
       {/* Diagnostik menyimpan pengaturan yang hanya dipakai saat menyelidiki masalah ketik. Tertutup
           supaya kontrol harian tak tercampur dengannya; ia merekam setiap tombol yang ditekan. */}
@@ -544,11 +606,15 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
     </div>
   );
 
-  const toolbarItems: OverflowItem[] = [
+  // "Buka…" memuat semua cara membuka sesi selain "Sesi baru" (toolbar ≤ 6 kontrol, Fase 3E).
+  const openItems: OverflowItem[] = [
     { key: "backlog", label: "Ambil backlog", icon: "inbox",
       onSelect: () => { setPickError(null); setPicking(true); } },
     { key: "history", label: "Riwayat sesi", icon: "history", onSelect: () => setHistoryOpen(true) },
     { key: "shell", label: "Terminal biasa", icon: "terminal", onSelect: () => void openShell() },
+  ];
+  // Aksi susunan grid: di desktop tampil sebagai tombol di baris grup; di sempit masuk satu menu.
+  const gridItems: OverflowItem[] = [
     { key: "col+", label: "+ Kolom", icon: "columns-2", disabled: !workspaceWritable,
       onSelect: () => void mutateWorkspace((current) => W.mapActiveLayout(current, L.addColumn)) },
     { key: "row+", label: "+ Baris", icon: "rows-2", disabled: !workspaceWritable,
@@ -580,34 +646,37 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
 
   return (
     <div data-testid="terminal-root" style={rootStyle}>
-      {/* Saat maximize, tabbar & toolbar melebur jadi satu baris supaya ~110px chrome
-          kembali ke grid — itu inti permintaannya. */}
-      <div style={{ display: "flex", gap: 8,
-        flexDirection: maxed ? "row" : "column", alignItems: maxed ? "center" : "stretch" }}>
-        <GroupTabs
-          compact={maxed}
-          ws={ws}
-          writable={workspaceWritable}
-          onSelect={setActiveGroup}
-          onAdd={() => void mutateWorkspace((current) => W.addGroup(current, `Grup ${current.groups.length + 1}`))}
-          onRename={(id, name) => void mutateWorkspace((current) => W.renameGroup(current, id, name))}
-          onRemove={(id) => void mutateWorkspace((current) => W.removeGroup(current, id))}
-        />
+      {/* Toolbar ≤ 6 kontrol (aturan minimalis, Fase 3E): Sesi baru (primer) · Buka… · Fokus|Grid ·
+          Tampilan · Layar penuh. Susunan grid, grup, dan tray hidup di baris grid di bawahnya. */}
+      {/* group, bukan toolbar: pola toolbar ARIA menuntut navigasi panah yang tak dipasang di sini. */}
+      <div className="hn-terminal-toolbar" role="group" aria-label="Terminal">
+        {/* SPEC-517 · membuka form runtime dulu (agen · model · effort); sesinya lahir saat
+            "Buka sesi" ditekan, dengan pilihan itu sebagai argv pane tmux. */}
+        <Button size="sm" leftIcon="plus" title="Pilih runtime lalu buka sesi agen di direktori project. Agen berjalan dengan izin penuh (claude --dangerously-skip-permissions)."
+          onClick={() => setNewOpen(true)}>Sesi baru</Button>
+        <OpenMenu items={openItems} />
+        <div className="hn-terminal-seg" role="group" aria-label="Mode tampilan terminal">
+          <button type="button" className="hn-terminal-seg-btn" aria-pressed={focusMode}
+            title="Satu terminal fokus dengan daftar sesi di samping" onClick={() => setView("focus")}>
+            Fokus
+          </button>
+          <button type="button" className="hn-terminal-seg-btn" aria-pressed={!focusMode}
+            title="Beberapa terminal sekaligus dalam grid" onClick={() => setView("grid")}>
+            Grid
+          </button>
+        </div>
+        {/* SPEC-800 · kontrol tampilan (font, papan tombol, ketik responsif, diagnostik) ada di panel ini. */}
+        <OverflowActions label="Tampilan terminal" icon="sliders" items={[]}>{displayControls}</OverflowActions>
+        <IconButton size="sm" icon={maxed ? "minimize-2" : "maximize-2"}
+          label={maxed ? "Keluar layar penuh" : "Layar penuh"}
+          aria-pressed={maxed} onClick={() => setMaxed((m) => !m)} />
+      </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
-          ...(maxed ? { flex: 1, minWidth: 0 } : {}) }}>
-          {!singlePane && (
-            <>
-              <Button size="sm" variant="ghost" disabled={!workspaceWritable}
-                onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, L.addColumn))}>+ Kolom</Button>
-              <Button size="sm" variant="ghost" disabled={!workspaceWritable}
-                onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, L.addRow))}>+ Baris</Button>
-            </>
-          )}
-          <div style={{ flex: 1, minWidth: 0 }} />
+      {(workspaceStatus !== "ready" || cleanups.length > 0) && (
+        <div className="hn-terminal-status">
           {workspaceStatus !== "ready" && (
             <span data-testid="terminal-workspace-status" title={workspaceMessage ?? undefined}
-              style={{ fontSize: 12, color: workspaceStatus === "conflict" ? "var(--status-warn)" : "var(--text-muted)" }}>
+              className={workspaceStatus === "conflict" ? "hn-terminal-status-warn" : undefined}>
               {workspaceStatus === "loading"
                 ? "Memuat layout server…"
                 : workspaceStatus === "recovering"
@@ -619,39 +688,38 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           {cleanups.length > 0 && (
             <span data-testid="worktree-cleanups"
               title={cleanups.map((c) => `${c.sessionId}${c.error ? ` — ${c.error}` : ""}`).join("\n")}
-              style={{ fontSize: 12, color: failedCleanups.length ? "var(--status-err)" : "var(--text-muted)" }}>
+              className={failedCleanups.length ? "hn-terminal-status-err" : undefined}>
               {failedCleanups.length
                 ? `${failedCleanups.length} worktree gagal dibersihkan`
                 : `membersihkan ${cleanups.length} worktree…`}
             </span>
           )}
+        </div>
+      )}
+
+      {/* Baris grid: hanya di mode grid. Tabbar grup milik workspace kanonik, jadi tetap di sini. */}
+      {!focusMode && (
+        <div className="hn-terminal-grid-bar">
+          <GroupTabs
+            compact={maxed}
+            ws={ws}
+            writable={workspaceWritable}
+            onSelect={setActiveGroup}
+            onAdd={() => void mutateWorkspace((current) => W.addGroup(current, `Grup ${current.groups.length + 1}`))}
+            onRename={(id, name) => void mutateWorkspace((current) => W.renameGroup(current, id, name))}
+            onRemove={(id) => void mutateWorkspace((current) => W.removeGroup(current, id))}
+          />
           {!singlePane && (
             <>
-              <Select size="sm" value={project} onChange={(e) => setProject(e.target.value)}
-                options={projects.map((p) => ({ value: p.id, label: p.name }))} />
-              <Button size="sm" variant="ghost" leftIcon="inbox"
-                onClick={() => { setPickError(null); setPicking(true); }}>Ambil backlog</Button>
-              <Button size="sm" variant="ghost" leftIcon="history"
-                title="Riwayat sesi yang sudah berlalu — buka kembali atau baca transkripnya"
-                onClick={() => setHistoryOpen(true)}>Riwayat</Button>
-              <Button size="sm" variant="ghost" leftIcon="terminal"
-                title="Buka shell tmux tanpa Claude di project terpilih — jalankan command di project"
-                onClick={() => void openShell()}>Terminal biasa</Button>
+              <Button size="sm" variant="ghost" disabled={!workspaceWritable}
+                onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, L.addColumn))}>+ Kolom</Button>
+              <Button size="sm" variant="ghost" disabled={!workspaceWritable}
+                onClick={() => void mutateWorkspace((current) => W.mapActiveLayout(current, L.addRow))}>+ Baris</Button>
             </>
           )}
-          {/* SPEC-517 · membuka form runtime dulu (agen · model · effort); sesinya lahir saat
-              "Buka sesi" ditekan, dengan pilihan itu sebagai argv pane tmux. */}
-          <Button size="sm" leftIcon="plus" title="Pilih runtime lalu buka sesi agen di direktori project. Agen berjalan dengan izin penuh (claude --dangerously-skip-permissions)."
-            onClick={() => setNewOpen(true)}>Sesi baru</Button>
-          {/* SPEC-800 · di mobile & tablet-collapse aksi sekunder pindah ke satu panel supaya pane
-              mendapat ruang layar terbesar; di grid penuh panel ini hanya memuat kontrol tampilan. */}
-          <OverflowActions label={singlePane ? "Aksi terminal lain" : "Tampilan terminal"}
-            items={singlePane ? toolbarItems : []}>{displayControls}</OverflowActions>
-          <IconButton size="sm" icon={maxed ? "minimize-2" : "maximize-2"}
-            label={maxed ? "Keluar layar penuh" : "Layar penuh"}
-            aria-pressed={maxed} onClick={() => setMaxed((m) => !m)} />
+          {singlePane && <OverflowActions label="Atur grid" icon="sliders" items={gridItems} />}
         </div>
-      </div>
+      )}
 
       {listError && (
         <Callout tone="err" title="Daftar sesi belum bisa dimuat" style={{ marginBottom: 8 }}>
@@ -661,7 +729,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         </Callout>
       )}
 
-      {unplaced.length > 0 && (
+      {!focusMode && unplaced.length > 0 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>Belum di grid:</span>
           {unplaced.map((s) => (
@@ -682,7 +750,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         </div>
       )}
 
-      {singlePane && !showEmpty && (
+      {!focusMode && singlePane && !showEmpty && (
         <div className="hn-stack-mobile" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Tabs aria-label="Panel terminal" variant="pill" value={String(activeCell)}
             onChange={(next) => setActiveCell(Number(next))}
@@ -691,7 +759,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         </div>
       )}
 
-      {showEmpty ? (
+      {!focusMode && (showEmpty ? (
         // Saat daftar gagal dimuat, "Belum ada sesi" akan berbohong: galat di atas yang bicara.
         // Tanpa `action`: toolbar di atas sudah menawarkan "Sesi baru".
         listError ? null : (
@@ -768,6 +836,29 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
               );
             }))}
         </div>
+      ))}
+
+      {focusMode && (
+        <FocusView
+          sessionCount={sessions.length} focused={focused} mobile={mobile}
+          railItems={ordered.map((s) => ({
+            session: s,
+            label: cellLabel(s, nameOf, titleOf),
+            status: railStatus(s, finishedIds.has(s.id)),
+            startedMs: railStartedMs(s),
+          }))}
+          listError={!!listError}
+          menuFor={menuFor}
+          onFocus={setFocusId}
+          drawerOpen={drawerOpen}
+          onDrawer={setDrawerOpen}
+          fullId={fullId}
+          focusPhases={focusPhases}
+          paneHandlers={(id) => ({
+            onExit: handlersFor(id).onExit, onPhases: phasesFor(id), onForget: handlersFor(id).onForget,
+          })}
+          fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
+        />
       )}
 
       {picking && (
@@ -777,6 +868,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
 
       {newOpen && (
         <NewTerminalModal open projectId={project} projectName={nameOf(project)}
+          projects={projects} onProjectChange={setProject}
           onClose={() => setNewOpen(false)} onCreated={placeNew} />
       )}
 
@@ -785,6 +877,12 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           onRestart={(r) => void restartFromHistory(r)} />
       )}
       {launchAdmission.dialog}
+
+      {sessionDialog && byId(sessionDialog.sessionId) && (
+        <SessionDialogs kind={sessionDialog.kind} session={byId(sessionDialog.sessionId)!}
+          specOf={specOf} onIntegrate={onIntegrate} onIntegrateSession={onIntegrateSession}
+          onClose={() => setSessionDialog(null)} />
+      )}
 
       {fullId && byId(fullId) && (
         <FullscreenTerminal session={byId(fullId)!}
@@ -1179,9 +1277,11 @@ export function PhaseStrip({ phases, compact = false, now }: {
 
 const Cell = React.memo(CellImpl);
 
-function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen, paneHidden }: {
+function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, fullscreen, onFullscreen, onDialog, paneHidden }: {
   session: TerminalSession; nameOf: (pid: string) => string;
   onClose: () => void; onForget: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
+  // Dialog dokumen/integrasi dipegang layar (satu tempat untuk sel, rail, dan pane fokus).
+  onDialog: (kind: SessionDialogKind) => void;
   onReview?: (specId: string) => void;
   onSessionReview?: (sessionId: string, title: string) => void;
   titleOf?: (specId: string) => string | undefined;
@@ -1213,13 +1313,6 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
   // bisa dibaca di sisi yang memegang worktree-nya.
   const [complete, setComplete] = React.useState(false);
   const onPhases = React.useCallback((p: Phase[], done: boolean) => { setPhases(p); setComplete(done); }, []);
-  const [docs, setDocs] = React.useState(false);
-  const [integrate, setIntegrate] = React.useState(false);
-  const [sessIntegrate, setSessIntegrate] = React.useState(false);
-  // SPEC-175 · spec dari specId untuk aksi rebase/merge di header.
-  const spec = session.specId ? specOf?.(session.specId) : undefined;
-  // SPEC-230 · sesi project-level ber-branch (PRD) tanpa Spec: review + integrate ber-skop sesi.
-  const branchSession = !session.specId && !!session.branch;
   const label = cellLabel(session, nameOf, titleOf);
   // SPEC-196 · sesi yang berhenti menunggu keputusan manusia (marker) belum `exited` — beri
   // pembeda sendiri. `exited` menang bila keduanya benar (proses sudah beku).
@@ -1246,40 +1339,12 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
   // Aksi sekunder dikumpulkan di satu menu ⋯ dengan label teks (audit UI/UX). Ikon-saja di header sel
   // yang sempit tak terbaca, dan tak punya nama bagi pembaca layar. "Tutup" tetap di luar menu: ia
   // satu-satunya aksi yang menghentikan agen, jadi ia berdiri sendiri dan dikonfirmasi.
-  const menuItems: OverflowItem[] = [
-    ...(session.specId ? [{
-      key: "docs", label: "Lihat dokumen", icon: "file-text",
-      title: "Lihat dokumen (audit/spec/plan)", onSelect: () => setDocs(true),
-    }] : []),
-    ...(session.specId && onReview ? [{
-      key: "review", label: "Review perubahan", icon: "git-compare",
-      title: "Review perubahan (diff worktree)", onSelect: () => onReview(session.specId!),
-    }] : []),
-    // SPEC-230 · review diff worktree sesi project-level (PRD, tanpa Spec).
-    ...(branchSession && onSessionReview ? [{
-      key: "review-session", label: "Review perubahan", icon: "git-compare",
-      title: "Review perubahan (diff worktree sesi)", onSelect: () => onSessionReview(session.id, label),
-    }] : []),
-    // SPEC-175 · rebase/merge branch hasil spec (muncul hanya bila spec-nya dikenal).
-    ...(spec && onIntegrate ? [{
-      key: "integrate", label: "Rebase / Merge branch", icon: "git-merge",
-      title: "Rebase / Merge branch spec", onSelect: () => setIntegrate(true),
-    }] : []),
-    // SPEC-230 · rebase/merge branch sesi project-level (PRD prd/<slug>).
-    ...(branchSession && onIntegrateSession ? [{
-      key: "integrate-session", label: "Rebase / Merge branch", icon: "git-merge",
-      title: "Rebase / Merge branch sesi", onSelect: () => setSessIntegrate(true),
-    }] : []),
-    {
-      key: "detach", label: "Lepas dari grid", icon: "unlink", disabled: !canArrange,
-      title: "Lepas dari grid (sesi tetap hidup)", onSelect: onDetach,
-    },
-    // SPEC-232 · lihat SATU terminal ini secara penuh dalam modal.
-    {
-      key: "fullscreen", label: "Layar penuh", icon: "fullscreen",
-      title: "Layar penuh — fokus 1 terminal", onSelect: onFullscreen,
-    },
-  ];
+  // Menu ⋯ sel grid: satu sumber dengan rail dan pane fokus (sessionMenuItems). Sel grid tetap
+  // memegang tombol × sendiri, jadi menunya tak memuat "Tutup".
+  const menuItems = sessionMenuItems(session, {
+    label, canArrange, specOf, onReview, onSessionReview, onIntegrate, onIntegrateSession,
+    onDialog, onDetach, onFullscreen,
+  });
   return (
     <>
       <div className="hn-terminal-cell-header" style={{
@@ -1347,19 +1412,202 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
                 onForget={onForget} label={cellLabel(session, nameOf, titleOf)} />}
         </div>
       </div>
-      {docs && session.specId && <SpecDocsModal specId={session.specId} onClose={() => setDocs(false)} />}
-      {integrate && spec && onIntegrate && (
-        <IntegrateDialog projectId={spec.projectId}
-          ownBranch={`hanoman/${spec.id.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`} eyebrow={spec.id}
-          onClose={() => setIntegrate(false)}
-          onIntegrate={(op, target) => { setIntegrate(false); onIntegrate(spec, op, target); }} />
-      )}
-      {sessIntegrate && branchSession && onIntegrateSession && (
-        <IntegrateDialog projectId={session.projectId} ownBranch={session.branch!} eyebrow={session.id.slice(0, 16)}
-          onClose={() => setSessIntegrate(false)}
-          onIntegrate={(op, target) => { setSessIntegrate(false); onIntegrateSession(session, op, target); }} />
+    </>
+  );
+}
+
+// Aksi sekunder satu sesi (Audit UI/UX 2026-10 · Fase 3E). Dipakai sel grid, baris rail, dan kepala
+// pane fokus. Urutan tetap: dokumen, review, integrasi, lepas, layar penuh, lalu tutup (destruktif;
+// "Tutup" selalu dikonfirmasi lewat `onKill` → requestKill). Dialog dokumen/integrasi dibuka lewat
+// `onDialog` supaya ia bertahan walau baris/sel yang membukanya lenyap (mis. drawer mobile).
+type SessionMenuCtx = {
+  label: string;
+  canArrange: boolean;
+  specOf?: (specId: string) => SpecSlim | undefined;
+  onReview?: (specId: string) => void;
+  onSessionReview?: (sessionId: string, title: string) => void;
+  onIntegrate?: (spec: SpecSlim, op: "merge" | "rebase", target: string) => void;
+  onIntegrateSession?: (session: TerminalSession, op: "merge" | "rebase", target: string) => void;
+  onDialog: (kind: SessionDialogKind) => void;
+  onDetach: () => void;
+  onFullscreen: () => void;
+  onKill?: () => void;
+};
+
+export function sessionMenuItems(s: TerminalSession, c: SessionMenuCtx): OverflowItem[] {
+  const items: OverflowItem[] = [];
+  const spec = s.specId ? c.specOf?.(s.specId) : undefined;
+  // SPEC-230 · sesi project-level ber-branch (PRD) tanpa Spec: review + integrate ber-skop sesi.
+  const branchSession = !s.specId && !!s.branch;
+  if (s.specId) {
+    items.push({ key: "docs", label: "Lihat dokumen", icon: "file-text",
+      title: "Lihat dokumen (audit/spec/plan)", onSelect: () => c.onDialog("docs") });
+  }
+  const specId = s.specId;
+  if (specId && c.onReview) {
+    const onReview = c.onReview;
+    items.push({ key: "review", label: "Review perubahan", icon: "git-compare",
+      title: "Review perubahan (diff worktree)", onSelect: () => onReview(specId) });
+  }
+  // SPEC-230 · review diff worktree sesi project-level (PRD, tanpa Spec).
+  if (branchSession && c.onSessionReview) {
+    const onSessionReview = c.onSessionReview;
+    items.push({ key: "review-session", label: "Review perubahan", icon: "git-compare",
+      title: "Review perubahan (diff worktree sesi)", onSelect: () => onSessionReview(s.id, c.label) });
+  }
+  // SPEC-175 · rebase/merge branch hasil spec (muncul hanya bila spec-nya dikenal).
+  if (spec && c.onIntegrate) {
+    items.push({ key: "integrate", label: "Rebase / Merge branch", icon: "git-merge",
+      title: "Rebase / Merge branch spec", onSelect: () => c.onDialog("integrate") });
+  }
+  // SPEC-230 · rebase/merge branch sesi project-level (PRD prd/<slug>).
+  if (branchSession && c.onIntegrateSession) {
+    items.push({ key: "integrate-session", label: "Rebase / Merge branch", icon: "git-merge",
+      title: "Rebase / Merge branch sesi", onSelect: () => c.onDialog("sessIntegrate") });
+  }
+  items.push({ key: "detach", label: "Lepas dari grid", icon: "unlink", disabled: !c.canArrange,
+    title: "Lepas dari grid (sesi tetap hidup)", onSelect: c.onDetach });
+  // SPEC-232 · lihat SATU terminal ini secara penuh dalam modal.
+  items.push({ key: "fullscreen", label: "Layar penuh", icon: "fullscreen",
+    title: "Layar penuh — fokus 1 terminal", onSelect: c.onFullscreen });
+  if (c.onKill) {
+    items.push({ key: "close", label: "Tutup sesi", icon: "square", tone: "danger",
+      title: "Tutup sesi (dikonfirmasi dulu)", onSelect: c.onKill });
+  }
+  return items;
+}
+
+// Dialog dokumen dan integrasi milik satu sesi, dirender layar. Tiap kondisi cocok dengan item menu
+// yang membukanya (sessionMenuItems), jadi dialog tak pernah terbuka untuk sesi yang tak mendukungnya.
+function SessionDialogs({ kind, session, specOf, onIntegrate, onIntegrateSession, onClose }: {
+  kind: SessionDialogKind; session: TerminalSession;
+  specOf?: (specId: string) => SpecSlim | undefined;
+  onIntegrate?: (spec: SpecSlim, op: "merge" | "rebase", target: string) => void;
+  onIntegrateSession?: (session: TerminalSession, op: "merge" | "rebase", target: string) => void;
+  onClose: () => void;
+}) {
+  if (kind === "docs") {
+    return session.specId ? <SpecDocsModal specId={session.specId} onClose={onClose} /> : null;
+  }
+  if (kind === "integrate") {
+    const spec = session.specId ? specOf?.(session.specId) : undefined;
+    if (!spec || !onIntegrate) return null;
+    return (
+      <IntegrateDialog projectId={spec.projectId}
+        ownBranch={`hanoman/${spec.id.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`} eyebrow={spec.id}
+        onClose={onClose}
+        onIntegrate={(op, target) => { onClose(); onIntegrate(spec, op, target); }} />
+    );
+  }
+  if (!session.branch || session.specId || !onIntegrateSession) return null;
+  return (
+    <IntegrateDialog projectId={session.projectId} ownBranch={session.branch} eyebrow={session.id.slice(0, 16)}
+      onClose={onClose}
+      onIntegrate={(op, target) => { onClose(); onIntegrateSession(session, op, target); }} />
+  );
+}
+
+// "Buka…": pemicu bertulisan untuk cara membuka sesi selain "Sesi baru". Panelnya Modal DS, sama
+// dengan menu ⋯ lain (fokus, Escape, sheet di mobile).
+function OpenMenu({ items }: { items: readonly OverflowItem[] }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <>
+      <Button size="sm" variant="ghost" aria-haspopup="dialog" aria-expanded={open}
+        onClick={() => setOpen(true)}>Buka…</Button>
+      {open && (
+        <Modal open title="Buka sesi" icon="terminal" width={420} onClose={() => setOpen(false)}>
+          <div className="hn-terminal-menu-list">
+            {items.map((item) => (
+              <button key={item.key} type="button" disabled={item.disabled} title={item.title}
+                className="hn-overflow-item"
+                onClick={() => { setOpen(false); item.onSelect(); }}>
+                {item.icon && <Icon name={item.icon} size={15} />}
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </Modal>
       )}
     </>
+  );
+}
+
+// Pane fokus (Audit UI/UX 2026-10 · Fase 3E): satu TerminalPane untuk sesi fokus, kepala ringkas
+// (nama, satu status, ⋯), banner Berakhir, strip fase, lalu composer di dock bawah. Rail di kiri
+// desktop; di mobile rail jadi laci. Hanya SATU pane yang dipasang, jadi satu sesi = satu attach tmux.
+type FocusViewProps = {
+  sessionCount: number;
+  focused: TerminalSession | null;
+  railItems: RailItem[];
+  mobile: boolean;
+  listError: boolean;
+  menuFor: (s: TerminalSession) => OverflowItem[];
+  onFocus: (id: string) => void;
+  drawerOpen: boolean;
+  onDrawer: (open: boolean) => void;
+  fullId: string | null;
+  focusPhases: { sessionId: string; phases: Phase[] } | null;
+  paneHandlers: (id: string) => { onExit: (code: number) => void; onPhases: (p: Phase[], done: boolean) => void; onForget: () => void };
+  fontSize: number; showKeys: boolean; predict: boolean; diag: boolean;
+};
+
+function FocusView({ sessionCount, focused, railItems, mobile, listError, menuFor, onFocus, drawerOpen, onDrawer,
+  fullId, focusPhases, paneHandlers, fontSize, showKeys, predict, diag }: FocusViewProps) {
+  const current = focused ? railItems.find((item) => item.session.id === focused.id) : undefined;
+  return (
+    <div className="hn-terminal-focus" data-testid="terminal-focus">
+      {!mobile && sessionCount > 0 && (
+        <aside className="hn-terminal-rail" aria-label="Sesi terminal">
+          <div className="hn-terminal-rail-head">
+            <span>Sesi</span>
+            <span>{sessionCount}</span>
+          </div>
+          <div className="hn-terminal-rail-scroll">
+            <SessionRail items={railItems} focusedId={focused?.id ?? null} onFocus={onFocus} menuFor={menuFor} />
+          </div>
+        </aside>
+      )}
+      <section className="hn-terminal-focus-main" aria-label="Terminal fokus">
+        {focused && current ? (
+          <>
+            <header className="hn-terminal-focus-head">
+              {mobile && (
+                <button type="button" className="hn-terminal-rail-toggle" aria-haspopup="dialog"
+                  aria-expanded={drawerOpen} onClick={() => onDrawer(true)}>
+                  Sesi · {sessionCount}
+                </button>
+              )}
+              <span className="hn-terminal-focus-title" title={current.label}>
+                {current.label} · {focused.id.slice(0, 6)}
+              </span>
+              <StatusPill status={RAIL_PILL[current.status.tone]} size="sm" variant="dot">{current.status.label}</StatusPill>
+              <OverflowActions label={`Aksi sesi ${focused.id}`} items={menuFor(focused)} />
+            </header>
+            {focused.exited && <SessionEndedBanner />}
+            <PhaseStrip phases={focusPhases?.sessionId === focused.id ? focusPhases.phases : null} />
+            <div className="hn-terminal-focus-body">
+              {fullId === focused.id ? (
+                <div className="hn-terminal-focus-placeholder">Terbuka di layar penuh</div>
+              ) : (
+                <TerminalPane key={focused.id} sessionId={focused.id} {...paneHandlers(focused.id)}
+                  fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag}
+                  composer label={current.label} />
+              )}
+            </div>
+          </>
+        ) : listError ? null : (
+          <StateBlock kind="empty" icon="terminal" title="Belum ada sesi terminal"
+            hint="Tekan Sesi baru untuk memulai agen di project terpilih, atau Terminal biasa untuk shell." />
+        )}
+      </section>
+      {mobile && drawerOpen && (
+        <Modal open title="Sesi terminal" icon="terminal" width={460} onClose={() => onDrawer(false)}>
+          <SessionRail items={railItems} focusedId={focused?.id ?? null}
+            onFocus={(id) => { onFocus(id); onDrawer(false); }} menuFor={menuFor} />
+        </Modal>
+      )}
+    </div>
   );
 }
 

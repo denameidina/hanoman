@@ -36,16 +36,21 @@ function mockApi(initial: RemoteControlView) {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("RemoteControlPanel (SPEC-1215 · ADR-0165 §4)", () => {
-  it("default mati: toggle capability terkunci sampai master menyala", async () => {
-    mockApi(base);
+// Radio DS menaruh label + deskripsi di nama aksesibelnya, jadi cocokkan awalannya saja.
+const tier = (name: RegExp) => screen.findByRole("radio", { name });
+
+describe("RemoteControlPanel · selektor tingkat akses (SPEC-1215 · Fase 3G)", () => {
+  it("default mati: selektor tingkat terkunci sampai master menyala", async () => {
+    const puts = mockApi(base);
     render(<RemoteControlPanel />);
     const master = await screen.findByRole("switch", { name: "Izinkan kendali jarak jauh" });
     expect(master).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByRole("switch", { name: "Mulai sesi" })).toHaveAttribute("aria-disabled", "true");
+    expect(await tier(/^Lihat/)).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(await tier(/^Kerja/));
+    expect(puts).toEqual([]);
   });
 
-  it("menyalakan master mengirim grant Lihat saja", async () => {
+  it("menyalakan master mengirim tingkat Lihat (tiga grant baca)", async () => {
     const puts = mockApi(base);
     render(<RemoteControlPanel />);
     fireEvent.click(await screen.findByRole("switch", { name: "Izinkan kendali jarak jauh" }));
@@ -54,43 +59,70 @@ describe("RemoteControlPanel (SPEC-1215 · ADR-0165 §4)", () => {
     ]));
   });
 
-  // Izin berisiko: menyalakannya meminta konfirmasi dulu, dan baru menyimpan setelah diizinkan.
-  it("menyalakan Mulai sesi meminta konfirmasi, lalu selalu menyertakan Lihat", async () => {
+  it("tingkat Lihat aktif saat grant hanya baca; Kerja dan Tulis tak tercentang", async () => {
+    mockApi({ ...base, control: { enabled: true, capabilities: ["sessions:read", "backlog:read", "ide:read"] } });
+    render(<RemoteControlPanel />);
+    expect(await tier(/^Lihat/)).toHaveAttribute("aria-checked", "true");
+    expect(await tier(/^Kerja/)).toHaveAttribute("aria-checked", "false");
+    expect(await tier(/^Tulis/)).toHaveAttribute("aria-checked", "false");
+  });
+
+  // Naik ke tingkat berisiko selalu menyalakan Lihat dulu (termasuk dalam daftar grant), dan dikonfirmasi.
+  it("naik ke Kerja meminta konfirmasi, lalu menyimpan grant Lihat + kerja", async () => {
     const puts = mockApi({ ...base, control: { enabled: true, capabilities: ["sessions:read", "backlog:read", "ide:read"] } });
     render(<RemoteControlPanel />);
-    fireEvent.click(await screen.findByRole("switch", { name: "Mulai sesi" }));
+    fireEvent.click(await tier(/^Kerja/));
     expect(puts).toEqual([]);
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/Server pusat boleh membuka sesi agen baru/i)).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Izinkan" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Izinkan Kerja" }));
     await waitFor(() => expect(puts.at(-1)).toEqual({
-      control: { enabled: true, capabilities: ["sessions:read", "backlog:read", "ide:read", "sessions:spawn"] },
+      control: {
+        enabled: true,
+        capabilities: ["sessions:read", "backlog:read", "ide:read", "backlog:write", "sessions:spawn"],
+      },
     }));
   });
 
-  it("membatalkan konfirmasi Tulis terminal tidak menyimpan apa pun", async () => {
+  it("membatalkan naik ke Tulis tidak menyimpan apa pun", async () => {
     const puts = mockApi({ ...base, control: { enabled: true, capabilities: ["sessions:read", "backlog:read", "ide:read"] } });
     render(<RemoteControlPanel />);
-    fireEvent.click(await screen.findByRole("switch", { name: "Tulis terminal" }));
+    fireEvent.click(await tier(/^Tulis/));
     const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Server pusat boleh mengetik ke terminal/i)).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Batal" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(puts).toEqual([]);
   });
 
-  // Mematikan "Lihat" membuang semua izin (lihat `save(enabled, [])`), jadi dialognya harus menyebutnya.
-  it("mematikan Lihat memperingatkan bahwa semua izin ikut dicabut", async () => {
-    const puts = mockApi({ ...base, control: { enabled: true, capabilities: ["sessions:read", "backlog:read", "ide:read", "sessions:spawn"] } });
+  // Menurunkan tingkat juga lewat dialog, dan dialognya menyebut grant yang dicabut.
+  it("turun dari Tulis ke Kerja menampilkan efek yang dicabut sebelum menyimpan", async () => {
+    const puts = mockApi({ ...base, control: { enabled: true, capabilities: [
+      "sessions:read", "backlog:read", "ide:read", "backlog:write", "sessions:spawn", "sessions:write"] } });
     render(<RemoteControlPanel />);
-    fireEvent.click(await screen.findByRole("switch", { name: "Lihat" }));
+    fireEvent.click(await tier(/^Kerja/));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/Izin lain yang ikut dicabut: Mulai sesi/)).toBeInTheDocument();
+    expect(within(dialog).getByText("Dicabut: Tulis ke terminal.")).toBeInTheDocument();
     expect(puts).toEqual([]);
-    fireEvent.click(within(dialog).getByRole("button", { name: "Matikan dan cabut izin" }));
-    await waitFor(() => expect(puts).toEqual([{ control: { enabled: true, capabilities: [] } }]));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Turunkan ke Kerja" }));
+    await waitFor(() => expect(puts.at(-1)).toEqual({
+      control: {
+        enabled: true,
+        capabilities: ["sessions:read", "backlog:read", "ide:read", "backlog:write", "sessions:spawn"],
+      },
+    }));
   });
 
-  it("status relay dan audit aksi hub ditampilkan", async () => {
+  // Kombinasi grant yang tak sama dengan tingkat mana pun tampil sebagai Khusus dengan rincian yang dilipat.
+  it("kombinasi di luar tingkat tampil sebagai Khusus dengan rincian lipat", async () => {
+    mockApi({ ...base, control: { enabled: true, capabilities: ["sessions:read", "sessions:write"] } });
+    render(<RemoteControlPanel />);
+    expect(await tier(/^Khusus/)).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("Rincian izin khusus")).toBeInTheDocument();
+    expect(screen.getByText("Lihat sesi, Tulis ke terminal")).toBeInTheDocument();
+  });
+
+  it("status relay dan riwayat perintah tampil ringkas; detail ada di balik lipatan", async () => {
     mockApi({
       ...base,
       control: { enabled: true, capabilities: ["sessions:read"] },
@@ -104,6 +136,7 @@ describe("RemoteControlPanel (SPEC-1215 · ADR-0165 §4)", () => {
     render(<RemoteControlPanel />);
     expect(await screen.findByText("tersambung")).toBeInTheDocument();
     expect(screen.getByText("https://hub.example")).toBeInTheDocument();
+    expect(screen.getByText("1 perintah tercatat", { exact: false })).toBeInTheDocument();
     expect(screen.getAllByTestId("remote-audit-row")).toHaveLength(1);
   });
 });

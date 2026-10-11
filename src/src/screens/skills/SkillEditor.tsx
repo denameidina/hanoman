@@ -1,12 +1,16 @@
 // Skills library · struktur (pohon berkas) + editor berkas skill. Plugin baca-saja → tombol Fork.
+// Redesign 3K: footer Simpan selalu tampil dan sticky untuk skill yang bisa disunting; keadaan
+// "belum disimpan" terlihat; tombol Simpan mati saat tak ada perubahan.
 import React from "react";
 import { parseSkillFrontmatter, type SkillEntry, type SkillFileView, type SkillTreeView } from "@hanoman/shared";
-import { Badge, Button, Card, Field, Input, Modal, StateBlock, isMarkdownPath, useConfirm } from "../../ds";
+import { Badge, Button, Field, Input, Modal, StateBlock, isMarkdownPath, useConfirm } from "../../ds";
 import { MarkdownView } from "../../ds/markdown";
 import { useApi } from "../../api/instance";
 import { ApiError } from "../../api/client";
 import { failureMessage } from "../../lib/report-error";
 import { buildFileTree, TreeRow } from "../file-tree";
+import "../styles/skills.css";
+import "../styles/projects.css";
 
 /** Frontmatter sudah punya kartunya sendiri — jangan dirender ulang sebagai prosa di pratinjau. */
 const stripFrontmatter = (t: string): string => t.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
@@ -60,18 +64,18 @@ export function SkillStructure({ skill, tree, selected, onSelect, onChanged }:
   };
 
   return (
-    <Card padding={0} fill>
-      <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border-hair)" }}>
-        <span className="hn-eyebrow">{skill.name}/</span>
+    <div className="hn-skill-structure">
+      <div className="hn-skill-structure-head">
+        <span className="hn-prj-mono hn-skill-structure-name">{skill.name}/</span>
       </div>
-      <div style={{ padding: 8, flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+      <div className="hn-skill-structure-tree">
         {!tree ? <StateBlock kind="loading" compact title="Memuat struktur…" />
           : buildFileTree(tree.files.map((f) => f.path), tree.dirs).map((n) => (
               <TreeRow key={n.path} node={n} selected={selected} onSelect={onSelect} defaultOpen />
             ))}
       </div>
       {skill.editable && (
-        <div style={{ display: "flex", gap: 8, padding: 8, borderTop: "1px solid var(--border-hair)" }}>
+        <div className="hn-skill-structure-foot">
           <Button size="sm" variant="ghost" leftIcon="file-plus" onClick={() => open("file")}>Berkas</Button>
           <Button size="sm" variant="ghost" leftIcon="folder-plus" onClick={() => open("dir")}>Folder</Button>
         </div>
@@ -82,7 +86,7 @@ export function SkillStructure({ skill, tree, selected, onSelect, onChanged }:
           <Button onClick={() => void submit()} loading={busy} disabled={Boolean(problem)}>Buat</Button>
         </>}>
         <Field label={label} hint={shownProblem
-          ? <span id={errorId} role="alert" style={{ color: "var(--clay-600)" }}>{shownProblem}</span>
+          ? <span id={errorId} role="alert" className="hn-skill-error-text">{shownProblem}</span>
           : "Relatif ke folder skill; pakai / untuk subfolder."}>
           <Input aria-label={label} value={path} mono invalid={Boolean(shownProblem)}
             aria-invalid={shownProblem ? true : undefined} aria-describedby={shownProblem ? errorId : undefined}
@@ -91,7 +95,7 @@ export function SkillStructure({ skill, tree, selected, onSelect, onChanged }:
             onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); void submit(); } }} />
         </Field>
       </Modal>
-    </Card>
+    </div>
   );
 }
 
@@ -160,49 +164,53 @@ export function SkillFileEditor({ skill, path, onFork, onToast, onDirtyChange }:
   };
 
   const fm = path === "SKILL.md" && file?.content != null ? parseSkillFrontmatter(draft) : null;
+  const canEdit = skill.editable;
 
   return (
-    <Card padding={0} fill>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--border-hair)" }}>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, flex: "1 1 auto" }}>{path}</span>
-        {skill.editable ? (
-          <>
-            <Button size="sm" variant={mode === "preview" ? "secondary" : "ghost"} aria-pressed={mode === "preview"} onClick={() => setMode("preview")}>Pratinjau</Button>
-            <Button size="sm" variant={mode === "edit" ? "secondary" : "ghost"} aria-pressed={mode === "edit"} onClick={() => setMode("edit")}>Edit</Button>
-          </>
+    <div className="hn-skill-editor">
+      <div className="hn-skill-editor-head">
+        <span className="hn-prj-mono hn-skill-editor-path">{path}</span>
+        {canEdit ? (
+          <div role="group" aria-label="Mode berkas" className="hn-prj-seg">
+            <button type="button" aria-pressed={mode === "preview"} className="hn-touch-target" onClick={() => setMode("preview")}>Pratinjau</button>
+            <button type="button" aria-pressed={mode === "edit"} className="hn-touch-target" onClick={() => setMode("edit")}>Edit</button>
+          </div>
         ) : <Button size="sm" leftIcon="git-fork" onClick={onFork}>Fork ke global hanoman / project</Button>}
       </div>
       {fm && (
-        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border-hair)", background: "var(--bone-200)" }}>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>name: {fm.name ?? "—"}</div>
-          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{fm.description ?? "—"}</div>
+        <div className="hn-skill-frontmatter">
+          <div className="hn-prj-mono hn-skill-fm-name">name: {fm.name ?? "—"}</div>
+          <div className="hn-skill-fm-desc">{fm.description ?? "—"}</div>
           {fm.error && <Badge tone="err" size="sm">{fm.error}</Badge>}
         </div>
       )}
-      <div style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", padding: mode === "edit" ? 0 : 16 }}>
+      <div className={`hn-skill-editor-body${mode === "edit" ? " is-edit" : ""}`}>
         {loadError !== null ? <StateBlock kind="error" compact title="Gagal memuat berkas" hint={loadError} action={load} actionLabel="Coba lagi" />
           : !file ? <StateBlock kind="loading" compact title="Memuat berkas…" />
           : file.binary || file.tooLarge ? <StateBlock kind="empty" compact icon="file" title={file.binary ? "Berkas biner" : "Berkas terlalu besar"} hint={`${file.size} B`} />
           : mode === "edit" ? (
             <textarea aria-label="Isi berkas" value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} placeholder="mis. # Langkah deploy"
-              style={{ width: "100%", height: "100%", minHeight: 320, border: 0, padding: 16, fontFamily: "var(--font-mono)", fontSize: 13, background: "transparent", resize: "none" }} />
+              className="hn-skill-textarea" />
           ) : isMarkdownPath(path) ? <MarkdownView text={path === "SKILL.md" ? stripFrontmatter(draft) : draft} name={path} />
-          : <pre style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 13, whiteSpace: "pre-wrap" }}>{draft}</pre>}
+          : <pre className="hn-skill-pre">{draft}</pre>}
       </div>
-      {skill.editable && (mode === "edit" || dirty || conflict) && (
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, padding: 8, borderTop: "1px solid var(--border-hair)" }}>
-          <Button size="sm" onClick={() => void save()} loading={saving} disabled={!dirty || saving}>Simpan</Button>
-          {dirty && <span style={{ fontSize: 12, color: "var(--brass-700)" }}>belum disimpan</span>}
+      {/* Footer Simpan: selalu terlihat untuk skill yang bisa disunting, sticky di bawah editor. */}
+      {canEdit && (
+        <div role="region" aria-label="Simpan berkas" className="hn-skill-savebar">
+          {dirty ? <Badge tone="warn" size="sm">belum disimpan</Badge>
+            : <span className="hn-prj-hint">Tersimpan</span>}
           {conflict && (
-            <span role="alert" style={{ fontSize: 12, color: "var(--clay-600)", display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            <span role="alert" className="hn-skill-conflict">
               {conflict}
               <Button size="sm" variant="ghost" disabled={saving} onClick={() => void reload()}>Muat ulang</Button>
               <Button size="sm" variant="ghost" disabled={saving || !dirty} onClick={() => void overwrite()}>Timpa</Button>
             </span>
           )}
+          <span className="hn-grow" />
+          <Button size="sm" onClick={() => void save()} loading={saving} disabled={!dirty || saving}>Simpan</Button>
         </div>
       )}
       {dialog}
-    </Card>
+    </div>
   );
 }

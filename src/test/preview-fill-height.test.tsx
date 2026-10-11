@@ -6,7 +6,13 @@
    jsdom tak melayout, jadi yang diuji di sini adalah kontrak style-nya: pane menyerap sisa
    tinggi lewat rantai flex (pola `LIST_SCROLL_STYLE`, kit.tsx) dan tak lagi memasang tinggi
    tetap dalam px/vh. */
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
+
+// Audit UI/UX 2026-10 (3H): berkas IDE di tab Berkas (default-nya Perubahan).
+async function openBerkas() {
+  const list = await screen.findByRole("tablist", { name: "Bagian IDE" });
+  fireEvent.click(within(list).getByRole("tab", { name: "Berkas" }));
+}
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { paths } from "@hanoman/shared";
 
@@ -103,6 +109,7 @@ describe("pane pratinjau menyerap tinggi yang tersedia (SPEC-363)", () => {
 
   it("IdeScreen (Explorer) — tanpa maxHeight 620", async () => {
     render(<IdeScreen projects={[{ id: "p1", name: "P1" }] as never[]} projectId="p1" onProject={() => {}} />);
+    await openBerkas();
     fireEvent.click(await screen.findByText("README.md"));
     await waitFor(() => expect(pane()).toBeInTheDocument());
     expect(pane().style.flex).toBe("1 1 auto");

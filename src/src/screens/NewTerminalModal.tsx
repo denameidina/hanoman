@@ -14,8 +14,11 @@ import { runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs } fro
  * Katalognya datang dari `@hanoman/shared` lewat `session-runtime.ts` — tak ada daftar model
  * kedua yang bisa basi.
  */
-export function NewTerminalModal({ open, projectId, projectName, onClose, onCreated }: {
+export function NewTerminalModal({ open, projectId, projectName, projects, onProjectChange, onClose, onCreated }: {
   open: boolean; projectId: string; projectName: string;
+  // Audit UI/UX 2026-10 · Fase 3E: project dipilih di sini (toolbar tak lagi memuat pemilih). Opsional:
+  // tanpa `onProjectChange` atau dengan satu project, pilihan project tak ditampilkan.
+  projects?: readonly { id: string; name: string }[]; onProjectChange?: (id: string) => void;
   onClose: () => void; onCreated: (id: string) => void;
 }) {
   const [agent, setAgent] = React.useState<Agent>("claude");
@@ -97,6 +100,13 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
         Runtime untuk sesi ini. Default dari setelan global; ubah bila perlu. Sesi lahir dengan
         pilihan ini untuk seluruh hidupnya — <code>/model</code> di terminal tetap bisa mengubahnya.
       </div>
+      {projects && onProjectChange && projects.length > 1 && (
+        <Field label="Project" hint="Direktori repo tempat sesi dibuka.">
+          <Select aria-label="Project" value={projectId} style={{ width: "100%" }}
+            options={projects.map((p) => ({ value: p.id, label: p.name }))}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onProjectChange(e.target.value)} />
+        </Field>
+      )}
       <Field label="Agen" hint="Mesin yang menjalankan sesi ini. Perilaku sesi sama; hanya CLI-nya berbeda.">
         <Select aria-label="Agen" value={agent} style={{ width: "100%" }}
           options={[{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex CLI" }]}

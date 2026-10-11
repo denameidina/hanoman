@@ -60,10 +60,13 @@ describe("SPEC-763 · baris padat memberi teks lebar minimum di mobile", () => {
   });
 
   it("memakai aturan itu pada baris yang terukur terjepit", () => {
+    // Audit 2026-10 · Fase 3B: baris Overview kini memakai DenseRow (kelas `hn-row`, flex-wrap, dan
+    // `.hn-row-main` ber-min-width 0), bukan `hn-dense-row` sendiri. Kontraknya tetap: baris membungkus.
     const overview = readFileSync(resolve(import.meta.dirname, "../src/screens/OverviewScreen.tsx"), "utf8");
-    const from = overview.indexOf("function AttnRow");
-    const attn = overview.slice(from, overview.indexOf(">Buka dokumen</Button>", from));
-    expect(attn).toContain('className="hn-dense-row"');
+    expect(overview).toContain("<DenseRow");
+    expect(overview).not.toMatch(/style=\{\{/);   // layout Overview lewat kelas, bukan inline
+    expect(css).toMatch(/\.hn-row \{[^}]*flex-wrap:\s*wrap/);
+    expect(css).toMatch(/\.hn-row-main \{[^}]*min-width:\s*0/);
 
     const crons = readFileSync(resolve(import.meta.dirname, "../src/screens/SchedulerCrons.tsx"), "utf8");
     const gate = crons.slice(crons.indexOf("belum diizinkan untuk scheduler") - 900, crons.indexOf("belum diizinkan untuk scheduler"));

@@ -128,11 +128,14 @@ export function WebhookDocs({ onBack }: { onBack?: () => void } = {}) {
   return (
     <>
       <Card eyebrow="dokumentasi" title="Dokumentasi webhook">
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <Button size="sm" variant="ghost" onClick={onBack}>
-            <Icon name="arrow-left" size={14} /> Kembali ke daftar endpoint
-          </Button>
-        </div>
+        {/* Tombol kembali hanya ada bila dokumentasi berdiri sendiri; di Pengaturan ia dilipat (details). */}
+        {onBack && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <Button size="sm" variant="ghost" onClick={onBack}>
+              <Icon name="arrow-left" size={14} /> Kembali ke daftar endpoint
+            </Button>
+          </div>
+        )}
         <div style={prose}>
           Setiap kali sesuatu berubah di hanoman, kami mengirim satu <b>HTTP POST</b> ke URL yang
           Anda daftarkan. Kanal ini <b>satu arah</b> — hanoman tak pernah membaca apa pun dari

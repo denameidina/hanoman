@@ -131,6 +131,7 @@ describe("CustomAgentsPanel", () => {
     fireEvent.change(screen.getByLabelText("Nama"), { target: { value: "agn-baru" } });
     fireEvent.change(screen.getByLabelText("Deskripsi"), { target: { value: "d" } });
     fireEvent.change(screen.getByLabelText("Instruksi"), { target: { value: "i" } });
+    fireEvent.click(screen.getByRole("tab", { name: /Tools & Mention/ }));
     fireEvent.click(screen.getByRole("button", { name: "Mention" }));
     fireEvent.click(screen.getByRole("option", { name: /rev/ }));
     fireEvent.click(screen.getByRole("button", { name: /simpan/i }));
@@ -197,6 +198,7 @@ describe("CustomAgentsPanel · kontrol pilihan (SPEC-484)", () => {
   it("Tools memakai MultiSelect bersumber katalog API, bukan teks bebas", async () => {
     render(<CustomAgentsPanel projectId={null} />);
     fireEvent.click(await screen.findByRole("button", { name: /agen baru/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Tools & Mention/ }));
     fireEvent.click(screen.getByRole("button", { name: "Tools" }));
     const names = screen.getAllByRole("option").map((o) => o.textContent);
     expect(names.some((n) => n?.includes("Semua tools"))).toBe(true);
@@ -207,6 +209,7 @@ describe("CustomAgentsPanel · kontrol pilihan (SPEC-484)", () => {
   it("memilih 'Semua tools (*)' MENGOSONGKAN pilihan lain, dan sebaliknya", async () => {
     render(<CustomAgentsPanel projectId={null} />);
     fireEvent.click(await screen.findByRole("button", { name: /agen baru/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Tools & Mention/ }));
     fireEvent.click(screen.getByRole("button", { name: "Tools" }));
     fireEvent.click(screen.getByRole("option", { name: /^Read/ }));
     fireEvent.click(screen.getByRole("option", { name: /Semua tools/ }));
@@ -262,6 +265,7 @@ describe("CustomAgentsPanel · kontrol pilihan (SPEC-484)", () => {
     fireEvent.change(screen.getByLabelText("Deskripsi"), { target: { value: "d" } });
     fireEvent.change(screen.getByLabelText("Instruksi"), { target: { value: "i" } });
     fireEvent.change(screen.getByLabelText("Runtime agent"), { target: { value: "codex" } });
+    fireEvent.click(screen.getByRole("tab", { name: /Tools & Mention/ }));
     fireEvent.click(screen.getByRole("button", { name: "Tools" }));
     fireEvent.click(screen.getByRole("option", { name: /^Read/ }));
     fireEvent.click(screen.getByRole("button", { name: /simpan/i }));
@@ -442,7 +446,7 @@ describe("SPEC-950 · profil eksekusi dan bukti efektivitas", () => {
     updateAgentInvocationDisposition.mockResolvedValue({});
     render(<CustomAgentsPanel projectId={null} />);
     await screen.findByText("rev");
-    fireEvent.click(screen.getByText(/1 sampel bukti/i));
+    fireEvent.click(screen.getByText(/1 sampel/));
     fireEvent.change(screen.getByLabelText("Disposition inv-1"), { target: { value: "accepted" } });
     fireEvent.change(screen.getByLabelText("Catatan inv-1"), { target: { value: "berguna" } });
     fireEvent.click(screen.getByRole("button", { name: "Nilai inv-1" }));
@@ -474,7 +478,7 @@ describe("SPEC-950 · profil eksekusi dan bukti efektivitas", () => {
     await screen.findByText("rev");
     expect(screen.getByText(/claude · sonnet/, { selector: "li" }).textContent).toContain("aaaaaaaaaaaa");
     expect(screen.getByText(/codex · model tidak tercatat/).textContent).toContain("versi tidak tercatat");
-    fireEvent.click(screen.getByText(/1 sampel bukti/i));
+    fireEvent.click(screen.getByText(/1 sampel/));
     fireEvent.change(screen.getByLabelText("Kerja ulang inv-1"), { target: { value: "yes" } });
     fireEvent.change(screen.getByLabelText("Catatan inv-1"), { target: { value: "perlu penyempurnaan" } });
     fireEvent.click(screen.getByRole("button", { name: "Nilai inv-1" }));
@@ -489,13 +493,17 @@ describe("audit UI/UX · hapus, galat muat, field lanjutan, validasi", () => {
     instructions: "i", tools: null, model: null, mentions: [], runtime: null,
     enabled: true, inherited: false, builtin: false };
   const bawaan = { ...own, id: "global:scout", name: "scout", builtin: true };
+  const openDelete = async (name: string) => {
+    fireEvent.click(screen.getByRole("button", { name: `Aksi untuk agen ${name}` }));
+    fireEvent.click(await screen.findByRole("button", { name: /Hapus agen…/ }));
+  };
 
   it("Hapus meminta konfirmasi bernama agen dan baru menghapus setelah disetujui", async () => {
     listCustomAgents.mockResolvedValue([own]);
     deleteCustomAgent.mockResolvedValue(undefined);
     render(<CustomAgentsPanel projectId={null} />);
     await screen.findByText("punyaku");
-    fireEvent.click(screen.getByRole("button", { name: "Hapus" }));
+    await openDelete("punyaku");
     expect(await screen.findByText("Hapus agen punyaku?")).toBeTruthy();
     expect(deleteCustomAgent).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Hapus agen" }));
@@ -506,7 +514,7 @@ describe("audit UI/UX · hapus, galat muat, field lanjutan, validasi", () => {
     listCustomAgents.mockResolvedValue([own]);
     render(<CustomAgentsPanel projectId={null} />);
     await screen.findByText("punyaku");
-    fireEvent.click(screen.getByRole("button", { name: "Hapus" }));
+    await openDelete("punyaku");
     fireEvent.click(await screen.findByRole("button", { name: "Batal" }));
     await waitFor(() => expect(screen.queryByText("Hapus agen punyaku?")).toBeNull());
     expect(deleteCustomAgent).not.toHaveBeenCalled();
@@ -517,7 +525,7 @@ describe("audit UI/UX · hapus, galat muat, field lanjutan, validasi", () => {
     deleteCustomAgent.mockRejectedValue(new FakeApiError(500, "500", { error: "db terkunci" }));
     render(<CustomAgentsPanel projectId={null} />);
     await screen.findByText("punyaku");
-    fireEvent.click(screen.getByRole("button", { name: "Hapus" }));
+    await openDelete("punyaku");
     fireEvent.click(await screen.findByRole("button", { name: "Hapus agen" }));
     expect(await screen.findByText("Gagal menghapus agen: db terkunci")).toBeTruthy();
   });
@@ -526,7 +534,8 @@ describe("audit UI/UX · hapus, galat muat, field lanjutan, validasi", () => {
     listCustomAgents.mockResolvedValue([bawaan]);
     render(<CustomAgentsPanel projectId={null} />);
     await screen.findByText("scout");
-    const btn = screen.getByRole("button", { name: "Hapus" }) as HTMLButtonElement;
+    fireEvent.click(screen.getByRole("button", { name: "Aksi untuk agen scout" }));
+    const btn = await screen.findByRole("button", { name: /Hapus agen…/ }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
     expect(screen.getByText("Agen bawaan tak bisa dihapus")).toBeTruthy();
   });
@@ -541,18 +550,19 @@ describe("audit UI/UX · hapus, galat muat, field lanjutan, validasi", () => {
     expect(await screen.findByText("rev")).toBeTruthy();
   });
 
-  it("field lanjutan ada di <details> 'Lanjutan' yang tertutup default", async () => {
+  it("field dibagi tiga tab: Dasar, Tools & Mention, dan Lanjutan (field lanjutan di tab Lanjutan)", async () => {
     render(<CustomAgentsPanel projectId={null} />);
     fireEvent.click(await screen.findByRole("button", { name: /agen baru/i }));
-    const details = screen.getByText(/^Lanjutan/).closest("details")!;
-    expect(details.open).toBe(false);
+    expect(screen.getByRole("tab", { name: /^Dasar/, selected: true })).toBeInTheDocument();
+    const tabOf = (label: string) => screen.getByLabelText(label).closest('[role="tabpanel"]')!.getAttribute("aria-labelledby") ?? "";
+    expect(tabOf("Model")).toMatch(/-tab-dasar$/);
+    expect(tabOf("Tools")).toMatch(/-tab-tools$/);
     for (const label of ["Runtime agent", "Effort", "Kebijakan workspace", "Maksimum giliran", "Timeout detik"]) {
-      expect(details.contains(screen.getByLabelText(label))).toBe(true);
+      expect(tabOf(label)).toMatch(/-tab-lanjutan$/);
     }
-    expect(details.contains(screen.getByLabelText("Model"))).toBe(false);
   });
 
-  it("nilai salah memberi aria-invalid + pesan terkait, dan Lanjutan membuka sendiri", async () => {
+  it("nilai salah memberi aria-invalid + pesan terkait, dan angka galat tampil di tab Lanjutan", async () => {
     render(<CustomAgentsPanel projectId={null} />);
     fireEvent.click(await screen.findByRole("button", { name: /agen baru/i }));
     fireEvent.change(screen.getByLabelText("Nama"), { target: { value: "Rev" } });
@@ -565,7 +575,8 @@ describe("audit UI/UX · hapus, galat muat, field lanjutan, validasi", () => {
     const turns = screen.getByLabelText("Maksimum giliran");
     expect(turns.getAttribute("aria-invalid")).toBe("true");
     expect(document.getElementById(turns.getAttribute("aria-describedby")!)!.textContent).toMatch(/1–200/);
-    expect((screen.getByText(/^Lanjutan/).closest("details") as HTMLDetailsElement).open).toBe(true);
+    // Galat tersembunyi di tab Lanjutan tetap terlihat sebagai angka di tab-nya.
+    expect(screen.getByRole("tab", { name: /Lanjutan\s*1/ })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Maksimum giliran"), { target: { value: "40" } });
     expect(screen.getByLabelText("Maksimum giliran").getAttribute("aria-invalid")).toBeNull();

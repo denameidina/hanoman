@@ -8,8 +8,11 @@ const VPS = {
 };
 // vi.mock di-hoist ke atas berkas — factory-nya TIDAK boleh merujuk `const` biasa.
 // vi.hoisted menaikkan mock fn-nya bersama vi.mock, jadi test bisa memeriksanya.
-const { updateVps, testVps, vpsSession, vpsConsole, vpsChecklist, listVpsComponents } = vi.hoisted(() => ({
+const { updateVps, testVps, vpsSession, vpsConsole, vpsChecklist, listVpsComponents, auditVps, hardenVps } = vi.hoisted(() => ({
   updateVps: vi.fn(),
+  // Periksa (audit) menyimpan skornya di daftar; harden hanya lewat konfirmasi di menu ⋯.
+  auditVps: vi.fn(async () => ({ audit: [], hardened: false, scoreTotal: 64, scoreBySection: {}, drift: 0 })),
+  hardenVps: vi.fn(async () => ({ ok: true })),
   // SPEC-883 · panel provisioning ikut ter-mount di modal detail; mock parsial tanpa entri ini
   // membuat modal melempar "is not a function" dan test detail gagal tanpa menyebut sebabnya.
   listVpsComponents: vi.fn(async () => ({ components: [] })),
@@ -26,7 +29,7 @@ const { updateVps, testVps, vpsSession, vpsConsole, vpsChecklist, listVpsCompone
 }));
 vi.mock("../src/api/client", () => ({
   api: { listVps: vi.fn(async () => [VPS]), updateVps, testVps, vpsSession, vpsConsole, vpsChecklist,
-    listVpsComponents },
+    listVpsComponents, auditVps, hardenVps },
   ApiError: class extends Error {},
 }));
 import { VpsScreen, isReachable, hardenedLabel, vpsFormToBody } from "../src/screens/VpsScreen";
@@ -63,7 +66,7 @@ describe("VpsScreen (SPEC-164)", () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={onGotoTerminal} />);
     await screen.findByText("web-1");
     openMenu();
-    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Buka console" })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Buka console" })); });
     await vi.waitFor(() => expect(vpsConsole).toHaveBeenCalledWith("v1"));
     await vi.waitFor(() => expect(onGotoTerminal).toHaveBeenCalledWith("vpsc-v1"));
   });
@@ -72,7 +75,7 @@ describe("VpsScreen (SPEC-164)", () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={onGotoTerminal} />);
     await screen.findByText("web-1");
     openMenu();
-    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Sesi Claude" })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Sesi Claude" })); });
     expect(vpsSession).toHaveBeenCalledWith("v1");
     expect(onGotoTerminal).toHaveBeenCalledWith("vps-v1");
   });
@@ -80,7 +83,7 @@ describe("VpsScreen (SPEC-164)", () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
     await screen.findByText("web-1");
     openMenu();
-    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Tes koneksi" })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Tes koneksi" })); });
     await vi.waitFor(() => expect(testVps).toHaveBeenCalledWith("v1"));
   });
   it("klik baris VPS membuka modal detail+checklist langsung (UI 2026-07-18)", async () => {
@@ -111,11 +114,58 @@ describe("modal edit (SPEC-165)", () => {
     render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
     await screen.findByText("web-1");
     openMenu();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Edit web-1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(await screen.findByDisplayValue("web-1")).toBeTruthy();
     expect(screen.getByDisplayValue("203.0.113.10")).toBeTruthy();
     await act(async () => { fireEvent.click(screen.getByText("Simpan")); });
     expect(updateVps).toHaveBeenCalled();
     expect(updateVps.mock.calls[0]![0]).toBe("v1");
+  });
+});
+
+// Audit UI/UX 2026-10 · Fase 3J — daftar ringkas: satu aksi utama, sisanya di ⋯; detail bertab.
+describe("VpsScreen · daftar ringkas (Fase 3J)", () => {
+  it("baris punya tiga langkah bertulisan dan satu aksi utama Periksa", async () => {
+    render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
+    await screen.findByText("web-1");
+    expect(screen.getByRole("list", { name: "Kemajuan web-1" })).toBeInTheDocument();
+    expect(screen.getByText("Terhubung")).toBeInTheDocument();
+    expect(screen.getByText("Diaudit")).toBeInTheDocument();
+    expect(screen.getByText("Diperkuat")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Periksa" })).toBeInTheDocument();
+    // Harden dan aksi jarang tidak lagi tampil di baris.
+    expect(screen.queryByRole("button", { name: "Harden" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Audit" })).toBeNull();
+  });
+
+  it("Periksa menjalankan audit dan menampilkan skornya di baris", async () => {
+    render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
+    await screen.findByText("web-1");
+    expect(screen.getByText("Skor —")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Periksa" }));
+    expect(await screen.findByText("Skor 64%")).toBeInTheDocument();
+    expect(auditVps).toHaveBeenCalledWith("v1");
+  });
+
+  // Harden berbahaya: dari menu ⋯ ia hanya membuka konfirmasi, tak pernah langsung menjalankan.
+  it("Harden dari menu ⋯ meminta konfirmasi dulu", async () => {
+    render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
+    await screen.findByText("web-1");
+    fireEvent.click(screen.getByRole("button", { name: "Aksi lain untuk web-1" }));
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Harden" })); });
+    expect(await screen.findByText('Harden "web-1"?')).toBeInTheDocument();
+    expect(hardenVps).not.toHaveBeenCalled();
+  });
+
+  it("detail VPS terbuka sebagai modal bertab Ringkasan · Checklist · Pemasangan · Akses", async () => {
+    render(<VpsScreen onToast={() => {}} onGotoTerminal={() => {}} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Buka detail web-1" }));
+    expect(await screen.findByRole("tab", { name: "Ringkasan" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Checklist" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Pemasangan" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Akses" })).toBeInTheDocument();
+    // Tab Akses memuat aksi koneksi yang dulu ada di baris.
+    fireEvent.click(screen.getByRole("tab", { name: "Akses" }));
+    expect(await screen.findByRole("button", { name: "Tes koneksi" })).toBeInTheDocument();
   });
 });

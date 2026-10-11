@@ -25,9 +25,11 @@ beforeEach(() => { deleteDoc.mockClear(); });
 
 const openDialog = async () => {
   render(<DocsWorkspace projectId="demo" projectName="Demo" docStatus="ok" />);
-  const btn = await screen.findByRole("button", { name: "Hapus" });
+  // Redesign 3P: hapus dokumen ada di menu ⋯ kepala dokumen, lalu konfirmasi lewat useConfirm.
+  const btn = await screen.findByRole("button", { name: "Aksi untuk dokumen" });
   btn.focus();
   fireEvent.click(btn);
+  fireEvent.click(await screen.findByRole("button", { name: /Hapus dokumen…/ }));
   await screen.findByRole("dialog");
   return btn;
 };

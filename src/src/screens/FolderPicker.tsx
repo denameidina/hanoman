@@ -6,29 +6,16 @@
    Audit 2026-10 (P0): dua keadaan dipisah. `draft` = isi kolom path yang sedang diketik;
    `cur` = path yang BERHASIL dimuat server. "Pilih folder ini" hanya memilih `cur`, jadi path
    yang belum divalidasi (ketikan tanpa Buka/Enter) tak pernah bisa jadi pilihan. Baris folder
-   adalah <button> native, sehingga fokus keyboard dan Enter/Space datang gratis. */
+   adalah <button> native, sehingga fokus keyboard dan Enter/Space datang gratis.
+   Redesign 3P: baris memakai kelas (hover di CSS, bukan useState). */
 import React from "react";
-import { Modal, Button, Input, Icon, StateBlock } from "../ds";
+import { Modal, Button, Input, StateBlock } from "../ds";
+import { Icon } from "../ds";
 import { api } from "../api/client";
 import { errorMessage } from "../lib/report-error";
+import "./styles/projects.css";
 
 type FsEntry = { name: string; path: string };
-
-function FolderRow({ icon, name, onClick }: { icon: string; name: string; onClick: () => void }) {
-  const [hover, setHover] = React.useState(false);
-  return (
-    <button type="button" onClick={onClick}
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box",
-        padding: "8px 12px", cursor: "pointer", textAlign: "left",
-        border: "none", borderBottom: "1px solid var(--border-hair)",
-        background: hover ? "var(--bone-100)" : "transparent",
-        fontSize: 13, color: "var(--text-strong)", fontFamily: "inherit" }}>
-      <Icon name={icon} size={16} color="var(--brass-700)" />
-      <span style={{ fontFamily: "var(--font-mono)", wordBreak: "break-all" }}>{name}</span>
-    </button>
-  );
-}
 
 export function FolderPicker({ open, onClose, onPick, start }:
   { open: boolean; onClose: () => void; onPick: (path: string) => void; start?: string }) {
@@ -67,14 +54,14 @@ export function FolderPicker({ open, onClose, onPick, start }:
         <Button variant="ghost" size="sm" onClick={onClose}>Batal</Button>
         <Button size="sm" leftIcon="check" disabled={!canPick} onClick={() => { onPick(cur); onClose(); }}>Pilih folder ini</Button>
       </>}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+      <div className="hn-prj-inline hn-prj-picker-path">
         <Input value={draft} onChange={(e: any) => setDraft(e.target.value)}
           onKeyDown={(e: any) => { if (e.key === "Enter") load(e.currentTarget.value.trim() || undefined); }}
           aria-label="Path folder"
-          leftIcon="folder" mono style={{ flex: 1 }} placeholder="/path/ke/folder" />
+          leftIcon="folder" mono className="hn-prj-grow" placeholder="/path/ke/folder" />
         <Button size="sm" variant="secondary" onClick={() => load(draft.trim() || undefined)}>Buka</Button>
       </div>
-      <div aria-label="Sub-folder" style={{ border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", maxHeight: 320, overflow: "auto" }}>
+      <div aria-label="Sub-folder" className="hn-prj-picker-list">
         {loading ? <StateBlock kind="loading" compact title="Membuka folder…" />
           : err ? <StateBlock kind="error" compact title={err} hint={draft || undefined}
               action={() => load(draft.trim() || undefined)} />
@@ -86,5 +73,14 @@ export function FolderPicker({ open, onClose, onPick, start }:
             </>}
       </div>
     </Modal>
+  );
+}
+
+function FolderRow({ icon, name, onClick }: { icon: string; name: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="hn-prj-folder-row">
+      <Icon name={icon} size={16} color="var(--brass-700)" />
+      <span className="hn-prj-mono hn-prj-wrap">{name}</span>
+    </button>
   );
 }

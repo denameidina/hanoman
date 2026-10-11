@@ -129,12 +129,16 @@ export function IdeReadPanel({ projectId }: { projectId: string }) {
 function GraphRead({ projectId }: { projectId: string }) {
   const api = useApi();
   const [commits, setCommits] = React.useState<GraphCommit[] | null>(null);
+  const [commitErr, setCommitErr] = React.useState("");
   const [compareFrom, setCompareFrom] = React.useState<string | null>(null);
   const [compare, setCompare] = React.useState<{ from: string; to: string; changed: { path: string }[] } | null>(null);
   const [compareErr, setCompareErr] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    api.ideGraph(projectId, 100).then((g) => setCommits(g.commits)).catch(() => setCommits([]));
+    // Galat memuat tampil sebagai galat, bukan sebagai "Tak ada commit" (daftar kosong yang menyamar).
+    api.ideGraph(projectId, 100)
+      .then((g) => { setCommits(g.commits); setCommitErr(""); })
+      .catch((e: unknown) => { setCommits([]); setCommitErr(failureMessage("memuat riwayat", e)); });
   }, [projectId, api]);
 
   const onClickCommit = (sha: string) => {
@@ -172,6 +176,7 @@ function GraphRead({ projectId }: { projectId: string }) {
       )}
       <div style={{ padding: 8, overflow: "auto" }}>
         {commits === null ? <StateBlock kind="loading" compact title="Memuat riwayat…" />
+          : commitErr ? <StateBlock kind="error" compact title="Gagal memuat riwayat" hint={commitErr} />
           : commits.length === 0 ? <StateBlock kind="empty" compact icon="git-commit" title="Tak ada commit" />
           : commits.map((c) => (
               <button key={c.sha} onClick={() => onClickCommit(c.sha)} style={{

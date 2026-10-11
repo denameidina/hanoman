@@ -21,6 +21,8 @@ Dokumen ini adalah kontrak untuk teks yang tampil ke operator. Kode penegaknya: 
 | Retry | **Coba lagi** (galat), **Kirim ulang** (pengiriman) | Retry | Istilah teknis di kutipan kode dikecualikan. |
 | Nilai enum | label dari `lib/labels.ts` | nilai mentah | Lihat "Enum" di bawah. |
 | Waktu relatif | "baru saja", "5 menit lalu", "2 jam lalu", "kemarin", "3 hari lalu", lalu tanggal ("4 Okt") | "5m lalu", "5 mnt", "2j lalu", "baru saja lalu" | Lihat "Waktu relatif" di bawah. |
+| Mode tampilan terminal | **Fokus** (satu pane + daftar sesi), **Grid** (beberapa pane) | Split, Tabs, Panel | Default Fokus sejak Fase 3E. Pilihan tersimpan per browser. |
+| Buka sesi lain | **Buka…** (menu: Ambil backlog, Riwayat sesi, Terminal biasa) | Impor, Attach | Pemicu bertulisan di toolbar Terminal. |
 
 ## Aturan voice
 
@@ -83,12 +85,9 @@ Daftar ini sama dengan allowlist `UTANG Fase 3`. Setiap baris dihapus dari allow
 
 | Berkas | Copy | Mengapa belum |
 |---|---|---|
-| `screens/AutoMergeCard.tsx` | "… menyisakan setelan basi." | Redesign Backlog · auto-merge |
-| `screens/DocsWorkspace.tsx` | eyebrow "Cakupan SoT" | Redesign Docs |
 | `screens/LogsPanel.tsx` | `aria-label="Device"` | Di luar wilayah Fase 2D (copy, bukan label dedupe) |
 | `screens/PhasePlanPreview.tsx` | "Pratinjau ini memakai Setting hub ini…" | Keputusan istilah server pusat |
 | `screens/ReconcileModal.tsx` | "Hub …" (4 kalimat) | Keputusan istilah server pusat |
-| `screens/SettingsScreen.tsx` | "… SoT, ADR, plan, kode, riwayat git …" | Redesign Settings · lead |
 | `screens/SyncButton.tsx` | "Instance ini hub", "… ke hub …" | Keputusan istilah server pusat |
 | `screens/WebhookDocs.tsx` | "bisa basi", "Retry, pengiriman ganda…", "… retry setelah …" | Keputusan "Retry" → "Kirim ulang" |
 | `ds/shell.tsx` | nav "Docs · SoT" | Berkas milik agen 3A (shell) |
@@ -97,8 +96,8 @@ Sisa di luar pemindai (bukan wilayah Fase 2D, tercatat untuk Fase 3):
 
 - `notifications/NotificationBell.tsx`, `notifications/NotificationsArchiveModal.tsx`: waktu relatif sendiri (`5m lalu`, `2j lalu`). Ganti ke `relativeTime`.
 - `portal/labels.ts`: peta kategori dan prioritas klien (`Prioritas tinggi`) masih berdiri sendiri. Pusatkan bila portal masuk cakupan.
-- `screens/VpsChecklist.tsx`: enum mentah di tooltip baris (`${item.mode} · severity ${item.severity}`) dan lencana. Peta `VPS_ITEM_STATUS_LABEL` dan `VPS_SEVERITY_LABEL` sudah ada di `lib/labels.ts`, tinggal dipakai.
-- `screens/SpecDocsModal.tsx` (`KIND_LABEL`), `screens/SettingsScreen.tsx` (`GROUP_LABEL`, `SOURCE_WORD`, `APPLY_WORD`), `screens/RemoteControlPanel.tsx` (`RELAY_LABEL`): peta lokal yang belum dipindah.
+- `screens/VpsChecklist.tsx`: peta `MODE_LABEL` (Otomatis/Audit/Info) masih lokal. Pindahkan ke `lib/labels.ts`. Tooltip dan lencana sudah memakai `VPS_SEVERITY_LABEL` dan `VPS_ITEM_STATUS_LABEL` (Fase 3J).
+- `screens/SpecDocsModal.tsx` (`KIND_LABEL`), `screens/settings/Advanced.tsx` (`GROUP_LABEL`, `SOURCE_WORD`, `APPLY_WORD`; pindah dari `SettingsScreen.tsx` di Fase 3C), `screens/RemoteControlPanel.tsx` (`RELAY_LABEL`): peta lokal yang belum dipindah.
 
 ## Keputusan terbuka
 

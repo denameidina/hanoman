@@ -1,30 +1,35 @@
-/* SchedulerScreen — panel scheduler otonom (SPEC-299, daun #6 ADR-0072). Screen mandiri (pola
-   VpsScreen): memuat state fondasi sendiri lewat HTTP. Menampilkan status per sumber, sesi berjalan,
-   antrean, gagal + alasan, done + link review; panel setelan menulis semua knob
-   (PUT /api/scheduler/config), opt-in per project (pola helpEnabled → PATCH /projects/:id), dan rem
-   darurat Jeda/Hentikan (keduanya lewat dialog konfirmasi yang menyebut dampaknya).
-   SPEC-908 · realtime kini lewat langganan berparameter di `/events/ws` — topik `schedulerState`
-   untuk layar dan `schedulerQueue` per seksi antrean; HTTP tinggal muat awal + fallback saat
-   server belum punya topiknya. Penanda `nonce` SPEC-523 dicabut bersamanya.
-   Audit UI/UX 2026-10 (1G): antrean di atas, setelan di bawah; seksi kosong (Gagal, Dibatalkan)
-   disembunyikan; galat muat tampil sebagai galat; input angka tak memaksa nilai saat diketik. */
+/* SchedulerScreen — tab Scheduler di hub Otonom (ADR-0205). Redesign Audit UI/UX 2026-10 · Fase 3I:
+   - Strip status satu baris di atas: state (Berjalan/Dijeda/Berhenti), kapasitas "N dari M sesi", limit
+     ringkas, dan kendali. Jeda/Lanjutkan biasa; Hentikan rem darurat (danger, lewat konfirmasi).
+   - Lima tab: Antre · Berjalan · Riwayat (Selesai/Gagal/Dibatalkan sebagai filter chip) · Cron · Setelan.
+     Tab aktif bertahan di `hn.ui` (ADR-0115). Tab kosong hanya menampilkan satu baris keterangan.
+   - Setelan memakai bahasa biasa dengan draft + Simpan. Orkestrasi per flow ada di bawahnya sebagai
+     baris yang bisa dibuka, dan tersimpan saat diubah (pola Settings 3C).
+   Realtime tetap lewat `/events/ws` (SPEC-908): `schedulerState` untuk strip dan tab Berjalan,
+   `schedulerQueue` per seksi antrean yang sedang tampil. HTTP hanya untuk muat awal dan fallback. */
 import React from "react";
-import { Card, Button, Badge, Select, Switch, Input, StateBlock, Icon, Pager, serverPage, LiveConnectionBadge, useConfirm } from "../ds";
+import {
+  Badge, Button, Field, Input, Select, StateBlock, Switch, Pager, serverPage, LiveConnectionBadge, useConfirm,
+  Tabs, TabPanel, RowList, DenseRow, ProgressBar, StatusPill, SkeletonList,
+} from "../ds";
+import { LimitBadge, CodexLimitBadge } from "./LimitIndicator";
 import { api } from "../api/client";
 import { useLiveTopic } from "../api/live";
 import type {
-  SchedulerStateView, SchedulerQueueItemView, SchedulerSessionView, SchedulerSourceView, Scheduler,
-  TopicParams, LaunchStatus, OrchestrationFlow,
+  Orchestration, Setting, SchedulerStateView, SchedulerQueueItemView, SchedulerSessionView, SchedulerSourceView,
+  Scheduler, LaunchStatus, OrchestrationFlow, TopicParams,
 } from "@hanoman/shared";
 import { SCHEDULER_DEFAULTS } from "@hanoman/shared";
 import type { ProjectVM, SpecSlim } from "./types";
 import { specDeepLink } from "./deeplink";
 import { SchedulerCrons } from "./SchedulerCrons";
-import { FLOW_LABEL } from "./OrchestrationPanel";
-import { usePersistedState, isNum } from "../ui-state";
+import { OrchestrationPanel, FLOW_LABEL } from "./OrchestrationPanel";
+import { usePersistedState, isNum, oneOf } from "../ui-state";
 import { failureMessage } from "../lib/report-error";
 import { PRIORITY_LABEL, QUEUE_SOURCE_LABEL, labelOf } from "../lib/labels";
 import { agoLabel, untilLabel, clampNumber, InlineError, useServerDraft } from "./sched-lead-shared";
+import { rebaseEdits } from "./settings-rebase";
+import "./styles/scheduler.css";
 
 // SPEC-908 · tinggal kadens FALLBACK; jalur normalnya langganan `/events/ws`.
 const POLL_MS = 5000;
@@ -32,9 +37,17 @@ const QUEUE_PAGE = 10;
 // Status antrean yang punya seksinya sendiri — disempitkan dari `string` supaya cocok
 // dengan skema parameter topik `schedulerQueue`.
 type QueueStatus = TopicParams["schedulerQueue"]["status"];
+type Tone = NonNullable<React.ComponentProps<typeof Badge>["tone"]>;
+
+type MainTab = "antre" | "berjalan" | "riwayat" | "cron" | "setelan";
+const MAIN_TABS: readonly MainTab[] = ["antre", "berjalan", "riwayat", "cron", "setelan"];
+type HistoryStatus = "done" | "failed" | "canceled";
+const HISTORY_STATUSES: readonly HistoryStatus[] = ["done", "failed", "canceled"];
+// Label huruf-besar untuk chip riwayat. `QUEUE_STATUS_LABEL` sengaja huruf kecil (dipakai dalam kalimat).
+const HISTORY_LABEL: Record<HistoryStatus, string> = { done: "Selesai", failed: "Gagal", canceled: "Dibatalkan" };
 
 // Istilah baku per enum ada di lib/labels.ts: layar tak pernah menampilkan nilai mentah (`backlog`, `tinggi`, …).
-const PRIO_TONE: Record<string, string> = { tinggi: "err", sedang: "warn", rendah: "neutral" };
+const PRIO_TONE: Record<string, Tone> = { tinggi: "err", sedang: "warn", rendah: "neutral" };
 const AUTONOMY_OPTIONS = [
   { value: "butuh-keputusan", label: "Berhenti dan minta keputusan dulu" },
   { value: "full-control", label: "Jalan sampai selesai tanpa berhenti" },
@@ -56,131 +69,105 @@ function titleFor(specId: string, backlog: SpecSlim[]): string {
   return backlog.find((s) => s.id === specId)?.title ?? specId;
 }
 
-function SourceCard({ s }: { s: SchedulerSourceView }) {
-  return (
-    <div style={{ padding: "12px 14px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-md)",
-      background: "var(--surface-card)", display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 180 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontWeight: 600, color: "var(--text-strong)" }}>{labelOf(QUEUE_SOURCE_LABEL, s.id)}</span>
-        <Badge tone={s.enabled ? "ok" : "neutral"} size="sm">{s.enabled ? "aktif" : "nonaktif"}</Badge>
-      </div>
-      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
-        cek tiap {s.everyMin} menit
-      </div>
-      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-        {s.lastRunAt ? `terakhir ${agoLabel(s.lastRunAt)}` : "belum pernah dicek"}
-        {" · "}
-        {s.nextRunAt ? `berikutnya ${untilLabel(s.nextRunAt)}` : "belum dijadwalkan"}
-      </div>
-    </div>
-  );
+function RowTitle({ specId, ctx }: { specId: string; ctx: Ctx }) {
+  return <span className="hn-sched-row-title">{titleFor(specId, ctx.backlog)}</span>;
 }
 
-function RowShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 12px",
-      border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)", marginBottom: 6 }}>
-      {children}
-    </div>
-  );
-}
+// ---------------------------------------------------------------- baris per status antrean
 
-function QueueRow({ q, ctx, onCancel, busy }:
-  { q: SchedulerQueueItemView; ctx: Ctx; onCancel: (id: string) => void; busy: boolean }) {
+function QueuedRow({ q, ctx, busy, onCancel }:
+  { q: SchedulerQueueItemView; ctx: Ctx; busy: boolean; onCancel: (id: string) => void }) {
+  // SPEC-522 · tanpa dialog konfirmasi: tindakannya reversibel lewat "Antre lagi" di Riwayat.
   return (
-    <RowShell>
-      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, ctx.backlog)}</span>
-        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
+    <DenseRow actions={<Button size="sm" variant="ghost" leftIcon="ban" disabled={busy} onClick={() => onCancel(q.id)}>Batalkan</Button>}>
+      <span className="hn-sched-row-text">
+        <span className="hn-sched-row-head">
+          <RowTitle specId={q.specId} ctx={ctx} />
+          <Badge tone={PRIO_TONE[q.priority] ?? "neutral"} size="sm">{labelOf(PRIORITY_LABEL, q.priority)}</Badge>
+        </span>
+        <span className="hn-sched-row-meta">
           {ctx.projectName(q.projectId)} · {labelOf(QUEUE_SOURCE_LABEL, q.source)}{q.note ? ` · ${q.note}` : ""}
         </span>
       </span>
-      <Badge tone={(PRIO_TONE[q.priority] ?? "neutral") as never} size="sm">{labelOf(PRIORITY_LABEL, q.priority)}</Badge>
-      {/* SPEC-522 · tanpa dialog konfirmasi: tindakannya reversibel lewat "Antre lagi", dan
-          konfirmasi untuk tindakan reversibel adalah gesekan tanpa hasil. */}
-      <Button size="sm" variant="ghost" leftIcon="ban" disabled={busy} onClick={() => onCancel(q.id)}>Batalkan</Button>
-    </RowShell>
+    </DenseRow>
   );
 }
 
-// SPEC-522 · ADR-0106 · baris tombstone: ia sengaja TIDAK dihapus — `enqueue` (`upsert`
-// ber-`update:{}`) karena itu tak bisa menghidupkannya lagi saat checker `backlog` menjumpai spec
-// yang sama pada cadence berikutnya.
-function CanceledRow({ q, ctx, onRequeue, busy }:
-  { q: SchedulerQueueItemView; ctx: Ctx; onRequeue: (id: string) => void; busy: boolean }) {
-  return (
-    <RowShell>
-      <Icon name="ban" size={16} color="var(--text-subtle)" />
-      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, ctx.backlog)}</span>
-        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
-          {ctx.projectName(q.projectId)} · {labelOf(QUEUE_SOURCE_LABEL, q.source)} · {q.note ?? "dibatalkan"}
-        </span>
-      </span>
-      <Button size="sm" variant="ghost" leftIcon="rotate-ccw" disabled={busy} onClick={() => onRequeue(q.id)}>Antre lagi</Button>
-    </RowShell>
-  );
-}
-
-function SessionRow({ s, ctx, onGotoTerminal }: { s: SchedulerSessionView; ctx: Ctx; onGotoTerminal: (sessionId: string) => void }) {
+function SessionRow({ s, ctx, onGotoTerminal }:
+  { s: SchedulerSessionView; ctx: Ctx; onGotoTerminal: (sessionId: string) => void }) {
   const flow = s.flow ? (FLOW_LABEL[s.flow as OrchestrationFlow] ?? s.flow) : "";
   return (
-    <RowShell>
-      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(s.specId, ctx.backlog)}</span>
-        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
-          {ctx.projectName(s.projectId)}{flow ? ` · ${flow}` : ""}
+    <DenseRow actions={<Button size="sm" variant="ghost" leftIcon="terminal" onClick={() => onGotoTerminal(s.id)}>Buka terminal</Button>}>
+      <span className="hn-sched-row-text">
+        <span className="hn-sched-row-head">
+          <RowTitle specId={s.specId} ctx={ctx} />
+          {s.decision && <Badge tone="warn" icon="bell" size="sm">menunggu kamu</Badge>}
         </span>
+        <span className="hn-sched-row-meta">{ctx.projectName(s.projectId)}{flow ? ` · ${flow}` : ""}</span>
       </span>
-      {s.decision && <Badge tone="warn" icon="bell" size="sm">menunggu kamu</Badge>}
-      <Button size="sm" variant="ghost" leftIcon="terminal" onClick={() => onGotoTerminal(s.id)}>Buka terminal</Button>
-    </RowShell>
+    </DenseRow>
   );
 }
 
-function DoneRow({ q, ctx, onToast }: { q: SchedulerQueueItemView; ctx: Ctx; onToast: SchedulerScreenProps["onToast"] }) {
+function DoneRow({ q, ctx, onToast }:
+  { q: SchedulerQueueItemView; ctx: Ctx; onToast: SchedulerScreenProps["onToast"] }) {
   const link = specDeepLink(q.specId);
   return (
-    <RowShell>
-      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, ctx.backlog)}</span>
-        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
-          {/* SPEC-431 · baris yang ditutup gerbang "spec sudah selesai" tak pernah punya sesi;
-              "selesai —" akan terbaca seolah scheduler yang menyelesaikannya. */}
+    <DenseRow actions={<>
+      <Button size="sm" variant="ghost" leftIcon="external-link" onClick={() => window.open(link, "_blank", "noreferrer")}>Buka review</Button>
+      <Button size="sm" variant="ghost" leftIcon="copy" onClick={() => { void navigator.clipboard?.writeText(link); onToast("Link review disalin", "ok", "copy"); }}>Salin</Button>
+    </>}>
+      <span className="hn-sched-row-text">
+        <RowTitle specId={q.specId} ctx={ctx} />
+        {/* SPEC-431 · baris yang ditutup gerbang "spec sudah selesai" tak pernah punya sesi;
+            "selesai —" akan terbaca seolah scheduler yang menyelesaikannya. */}
+        <span className="hn-sched-row-meta">
           {ctx.projectName(q.projectId)} · {labelOf(QUEUE_SOURCE_LABEL, q.source)} · {q.launchedAt ? `selesai ${agoLabel(q.launchedAt)}` : (q.note ?? "tidak diluncurkan")}
         </span>
       </span>
-      <Button size="sm" variant="ghost" leftIcon="external-link" onClick={() => window.open(link, "_blank", "noreferrer")}>Buka review</Button>
-      <Button size="sm" variant="ghost" leftIcon="copy" onClick={() => { void navigator.clipboard?.writeText(link); onToast("Link review disalin", "ok", "copy"); }}>Salin</Button>
-    </RowShell>
+    </DenseRow>
   );
 }
 
-// Gagal punya jalan keluar: "Antre ulang" mengembalikan item ke antrean (lihat rowAction).
+// Gagal punya jalan keluar: "Antre ulang" mengembalikan item ke antrean (server: ADR-0204, butuh sessions:spawn).
 function FailedRow({ q, ctx, onRequeue, busy }:
   { q: SchedulerQueueItemView; ctx: Ctx; onRequeue: (id: string) => void; busy: boolean }) {
   return (
-    <RowShell>
-      <Icon name="x-circle" size={16} color="var(--clay-500)" />
-      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, ctx.backlog)}</span>
-        <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
-          {ctx.projectName(q.projectId)} · {q.note ?? "gagal tanpa alasan tercatat"}
-        </span>
+    <DenseRow actions={<Button size="sm" variant="secondary" leftIcon="rotate-ccw" disabled={busy} onClick={() => onRequeue(q.id)}>Antre ulang</Button>}>
+      <span className="hn-sched-row-text">
+        <RowTitle specId={q.specId} ctx={ctx} />
+        <span className="hn-sched-row-meta">{ctx.projectName(q.projectId)} · {q.note ?? "gagal tanpa alasan tercatat"}</span>
       </span>
-      <Button size="sm" variant="secondary" leftIcon="rotate-ccw" disabled={busy} onClick={() => onRequeue(q.id)}>Antre ulang</Button>
-    </RowShell>
+    </DenseRow>
   );
 }
 
-/* SPEC-523 · satu bagian antrean = satu daftar berhalaman yang memuat datanya sendiri.
-   Galat muat TAMPIL sebagai galat dengan Coba lagi — bukan sebagai "Antrean kosong", yang berbohong. */
-function QueueSection({ title, what, status, count, empty, render }: {
-  title: string; what: string; status: QueueStatus; count: number; empty: string;
+// SPEC-522 · ADR-0106 · baris tombstone: ia sengaja TIDAK dihapus — `enqueue` (`upsert` ber-`update:{}`)
+// karena itu tak bisa menghidupkannya lagi saat checker `backlog` menjumpai spec yang sama.
+function CanceledRow({ q, ctx, onRequeue, busy }:
+  { q: SchedulerQueueItemView; ctx: Ctx; onRequeue: (id: string) => void; busy: boolean }) {
+  return (
+    <DenseRow actions={<Button size="sm" variant="ghost" leftIcon="rotate-ccw" disabled={busy} onClick={() => onRequeue(q.id)}>Antre lagi</Button>}>
+      <span className="hn-sched-row-text">
+        <RowTitle specId={q.specId} ctx={ctx} />
+        <span className="hn-sched-row-meta">
+          {ctx.projectName(q.projectId)} · {labelOf(QUEUE_SOURCE_LABEL, q.source)} · {q.note ?? "dibatalkan"}
+        </span>
+      </span>
+    </DenseRow>
+  );
+}
+
+/* SPEC-523 · satu seksi antrean = satu daftar berhalaman yang memuat datanya sendiri (status + halaman).
+   Galat muat TAMPIL sebagai galat dengan Coba lagi — bukan sebagai "Antrean kosong", yang berbohong.
+   Tanpa `count` > 0 seksi tak memuat apa pun: tab kosong cukup satu baris keterangan. */
+function QueueSection({ what, status, count, empty, render }: {
+  what: string; status: QueueStatus; count: number; empty: string;
   render: (q: SchedulerQueueItemView) => React.ReactNode;
 }) {
   const [items, setItems] = React.useState<SchedulerQueueItemView[]>([]);
   const [total, setTotal] = React.useState(0);
+  const [loaded, setLoaded] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   // SPEC-740 · ADR-0115 · tiga seksi antrean memakai komponen yang SAMA — kuncinya wajib
   // memuat `status`, kalau tidak ketiganya berbagi satu nomor halaman.
@@ -188,81 +175,128 @@ function QueueSection({ title, what, status, count, empty, render }: {
 
   const load = React.useCallback(() => {
     api.getSchedulerQueue({ status, page, limit: QUEUE_PAGE })
-      .then((r) => { setItems(r.items); setTotal(r.total); setError(null); })
-      .catch((e) => setError(failureMessage(`memuat ${what}`, e)));
+      .then((r) => { setItems(r.items); setTotal(r.total); setError(null); setLoaded(true); })
+      .catch((e) => { setError(failureMessage(`memuat ${what}`, e)); setLoaded(true); });
   }, [status, page, what]);
   React.useEffect(() => { load(); }, [load]);
-  // SPEC-908 · tiap seksi berlangganan (status, halaman)-nya SENDIRI, jadi penanda muat-ulang
-  // `nonce` (SPEC-523) — yang dulu di-bump oleh poll state 5 dtk — tak punya pekerjaan lagi.
+  // SPEC-908 · tiap seksi berlangganan (status, halaman)-nya SENDIRI.
   useLiveTopic({
     topic: "schedulerQueue", params: { status, page, limit: QUEUE_PAGE },
-    apply: (m) => { setItems(m.data.items); setTotal(m.data.total); setError(null); },
+    apply: (m) => { setItems(m.data.items); setTotal(m.data.total); setError(null); setLoaded(true); },
     refetch: () => { load(); }, pollMs: POLL_MS,
   });
 
+  if (error) return <InlineError message={error} onRetry={load} />;
+  if (count === 0) return <p className="hn-sched-empty">{empty}</p>;
+  if (!loaded) return <SkeletonList rows={3} label={`Memuat ${what}…`} />;
   const sp = serverPage(total, page, QUEUE_PAGE);
   return (
-    <Card eyebrow="scheduler" title={`${title}${count ? ` · ${count}` : ""}`}>
-      {error
-        ? <InlineError message={error} onRetry={load} />
-        : count === 0
-          ? <div style={{ fontSize: "var(--text-sm)", color: "var(--text-subtle)" }}>{empty}</div>
-          : <>
-            {items.map((q) => render(q))}
-            <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to}
-              onPage={setPage} unit="item" />
-          </>}
-    </Card>
+    <>
+      <RowList label={what}>{items.map((q) => render(q))}</RowList>
+      <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to}
+        onPage={setPage} unit="item" />
+    </>
   );
 }
 
-// Rem darurat. Jeda & Hentikan MINTA KONFIRMASI (dialog menyebut dampaknya) lewat `onAsk`; Hentikan
-// memakai varian `danger` supaya hierarkinya terbaca: rem darurat, bukan tombol sekunder biasa.
-function ControlBar({ cfg, cap, liveCount, onWrite, onAsk, busy }:
+// Riwayat: chip status (hanya yang punya isi) + satu seksi antrean untuk status yang dipilih.
+// Status awal = yang paling perlu perhatian: Gagal, lalu Selesai, lalu Dibatalkan.
+function HistoryPanel({ counts, ctx, busyId, onRowAction, onToast }: {
+  counts: Record<HistoryStatus, number>; ctx: Ctx; busyId: string | null;
+  onRowAction: (id: string, kind: "cancel" | "requeue") => void | Promise<void>;
+  onToast: SchedulerScreenProps["onToast"];
+}) {
+  const available = HISTORY_STATUSES.filter((s) => (counts[s] ?? 0) > 0);
+  const initial: HistoryStatus = (counts.failed ?? 0) > 0 ? "failed" : (counts.done ?? 0) > 0 ? "done" : "canceled";
+  const [picked, setPicked] = usePersistedState<HistoryStatus>("scheduler", "riwayatStatus", initial,
+    oneOf<HistoryStatus>("done", "failed", "canceled"));
+  if (available.length === 0) return <p className="hn-sched-empty">Belum ada riwayat.</p>;
+  const active: HistoryStatus = available.includes(picked) ? picked : (available[0] as HistoryStatus);
+  const requeue = (id: string) => void onRowAction(id, "requeue");
+  const render = (q: SchedulerQueueItemView) => {
+    const busy = busyId === q.id;
+    if (active === "done") return <DoneRow key={q.id} q={q} ctx={ctx} onToast={onToast} />;
+    if (active === "failed") return <FailedRow key={q.id} q={q} ctx={ctx} onRequeue={requeue} busy={busy} />;
+    return <CanceledRow key={q.id} q={q} ctx={ctx} onRequeue={requeue} busy={busy} />;
+  };
+  return (
+    <>
+      <div role="group" aria-label="Filter riwayat" className="hn-sched-chips">
+        {available.map((s) => (
+          <button key={s} type="button" className="hn-sched-chip hn-touch-target" aria-pressed={s === active}
+            onClick={() => setPicked(s)}>
+            {HISTORY_LABEL[s]}
+            <span className="hn-sched-chip-count">{counts[s]}</span>
+          </button>
+        ))}
+      </div>
+      <QueueSection key={active} what={`item ${HISTORY_LABEL[active].toLowerCase()}`} status={active}
+        count={counts[active] ?? 0} empty="Belum ada riwayat." render={render} />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- strip status
+
+/* Strip satu baris: state, kapasitas, limit ringkas, dan kendali. Jeda/Lanjutkan memakai tombol biasa;
+   Hentikan rem darurat (danger, dipisah garis) dan MINTA KONFIRMASI lewat `onAsk`. */
+function StatusStrip({ cfg, cap, liveCount, onWrite, onAsk, busy }:
   { cfg: Scheduler; cap: number; liveCount: number;
     onWrite: (next: Scheduler, msg: string) => void;
     onAsk: (next: Scheduler, kind: "jeda" | "hentikan") => void; busy: boolean }) {
-  const stopped = !cfg.enabled;
-  const tone = stopped ? "neutral" : cfg.paused ? "warn" : "ok";
-  const label = stopped ? "berhenti" : cfg.paused ? "dijeda" : "aktif";
+  const state = !cfg.enabled
+    ? { status: "stopped", label: "Berhenti" }
+    : cfg.paused ? { status: "paused", label: "Dijeda" } : { status: "running", label: "Berjalan" };
+  const full = liveCount >= cap;
   return (
-    <Card eyebrow="scheduler · kendali" title="Kendali scheduler">
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <Badge tone={tone as never}>{label}</Badge>
-        <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>{liveCount} / {cap} sesi hidup</span>
-        <LiveConnectionBadge />
-        <span style={{ flex: 1 }} />
-        {cfg.enabled && (cfg.paused
-          ? <Button size="sm" variant="secondary" leftIcon="play" disabled={busy}
-              onClick={() => onWrite({ ...cfg, paused: false }, "Scheduler dilanjutkan")}>Lanjutkan</Button>
-          : <Button size="sm" variant="secondary" leftIcon="pause" disabled={busy}
-              onClick={() => onAsk({ ...cfg, paused: true }, "jeda")}>Jeda</Button>)}
+    <section aria-label="Status scheduler" className="hn-sched-strip">
+      <StatusPill status={state.status} variant="dot">{state.label}</StatusPill>
+      <div className="hn-sched-capacity">
+        <ProgressBar value={liveCount} max={Math.max(cap, 1)} size="sm" tone={full ? "warn" : "brass"}
+          label={`${liveCount} dari ${cap} sesi`} />
+      </div>
+      <div className="hn-sched-limits">
+        <LimitBadge />
+        <CodexLimitBadge />
+      </div>
+      <LiveConnectionBadge />
+      <div className="hn-sched-strip-actions">
         {cfg.enabled
-          ? <Button size="sm" variant="danger" leftIcon="square" disabled={busy}
-              onClick={() => onAsk({ ...cfg, enabled: false }, "hentikan")}>Hentikan</Button>
+          ? (cfg.paused
+            ? <Button size="sm" leftIcon="play" disabled={busy}
+                onClick={() => onWrite({ ...cfg, paused: false }, "Scheduler dilanjutkan")}>Lanjutkan</Button>
+            : <Button size="sm" variant="secondary" leftIcon="pause" disabled={busy}
+                onClick={() => onAsk({ ...cfg, paused: true }, "jeda")}>Jeda</Button>)
           : <Button size="sm" leftIcon="play" disabled={busy}
               onClick={() => onWrite({ ...cfg, enabled: true }, "Scheduler diaktifkan")}>Aktifkan</Button>}
+        {cfg.enabled && (
+          <>
+            <span className="hn-sched-strip-divider" aria-hidden="true" />
+            <Button size="sm" variant="danger" leftIcon="square" disabled={busy}
+              onClick={() => onAsk({ ...cfg, enabled: false }, "hentikan")}>Hentikan</Button>
+          </>
+        )}
       </div>
-    </Card>
+    </section>
   );
 }
 
+// ---------------------------------------------------------------- setelan
+
 // Pemeriksaan sebelum peluncuran (launchGuard, ADR-0161/0170) — status saat ini, bahasa biasa.
-function AdmissionStatus({ status }: { status: LaunchStatus }) {
+function AdmissionLine({ status }: { status: LaunchStatus }) {
   return (
-    <Card eyebrow="host · peluncuran sesi" title="Pemeriksaan sebelum peluncuran">
-      <div aria-label="Status pemeriksaan peluncuran" style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", lineHeight: 1.6 }}>
-        <div>Pemeriksaan {status.enabled ? "aktif" : "nonaktif"} · {status.liveCount} dari batas {status.maxConcurrent} sesi berjalan ({status.liveAgentCount} di antaranya agen)</div>
-        <div>Beban CPU per inti: {status.loadStatus === "available" && status.loadPerCore !== null
-          ? status.loadPerCore.toFixed(2) : "tidak tersedia"}
-          {status.loadStatus === "unsupported" ? " (tidak didukung platform)" : ""} · batas {status.maxLoadPerCore}</div>
-        <div>Memori bebas: {status.memStatus === "available" && status.memAvailablePct !== null
-          ? `${status.memAvailablePct.toFixed(0)}%` : "tidak tersedia"} · minimal {status.minMemAvailablePct}%</div>
-        <div style={{ fontSize: "var(--text-xs)", marginTop: 6 }}>
-          Berlaku juga saat scheduler berhenti. Terminal dan shell tetap bisa dibuka, dan keduanya ikut dihitung dalam batas sesi.
-        </div>
+    <div aria-label="Status pemeriksaan peluncuran" className="hn-sched-guard-status">
+      <div>Pemeriksaan {status.enabled ? "aktif" : "nonaktif"} · {status.liveCount} dari batas {status.maxConcurrent} sesi berjalan ({status.liveAgentCount} di antaranya agen)</div>
+      <div>Beban CPU per inti: {status.loadStatus === "available" && status.loadPerCore !== null
+        ? status.loadPerCore.toFixed(2) : "tidak tersedia"}
+        {status.loadStatus === "unsupported" ? " (tidak didukung platform)" : ""} · batas {status.maxLoadPerCore}</div>
+      <div>Memori bebas: {status.memStatus === "available" && status.memAvailablePct !== null
+        ? `${status.memAvailablePct.toFixed(0)}%` : "tidak tersedia"} · minimal {status.minMemAvailablePct}%</div>
+      <div className="hn-sched-note">
+        Berlaku juga saat scheduler berhenti. Terminal dan shell tetap bisa dibuka, dan keduanya ikut dihitung dalam batas sesi.
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -307,7 +341,13 @@ const payloadFrom = (f: SettingsForm, cfg: Scheduler): Scheduler => {
   };
 };
 
-function SettingsPanel({ cfg, onWrite, busy }: { cfg: Scheduler; onWrite: (next: Scheduler) => void; busy: boolean }) {
+const sourceFacts = (s: SchedulerSourceView): string =>
+  `${s.lastRunAt ? `terakhir ${agoLabel(s.lastRunAt)}` : "belum pernah dicek"} · ${s.nextRunAt ? `berikutnya ${untilLabel(s.nextRunAt)}` : "belum dijadwalkan"}`;
+
+function SettingsPanel({ cfg, sources, admission, onWrite, busy }: {
+  cfg: Scheduler; sources: SchedulerSourceView[]; admission: LaunchStatus | undefined;
+  onWrite: (next: Scheduler) => void; busy: boolean;
+}) {
   const { draft, setDraft, dirty } = useServerDraft<SettingsForm>(formOf(cfg));
   // Jepit semua angka ke rentang yang sah dan tampilkan hasilnya (tanpa menyimpan).
   const normalize = (d: SettingsForm): SettingsForm => formOf(payloadFrom(d, cfg));
@@ -323,79 +363,74 @@ function SettingsPanel({ cfg, onWrite, busy }: { cfg: Scheduler; onWrite: (next:
   const setSrc = (k: "backlog" | "triase", patch: Partial<SettingsForm["sources"]["backlog"]>) =>
     setDraft((d) => ({ ...d, sources: { ...d.sources, [k]: { ...d.sources[k], ...patch } } }));
   return (
-    <Card eyebrow="scheduler · setelan" title="Setelan"
-      actions={<Button size="sm" leftIcon="save" disabled={busy} onClick={commit}>Simpan setelan</Button>}>
-      <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 14 }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span className="hn-eyebrow">Batas sesi berjalan</span>
-          <Input type="number" min={1} value={draft.maxConcurrent} aria-label="Batas sesi berjalan" placeholder="mis. 6"
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((d) => ({ ...d, maxConcurrent: e.target.value }))}
-            onBlur={blur} onKeyDown={enterCommits} />
-        </label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span className="hn-eyebrow">Mode otonomi</span>
+    <div className="hn-sched-panel">
+      <section className="hn-sched-group" aria-labelledby="sched-set-sesi">
+        <h3 id="sched-set-sesi" className="hn-sched-group-title">Sesi</h3>
+        <div className="hn-sched-grid">
+          <Field label="Batas sesi bersamaan" hint="Termasuk terminal dan shell yang kamu buka sendiri.">
+            <Input type="number" min={1} value={draft.maxConcurrent} aria-label="Batas sesi bersamaan" placeholder="mis. 6"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((d) => ({ ...d, maxConcurrent: e.target.value }))}
+              onBlur={blur} onKeyDown={enterCommits} />
+          </Field>
+          <Field label="Saat ada keputusan yang belum jelas" hint="Keputusan yang ambigu tetap ditanyakan ke lead atau kamu.">
             <Select value={draft.autonomy} aria-label="Mode otonomi"
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setDraft((d) => ({ ...d, autonomy: e.target.value as Scheduler["autonomy"] }))}
               options={AUTONOMY_OPTIONS} />
-          </label>
-          <span style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
-            Keputusan yang ambigu tetap ditanyakan ke lead atau kamu.
-          </span>
+          </Field>
         </div>
-      </div>
-      <div style={{ marginTop: 14, padding: "10px 12px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)" }}>
-        <Switch label="Pemeriksaan sebelum peluncuran" checked={draft.guardOn}
+      </section>
+
+      <section className="hn-sched-group" aria-labelledby="sched-set-peluncuran">
+        <h3 id="sched-set-peluncuran" className="hn-sched-group-title">Peluncuran</h3>
+        <Switch label="Tahan peluncuran saat server sibuk" checked={draft.guardOn}
           onChange={(on: boolean) => setDraft((d) => ({ ...d, guardOn: on }))} />
-        <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", lineHeight: 1.5 }}>
+        <p className="hn-sched-group-hint">
           Mencegah sesi baru diluncurkan saat batas sesi penuh, beban CPU per inti terlalu tinggi, atau memori
           bebas terlalu sedikit. Berlaku juga untuk peluncuran manual. Mematikannya melewati ketiga pemeriksaan
           itu. Terpisah dari saklar scheduler dan sumber.
         </p>
-        <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 14 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span className="hn-eyebrow">Batas beban CPU per inti</span>
-              <Input type="number" min={0.1} step="any" value={draft.maxLoad} aria-label="Batas beban CPU per inti" placeholder="mis. 2.5"
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((d) => ({ ...d, maxLoad: e.target.value }))}
-                onBlur={blur} onKeyDown={enterCommits} />
-            </label>
-            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>Di atas angka ini, sesi baru tidak diluncurkan.</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span className="hn-eyebrow">Memori bebas minimal (%)</span>
-              <Input type="number" min={0} max={100} step="any" value={draft.minMem} aria-label="Memori bebas minimal (%)" placeholder="mis. 15"
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((d) => ({ ...d, minMem: e.target.value }))}
-                onBlur={blur} onKeyDown={enterCommits} />
-            </label>
-            <span style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>Di bawah angka ini, sesi baru tidak diluncurkan.</span>
-          </div>
+        <div className="hn-sched-grid">
+          <Field label="Batas beban CPU per inti" hint="Di atas angka ini, sesi baru tidak diluncurkan.">
+            <Input type="number" min={0.1} step="any" value={draft.maxLoad} aria-label="Batas beban CPU per inti" placeholder="mis. 2.5"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((d) => ({ ...d, maxLoad: e.target.value }))}
+              onBlur={blur} onKeyDown={enterCommits} />
+          </Field>
+          <Field label="Memori bebas minimal (%)" hint="Di bawah angka ini, sesi baru tidak diluncurkan.">
+            <Input type="number" min={0} max={100} step="any" value={draft.minMem} aria-label="Memori bebas minimal (%)" placeholder="mis. 15"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((d) => ({ ...d, minMem: e.target.value }))}
+              onBlur={blur} onKeyDown={enterCommits} />
+          </Field>
         </div>
+        {admission && <AdmissionLine status={admission} />}
+      </section>
+
+      <section className="hn-sched-group" aria-labelledby="sched-set-sumber">
+        <h3 id="sched-set-sumber" className="hn-sched-group-title">Sumber otomatis</h3>
+        {(["backlog", "triase"] as const).map((k) => {
+          const src = sources.find((s) => s.id === k);
+          return (
+            <div key={k} className="hn-sched-source">
+              <Switch label={QUEUE_SOURCE_LABEL[k]} checked={draft.sources[k].enabled} onChange={(next: boolean) => setSrc(k, { enabled: next })} />
+              <span className="hn-sched-spacer" />
+              <label className="hn-sched-inline-field">
+                cek tiap
+                <Input type="number" min={1} aria-label={`Interval cek ${QUEUE_SOURCE_LABEL[k]}`}
+                  placeholder="mis. 30" value={draft.sources[k].everyMin}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSrc(k, { everyMin: e.target.value })}
+                  onBlur={blur} onKeyDown={enterCommits} />
+                menit
+              </label>
+              {src && <span className="hn-sched-source-facts">{sourceFacts(src)}</span>}
+            </div>
+          );
+        })}
+      </section>
+
+      <div className="hn-sched-savebar">
+        {dirty && <span role="status" className="hn-sched-note">Ada perubahan yang belum disimpan.</span>}
+        <Button leftIcon="save" disabled={busy} onClick={commit}>Simpan setelan</Button>
       </div>
-      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-        {(["backlog", "triase"] as const).map((k) => (
-          <div key={k} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-            padding: "10px 12px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)" }}>
-            <Switch label={QUEUE_SOURCE_LABEL[k]} checked={draft.sources[k].enabled} onChange={(next: boolean) => setSrc(k, { enabled: next })} />
-            <span style={{ flex: 1 }} />
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--text-xs)" }}>
-              cek tiap
-              <Input type="number" min={1} style={{ width: 84 }} aria-label={`Interval cek ${QUEUE_SOURCE_LABEL[k]}`}
-                placeholder="30" value={draft.sources[k].everyMin}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSrc(k, { everyMin: e.target.value })}
-                onBlur={blur} onKeyDown={enterCommits} />
-              menit
-            </label>
-          </div>
-        ))}
-      </div>
-      {dirty && (
-        <div role="status" style={{ marginTop: 12, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-          Ada perubahan yang belum disimpan.
-        </div>
-      )}
-    </Card>
+    </div>
   );
 }
 
@@ -403,24 +438,74 @@ function SettingsPanel({ cfg, onWrite, busy }: { cfg: Scheduler; onWrite: (next:
 function OptInPanel({ projects, onToggle, busyId }:
   { projects: ProjectVM[]; onToggle: (id: string, next: boolean) => void; busyId: string | null }) {
   return (
-    <Card eyebrow="scheduler · project" title="Project yang diizinkan">
-      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)", marginBottom: 10 }}>
-        Scheduler hanya menyentuh project yang diizinkan. Default: tidak diizinkan.
-      </div>
+    <section className="hn-sched-group" aria-labelledby="sched-set-project">
+      <h3 id="sched-set-project" className="hn-sched-group-title">Project yang diizinkan</h3>
+      <p className="hn-sched-group-hint">Scheduler hanya menyentuh project yang diizinkan. Default: tidak diizinkan.</p>
       {projects.length === 0
-        ? <div style={{ fontSize: "var(--text-sm)", color: "var(--text-subtle)" }}>Belum ada project.</div>
-        : projects.map((p) => (
-          <RowShell key={p.id}>
-            <span className="hn-grow" style={{ flex: 1, minWidth: 0, color: "var(--text-strong)", fontWeight: 500 }}>{p.name}</span>
-            <Badge tone={p.schedulerOptIn ? "ok" : "neutral"} size="sm">{p.schedulerOptIn ? "diizinkan" : "tidak diizinkan"}</Badge>
-            {p.schedulerOptIn
-              ? <Button size="sm" variant="ghost" leftIcon="ban" disabled={busyId === p.id} onClick={() => onToggle(p.id, false)}>Cabut izin</Button>
-              : <Button size="sm" leftIcon="check" disabled={busyId === p.id} onClick={() => onToggle(p.id, true)}>Izinkan</Button>}
-          </RowShell>
-        ))}
-    </Card>
+        ? <p className="hn-sched-empty">Belum ada project.</p>
+        : (
+          <RowList label="Project yang diizinkan">
+            {projects.map((p) => (
+              <DenseRow key={p.id} actions={p.schedulerOptIn
+                ? <Button size="sm" variant="ghost" leftIcon="ban" disabled={busyId === p.id} onClick={() => onToggle(p.id, false)}>Cabut izin</Button>
+                : <Button size="sm" leftIcon="check" disabled={busyId === p.id} onClick={() => onToggle(p.id, true)}>Izinkan</Button>}>
+                <span className="hn-sched-row-text">
+                  <span className="hn-sched-row-head">
+                    <span className="hn-sched-row-title">{p.name}</span>
+                    <Badge tone={p.schedulerOptIn ? "ok" : "neutral"} size="sm">{p.schedulerOptIn ? "diizinkan" : "tidak diizinkan"}</Badge>
+                  </span>
+                </span>
+              </DenseRow>
+            ))}
+          </RowList>
+        )}
+    </section>
   );
 }
+
+/* Orkestrasi per flow: dibaca dari `GET /settings` dan ditulis dengan pola Settings (rebase ke DB terbaru
+   sebelum PUT, supaya snapshot tab ini tak membalik perubahan lain). Setiap perubahan tersimpan langsung. */
+function useSettingsSnapshot(onToast: SchedulerScreenProps["onToast"]) {
+  const [setting, setSetting] = React.useState<Setting | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const load = React.useCallback(() => {
+    api.getSettings()
+      .then((s) => { setSetting(s); setError(null); })
+      .catch((e: unknown) => setError(failureMessage("memuat orkestrasi", e)));
+  }, []);
+  React.useEffect(() => { load(); }, [load]);
+  const writeOrchestration = React.useCallback(async (next: Orchestration, msg: string) => {
+    if (!setting) return;
+    const base = setting;
+    setSetting({ ...base, orchestration: next });
+    try {
+      const fresh = await api.getSettings().catch(() => undefined);
+      await api.putSettings(rebaseEdits(base, { ...base, orchestration: next }, fresh));
+      onToast(msg, "ok", "check-circle-2");
+    } catch (e) {
+      setSetting(base);
+      onToast(failureMessage("menyimpan orkestrasi", e), "err", "alert-triangle");
+    }
+  }, [setting, onToast]);
+  return { setting, error, load, writeOrchestration };
+}
+
+function OrchestrationSection({ snap }: { snap: ReturnType<typeof useSettingsSnapshot> }) {
+  return (
+    <section className="hn-sched-group" aria-labelledby="sched-set-orkestrasi">
+      <h3 id="sched-set-orkestrasi" className="hn-sched-group-title">Orkestrasi subagen per fase</h3>
+      <p className="hn-sched-group-hint">Perubahan tersimpan saat diubah. Buka satu flow untuk mengatur model dan effort per fase.</p>
+      {snap.error
+        ? <InlineError message={snap.error} onRetry={snap.load} />
+        : !snap.setting
+          ? <SkeletonList rows={2} label="Memuat orkestrasi…" />
+          : <OrchestrationPanel variant="accordion" orchestration={snap.setting.orchestration}
+              onChange={(next, msg) => void snap.writeOrchestration(next, msg)} />}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- layar
 
 export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, onGotoTerminal }: SchedulerScreenProps) {
   const { confirm, dialog } = useConfirm();
@@ -428,6 +513,8 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
   const [phase, setPhase] = React.useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = React.useState(false);
   const [busyId, setBusyId] = React.useState<string | null>(null);
+  const [tab, setTab] = usePersistedState<MainTab>("scheduler", "tab", "antre", oneOf<MainTab>(...MAIN_TABS));
+  const snap = useSettingsSnapshot(onToast);
   const load = React.useCallback((silent = false) => {
     if (!silent) setPhase("loading");
     api.getSchedulerState()
@@ -495,58 +582,61 @@ export function SchedulerScreen({ projects, backlog, onProjectChanged, onToast, 
     } finally { setBusyId(null); load(true); }
   }, [load, onToast]);
 
-  if (phase === "loading") return <StateBlock kind="loading" />;
+  if (phase === "loading") return <SkeletonList rows={4} label="Memuat scheduler…" />;
   if (phase === "error" || !state) return <StateBlock kind="error" hint="Gagal memuat state scheduler." action={() => load()} actionLabel="Coba lagi" />;
 
   const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? "Project lain";
   const ctx: Ctx = { backlog, projectName };
   const counts = state.queueCounts;
+  const historyCount = (counts.done ?? 0) + (counts.failed ?? 0) + (counts.canceled ?? 0);
+  // Angka tab hanya tampil bila > 0: tab kosong tak menambah kebisingan.
+  const tabs = [
+    { value: "antre", label: "Antre", count: counts.queued || undefined },
+    { value: "berjalan", label: "Berjalan", count: state.sessions.length || undefined },
+    { value: "riwayat", label: "Riwayat", count: historyCount || undefined },
+    { value: "cron", label: "Cron" },
+    { value: "setelan", label: "Setelan" },
+  ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0 }}>
-      <ControlBar cfg={state.config} cap={state.cap} liveCount={state.liveCount} onWrite={writeConfig} onAsk={askControl} busy={busy} />
+    <div className="hn-sched">
+      <StatusStrip cfg={state.config} cap={state.cap} liveCount={state.liveCount} onWrite={writeConfig} onAsk={askControl} busy={busy} />
 
-      <Card eyebrow="scheduler · sumber" title="Sumber otomatis">
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          {state.sources.map((s) => <SourceCard key={s.id} s={s} />)}
-        </div>
-      </Card>
+      <Tabs tabs={tabs} value={tab} onChange={(v) => setTab(v as MainTab)}>
+        <TabPanel value="antre" className="hn-sched-panel">
+          <QueueSection what="antrean" status="queued" count={counts.queued} empty="Antrean kosong."
+            render={(q) => <QueuedRow key={q.id} q={q} ctx={ctx} busy={busyId === q.id}
+              onCancel={(id) => void rowAction(id, "cancel")} />} />
+        </TabPanel>
 
-      {/* Urutan kerja: yang sedang berjalan dan yang antre di atas; yang perlu tindakan segera (Gagal)
-          tepat di bawahnya; riwayat (Selesai, Dibatalkan) di bawah. Seksi kosong disembunyikan. */}
-      <Card eyebrow="scheduler" title={`Sesi berjalan${state.sessions.length ? ` · ${state.sessions.length}` : ""}`}>
-        {state.sessions.length === 0
-          ? <div style={{ fontSize: "var(--text-sm)", color: "var(--text-subtle)" }}>Tidak ada sesi dari scheduler yang sedang berjalan.</div>
-          : state.sessions.map((s) => <SessionRow key={s.id} s={s} ctx={ctx} onGotoTerminal={onGotoTerminal} />)}
-      </Card>
+        <TabPanel value="berjalan" className="hn-sched-panel">
+          {state.sessions.length === 0
+            ? <p className="hn-sched-empty">Tidak ada sesi dari scheduler yang sedang berjalan.</p>
+            : (
+              <RowList label="Sesi berjalan">
+                {state.sessions.map((s) => <SessionRow key={s.id} s={s} ctx={ctx} onGotoTerminal={onGotoTerminal} />)}
+              </RowList>
+            )}
+        </TabPanel>
 
-      <QueueSection title="Antrean" what="antrean" status="queued" count={counts.queued} empty="Antrean kosong."
-        render={(q) => <QueueRow key={q.id} q={q} ctx={ctx}
-          onCancel={(id) => void rowAction(id, "cancel")} busy={busyId === q.id} />} />
+        <TabPanel value="riwayat" className="hn-sched-panel">
+          {tab === "riwayat" && <HistoryPanel counts={counts as Record<HistoryStatus, number>} ctx={ctx}
+            busyId={busyId} onRowAction={rowAction} onToast={onToast} />}
+        </TabPanel>
 
-      {counts.failed > 0 && (
-        <QueueSection title="Gagal" what="item yang gagal" status="failed" count={counts.failed} empty="Tidak ada sesi gagal."
-          render={(q) => <FailedRow key={q.id} q={q} ctx={ctx}
-            onRequeue={(id) => void rowAction(id, "requeue")} busy={busyId === q.id} />} />
-      )}
+        <TabPanel value="cron" className="hn-sched-panel">
+          {/* SPEC-646 · cron dimuat saat tabnya dibuka; zona waktu dari server (ADR-0204). */}
+          {tab === "cron" && <SchedulerCrons projects={projects} onProjectChanged={onProjectChanged} onToast={onToast}
+            timeZone={state.serverTimeZone} />}
+        </TabPanel>
 
-      <QueueSection title="Selesai" what="item yang selesai" status="done" count={counts.done} empty="Belum ada hasil selesai."
-        render={(q) => <DoneRow key={q.id} q={q} ctx={ctx} onToast={onToast} />} />
-
-      {/* SPEC-522 · tombstone punya seksinya sendiri; SPEC-523 · dibaca berhalaman lewat
-          `GET /scheduler/queue?status=canceled`, bukan dari `state`. */}
-      {counts.canceled > 0 && (
-        <QueueSection title="Dibatalkan" what="item yang dibatalkan" status="canceled" count={counts.canceled} empty="Tak ada item yang dibatalkan."
-          render={(q) => <CanceledRow key={q.id} q={q} ctx={ctx}
-            onRequeue={(id) => void rowAction(id, "requeue")} busy={busyId === q.id} />} />
-      )}
-
-      {/* SPEC-646 · ADR-0112 · cronjob per project: jadwal HH:MM yang ditunda ADR-0072. */}
-      <SchedulerCrons projects={projects} onProjectChanged={onProjectChanged} onToast={onToast} />
-
-      <SettingsPanel cfg={state.config} onWrite={(next) => void writeConfig(next)} busy={busy} />
-      {state.admission && <AdmissionStatus status={state.admission} />}
-      <OptInPanel projects={projects} onToggle={toggleOptIn} busyId={busyId} />
+        <TabPanel value="setelan" className="hn-sched-panel">
+          <SettingsPanel cfg={state.config} sources={state.sources} admission={state.admission}
+            onWrite={(next) => void writeConfig(next)} busy={busy} />
+          <OptInPanel projects={projects} onToggle={toggleOptIn} busyId={busyId} />
+          <OrchestrationSection snap={snap} />
+        </TabPanel>
+      </Tabs>
       {dialog}
     </div>
   );

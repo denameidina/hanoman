@@ -29,7 +29,7 @@ beforeEach(() => {
 
 const openSesi = () => {
   render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: "Sesi" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sesi harian" }));
 };
 
 describe("SettingsScreen · kartu mode goal", () => {

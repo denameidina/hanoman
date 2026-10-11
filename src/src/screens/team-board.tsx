@@ -1,31 +1,79 @@
 import React from "react";
 import type { CreateTaskInput, MemberView, TaskStatus, TaskView } from "@hanoman/shared";
-import { Badge, Button, Icon, OverflowActions, Tabs, LIST_SCROLL_STYLE, FIXED_ROW_STYLE, useResponsiveTier } from "../ds";
-import { TEAM_COLUMNS, canDropTask, taskDates, type Board } from "./team-rules";
+import { Icon, OverflowActions, Tabs, useResponsiveTier, type OverflowItem } from "../ds";
+import { TEAM_COLUMNS, canDropTask, type Board } from "./team-rules";
+import { PRIORITY_LABEL } from "../lib/labels";
 
 /* SPEC-946 · papan kanban MANUSIA. Kolomnya `Task.status` — milik manusia — bukan `Spec.stage`
    yang diturunkan dari fase sesi (ADR-0008/0024). Konsekuensinya keempat kolom saling menerima
    drop, kebalikan board Backlog yang hampir seluruhnya menolaknya.
 
-   Audit 2026-10: (1) kartu menampilkan nama project, bukan id mentah; (2) dua Select aksi kartu
-   digabung jadi satu menu "⋯" (pindah kolom + tugaskan), keyboard tetap jalan lewat Modal DS;
-   (3) mobile memakai pemilih kolom (Tabs) alih-alih papan yang digeser mendatar. */
+   Redesign Audit UI/UX 2026-10 · Fase 3D: kartu hanya judul, titik prioritas, penanggung jawab
+   (avatar + nama), dan SATU menu "Ubah tugas". Pindah, tugaskan, dan tautan Backlog ada di menu itu,
+   jadi keyboard dan layar sentuh punya jalur yang sama dengan drag. Mobile = satu kolom + pemilih. */
 
-/* `Record<Priority, …>` — bukan `Record<string, …>` seperti dua cermin yang sudah ada
-   (`BacklogScreen.tsx` `B_PRIO`, `SchedulerScreen.tsx` `PRIO_TONE`): dengan kunci `string`,
-   nilai prioritas baru jatuh ke default tanpa satu pun galat kompilasi.
-
-   `sedang` sengaja `neutral`, mengikuti `B_PRIO` board Backlog — bukan `warn` seperti
-   SchedulerScreen. Dua alasan: ia nilai BAWAAN `zCreateTask`, jadi mewarnainya amber membuat
-   hampir seluruh papan berteriak; dan prioritas yang sama harus terbaca sama di dua papan yang
-   dibolak-balik operator. (Kedua cermin lama sudah berselisih di nilai ini sebelum SPEC-946;
-   menyelaraskan keduanya di luar lingkup spec ini.) */
+/* Titik prioritas sama dengan papan Backlog (`B_PRIO`): tinggi = aksen, sedang = isi netral, rendah =
+   berlubang. Dua papan yang dibolak-balik operator harus membaca prioritas yang sama dengan cara yang
+   sama. Bentuknya membawa makna; warnanya hanya penguat. */
 type Priority = NonNullable<CreateTaskInput["priority"]>;
-const PRIO_TONE: Record<Priority, "err" | "warn" | "neutral"> = {
-  tinggi: "err", sedang: "neutral", rendah: "neutral",
-};
+const PRIO_LEVEL: Record<Priority, "high" | "mid" | "low"> = { tinggi: "high", sedang: "mid", rendah: "low" };
 
 type ProjectRef = { id: string; name: string };
+
+function PrioDot({ priority }: { priority: string }) {
+  const level = PRIO_LEVEL[priority as Priority] ?? "mid";
+  const label = PRIORITY_LABEL[priority as Priority] ?? priority;
+  return (
+    <span className={`hn-tm-prio hn-tm-prio-${level}`} title={`Prioritas ${label}`}>
+      <span className="hn-sr-only">Prioritas {label}</span>
+    </span>
+  );
+}
+
+// Inisial dari nama anggota, untuk avatar. Tanpa nama, ikon orang: "belum ditugaskan" tetap terbaca.
+function Avatar({ name }: { name: string | null }) {
+  if (!name) {
+    return <span className="hn-tm-avatar hn-tm-avatar-empty" aria-hidden="true"><Icon name="user" size={12} /></span>;
+  }
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
+  return <span className="hn-tm-avatar" aria-hidden="true">{initials || "?"}</span>;
+}
+
+// Semua aksi kartu, satu menu. Pindah ke kolom sendiri dibuang (bukan perpindahan); anggota yang
+// sudah menugaskan task ini ditandai nonaktif, bukan dihilangkan.
+function taskMenu(task: TaskView, members: MemberView[], actions: {
+  onMove: (t: TaskView, to: TaskStatus) => void;
+  onAssign: (t: TaskView, memberId: string | null) => void;
+  onEscalate: (t: TaskView) => void;
+  onUnlink: (t: TaskView) => void;
+  onOpenSpec?: (specId: string) => void;
+}): OverflowItem[] {
+  const items: OverflowItem[] = [
+    ...TEAM_COLUMNS.filter((c) => c.key !== task.status).map((c) => ({
+      key: `move-${c.key}`, label: `Pindah ke ${c.label}`,
+      onSelect: () => actions.onMove(task, c.key),
+    })),
+    ...members.map((m) => ({
+      key: `assign-${m.id}`, label: `Tugaskan ke ${m.name}`, disabled: task.memberId === m.id,
+      onSelect: () => actions.onAssign(task, m.id),
+    })),
+    { key: "assign-none", label: "Kosongkan penugasan", disabled: !task.memberId,
+      onSelect: () => actions.onAssign(task, null) },
+  ];
+  // Tautan ke backlog. "tautan putus" (specId ada, spec tak ada) tetap terbaca di label, bukan diam-diam kosong.
+  if (task.specId) {
+    if (task.spec && actions.onOpenSpec) {
+      const specId = task.specId;
+      items.push({ key: "open-spec", label: `Buka ${task.spec.id} di Backlog`,
+        onSelect: () => actions.onOpenSpec?.(specId) });
+    }
+    items.push({ key: "unlink", label: task.spec ? "Lepas tautan" : "Lepas tautan (spec tak ditemukan)",
+      onSelect: () => actions.onUnlink(task) });
+  } else {
+    items.push({ key: "escalate", label: "Kirim ke Backlog", onSelect: () => actions.onEscalate(task) });
+  }
+  return items;
+}
 
 function TaskCard({ task, members, projectName, dragging, onDragStart, onDragEnd, onOpen, onMove, onAssign,
   onEscalate, onUnlink, onOpenSpec }: {
@@ -40,87 +88,28 @@ function TaskCard({ task, members, projectName, dragging, onDragStart, onDragEnd
 }) {
   // Anggota bisa lenyap dari daftar sebelum kartunya menyusul (frame sync mendahului). Yang
   // dirender tetap kalimat manusia, bukan id mentah.
-  const assignee = members.find((m) => m.id === task.memberId)?.name ?? "belum ditugaskan";
-  const dates = taskDates(task);
-  // Menu "Ubah…": pindah kolom + tugaskan, satu tempat. Pindah ke kolom sendiri dibuang (bukan
-  // perpindahan); anggota yang sudah menugaskan task ini ditandai nonaktif, bukan dihilangkan.
-  const menu = [
-    ...TEAM_COLUMNS.filter((c) => c.key !== task.status).map((c) => ({
-      key: `move-${c.key}`, label: `Pindah ke ${c.label}`,
-      onSelect: () => onMove(task, c.key),
-    })),
-    { key: "assign-none", label: "Kosongkan penugasan", disabled: !task.memberId,
-      onSelect: () => onAssign(task, null) },
-    ...members.map((m) => ({
-      key: `assign-${m.id}`, label: `Tugaskan ke ${m.name}`, disabled: task.memberId === m.id,
-      onSelect: () => onAssign(task, m.id),
-    })),
-  ];
+  const assignee = members.find((m) => m.id === task.memberId)?.name ?? null;
+  const menu = taskMenu(task, members, { onMove, onAssign, onEscalate, onUnlink, onOpenSpec });
+  const project = task.projectId === null ? "tanpa project" : projectName ?? "project tak dikenal";
   return (
-    <div draggable data-testid={`team-card-${task.id}`}
+    <div draggable data-testid={`team-card-${task.id}`} className="hn-tm-card"
+      data-dragging={dragging || undefined} title={`Project: ${project}`}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", task.id);
         onDragStart();
       }}
-      onDragEnd={onDragEnd}
-      style={{
-        // `0 0 auto`: tanpa ini kartu menyusut mengisi kolom, bukan kolomnya yang menggulir.
-        flex: "0 0 auto",
-        background: "var(--surface-card)", border: "1px solid var(--border-hair)",
-        borderRadius: "var(--radius-md)", padding: 10, boxShadow: "var(--shadow-xs)",
-        cursor: "grab", opacity: dragging ? 0.4 : 1,
-      }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-        <Badge tone={PRIO_TONE[task.priority as Priority] ?? "neutral"} size="sm"
-          variant={task.priority === "tinggi" ? "soft" : "outline"}>{task.priority}</Badge>
-        <span style={{ flex: 1 }} />
-        <span style={{
-          fontSize: 11, color: "var(--text-subtle)",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        }}>{task.projectId === null ? "tanpa project" : projectName ?? "project tak dikenal"}</span>
+      onDragEnd={onDragEnd}>
+      <div className="hn-tm-card-head">
+        <PrioDot priority={task.priority} />
+        <button type="button" className="hn-tm-title" onClick={() => onOpen(task)}>{task.title}</button>
       </div>
-      <button type="button" onClick={() => onOpen(task)} style={{
-        display: "block", width: "100%", textAlign: "left", border: "none", background: "none",
-        padding: 0, cursor: "pointer", fontFamily: "var(--font-ui)", fontSize: 13,
-        fontWeight: "var(--weight-medium)", color: "var(--text-strong)", lineHeight: 1.35,
-      }}>{task.title}</button>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap",
-        fontSize: "var(--text-xs)", color: "var(--text-subtle)",
-      }}>
-        <Icon name="user" size={12} color="var(--text-subtle)" />
-        <span>{assignee}</span>
-        {dates && <><span aria-hidden="true">·</span><span>{dates}</span></>}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-        {task.specId ? (
-          <>
-            {/* ADR-0150 keputusan 5 · `specId` terisi tanpa `spec` = tautan putus. Bedanya dengan
-                "tak pernah dikirim ke backlog" harus terlihat, bukan diam-diam kosong. Audit
-                2026-10: istilah "tautan putus" diganti "spec tak ditemukan". */}
-            {task.spec && onOpenSpec ? (
-              <button type="button" onClick={() => onOpenSpec(task.specId!)}
-                aria-label={`Buka ${task.spec.id} di Backlog`}
-                style={{ border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-                <Badge tone="ok" size="sm" icon="link">{`${task.spec.id} · ${task.spec.stage}`}</Badge>
-              </button>
-            ) : (
-              <Badge tone={task.spec ? "ok" : "warn"} size="sm" icon={task.spec ? "link" : "unlink"}>
-                {task.spec ? `${task.spec.id} · ${task.spec.stage}` : "spec tak ditemukan"}
-              </Badge>
-            )}
-            <Button size="sm" variant="ghost" leftIcon="unlink"
-              aria-label={`Lepas tautan: ${task.title}`}
-              onClick={() => onUnlink(task)}>Lepas tautan</Button>
-          </>
-        ) : (
-          <Button size="sm" variant="ghost" leftIcon="git-branch"
-            aria-label={`Kirim ke Backlog: ${task.title}`}
-            onClick={() => onEscalate(task)}>Kirim ke Backlog</Button>
-        )}
-        <span style={{ flex: 1 }} />
-        {/* Satu menu menggantikan dua Select. Drag tetap ada untuk mouse; menu ini jalur keyboard
+      <div className="hn-tm-card-foot">
+        <span className="hn-tm-assignee-wrap">
+          <Avatar name={assignee} />
+          <span className="hn-tm-assignee">{assignee ?? "belum ditugaskan"}</span>
+        </span>
+        {/* Satu menu menggantikan semua aksi kartu. Drag tetap ada untuk mouse; menu ini jalur keyboard
             dan sentuh (Modal DS: focus trap, Escape, fokus kembali ke pemicu). */}
         <OverflowActions label={`Ubah tugas: ${task.title}`} icon="ellipsis" items={menu} />
       </div>
@@ -176,21 +165,17 @@ export function TeamBoard({ board, totals, columns, members, projects = [], onMo
     const items = board[current.key];
     const hidden = Math.max(0, (totals[current.key] ?? 0) - items.length);
     return (
-      <div data-testid="team-board" data-layout="mobile" style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
+      <div data-testid="team-board" data-layout="mobile" className="hn-tm-mobile">
         <Tabs variant="pill" aria-label="Kolom papan tim" value={current.key}
           onChange={(v) => setMobileCol(v as TaskStatus)}
           tabs={columns.map((c) => ({ value: c.key, label: `${c.label} · ${board[c.key].length}` }))} />
-        <div data-testid={`team-col-${current.key}`} style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 0 }}>
+        <div data-testid={`team-col-${current.key}`} className="hn-tm-col-stack">
           {items.map((t) => cardFor(t, current.key))}
           {items.length === 0 && (
-            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)", padding: "8px 2px" }}>
-              Tak ada tugas di {current.label}.
-            </div>
+            <div className="hn-tm-empty-col">Tak ada tugas di {current.label}.</div>
           )}
           {hidden > 0 && (
-            <div style={{ ...FIXED_ROW_STYLE, fontSize: "var(--text-xs)", color: "var(--status-warn)" }}>
-              menampilkan {items.length} dari {totals[current.key]} — persempit penyaring
-            </div>
+            <div className="hn-tm-hidden-note">menampilkan {items.length} dari {totals[current.key]} — persempit penyaring</div>
           )}
         </div>
       </div>
@@ -200,17 +185,16 @@ export function TeamBoard({ board, totals, columns, members, projects = [], onMo
   return (
     /* Baris kolom menggulir MENDATAR; tiap KOLOM menggulir tegak sendiri, jadi judul kolom tak
        pernah tergulir keluar dan kolom terpanjang tak menyeret yang lain. */
-    <div data-testid="team-board" className="hn-board-local-overflow" style={{
-      flex: "1 1 auto", minHeight: 0, display: "flex", gap: 10,
-      overflowX: "auto", overflowY: "hidden", alignItems: "stretch", paddingBottom: 4,
-    }}>
+    <div data-testid="team-board" className="hn-board-local-overflow hn-tm-board">
       {columns.map((c) => {
         const items = board[c.key];
         const active = !!drag && canDropTask(drag.from, c.key);
         const hot = active && over === c.key;
         const hidden = Math.max(0, (totals[c.key] ?? 0) - items.length);
         return (
-          <div key={c.key} data-testid={`team-col-${c.key}`}
+          <div key={c.key} data-testid={`team-col-${c.key}`} className="hn-tm-col"
+            data-active={active || undefined} data-hot={hot || undefined}
+            data-dimmed={drag && !active || undefined}
             onDragOver={(e) => {
               if (!active) return;   // tanpa preventDefault, kolom ini menolak drop
               e.preventDefault();
@@ -218,31 +202,19 @@ export function TeamBoard({ board, totals, columns, members, projects = [], onMo
               setOver(c.key);
             }}
             onDragLeave={() => setOver((o) => (o === c.key ? null : o))}
-            onDrop={(e) => { e.preventDefault(); drop(c.key); }}
-            style={{
-              flex: "0 0 244px", display: "flex", flexDirection: "column", minHeight: 0, padding: 10,
-              borderRadius: "var(--radius-lg)",
-              background: hot ? "var(--brass-100)" : "var(--bone-100)",
-              border: `1px ${active ? "dashed" : "solid"} ${hot ? "var(--brass-500)" : "var(--border-hair)"}`,
-              opacity: drag && !active ? 0.5 : 1, transition: "var(--transition-fast)",
-            }}>
-            <div style={{ ...FIXED_ROW_STYLE, display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            onDrop={(e) => { e.preventDefault(); drop(c.key); }}>
+            <div className="hn-tm-col-head">
               <span className="hn-eyebrow">{c.label}</span>
-              <span style={{ flex: 1 }} />
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>
-                {items.length}
-              </span>
+              <span className="hn-tm-col-count">{items.length}</span>
             </div>
             {/* Zona drop mencakup ruang kosong di bawah kartu: event menggelembung ke kolom. */}
-            <div style={{ ...LIST_SCROLL_STYLE, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="hn-tm-col-body">
               {items.map((t) => cardFor(t, c.key))}
             </div>
             {/* Plafon langganan 200/kolom (ADR-0151). Papan yang diam-diam memotong terbaca
                 sebagai papan yang lengkap. */}
             {hidden > 0 && (
-              <div style={{
-                ...FIXED_ROW_STYLE, marginTop: 8, fontSize: "var(--text-xs)", color: "var(--status-warn)",
-              }}>
+              <div className="hn-tm-hidden-note">
                 menampilkan {items.length} dari {totals[c.key]} — persempit penyaring
               </div>
             )}

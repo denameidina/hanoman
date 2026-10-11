@@ -33,11 +33,13 @@ function mockFetch(extra: (u: string, init?: RequestInit) => Promise<Response> |
 afterEach(() => vi.restoreAllMocks());
 
 describe("SkillsWorkspace (/skills)", () => {
-  it("mengelompokkan Global dan satu section per project, termasuk error repo", async () => {
+  // Redesign 3K: daftar datar; lapis jadi chip (Global · Project · Plugin), bukan grup lipat.
+  // Skill project menampilkan nama project-nya di baris, dan galat repo tampil di atas daftar.
+  it("daftar datar dengan chip lapis; skill project menyebut nama project; galat repo tampil", async () => {
     mockFetch();
     render(<SkillsWorkspace />);
     expect(await screen.findByText("shared-a")).toBeTruthy();
-    expect(screen.getByText("Global")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Global/ })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByText("Alpha")).toBeTruthy();
     expect(screen.getByText("deploy")).toBeTruthy();
     expect(screen.getByText(/repo tidak ditemukan/)).toBeTruthy();
@@ -79,14 +81,16 @@ describe("SkillsWorkspace (/skills)", () => {
     expect(await screen.findByText(/berubah di tempat lain/)).toBeTruthy();
   });
 
-  it("grup besar terlipat default dan terbuka saat mencari", async () => {
+  // Redesign 3K: tanpa grup lipat, semua skill tampil dalam satu daftar; pencarian menyaring.
+  it("daftar datar menampilkan semua skill besar; pencarian menyaring", async () => {
     const many = Array.from({ length: 12 }, (_, i) => e({ key: `plugin~-~plugin:pkg~p${i}`, name: `plug-${i}`, layer: "plugin", source: "plugin:pkg", editable: false }));
     mockFetch((u) => u.includes("/api/skills?scope=all") ? json({ ...library, global: [...library.global, ...many] }) : null);
     render(<SkillsWorkspace />);
     expect(await screen.findByText("shared-a")).toBeTruthy();
-    expect(screen.queryByText("plug-3")).toBeNull();
+    expect(screen.getByText("plug-3")).toBeTruthy();
     fireEvent.change(screen.getByRole("textbox", { name: "Cari skill" }), { target: { value: "plug-3" } });
     expect(await screen.findByText("plug-3")).toBeTruthy();
+    expect(screen.queryByText("plug-4")).toBeNull();
   });
 
   it("pencarian tanpa hasil menampilkan pesan khusus, bukan 'Belum ada skill'", async () => {
@@ -104,17 +108,20 @@ describe("SkillsWorkspace (/skills)", () => {
     fireEvent.click(await screen.findByText("shared-a"));
     await screen.findByText("references/");
     const rows = [...document.querySelectorAll(".hn-skill-row")];
-    expect(rows.filter((r) => r.getAttribute("aria-current") === "true").map((r) => r.textContent)).toEqual(["shared-a"]);
+    const current = rows.filter((r) => r.getAttribute("aria-current") === "true");
+    expect(current).toHaveLength(1);
+    expect(current[0]!.textContent).toContain("shared-a");
   });
 
-  it("grup yang berisi skill terpilih tetap bisa dilipat", async () => {
+  // Redesign 3K: lapis dipilih lewat chip; chip Plugin menyaring daftar ke skill plugin saja.
+  it("chip lapis menyaring daftar ke satu lapis", async () => {
     mockFetch();
     render(<SkillsWorkspace />);
-    fireEvent.click(await screen.findByText("shared-a"));
-    await screen.findByText("references/");
-    fireEvent.click(screen.getByRole("button", { name: /^Hanoman \(1\)/ }));
-    expect(document.querySelector(".hn-skill-row.is-selected")).toBeNull();
-    expect(screen.getByRole("button", { name: /^Hanoman \(1\)/ }).getAttribute("aria-expanded")).toBe("false");
+    expect(await screen.findByText("shared-a")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Plugin/ }));
+    expect(screen.getByRole("button", { name: /Plugin/ })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByText("pl")).toBeTruthy();
+    expect(screen.queryByText("shared-a")).toBeNull();
   });
 
   it("gagal memuat berkas menampilkan galat + Coba lagi, bukan spinner abadi", async () => {

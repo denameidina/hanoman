@@ -1,13 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { ClientsScreen } from "../src/screens/ClientsScreen";
+import { ClientsScreen, sessionSummary } from "../src/screens/ClientsScreen";
 import { relativeTime } from "../src/lib/time-format";
 import { api } from "../src/api/client";
 import type { PresenceView } from "@hanoman/shared";
 
 vi.mock("../src/api/client", () => ({
   // issueWsTicket: TerminalPane (mode remote) memintanya lewat `api` global saat mount.
-  api: { presence: vi.fn(), issueWsTicket: vi.fn().mockResolvedValue({ ticket: "t" }) },
+  // getRemoteControl: kartu izin server pusat (tab Perangkat) memuatnya saat tab itu dibuka.
+  // listClientAccounts/listProjects: tab Akun merender ClientAccessPanel.
+  api: {
+    presence: vi.fn(),
+    issueWsTicket: vi.fn().mockResolvedValue({ ticket: "t" }),
+    getRemoteControl: vi.fn().mockResolvedValue({
+      control: { enabled: true, capabilities: ["sessions:read", "backlog:read", "ide:read"] },
+      logs: { event: true, server: false, transcript: false },
+      relay: { state: "off", since: null, hubOrigin: null, lastClose: null }, audit: [],
+    }),
+    listClientAccounts: vi.fn().mockResolvedValue({ items: [] }),
+    listProjects: vi.fn().mockResolvedValue({ items: [] }),
+  },
   // SPEC-1217 · D6/AC-S8 · tab "Log" merender LogsPanel, yang memanggil fungsi ini di mount.
   logs: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
   logTranscript: vi.fn().mockResolvedValue(""),
@@ -118,7 +130,7 @@ describe("ClientsScreen tombol Buka (SPEC-1218 · AC-C1/C7)", () => {
       }],
     };
     render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: /buka/i }));
+    fireEvent.click(screen.getByRole("button", { name: /lihat \(baca saja\)/i }));
     expect(await screen.findByTestId("remote-banner")).toBeInTheDocument();
   });
 
@@ -131,7 +143,7 @@ describe("ClientsScreen tombol Buka (SPEC-1218 · AC-C1/C7)", () => {
       }],
     };
     render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={() => {}} />);
-    expect(screen.getByRole("button", { name: /buka/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /lihat \(baca saja\)/i })).toBeDisabled();
   });
 
   it("device tanpa control → tombol Buka disabled", () => {
@@ -140,12 +152,12 @@ describe("ClientsScreen tombol Buka (SPEC-1218 · AC-C1/C7)", () => {
       devices: [{ deviceId: "d1", name: "laptop", local: false, online: false, lastSeenAt: null, sessions: [] }],
     };
     render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={() => {}} />);
-    expect(screen.getByRole("button", { name: /buka/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /lihat \(baca saja\)/i })).toBeDisabled();
   });
 
   it("device lokal tak menawarkan tombol Buka — hanya device remote (d2) yang dapat", () => {
     render(<ClientsScreen view={view} specTitles={{}} onOpenSpec={() => {}} />);
-    expect(screen.getAllByRole("button", { name: /^buka$/i })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^lihat \(baca saja\)$/i })).toHaveLength(1);
   });
 });
 
@@ -171,8 +183,8 @@ describe("ClientsScreen tombol Buka: alasan terlihat & sesi terpilih", () => {
     };
     render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={() => {}} />);
     expect(screen.getByTestId("device-open-reason-d1")).toHaveTextContent("Perangkat sedang offline");
-    expect(screen.getByRole("button", { name: /buka/i })).toHaveAttribute("aria-describedby", expect.any(String));
-    expect(screen.getByRole("button", { name: /buka/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /lihat \(baca saja\)/i })).toHaveAttribute("aria-describedby", expect.any(String));
+    expect(screen.getByRole("button", { name: /lihat \(baca saja\)/i })).toBeDisabled();
   });
 
   it("tab IDE membawa project dari sesi yang dibuka (bukan 'Project belum diketahui')", async () => {
@@ -186,7 +198,7 @@ describe("ClientsScreen tombol Buka: alasan terlihat & sesi terpilih", () => {
       }],
     };
     render(<ClientsScreen view={v} specTitles={{}} onOpenSpec={() => {}} />);
-    fireEvent.click(screen.getByRole("button", { name: /buka/i }));
+    fireEvent.click(screen.getByRole("button", { name: /lihat \(baca saja\)/i }));
     fireEvent.click(await screen.findByRole("tab", { name: "IDE" }));
     expect(screen.queryByText("Project belum diketahui")).toBeNull();
   });
@@ -250,4 +262,37 @@ describe("waktu relatif Klien (lib/time-format)", () => {
     expect(relativeTime(new Date(T + 60_000).toISOString(), T)).toBe("baru saja"));
   it("stempel tak terbaca kosong (layar menampilkan —), tak menghasilkan NaN", () =>
     expect(relativeTime("bukan-tanggal", T)).toBe(""));
+});
+
+// Audit UI/UX 2026-10 · Fase 3G — baris Perangkat, tab Akun, dan selektor izin per perangkat.
+describe("ClientsScreen · baris Perangkat (Fase 3G)", () => {
+  it("ringkasan sesi memakai bahasa biasa, bukan hitungan mentah", () => {
+    expect(sessionSummary(0)).toBe("Tidak ada sesi berjalan");
+    expect(sessionSummary(1)).toBe("1 sesi berjalan");
+    expect(sessionSummary(3)).toBe("3 sesi berjalan");
+  });
+
+  it("perangkat lokal tak punya aksi Lihat; baris menyebut sesi berjalannya", () => {
+    render(<ClientsScreen view={view} specTitles={{}} onOpenSpec={() => {}} />);
+    expect(screen.getByText("1 sesi berjalan")).toBeInTheDocument();
+    expect(screen.getByText("perangkat ini")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^lihat \(baca saja\)$/i })).toHaveLength(1);
+  });
+
+  it("selektor izin server pusat ada di tab Perangkat, dengan tiga tingkat", async () => {
+    render(<ClientsScreen view={view} specTitles={{}} onOpenSpec={() => {}} />);
+    expect(await screen.findByRole("radiogroup", { name: "Tingkat akses" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /^Lihat/ })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: /^Kerja/ })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /^Tulis/ })).toBeInTheDocument();
+  });
+});
+
+describe("ClientsScreen tab Akun (Fase 3G)", () => {
+  it("tab Akun memuat akun klien (ClientAccessPanel), bukan daftar perangkat", async () => {
+    render(<ClientsScreen view={view} specTitles={{}} onOpenSpec={() => {}} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Akun" }));
+    expect(await screen.findByText("Belum ada akun klien")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Perangkat" })).toBeNull();
+  });
 });

@@ -8,7 +8,13 @@
    Test SPEC-363 lolos sepanjang bug ini karena ia hanya memeriksa style PANE-nya sendiri, yang
    memang tak pernah salah. Yang harus dijaga adalah INDUK-induknya, jadi di sini rantai leluhur
    yang dinaiki. jsdom tak melayout — yang diuji kontrak style tiap mata rantai. */
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
+
+// Audit UI/UX 2026-10 (3H): berkas IDE di tab Berkas (default-nya Perubahan).
+async function openBerkas() {
+  const list = await screen.findByRole("tablist", { name: "Bagian IDE" });
+  fireEvent.click(within(list).getByRole("tab", { name: "Berkas" }));
+}
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../src/api/client", () => ({
@@ -86,6 +92,7 @@ describe("rantai gulir pane tak boleh putus (SPEC-393)", () => {
   it("IDE · Explorer — pane berkas (preview, source, diff)", async () => {
     const { container } = render(<IdeScreen projects={[{ id: "p1", name: "P1" }] as never[]}
       projectId="p1" onProject={() => {}} />);
+    await openBerkas();
     fireEvent.click(await screen.findByText("README.md"));
     await waitFor(() => expect(screen.getByTestId("doc-preview-scroll")).toBeInTheDocument());
     expect(brokenLinks(screen.getByTestId("doc-preview-scroll"), rootOf(container))).toEqual([]);
@@ -94,6 +101,7 @@ describe("rantai gulir pane tak boleh putus (SPEC-393)", () => {
   it("IDE · Explorer — pane pohon berkas", async () => {
     const { container } = render(<IdeScreen projects={[{ id: "p1", name: "P1" }] as never[]}
       projectId="p1" onProject={() => {}} />);
+    await openBerkas();
     await waitFor(() => expect(screen.getByTestId("ide-tree-scroll")).toBeInTheDocument());
     expect(brokenLinks(screen.getByTestId("ide-tree-scroll"), rootOf(container))).toEqual([]);
   });

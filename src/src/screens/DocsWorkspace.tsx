@@ -1,14 +1,20 @@
-/* DocsWorkspace — interactive Source-of-Truth browser. Ported and wired
-   to the API: tree+coverage from GET /docs, file bodies from GET/PUT
-   /docs/*path (server-persisted, replacing the prototype's localStorage).
-   Audit UI/UX 2026-10 (P0): draft kotor ditandai & dijaga (konfirmasi saat pindah berkas/Batal),
-   simpan dengan try/catch + busy + galat inline, Ctrl/Cmd+S, pohon terbuka sampai berkas terpilih,
-   filter berkas, dan label bahasa Indonesia. */
+/* DocsWorkspace — penjelajah dokumen Source-of-Truth. Pohon + cakupan dari GET /docs; isi berkas dari
+   GET/PUT /docs/*path (tersimpan di server).
+   Audit UI/UX 2026-10 (P0): draft kotor ditandai & dijaga (konfirmasi saat pindah berkas/Baca),
+   simpan dengan try/catch + busy + galat inline, Ctrl/Cmd+S, pohon terbuka sampai berkas terpilih.
+
+   Redesign 3P (Docs): satu toggle Baca | Edit; mode Edit memakai bar status sticky ("belum disimpan",
+   Batal, Simpan). Pencarian lintas dokumen di atas pohon. Chip kategori (PRD · Spec · ADR · Lainnya)
+   diturunkan dari path kategori — tanpa API baru. Cakupan tampil sebagai chip di header pohon.
+   Pohon memakai role="tree" dengan navigasi panah. Hapus dan unduh pindah ke menu ⋯. */
 import React from "react";
-import { Card, StatusPill, Badge, Button, ProgressBar, Icon, StateBlock, MarkdownView, DocDownload, ResponsivePanels, Input, useConfirm } from "../ds";
+import { StatusPill, Badge, Button, Icon, StateBlock, MarkdownView, DocDownload, ResponsivePanels, Input,
+  OverflowActions, useConfirm } from "../ds";
 import { api } from "../api/client";
 import { usePersistedState, scoped, isStr } from "../ui-state";
 import { failureMessage } from "../lib/report-error";
+import "./styles/docs.css";
+import "./styles/projects.css";
 
 type DocCat = { cat: string; files: string[]; linked: boolean; scored: boolean; root?: boolean };
 
@@ -50,54 +56,95 @@ export function firstDoc(cats: DocCat[]): string {
   return pick && pick.files[0] ? `${pick.cat}/${pick.files[0]}` : "";
 }
 
+/** Kategori dokumen dari path kategori (tanpa API baru). Urutan: ADR, PRD, Spec, lalu Lainnya. */
+export type DocKind = "PRD" | "Spec" | "ADR" | "Lainnya";
+export function docKind(cat: string): DocKind {
+  if (/(^|\/)adr(s)?(\/|$)/i.test(cat)) return "ADR";
+  if (/(^|\/)prd(s)?(\/|$)/i.test(cat)) return "PRD";
+  if (/(^|\/)spec(s|ification)?(\/|$)/i.test(cat)) return "Spec";
+  return "Lainnya";
+}
+const KIND_CHIPS: readonly DocKind[] = ["PRD", "Spec", "ADR", "Lainnya"];
+type KindFilter = "all" | DocKind;
+
+/** Kunci node pohon: folder diawali `dir:` supaya tak bentrok dengan kunci berkas (`cat/file`). */
+const dirKey = (path: string) => `dir:${path}`;
+
 /** Kunci berkas (`cat/file`) di bawah node ini — dipakai untuk membuka folder yang memuat pilihan. */
 const containsSelected = (node: TreeNode, selected: string) => !!selected && selected.startsWith(node.path + "/");
 
-function DocTreeCat({ node, selected, onSelect, depth = 0 }:
-  { node: TreeNode; selected: string; onSelect: (k: string) => void; depth?: number }) {
+type TreeCtx = { selected: string; onSelect: (k: string) => void; tabbable: string; setFocusKey: (k: string) => void };
+
+function DocTreeNode({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: TreeCtx }) {
   // Folder yang memuat berkas terpilih terbuka dari awal dan saat pilihan berpindah ke dalamnya.
-  const inside = containsSelected(node, selected);
+  const inside = containsSelected(node, ctx.selected);
   const [open, setOpen] = React.useState(inside);
   React.useEffect(() => { if (inside) setOpen(true); }, [inside]);
   const scored = node.cat?.scored ?? true;
   const linked = node.cat?.linked ?? true;
+  const key = dirKey(node.path);
+  const toggle = () => setOpen((o) => !o);
+  const onFolderKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    else if (e.key === "ArrowRight" && !open) { e.preventDefault(); setOpen(true); }
+    else if (e.key === "ArrowLeft" && open) { e.preventDefault(); setOpen(false); }
+  };
   return (
-    <div style={depth === 0 ? { borderBottom: "1px solid var(--border-hair)" } : undefined}>
-      <button type="button" aria-expanded={open} onClick={() => setOpen((o) => !o)} style={{
-        display: "flex", alignItems: "center", gap: 8, width: "100%",
-        padding: "9px 6px", paddingLeft: 6 + depth * 12,
-        border: "none", background: "transparent", cursor: "pointer", textAlign: "left",
-      }}>
+    <>
+      <div role="treeitem" aria-level={depth + 1} aria-expanded={open} tabIndex={ctx.tabbable === key ? 0 : -1}
+        className="hn-docs-node hn-docs-node-dir" style={{ paddingLeft: 6 + depth * 12 }}
+        onClick={toggle} onKeyDown={onFolderKey} onFocus={() => ctx.setFocusKey(key)}>
         <Icon name={open ? "chevron-down" : "chevron-right"} size={14} color="var(--text-subtle)" />
         <Icon name="folder" size={15} color={!scored ? "var(--text-subtle)" : linked ? "var(--brass-500)" : "var(--clay-500)"} />
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", fontWeight: 500 }}>{node.label}/</span>
-        <span style={{ flex: 1 }} />
+        <span className="hn-docs-dir-label">{node.label}/</span>
         {node.cat && scored && (node.cat.linked
           ? <Icon name="link" size={13} color="var(--leaf-600)" />
           : <Icon name="unlink" size={13} color="var(--clay-500)" />)}
-      </button>
+      </div>
       {open && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 1, paddingBottom: 4 }}>
-          {node.kids.map((k) => <DocTreeCat key={k.path} node={k} selected={selected} onSelect={onSelect} depth={depth + 1} />)}
+        <div role="group" className="hn-docs-group">
+          {node.kids.map((k) => <DocTreeNode key={k.path} node={k} depth={depth + 1} ctx={ctx} />)}
           {node.cat?.files.map((f) => {
-            const key = node.path + "/" + f;
-            const on = key === selected;
+            const fileKey = node.path + "/" + f;
+            const on = fileKey === ctx.selected;
             return (
-              <button type="button" key={f} onClick={() => onSelect(key)} aria-current={on ? "true" : undefined} style={{
-                display: "flex", alignItems: "center", gap: 8, width: "100%",
-                padding: "6px 8px", paddingLeft: 18 + depth * 12, minHeight: 32,
-                borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer", textAlign: "left",
-                background: on ? "var(--brass-100)" : "transparent",
-              }}>
+              <div role="treeitem" key={f} aria-level={depth + 2} aria-selected={on}
+                aria-current={on ? "true" : undefined} tabIndex={ctx.tabbable === fileKey ? 0 : -1}
+                className={`hn-docs-node hn-docs-node-file${on ? " is-selected" : ""}`}
+                style={{ paddingLeft: 18 + depth * 12 }}
+                onClick={() => ctx.onSelect(fileKey)} onFocus={() => ctx.setFocusKey(fileKey)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ctx.onSelect(fileKey); } }}>
                 <Icon name="file-text" size={13} color={on ? "var(--brass-700)" : "var(--text-subtle)"} />
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12,
-                  color: on ? "var(--brass-700)" : (!scored || linked ? "var(--text-body)" : "var(--text-muted)"),
-                  fontWeight: on ? 600 : 400 }}>{f}</span>
-              </button>
+                <span className={`hn-docs-file-label${!scored || linked ? "" : " is-unlinked"}`}>{f}</span>
+              </div>
             );
           })}
         </div>
       )}
+    </>
+  );
+}
+
+/** Pohon berkas (role=tree). Panah atas/bawah memindahkan fokus antar item yang terlihat. */
+function DocTree({ label, nodes, selected, onSelect }:
+  { label: string; nodes: TreeNode[]; selected: string; onSelect: (k: string) => void }) {
+  const [focusKey, setFocusKey] = React.useState<string | null>(null);
+  // Satu tab stop: item terpilih (atau item terakhir yang difokus), lalu item pertama.
+  const first = nodes[0] ? dirKey(nodes[0].path) : "";
+  const tabbable = focusKey ?? (selected || first);
+  const ctx: TreeCtx = { selected, onSelect, tabbable, setFocusKey: (k) => setFocusKey(k) };
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="treeitem"]'));
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    if (at < 0) return;
+    e.preventDefault();
+    const next = items[Math.min(items.length - 1, Math.max(0, at + (e.key === "ArrowDown" ? 1 : -1)))];
+    next?.focus();
+  };
+  return (
+    <div role="tree" aria-label={label} className="hn-docs-tree" onKeyDown={onKeyDown}>
+      {nodes.map((n) => <DocTreeNode key={n.path} node={n} depth={0} ctx={ctx} />)}
     </div>
   );
 }
@@ -119,6 +166,7 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
   // Galat simpan/hapus tampil inline di atas isi dokumen; draft tetap utuh saat gagal.
   const [actionErr, setActionErr] = React.useState("");
   const [query, setQuery] = React.useState("");
+  const [kindFilter, setKindFilter] = React.useState<KindFilter>("all");
   // SPEC-847 · ADR-0127 · konfirmasi hapus dokumen memakai dialog aplikasi.
   const { confirm, dialog } = useConfirm();
   const [ixStatus, setIxStatus] = React.useState<"loading" | "ready" | "error">("loading");
@@ -132,7 +180,7 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
       if (!alive) return;
       const t = ix.tree as DocCat[];
       setTree(t); setCoverage(ix.coverage); setCache({}); setMode("preview"); setIxStatus("ready");
-      setActionErr(""); setQuery("");
+      setActionErr(""); setQuery(""); setKindFilter("all");
       setSelected(firstDoc(t));
     }).catch(() => { if (alive) { setTree([]); setSelected(""); setIxStatus("error"); } });
     return () => { alive = false; };
@@ -152,8 +200,10 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
   const docFailed = selected ? cache[selected] === null : false;
   const retryDoc = () => setCache((c) => { const n = { ...c }; delete n[selected]; return n; });
 
-  const nested = React.useMemo(() => buildTree(tree.filter((c) => c.scored)), [tree]);
-  const unscored = React.useMemo(() => buildTree(tree.filter((c) => !c.scored)), [tree]);
+  // Chip kategori menyaring kategori (folder) sebelum pohon dibangun.
+  const inKind = (c: DocCat) => kindFilter === "all" || docKind(c.cat) === kindFilter;
+  const nested = buildTree(tree.filter((c) => c.scored && inKind(c)));
+  const unscored = buildTree(tree.filter((c) => !c.scored && inKind(c)));
   const current = cache[selected] ?? "";
   // `selected` is the full repo-relative path (cat + "/" + basename); category is
   // everything before the last slash.
@@ -165,12 +215,16 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
 
   // Filter berkas: daftar datar semua berkas, dicocokkan terhadap path lengkapnya.
   const allFiles = React.useMemo(() => tree.flatMap((c) => c.files.map((f) => ({
-    key: `${c.cat}/${f}`, scored: c.scored, linked: c.linked,
+    key: `${c.cat}/${f}`, scored: c.scored, linked: c.linked, kind: docKind(c.cat),
   }))), [tree]);
   const needle = query.trim().toLowerCase();
-  const matches = needle ? allFiles.filter((f) => f.key.toLowerCase().includes(needle)) : [];
+  const matches = needle ? allFiles.filter((f) => (kindFilter === "all" || f.kind === kindFilter) && f.key.toLowerCase().includes(needle)) : [];
+  const kindCounts = React.useMemo(() => {
+    const counts: Record<DocKind, number> = { PRD: 0, Spec: 0, ADR: 0, Lainnya: 0 };
+    for (const f of allFiles) counts[f.kind] += 1;
+    return counts;
+  }, [allFiles]);
 
-  const covTone = docStatus === "broken" ? "err" : docStatus === "drift" ? "warn" : "ok";
   const status = docStatus === "broken" ? "broken" : docStatus === "drift" ? "drift" : "ok";
 
   /** Jalankan `run` setelah draft kotor dikonfirmasi dibuang; tanpa draft kotor langsung jalan. */
@@ -203,8 +257,7 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
     const ix = await api.getDocs(projectId);
     const t = ix.tree as DocCat[];
     setTree(t); setCoverage(ix.coverage);
-    // Cocokkan SELURUH file kategori, bukan cuma files[0] — versi lama memilih ulang
-    // tiap kali file kedua sebuah kategori sedang dibuka.
+    // Cocokkan SELURUH file kategori, bukan cuma files[0].
     if (!t.some((n) => n.files.some((f) => `${n.cat}/${f}` === selected))) setSelected(firstDoc(t));
   }
   // GET /docs sudah realtime; tombolnya cuma memuat ulang, kalau-kalau file berubah
@@ -234,14 +287,37 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
     try { await reloadIndex(); } catch { setIxStatus("error"); }
   }
 
+  const indexBody = ixStatus === "loading" ? <StateBlock kind="loading" compact title="Memuat indeks…" />
+    : ixStatus === "error" ? <StateBlock kind="error" compact title="Gagal memuat indeks dokumen"
+        hint={projectName} action={() => setIxTry((n) => n + 1)} />
+    : tree.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Belum ada dokumen"
+        hint="Belum ada Markdown di repo ini."
+        action={rescan} actionLabel="Muat ulang" actionIcon="radar" />
+    : needle ? (
+        matches.length === 0
+          ? <StateBlock kind="empty" compact icon="search" title="Tak ada berkas cocok" hint={`Tak ada yang cocok dengan “${query.trim()}”.`} />
+          : <div role="list" aria-label="Hasil pencarian berkas" className="hn-docs-results">
+              {matches.map((m) => (
+                <button type="button" key={m.key} aria-current={m.key === selected ? "true" : undefined}
+                  onClick={() => selectFile(m.key)} className={`hn-docs-result${m.key === selected ? " is-selected" : ""}`}>
+                  <Icon name="file-text" size={13} color="var(--text-subtle)" />
+                  <span className="hn-prj-mono">{m.key}</span>
+                  <span className="hn-docs-result-kind">{m.kind}</span>
+                </button>
+              ))}
+            </div>
+      )
+    : (<>
+        <DocTree label="Berkas dokumen" nodes={nested} selected={selected} onSelect={selectFile} />
+        {unscored.length > 0 && (
+          <div className="hn-docs-unscored">
+            <div className="hn-eyebrow hn-docs-unscored-label">Lainnya (tidak dinilai)</div>
+            <DocTree label="Dokumen tidak dinilai" nodes={unscored} selected={selected} onSelect={selectFile} />
+          </div>
+        )}
+      </>);
+
   return (
-    // SPEC-363 · tinggi pane diturunkan dari viewport lewat rantai flex Shell, bukan angka
-    // tetap. Dulu `maxHeight: 620`: MELEBIHI `<main>` di layar 13" (dua scrollbar) dan cuma
-    // memakai 57% tinggi di monitor 1329 px (terukur).
-    // `flex-basis` WAJIB `0`, bukan `auto`: pembungkus `<main>` memakai `min-height: 100%`
-    // (bukan `height`, SPEK-351), jadi item ber-basis-auto memakai tinggi ISI-nya dan justru
-    // menumbuhkan halaman — terukur pane 6000 px + halaman ikut menggulir. Basis 0 membuat
-    // tinggi container pasti lebih dulu, lalu item mengisi sisanya.
     <>
     <ResponsivePanels
       ariaLabel="Panel Dokumen"
@@ -250,138 +326,113 @@ export function DocsWorkspace({ projectId, projectName, docStatus }:
       masterWidth={288}
       className="hn-workspace-panels"
       panels={[
-        { id: "tree", label: "Berkas", className: "hn-panel-flex", content: (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: 0, overflow: "auto" }}>
-        <Card padding={0}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border-hair)" }}>
-            <span className="hn-eyebrow">dokumen · {projectName}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <StatusPill status={status} size="sm" />
-              <Button size="sm" variant="ghost" leftIcon={scanning ? "loader" : "radar"} onClick={rescan} disabled={scanning}>
-                {scanning ? "Memuat…" : "Muat ulang"}
-              </Button>
+        { id: "tree", label: "Indeks", className: "hn-panel-flex", content: (
+      <aside aria-label="Indeks dokumen" className="hn-docs-index">
+        <div className="hn-docs-index-head">
+          <span className="hn-eyebrow">dokumen · {projectName}</span>
+          <div className="hn-docs-index-actions">
+            <StatusPill status={status} size="sm" />
+            <Button size="sm" variant="ghost" leftIcon={scanning ? "loader" : "radar"} onClick={rescan} disabled={scanning}>
+              {scanning ? "Memuat…" : "Muat ulang"}
+            </Button>
+          </div>
+        </div>
+        {ixStatus === "ready" && tree.length > 0 && (
+          <div className="hn-docs-index-tools">
+            <Input size="sm" aria-label="Cari berkas dokumen" leftIcon="search" value={query}
+              placeholder="mis. product/prd" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+              className="hn-prj-full" />
+            <div role="group" aria-label="Kategori dokumen" className="hn-prj-chips">
+              <button type="button" className="hn-prj-chip hn-touch-target" aria-pressed={kindFilter === "all"}
+                onClick={() => setKindFilter("all")}>Semua</button>
+              {KIND_CHIPS.map((k) => (
+                <button key={k} type="button" className="hn-prj-chip hn-touch-target" aria-pressed={kindFilter === k}
+                  onClick={() => setKindFilter(k)}>
+                  {k}<span className="hn-prj-chip-count">{kindCounts[k]}</span>
+                </button>
+              ))}
             </div>
+            <span className="hn-docs-cov" title="Persentase kategori yang terindeks">
+              Cakupan {Math.round(coverage)}%
+            </span>
           </div>
-          {ixStatus === "ready" && tree.length > 0 && (
-            <div style={{ padding: "8px 14px 0" }}>
-              <Input size="sm" aria-label="Cari berkas dokumen" leftIcon="search" value={query}
-                placeholder="mis. product/prd" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
-                style={{ width: "100%" }} />
-            </div>
-          )}
-          <div style={{ padding: "4px 8px" }}>
-            {ixStatus === "loading" ? <StateBlock kind="loading" compact title="Memuat indeks…" />
-              : ixStatus === "error" ? <StateBlock kind="error" compact title="Gagal memuat indeks dokumen"
-                  hint={projectName} action={() => setIxTry((n) => n + 1)} />
-              : tree.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Belum ada dokumen"
-                  hint="Belum ada Markdown di repo ini."
-                  action={rescan} actionLabel="Muat ulang" actionIcon="radar" />
-              : needle ? (
-                  matches.length === 0
-                    ? <StateBlock kind="empty" compact icon="search" title="Tak ada berkas cocok" hint={`Tak ada yang cocok dengan “${query.trim()}”.`} />
-                    : <div role="list" aria-label="Hasil pencarian berkas">
-                        {matches.map((m) => (
-                          <button type="button" key={m.key} aria-current={m.key === selected ? "true" : undefined}
-                            onClick={() => selectFile(m.key)} style={{
-                              display: "flex", alignItems: "center", gap: 8, width: "100%", minHeight: 32,
-                              padding: "6px 8px", borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer", textAlign: "left",
-                              background: m.key === selected ? "var(--brass-100)" : "transparent" }}>
-                            <Icon name="file-text" size={13} color="var(--text-subtle)" />
-                            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-body)" }}>{m.key}</span>
-                          </button>
-                        ))}
-                      </div>
-                )
-              : (<>
-                  {nested.map((n) => <DocTreeCat key={n.path} node={n} selected={selected} onSelect={selectFile} />)}
-                  {unscored.length > 0 && (
-                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-hair)" }}>
-                      <div className="hn-eyebrow" style={{ padding: "4px 6px", color: "var(--text-subtle)" }}>Lainnya (tidak dinilai)</div>
-                      {unscored.map((n) => <DocTreeCat key={n.path} node={n} selected={selected} onSelect={selectFile} />)}
-                    </div>
-                  )}
-                </>)}
-          </div>
-        </Card>
-        <Card padding={16}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <span className="hn-eyebrow">Cakupan SoT</span>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-muted)" }}>{projectName}</span>
-          </div>
-          <ProgressBar value={coverage} showLabel label="Kategori terindeks" tone={covTone} />
-        </Card>
-      </div>
+        )}
+        <div className="hn-docs-tree-scroll">{indexBody}</div>
+      </aside>
         ) },
 
         { id: "viewer", label: "Dokumen", className: "hn-panel-flex", content: (
-      /* SPEC-393 · `fill` menyambungkan rantai flex melewati pembungkus internal Card, sehingga
-         viewer memakai scroller lokal dan tidak menumbuhkan halaman. */
-      <Card padding={0} fill>
-        <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: "1px solid var(--border-hair)", flexWrap: "wrap" }}>
+      /* SPEC-393 · `fill` menyambungkan rantai flex: viewer memakai scroller lokal dan tidak
+         menumbuhkan halaman. */
+      /* Rantai flex SPEC-363/393: pane menggulir hanya bila setiap leluhur menjadi flex dan boleh
+         menyusut. Nilainya inline karena kontrak itu diuji lewat style (jsdom tak memuat CSS);
+         ia struktural, bukan presentasi, dan tetap berupa nilai flex/overflow tanpa angka tetap. */
+      <section aria-label="Isi dokumen" className="hn-docs-viewer" style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div className="hn-docs-viewer-head">
           <Icon name="file-text" size={15} color="var(--text-muted)" />
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--text-strong)", fontWeight: 500 }}>{displayPath}</span>
+          <span className="hn-prj-mono hn-docs-path">{displayPath}</span>
           {node && node.scored && (node.linked
             ? <Badge tone="ok" size="sm" icon="link">terindeks</Badge>
             : <Badge tone="err" size="sm" icon="unlink">tak tertaut</Badge>)}
-          {dirty && <Badge tone="warn" size="sm">belum disimpan</Badge>}
-          <span style={{ flex: 1 }} />
-          {mode === "preview" ? (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              {/* SPEC-361 · unduh dokumen SoT; hanya di mode preview (isi tersimpan, bukan draft) */}
+          <span className="hn-grow" />
+          {/* Satu toggle Baca | Edit. Pindah ke Baca dari draft kotor melewati konfirmasi. */}
+          <div role="group" aria-label="Mode dokumen" className="hn-prj-seg">
+            <button type="button" aria-pressed={mode === "preview"} className="hn-touch-target"
+              onClick={() => { if (mode === "edit") cancelEdit(); }}>Baca</button>
+            <button type="button" aria-pressed={mode === "edit"} className="hn-touch-target"
+              onClick={() => { if (mode !== "edit") startEdit(); }}
+              disabled={!selected || docLoading || docFailed}>Edit</button>
+          </div>
+          {mode === "preview" && (
+            // SPEC-361 · unduh (isi tersimpan, bukan draft) dan hapus ada di ⋯ — hapus bukan aksi biasa.
+            <OverflowActions label="Aksi untuk dokumen" icon="ellipsis" items={[
+              { key: "delete", label: "Hapus dokumen…", icon: "trash-2", tone: "danger",
+                disabled: !selected, onSelect: () => { void removeDoc(); } },
+            ]}>
               <DocDownload href={(f) => api.docDownloadUrl(projectId, selected, f)}
                 disabled={!selected || docLoading || docFailed} />
-              <Button size="sm" variant="secondary" leftIcon="pencil" onClick={startEdit}
-                disabled={!selected || docLoading || docFailed}>Edit</Button>
-              {/* Hapus dipisah dari Edit: bukan aksi biasa, dan tombolnya merah. */}
-              <span aria-hidden="true" style={{ width: 1, alignSelf: "stretch", background: "var(--border-hair)" }} />
-              <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={removeDoc} disabled={!selected}>Hapus</Button>
-            </div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Button size="sm" variant="ghost" onClick={cancelEdit} disabled={saving}>Batal</Button>
-              <Button size="sm" leftIcon="check" onClick={() => void save()} loading={saving} disabled={saving}>Simpan</Button>
-            </div>
+            </OverflowActions>
           )}
         </div>
-        {actionErr && (
-          <div role="alert" style={{ flex: "0 0 auto", padding: "8px 16px", fontSize: 12.5, color: "var(--clay-600)",
-            borderBottom: "1px solid var(--border-hair)" }}>{actionErr}</div>
+
+        {mode === "edit" && (
+          // Bar status sticky: indikator draf kotor dan dua aksi. Selalu di atas isi editor.
+          <div role="region" aria-label="Simpan perubahan" className="hn-docs-savebar">
+            {dirty ? <Badge tone="warn" size="sm">belum disimpan</Badge>
+              : <span className="hn-prj-hint">Tak ada perubahan</span>}
+            <span className="hn-grow" />
+            <Button size="sm" variant="ghost" onClick={cancelEdit} disabled={saving}>Batal</Button>
+            <Button size="sm" leftIcon="check" onClick={() => void save()} loading={saving} disabled={saving || !dirty}>Simpan</Button>
+          </div>
         )}
+        {actionErr && <div role="alert" className="hn-docs-error">{actionErr}</div>}
 
         {mode === "preview" ? (
-          <div data-testid="doc-preview-scroll" style={{ padding: "8px 30px 34px", flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+          <div data-testid="doc-preview-scroll" className="hn-docs-body" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
             {!selected ? <StateBlock kind="empty" icon="file-text" title="Tidak ada dokumen dipilih"
-                hint="Pilih file dari pohon dokumen di kiri." />
+                hint="Pilih file dari indeks di kiri." />
               : docLoading ? <StateBlock kind="loading" title="Memuat dokumen…" hint={selected} />
               : docFailed ? <StateBlock kind="error" title="Gagal memuat dokumen" hint={selected} action={retryDoc} />
-              : <MarkdownView text={current} name={selected} />}
+              : <div className="hn-docs-read"><MarkdownView text={current} name={selected} /></div>}
           </div>
         ) : (
-          <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", flex: "1 1 auto", minHeight: 0 }}>
-            <div style={{ display: "flex", flexDirection: "column", borderRight: "1px solid var(--border-hair)", minHeight: 0 }}>
-              <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--border-hair)", background: "var(--bone-100)" }}>
-                <span className="hn-eyebrow">Markdown</span>
-              </div>
+          <div className="hn-docs-edit">
+            <div className="hn-docs-edit-pane">
+              <div className="hn-docs-edit-label"><span className="hn-eyebrow">Markdown</span></div>
               <textarea aria-label={`Isi ${displayPath}`} value={draft} spellCheck={false}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); void save(); } }}
-                placeholder={"# Judul dokumen\n\nParagraf pembuka…"} style={{
-                flex: 1, width: "100%", boxSizing: "border-box", resize: "none", border: "none",
-                padding: "16px 18px", fontFamily: "var(--font-mono)", fontSize: 12.5, lineHeight: 1.7,
-                color: "var(--text-body)", background: "var(--surface-card)",
-              }} />
+                placeholder={"# Judul dokumen\n\nParagraf pembuka…"} className="hn-docs-textarea" />
             </div>
-            <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
-              <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--border-hair)", background: "var(--bone-100)" }}>
-                <span className="hn-eyebrow">Pratinjau langsung</span>
-              </div>
-              <div style={{ flex: 1, overflow: "auto", padding: "4px 24px 24px" }}>
+            <div className="hn-docs-edit-pane">
+              <div className="hn-docs-edit-label"><span className="hn-eyebrow">Pratinjau langsung</span></div>
+              <div className="hn-docs-preview">
                 <MarkdownView text={draft} name={selected} />
               </div>
             </div>
           </div>
         )}
-      </Card>
+      </section>
         ) },
       ]}
     />

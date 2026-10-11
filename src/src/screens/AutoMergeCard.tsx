@@ -90,7 +90,7 @@ export function AutoMergeCard({ p, onToast, onProjectChanged }: {
         {form.mode === "default-branch" && (
           <div style={{ fontSize: 12.5, color: "var(--text-subtle)" }}>
             Default branch repo saat ini: <b>{branches.def ?? "— tak terbaca"}</b>. Diresolve ulang tiap
-            kali auto-merge berjalan, jadi mengganti default branch repo tak menyisakan setelan basi.
+            kali auto-merge berjalan, jadi mengganti default branch repo berlaku di run berikutnya.
           </div>
         )}
         {form.mode === "branch" && (

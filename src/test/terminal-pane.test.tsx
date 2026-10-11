@@ -1094,11 +1094,16 @@ describe("TerminalPane · kolom ketik perangkat sentuh (SPEC-882)", () => {
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
     // Host kini dibungkus wrapper relatif (badge/bar mode seleksi mengambang di atasnya), jadi
     // urutan yang berarti ada di anak-anak container TERATAS, bukan induk langsung host.
+    // Fase 3E: composer dan papan tombol hidup di dock bawah (`.hn-terminal-dock`), jadi urutannya
+    // diuji di dalam dock; host tetap mendahului dock di anak-anak container teratas.
     const kids = Array.from(container.firstElementChild!.children);
     const at = (sel: string) => kids.findIndex((k) => k.matches(sel) || k.querySelector(sel) !== null);
     expect(at('[data-testid="terminal-host"]')).toBeGreaterThanOrEqual(0);
-    expect(at('[data-testid="terminal-host"]')).toBeLessThan(at(".hn-terminal-composer"));
-    expect(at(".hn-terminal-composer")).toBeLessThan(at(".hn-terminal-keys"));
+    expect(at('[data-testid="terminal-host"]')).toBeLessThan(at(".hn-terminal-dock"));
+    const dock = Array.from(container.querySelector(".hn-terminal-dock")!.children);
+    const inDock = (sel: string) => dock.findIndex((k) => k.matches(sel));
+    expect(inDock(".hn-terminal-composer")).toBeGreaterThanOrEqual(0);
+    expect(inDock(".hn-terminal-composer")).toBeLessThan(inDock(".hn-terminal-keys"));
   });
 
   // Tanpa atribut ini papan ketik Android mengapitalkan & mengoreksi otomatis perintah shell,

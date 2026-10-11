@@ -56,6 +56,8 @@ async function openTelegramTab() {
     me={{ id: "u1", email: "dena@example.test", role: "admin", createdAt: "2026-08-01T00:00:00.000Z" }}
     onLoggedOut={() => {}}
   />);
+  // Telegram kini bagian dari niat "Integrasi & akses": pilih niatnya, lalu bagiannya.
+  fireEvent.click(screen.getByRole("button", { name: "Integrasi & akses" }));
   fireEvent.click(screen.getByRole("button", { name: "Telegram" }));
   expect(await screen.findByText("Kredensial Telegram")).toBeInTheDocument();
 }
@@ -130,8 +132,9 @@ describe("SettingsScreen Telegram kredensial (SPEC-477)", () => {
   it("toggle gateway & progress tetap ada dan mem-PUT settings", async () => {
     const fetchMock = telegramFetch();
     await openTelegramTab();
-    expect(screen.getAllByRole("switch")).toHaveLength(2);
-    fireEvent.click(screen.getAllByRole("switch")[0]!);
+    // Tiga sakelar: gateway, progress, dan "Pakai setelan sendiri" agen operator (satu komponen override).
+    expect(screen.getAllByRole("switch")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("switch", { name: "Gateway aktif" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/settings", expect.objectContaining({ method: "PUT" })));
   });
 });
@@ -145,7 +148,7 @@ describe("SettingsScreen obrolan portal klien (SPEC-854)", () => {
       me={{ id: "u1", email: "dena@example.test", role: "admin", createdAt: "2026-08-01T00:00:00.000Z" }}
       onLoggedOut={() => {}}
     />);
-    fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agen & model" }));
     expect(await screen.findByText("Obrolan portal klien")).toBeInTheDocument();
     expect((screen.getByLabelText("Jatah brainstorming") as HTMLInputElement).value)
       .toBe(String(PORTAL_CHAT_DEFAULTS.brainstormPerMonth));
@@ -167,7 +170,7 @@ describe("SettingsScreen obrolan portal klien (SPEC-854)", () => {
       me={{ id: "u1", email: "dena@example.test", role: "admin", createdAt: "2026-08-01T00:00:00.000Z" }}
       onLoggedOut={() => {}}
     />);
-    fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agen & model" }));
     const input = await screen.findByLabelText("Jatah brainstorming");
     fireEvent.change(input, { target: { value: "5" } });
     fireEvent.blur(input);
@@ -253,7 +256,9 @@ describe("SettingsScreen · simpan jujur (audit P0)", () => {
     localStorage.clear();
     const puts = settingsFetch(() => json(setting));
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Umum" }));
+    // Reset tinggal di Lanjutan › Zona bahaya (bukan lagi di tab Umum).
+    fireEvent.click(await screen.findByRole("button", { name: "Lanjutan" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Zona bahaya" }));
     fireEvent.click(await screen.findByRole("button", { name: "Reset ke default" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/Kendali jarak jauh, pengiriman log, dan retensi log/i)).toBeInTheDocument();

@@ -103,6 +103,9 @@ describe("SPEC-908 · LeadScreen live", () => {
     await screen.findByText(/Keputusan halaman satu\?/);
     getLeadDecisions.mockResolvedValue(
       { items: [decision("d6", "Keputusan halaman dua?")], total: 60, page: 2, pageSize: 20 });
+    // Riwayat "Keputusan" saja: halaman keputusan & rangkaian dipaginasi terpisah (timeline gabungan
+    // menyejajarkan keduanya, jadi invarian dua-halaman diuji di mode ini).
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Keputusan" })); });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Berikutnya" })); });
     await screen.findByText(/Keputusan halaman dua\?/);
     expect(allSubs("lead")).toEqual([expect.objectContaining({ decPage: 2, flowPage: 1 })]);

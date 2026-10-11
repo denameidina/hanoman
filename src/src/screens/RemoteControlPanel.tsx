@@ -1,48 +1,23 @@
 import React from "react";
-import type { LogLane, RelayLinkState, RemoteCapability, RemoteControlView } from "@hanoman/shared";
-import { Badge, Card, StateBlock, Switch, useConfirm, type ShowToast } from "../ds";
+import type { LogLane, RelayLinkState, RemoteControlView } from "@hanoman/shared";
+import { Badge, Card, Radio, RadioGroup, StateBlock, Switch, useConfirm, type ShowToast } from "../ds";
 import { api } from "../api/client";
 import { failureMessage } from "../lib/report-error";
+import { relativeTime } from "../lib/time-format";
+import {
+  ACCESS_TIERS, GRANT_IMPACT, GRANT_LABEL, RISKY_GRANTS, TIER_DESC, TIER_GRANTS, TIER_LABEL,
+  customGrantLabels, grantDiff, needsConfirm, tierOf, type AccessTier,
+} from "./remote-access-tier";
 
 // SPEC-1215 · ADR-0165 §4 · K7 transparansi: operator perangkat INI menentukan apa yang boleh dilakukan
 // server pusat dan membaca riwayat perintah yang sudah diterima. Berkas sendiri (pola ClientAccessPanel):
 // SettingsScreen sudah ~80 KB. Toggle lajur log sengaja BELUM ada — pengirimannya lahir di SPEC-1217
 // (keputusan Plan P6).
 //
-// Audit UI/UX 2026-10: istilah "grant", "socket relay", "POST /sync/logs", dan "lajur" diganti bahasa
-// biasa; izin yang bisa mengubah sesi diberi penanda risiko dan konfirmasi saat dinyalakan; mematikan
-// "Lihat" memperingatkan bahwa semua izin ikut dicabut.
+// Audit UI/UX 2026-10 · Fase 3G: lima switch grant diganti SATU selektor tingkat (Lihat · Kerja · Tulis).
+// Pemetaan tingkat ↔ grant ada di `remote-access-tier.ts` dan diuji sendiri. Relay dan riwayat
+// diringkas; rinciannya dilipat.
 
-const VIEW: RemoteCapability[] = ["sessions:read", "backlog:read", "ide:read"];
-const VIEW_LABEL = "Lihat";
-const EXTRA: { cap: RemoteCapability; label: string; desc: string; risk?: true; impact?: string[] }[] = [
-  {
-    cap: "sessions:write", label: "Tulis terminal", risk: true,
-    desc: "Mengetik ke terminal, mengarahkan, menghentikan, dan menjawab dialog agen.",
-    impact: [
-      "Server pusat boleh mengetik ke terminal sesi yang berjalan di perangkat ini.",
-      "Server pusat boleh menghentikan sesi dan menjawab keputusan yang diminta agen.",
-      "Server pusat boleh mengambil alih dialog agen dari Anda.",
-    ],
-  },
-  {
-    cap: "sessions:spawn", label: "Mulai sesi", risk: true,
-    desc: "Membuka sesi agen baru di perangkat ini atas perintah server pusat. Gerbang beban perangkat tetap berlaku.",
-    impact: [
-      "Server pusat boleh membuka sesi agen baru di perangkat ini.",
-      "Agen akan berjalan di perangkat ini tanpa Anda memulainya dari sini.",
-      "Gerbang beban perangkat tetap berlaku: server pusat tak bisa memaksa melewatinya.",
-    ],
-  },
-  { cap: "backlog:write", label: "Tandai selesai", desc: "Hanya menandai item backlog selesai; penyuntingan item lain tetap tertutup untuk server pusat." },
-];
-// SPEC-1217 · AC-D1 UI · tiga jenis log ke server pusat — terpisah dari izin kendali jarak jauh:
-// jenis log hanya MENGIRIM baris, tidak membuka jalur perintah.
-const LOG_LANES: { lane: LogLane; label: string; desc: string }[] = [
-  { lane: "event", label: "Kejadian", desc: "Sesi dimulai dan selesai, serta perubahan izin. Jejak audit lokal, menyala secara default." },
-  { lane: "server", label: "Log server", desc: "Log proses server ini, disaring dari data rahasia sebelum dikirim." },
-  { lane: "transcript", label: "Transkrip sesi", desc: "Transkrip sesi terminal yang sudah ditutup." },
-];
 const RELAY_LABEL: Record<RelayLinkState, string> = {
   off: "tidak aktif", connecting: "menyambung", open: "tersambung", backoff: "mencoba lagi",
   unsupported: "server pusat tak mendukung", rejected: "ditolak server pusat",
@@ -50,32 +25,135 @@ const RELAY_LABEL: Record<RelayLinkState, string> = {
 const RELAY_TONE: Record<RelayLinkState, "ok" | "warn" | "neutral"> = {
   off: "neutral", connecting: "neutral", open: "ok", backoff: "warn", unsupported: "warn", rejected: "warn",
 };
+// SPEC-1217 · AC-D1 UI · tiga jenis log ke server pusat — terpisah dari izin kendali jarak jauh:
+// jenis log hanya MENGIRIM baris, tidak membuka jalur perintah.
+const LOG_LANES: { lane: LogLane; label: string; desc: string }[] = [
+  { lane: "event", label: "Kejadian", desc: "Sesi dimulai dan selesai, serta perubahan izin. Jejak audit lokal, menyala secara default." },
+  { lane: "server", label: "Log server", desc: "Log proses server ini, disaring dari data rahasia sebelum dikirim." },
+  { lane: "transcript", label: "Transkrip sesi", desc: "Transkrip sesi terminal yang sudah ditutup." },
+];
 
-function Row({ title, desc, children, last, badge }:
-  { title: string; desc: string; children: React.ReactNode; last?: boolean; badge?: React.ReactNode }) {
+/** Memuat izin. `Promise.resolve` membuat api yang tak tersedia (mock parsial) jadi galat yang tertangkap,
+    bukan lemparan sinkron yang menjatuhkan render. */
+const fetchRemoteControl = (): Promise<RemoteControlView> =>
+  Promise.resolve().then(() => api.getRemoteControl());
+
+/** Master + selektor tingkat akses untuk satu perangkat. Dipakai di Klien (Perangkat) dan di panel kendali. */
+export function RemoteAccessSection({ view, onView, onToast }:
+  { view: RemoteControlView; onView: (next: RemoteControlView) => void; onToast?: ShowToast }) {
+  const { confirm, dialog } = useConfirm();
+  const [busy, setBusy] = React.useState(false);
+  const { enabled, capabilities } = view.control;
+  const tier = tierOf(capabilities);
+
+  const save = async (nextEnabled: boolean, next: RemoteControlView["control"]["capabilities"], okMsg: string) => {
+    setBusy(true);
+    try {
+      onView(await api.putRemoteControl({ control: { enabled: nextEnabled, capabilities: next } }));
+      onToast?.(okMsg, "ok", "check");
+    } catch (e) {
+      onToast?.(failureMessage("menyimpan izin kendali jarak jauh", e), "err", "x-circle");
+    } finally { setBusy(false); }
+  };
+
+  // Server menolak grant tulis tanpa `sessions:read` — tingkat mana pun sudah memuatnya, jadi invarian
+  // itu terjaga lewat pemetaan, bukan lewat 400 dari server.
+  const toggleMaster = (on: boolean) => save(on, on && capabilities.length === 0 ? [...TIER_GRANTS.lihat] : capabilities,
+    on ? "Izin kendali jarak jauh disimpan" : "Kendali jarak jauh dimatikan");
+
+  // Pilih tingkat: tak ada perubahan → diam. Naik ke grant berisiko atau turun (ada grant yang dicabut)
+  // → dialog yang menyebut dampaknya. Naik ke Lihat saja tak perlu dialog.
+  const choose = async (next: AccessTier) => {
+    const target = [...TIER_GRANTS[next]];
+    const diff = grantDiff(capabilities, target);
+    if (diff.added.length === 0 && diff.removed.length === 0) return;
+    const okMsg = `Tingkat akses: ${TIER_LABEL[next]}`;
+    if (!needsConfirm(diff)) { await save(enabled, target, okMsg); return; }
+    const raising = diff.added.some((c) => RISKY_GRANTS.includes(c));
+    await confirm({
+      title: raising ? `Izinkan tingkat ${TIER_LABEL[next]}?` : `Turunkan ke ${TIER_LABEL[next]}?`,
+      message: TIER_DESC[next],
+      impact: [
+        ...diff.added.map((c) => GRANT_IMPACT[c]),
+        ...diff.removed.map((c) => `Dicabut: ${GRANT_LABEL[c]}.`),
+      ],
+      confirmLabel: raising ? `Izinkan ${TIER_LABEL[next]}` : `Turunkan ke ${TIER_LABEL[next]}`,
+      tone: raising ? "danger" : "default",
+      icon: raising ? "shield" : "info",
+      // Dialog tetap terbuka dan `busy` selama simpan berjalan, jadi klik ganda tak bisa menyimpan dua kali.
+      run: () => save(enabled, target, okMsg),
+    });
+  };
+
   return (
-    <div className="hn-setting-row" style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 0", borderBottom: last ? "none" : "1px solid var(--border-hair)" }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, fontSize: 14, fontWeight: 600, color: "var(--text-strong)" }}>
-          {title}{badge}
+    <div className="kl-access">
+      <div className="kl-row">
+        <div className="kl-row-text">
+          <div className="kl-row-title">Izinkan kendali jarak jauh</div>
+          <div className="kl-row-desc">
+            Mati = server pusat tidak bisa mengirim perintah ke perangkat ini sama sekali.
+            Hanya bisa dinyalakan dari perangkat ini.
+          </div>
         </div>
-        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 3, lineHeight: 1.5 }}>{desc}</div>
+        <Switch checked={enabled} disabled={busy} onChange={(on: boolean) => void toggleMaster(on)}
+          aria-label="Izinkan kendali jarak jauh" />
       </div>
-      <div className="hn-setting-control" style={{ flex: "0 0 auto" }}>{children}</div>
+
+      <div className="kl-tier-head">Tingkat akses</div>
+      <RadioGroup aria-label="Tingkat akses" className="kl-tier-group"
+        value={tier === "khusus" ? "khusus" : tier === "kosong" ? null : tier}
+        disabled={busy || !enabled}
+        onChange={(v) => void choose(v as AccessTier)}>
+        {ACCESS_TIERS.map((t) => (
+          <Radio key={t} value={t} label={TIER_LABEL[t]} description={TIER_DESC[t]} />
+        ))}
+        {tier === "khusus" && (
+          <Radio value="khusus" label="Khusus" disabled
+            description="Kombinasi izin yang tak sama dengan tingkat mana pun. Pilih satu tingkat untuk menggantinya." />
+        )}
+      </RadioGroup>
+      {!enabled && (
+        <div className="kl-tier-hint">Nyalakan kendali jarak jauh untuk memilih tingkat akses.</div>
+      )}
+      {tier === "khusus" && (
+        <details className="kl-khusus">
+          <summary>Rincian izin khusus</summary>
+          <div>{customGrantLabels(capabilities).join(", ")}</div>
+        </details>
+      )}
+      {dialog}
     </div>
   );
 }
 
-const RISK_BADGE = <Badge tone="warn" size="sm">berisiko</Badge>;
+/** Kartu Perangkat: izin server pusat untuk perangkat yang sedang dibuka ini. Memuat izinnya sendiri. */
+export function RemoteAccessCard({ onToast }: { onToast?: ShowToast }) {
+  const [view, setView] = React.useState<RemoteControlView | null>(null);
+  const [failed, setFailed] = React.useState(false);
+  const load = React.useCallback(() => {
+    setFailed(false);
+    fetchRemoteControl().then(setView).catch(() => setFailed(true));
+  }, []);
+  React.useEffect(() => { load(); }, [load]);
+  return (
+    <Card eyebrow="akses" title="Izin server pusat untuk perangkat ini">
+      {view
+        ? <RemoteAccessSection view={view} onView={setView} onToast={onToast} />
+        : failed
+          ? <StateBlock kind="error" compact title="Gagal memuat izin perangkat ini"
+              hint="Periksa koneksi ke server ini, lalu coba lagi." action={load} />
+          : <StateBlock kind="loading" compact title="Memuat izin…" />}
+    </Card>
+  );
+}
 
 export function RemoteControlPanel({ onToast }: { onToast?: ShowToast }) {
-  const { confirm, dialog } = useConfirm();
   const [view, setView] = React.useState<RemoteControlView | null>(null);
   const [failed, setFailed] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const load = React.useCallback(() => {
     setFailed(false);
-    api.getRemoteControl().then(setView).catch(() => setFailed(true));
+    fetchRemoteControl().then(setView).catch(() => setFailed(true));
   }, []);
   React.useEffect(() => { load(); }, [load]);
 
@@ -90,62 +168,6 @@ export function RemoteControlPanel({ onToast }: { onToast?: ShowToast }) {
     );
   }
 
-  const { enabled, capabilities } = view.control;
-  const has = (c: RemoteCapability) => capabilities.includes(c);
-  const union = (...lists: RemoteCapability[][]): RemoteCapability[] => [...new Set(lists.flat())];
-  const save = async (nextEnabled: boolean, next: RemoteCapability[]) => {
-    setBusy(true);
-    try {
-      setView(await api.putRemoteControl({ control: { enabled: nextEnabled, capabilities: next } }));
-      onToast?.(nextEnabled ? "Izin kendali jarak jauh disimpan" : "Kendali jarak jauh dimatikan", "ok", "check");
-    } catch (e) {
-      onToast?.(failureMessage("menyimpan izin kendali jarak jauh", e), "err", "x-circle");
-    } finally { setBusy(false); }
-  };
-  // Server menolak grant tulis tanpa `sessions:read` — UI menjaga invarian yang sama, tak mengandalkan 400.
-  const toggleMaster = (on: boolean) => save(on, on && capabilities.length === 0 ? VIEW : capabilities);
-
-  // Mematikan "Lihat" membuang SEMUA izin (lihat `save(enabled, [])`), jadi konfirmasinya menyebut
-  // izin lain yang ikut hilang, bukan hanya izin lihat itu sendiri.
-  const toggleView = async (on: boolean) => {
-    if (on) return save(enabled, union(capabilities, VIEW));
-    const others = EXTRA.filter((e) => has(e.cap)).map((e) => e.label);
-    await confirm({
-      title: `Matikan "${VIEW_LABEL}"?`,
-      message: "Semua izin kendali jarak jauh ikut dicabut, bukan hanya izin lihat.",
-      impact: [
-        "Server pusat kehilangan akses lihat ke sesi, backlog, dan IDE perangkat ini.",
-        others.length
-          ? `Izin lain yang ikut dicabut: ${others.join(", ")}.`
-          : "Tak ada izin lain yang sedang aktif.",
-      ],
-      confirmLabel: "Matikan dan cabut izin",
-      tone: "danger",
-      icon: "eye",
-      run: () => save(enabled, []),
-    });
-  };
-
-  // Izin berisiko dikonfirmasi SAAT dinyalakan (mematikannya tak perlu konfirmasi). Dialog tetap
-  // terbuka dan `busy` selama simpan berjalan, jadi klik ganda tak bisa menyimpan dua kali.
-  const toggleExtra = async (cap: RemoteCapability, on: boolean) => {
-    const def = EXTRA.find((e) => e.cap === cap)!;
-    const next = on ? union(capabilities, VIEW, [cap]) : capabilities.filter((c) => c !== cap);
-    if (on && def.risk) {
-      await confirm({
-        title: `Izinkan "${def.label}"?`,
-        message: def.desc,
-        impact: def.impact,
-        confirmLabel: "Izinkan",
-        tone: "danger",
-        icon: "shield",
-        run: () => save(enabled, next),
-      });
-      return;
-    }
-    await save(enabled, next);
-  };
-
   const toggleLog = async (lane: LogLane, on: boolean) => {
     setBusy(true);
     try {
@@ -156,59 +178,70 @@ export function RemoteControlPanel({ onToast }: { onToast?: ShowToast }) {
     } finally { setBusy(false); }
   };
 
+  const lastAudit = view.audit[0];
+  const relayHint = view.relay.hubOrigin ?? "perangkat ini tidak tersambung ke server pusat";
+
   return (
     <>
       <Card eyebrow="kendali" title="Kendali jarak jauh dari server pusat">
-        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="kl-intro">
           Memberi <b>server pusat</b> tempat perangkat ini tersinkron izin untuk bertindak di perangkat ini,
-          lewat rute yang sama dengan dashboard lokal. Default mati, dan hanya bisa dinyalakan dari perangkat
-          ini — server pusat tak bisa menyalakannya sendiri.
+          lewat rute yang sama dengan dashboard lokal.
         </div>
-        <Row title="Izinkan kendali jarak jauh" desc="Membuka koneksi ke server pusat. Mati = server pusat tidak bisa mengirim perintah ke perangkat ini sama sekali.">
-          <Switch checked={enabled} disabled={busy} onChange={(on: boolean) => void toggleMaster(on)} aria-label="Izinkan kendali jarak jauh" />
-        </Row>
-        <Row title={VIEW_LABEL} desc="Melihat daftar sesi, fase, dialog, dokumen, dan IDE. Hanya baca.">
-          <Switch checked={has("sessions:read")} disabled={busy || !enabled} onChange={(on: boolean) => void toggleView(on)} aria-label={VIEW_LABEL} />
-        </Row>
-        {EXTRA.map((e, i) => (
-          <Row key={e.cap} title={e.label} desc={e.desc} last={i === EXTRA.length - 1} badge={e.risk ? RISK_BADGE : undefined}>
-            <Switch checked={has(e.cap)} disabled={busy || !enabled} onChange={(on: boolean) => void toggleExtra(e.cap, on)} aria-label={e.label} />
-          </Row>
-        ))}
+        <RemoteAccessSection view={view} onView={setView} onToast={onToast} />
       </Card>
       <Card eyebrow="kendali" title="Kirim log ke server pusat">
-        <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
+        <div className="kl-intro">
           Mengirim baris log dari perangkat ini ke server pusat. Ini terpisah dari izin kendali di atas.
           Tiap jenis log bisa dinyalakan sendiri-sendiri dan langsung berlaku tanpa restart.
         </div>
         {LOG_LANES.map((l, i) => (
-          <Row key={l.lane} title={l.label} desc={l.desc} last={i === LOG_LANES.length - 1}>
+          <div key={l.lane} className={`kl-row${i === LOG_LANES.length - 1 ? " kl-row-last" : ""}`}>
+            <div className="kl-row-text">
+              <div className="kl-row-title">{l.label}</div>
+              <div className="kl-row-desc">{l.desc}</div>
+            </div>
             <Switch checked={view.logs[l.lane]} disabled={busy}
               onChange={(on: boolean) => void toggleLog(l.lane, on)} aria-label={l.label} />
-          </Row>
+          </div>
         ))}
       </Card>
       <Card eyebrow="kendali" title="Koneksi ke server pusat">
-        <div data-testid="relay-status" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", fontSize: 13 }}>
+        <div data-testid="relay-status" className="kl-status-line">
           <Badge tone={RELAY_TONE[view.relay.state]}>{RELAY_LABEL[view.relay.state]}</Badge>
-          <span style={{ color: "var(--text-muted)", overflowWrap: "anywhere" }}>{view.relay.hubOrigin ?? "perangkat ini tidak tersambung ke server pusat"}</span>
-          {view.relay.lastClose && (
-            <span style={{ color: "var(--text-muted)" }}>
-              terputus terakhir (kode {view.relay.lastClose.code}){view.relay.lastClose.reason ? ` · ${view.relay.lastClose.reason}` : ""}
-            </span>
-          )}
+          <span className="kl-status-origin">{relayHint}</span>
         </div>
+        {view.relay.lastClose && (
+          <details className="kl-khusus">
+            <summary>Rincian koneksi</summary>
+            <div>
+              Terputus terakhir (kode {view.relay.lastClose.code})
+              {view.relay.lastClose.reason ? ` · ${view.relay.lastClose.reason}` : ""}
+            </div>
+          </details>
+        )}
       </Card>
       <Card eyebrow="kendali" title="Riwayat perintah dari server pusat">
-        {view.audit.length === 0
-          ? <div style={{ fontSize: 13, color: "var(--text-subtle)", padding: "8px 0" }}>Belum ada perintah dari server pusat.</div>
-          : view.audit.map((a) => (
-            <div key={a.id} data-testid="remote-audit-row" style={{ fontSize: 12.5, padding: "8px 0", borderBottom: "1px solid var(--border-hair)", overflowWrap: "anywhere" }}>
-              <b>{a.kind}</b> · {a.msg} · <span style={{ color: "var(--text-muted)" }}>{new Date(a.ts).toLocaleString("id-ID")}</span>
+        {view.audit.length === 0 ? (
+          <div className="kl-muted">Belum ada perintah dari server pusat.</div>
+        ) : (
+          <>
+            <div className="kl-muted">
+              {view.audit.length} perintah tercatat
+              {lastAudit && <> · terakhir {relativeTime(lastAudit.ts) || "—"}</>}
             </div>
-          ))}
+            <details className="kl-khusus">
+              <summary>Lihat semua riwayat</summary>
+              {view.audit.map((a) => (
+                <div key={a.id} data-testid="remote-audit-row" className="kl-audit-row" title={a.kind}>
+                  <span>{a.msg}</span>
+                  <span className="kl-muted"> · {relativeTime(a.ts) || "—"}</span>
+                </div>
+              ))}
+            </details>
+          </>
+        )}
       </Card>
-      {dialog}
     </>
   );
 }

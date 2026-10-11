@@ -32,5 +32,17 @@ yang tersentuh diperbarui dalam commit yang sama. Baseline gagal sebelum perubah
 
 ## Fase 3 — redesign
 - [x] 3A ADR IA baru (17 → 8 menu) + nav hub — ADR-0205; tanpa redirect (path section tak berubah, URL lama tetap hidup)
-- [ ] 3B Overview, 3C Settings, 3D Backlog/Tim, 3E Terminal, 3F Triase/Lead, 3G Klien, 3H IDE,
-      3I Scheduler, 3J VPS, 3K Skills, 3L Review, 3M Portal, 3N Onboarding
+- [x] 3B Overview "Hari ini" + Dalang sebagai papan senyap (Fase 3B di frontend-implementation.md)
+- [x] 3F Triase/Lead: kotak masuk keputusan — satu daftar tiket + issue, Terima/Tolak inline, J/K/A/R, toast Urungkan; Lead: mode Aktif/Jeda/Mati, Menunggu kamu sekali klik, riwayat gabungan, pengaturan dengan Simpan (Fase 3F di frontend-implementation.md)
+- [x] 3I Scheduler sebagai tab hub Otonom: strip status (state, kapasitas, limit, Jeda/Lanjutkan, Hentikan dikonfirmasi); tab Antre · Berjalan · Riwayat (chip) · Cron (tabel/kartu + menu ⋯, form dua tab, zona server) · Setelan (draft + Simpan, orkestrasi accordion) (Fase 3I · Scheduler di frontend-implementation.md)
+- [x] 3E Terminal: default Fokus (rail sesi + satu pane), Grid opsional, toolbar ≤ 6 kontrol, "Buka…" untuk Ambil backlog/Riwayat/Terminal biasa (Fase 3E · Terminal di frontend-implementation.md)
+- [x] 3D Backlog/Tim: daftar utama ber-segmen tahap, papan sekunder, popover Filter, detail linier (Ringkasan → Jalankan → Review/dokumen/lampiran → Lanjutan → Zona berbahaya), skeleton muat pertama, urung prioritas; Tim: lensa Saya/Semua, kartu = judul + prioritas + penanggung jawab + menu Ubah tugas, header ≤6 kontrol, urung pindah/tugaskan (Fase 3 · Backlog & Tim (3D) di frontend-implementation.md)
+- [x] 3C Settings: empat niat (Sesi harian · Agen & model · Integrasi & akses · Lanjutan tertutup), shell tipis + modul
+  `screens/settings/**`, satu aturan simpan (`useSettingField`), override satu-bentuk, Telegram satu tempat, dokumentasi webhook
+  dilipat, "Cari pengaturan", deep link `#bagian=` (Fase 3C di frontend-implementation.md; ADR IA Pengaturan belum ditulis)
+- [x] 3H IDE "Perubahan dulu": empat tab (Perubahan · Riwayat · Cabang · Berkas), toolbar ≤6 kontrol, branch + worktree dalam satu daftar (CabangPanel), menu konteks pohon, pemisah panel keyboard (Fase 3 · IDE di frontend-implementation.md)
+- [ ] 3L Review, 3M Portal, 3N Onboarding
+- [x] 3K Skills: master-detail (daftar ringkas + chip lapis Global/Project/Plugin, editor dengan footer Simpan sticky dan konfirmasi pindah), tab Skill · Agen, modal agen tiga tab, bukti dilipat (Fase 3 · Projects, PRD, Docs, Skills di frontend-implementation.md)
+- [x] 3P Projects · PRD · Docs: daftar diurut perhatian + chip hitungan, detail tiga pintu + Pengaturan lipat, PRD dengan indeks per status dan sheet "Jadikan backlog", Docs Baca|Edit dengan bar simpan sticky dan pohon role=tree (label 3P; 3I di rencana sudah milik Scheduler)
+- [x] 3G Klien: tab Perangkat · Akun · Log; selektor tingkat Lihat/Kerja/Tulis (grant API tak berubah); banner brass sticky (Fase 3 · Klien & VPS di frontend-implementation.md)
+- [x] 3J VPS: daftar ringkas dengan stepper dan Periksa; detail bertab Ringkasan · Checklist · Pemasangan · Akses; alur Pilih → Pratinjau → Terapkan (Fase 3 · Klien & VPS di frontend-implementation.md)

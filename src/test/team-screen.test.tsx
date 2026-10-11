@@ -7,6 +7,8 @@ vi.mock("../src/api/client", () => ({
     listTasks: vi.fn(), createTask: vi.fn(), patchTask: vi.fn(), deleteTask: vi.fn(),
     listMembers: vi.fn(), createMember: vi.fn(), patchMember: vi.fn(), deleteMember: vi.fn(),
     getConfig: vi.fn(async () => ({ sync: { running: false } })),
+    // Identitas akun yang login: dasar lensa "Saya". Tanpa user, lensa itu tak muncul.
+    authStatus: vi.fn(async () => ({ needsSetup: false, user: null })),
   },
   ApiError: class extends Error {},
 }));
@@ -49,16 +51,34 @@ const view = (projectFilter = "all") => {
   return { onProjectFilter, onToast };
 };
 
+// Penyaring lanjutan ada di popover "Filter" (progressive disclosure): buka bila belum terbuka.
+// Klik di luar popover bisa menutupnya, jadi helper ini dipanggil ulang tiap kali dibutuhkan.
+const ensureFilter = () => {
+  if (!screen.queryByRole("dialog", { name: "Filter" })) {
+    fireEvent.click(screen.getByRole("button", { name: /^Filter/ }));
+  }
+};
+
 describe("TeamScreen · toolbar", () => {
-  it("semua kontrol punya nama yang bisa dipegang", async () => {
+  it("baris alat: mode, pencarian, Filter, Tugas baru, dan Lainnya punya nama yang bisa dipegang", async () => {
     view();
     await screen.findByTestId("team-board");
     expect(screen.getByRole("tablist", { name: "Mode tampilan" })).toBeInTheDocument();
-    for (const label of ["Cari tugas", "Filter project", "Filter kolom", "Filter anggota"]) {
+    expect(screen.getByLabelText("Cari tugas")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /tugas baru/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Lainnya" })).toBeInTheDocument();
+    ensureFilter();
+    for (const label of ["Filter project", "Filter kolom", "Filter anggota"]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
-    expect(screen.getByRole("button", { name: /tugas baru/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^anggota$/i })).toBeInTheDocument();
+  });
+
+  it("Lainnya menyimpan Anggota tim (bukan tombol sejajar)", async () => {
+    view();
+    await screen.findByTestId("team-board");
+    expect(screen.queryByRole("button", { name: /^anggota$/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Lainnya" }));
+    expect(screen.getByRole("button", { name: "Anggota tim" })).toBeInTheDocument();
   });
 
   /* Satu langganan & satu fetch PER KOLOM: `order` bermakna DI DALAM kolom, jadi potongan 200
@@ -79,6 +99,7 @@ describe("TeamScreen · toolbar", () => {
     await waitFor(() => expect(api.listTasks).toHaveBeenCalled());
     expect(vi.mocked(api.listTasks).mock.calls[0]![0]!.projectId).toBe("p1");
     vi.mocked(api.listTasks).mockClear();
+    ensureFilter();
     fireEvent.change(screen.getByLabelText("Filter anggota"), { target: { value: "dena@x.id" } });
     await waitFor(() => expect(vi.mocked(api.listTasks).mock.calls[0]![0]!.memberId).toBe("dena@x.id"));
   });
@@ -95,6 +116,7 @@ describe("TeamScreen · toolbar", () => {
     view();
     await screen.findByTestId("team-col-doing");
     vi.mocked(api.listTasks).mockClear();
+    ensureFilter();
     fireEvent.change(screen.getByLabelText("Filter kolom"), { target: { value: "doing" } });
     await waitFor(() => expect(screen.queryByTestId("team-col-backlog")).toBeNull());
     expect(screen.getByTestId("team-col-doing")).toBeInTheDocument();
@@ -137,11 +159,12 @@ describe("TeamScreen · modal", () => {
     expect(await screen.findByLabelText("Judul tugas")).toHaveValue("Desain");
   });
 
-  // Anggota dikelola DI SINI, bukan di SettingsScreen yang sudah 93 KB.
+  // Anggota dikelola DI SINI, bukan di SettingsScreen yang sudah 93 KB. Dari menu Lainnya.
   it("Anggota membuka modal kelola anggota", async () => {
     view();
     await screen.findByTestId("team-board");
-    fireEvent.click(screen.getByRole("button", { name: /^anggota$/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Lainnya" }));
+    fireEvent.click(screen.getByRole("button", { name: "Anggota tim" }));
     expect(await screen.findByLabelText("Email anggota baru")).toBeInTheDocument();
   });
 });
@@ -231,14 +254,17 @@ describe("TeamScreen · mode Linimasa", () => {
   it("Select zoom mati di Papan, hidup di Linimasa DAN Lintas project", async () => {
     view();
     await screen.findByTestId("team-board");
+    ensureFilter();
     expect(screen.queryByLabelText("Zoom linimasa")).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: /^linimasa$/i }));
+    ensureFilter();
     const zoom = await screen.findByLabelText("Zoom linimasa");
     expect((zoom as HTMLSelectElement).value).toBe("week");
     // Mode ketiga memakai kanvas yang sama, jadi zoom-nya bermakna di sana juga — dan satu state
     // `zoom` yang sama (ADR-0115), bukan salinan kedua.
     fireEvent.click(screen.getByRole("tab", { name: /lintas project/i }));
     await screen.findByTestId("team-projects");
+    ensureFilter();
     expect((screen.getByLabelText("Zoom linimasa") as HTMLSelectElement).value).toBe("week");
   });
 
@@ -252,6 +278,7 @@ describe("TeamScreen · mode Linimasa", () => {
     await screen.findByTestId("team-timeline");
     const minggu = screen.getAllByTestId("timeline-tick").length;
     vi.mocked(api.listTasks).mockClear();
+    ensureFilter();
     fireEvent.change(screen.getByLabelText("Zoom linimasa"), { target: { value: "day" } });
     await waitFor(() => expect(screen.getAllByTestId("timeline-tick").length).toBeGreaterThan(minggu));
     expect(api.listTasks).not.toHaveBeenCalled();
@@ -267,6 +294,7 @@ describe("TeamScreen · mode Linimasa", () => {
     view();
     fireEvent.click(await screen.findByRole("tab", { name: /linimasa/i }));
     await screen.findByTestId("timeline-bar-b1");
+    ensureFilter();
     fireEvent.change(screen.getByLabelText("Filter kolom"), { target: { value: "doing" } });
     await waitFor(() => expect(screen.queryByTestId("timeline-bar-b1")).toBeNull());
     expect(screen.getByTestId("timeline-bar-d1")).toBeInTheDocument();
@@ -287,7 +315,8 @@ describe("TeamScreen · mode Linimasa", () => {
    memang sedang aktif. */
 describe("TeamScreen · mode Lintas project", () => {
   const dated = () => task({ id: "t1", title: "Desain", startDate: "2026-09-10T12:00:00.000Z" });
-  const projectSelect = () => screen.getByLabelText("Filter project") as HTMLSelectElement;
+  // Popover bisa tertutup oleh klik tab di baris atas; buka lagi sebelum membaca kontrolnya.
+  const projectSelect = () => { ensureFilter(); return screen.getByLabelText("Filter project") as HTMLSelectElement; };
 
   it("tab Lintas project ada dan memilihnya mengganti papan dengan kanvasnya", async () => {
     vi.mocked(api.listTasks).mockImplementation(async (p) =>
@@ -349,6 +378,7 @@ describe("TeamScreen · mode Lintas project", () => {
     expect(screen.queryByTestId("project-filter-note")).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: /lintas project/i }));
     await screen.findByTestId("team-projects");
+    ensureFilter();
     // `title` pada `<select disabled>` ditekan browser — kontrol mati tanpa sebab persis alternatif
     // yang ditolak ADR-0154.
     expect(screen.getByTestId("project-filter-note")).toBeInTheDocument();
@@ -361,12 +391,13 @@ describe("TeamScreen · mode Lintas project", () => {
     // Penyaring anggota, bukan kotak cari: `q` ditahan 400 ms sebelum menyentuh langganan, dan
     // timer yang jatuh tempo sesudah test berakhir memunculkan peringatan `act()` yang tak ada
     // hubungannya dengan apa yang diuji di sini.
+    ensureFilter();
     fireEvent.change(screen.getByLabelText("Filter anggota"), { target: { value: "dena@x.id" } });
     fireEvent.click(screen.getByRole("tab", { name: /lintas project/i }));
     await screen.findByTestId("team-projects");
-    fireEvent.click(screen.getByRole("button", { name: /reset tampilan/i }));
-    // Lencana mengaku hanya memegang penyaring anggota; menghapus penyaring project juga akan
-    // mengubah apa yang dilihat Backlog (SPEC-146).
+    // Chip "Anggota" mengaku hanya memegang penyaring anggota; Reset tak boleh ikut menghapus project.
+    fireEvent.click(screen.getByRole("button", { name: "Reset filter" }));
+    ensureFilter();
     await waitFor(() =>
       expect((screen.getByLabelText("Filter anggota") as HTMLSelectElement).value).toBe("all"));
     expect(onProjectFilter).not.toHaveBeenCalled();
@@ -414,5 +445,42 @@ describe("TeamScreen · kontrak mode tampilan", () => {
     expect(new Set(rendered.values()).size,
       `dua mode berbagi permukaan yang sama: ${JSON.stringify([...rendered])}`)
       .toBe(TEAM_VIEWS.length);
+  });
+});
+
+/* Redesign 3D: bawaan papan adalah tugas SAYA (anggota yang sama dengan akun yang login). "Semua"
+   melepasnya. Lensa hanya muncul bila akunnya memang terdaftar sebagai anggota tim. */
+describe("TeamScreen · lensa Saya", () => {
+  it("bawaan: tugas saya, dan Semua melepas penyaring anggota", async () => {
+    vi.mocked(api.authStatus).mockResolvedValueOnce({
+      needsSetup: false, user: { id: "u1", email: "Dena@X.id", role: "owner", createdAt: "2026-08-25T00:00:00.000Z" },
+    } as never);
+    view();
+    await screen.findByTestId("team-board");
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Saya" })).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(vi.mocked(api.listTasks).mock.calls.at(-1)![0]!.memberId).toBe("dena@x.id"));
+
+    fireEvent.click(screen.getByRole("tab", { name: "Semua" }));
+    await waitFor(() => expect(vi.mocked(api.listTasks).mock.calls.at(-1)![0]!.memberId).toBeUndefined());
+  });
+
+  it("tanpa akun anggota yang cocok, lensa Saya tak ditawarkan", async () => {
+    view();
+    await screen.findByTestId("team-board");
+    expect(screen.queryByRole("tab", { name: "Saya" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Semua" })).toBeNull();
+  });
+});
+
+/* Pindah dan tugaskan reversibel: toast membawa "Urungkan" yang mengirim kebalikannya. */
+describe("TeamScreen · urung", () => {
+  it("pindah kolom menawarkan Urungkan yang mengembalikan status semula", async () => {
+    view();
+    await screen.findByTestId("team-card-t1");
+    fireEvent.click(screen.getByRole("button", { name: "Ubah tugas: Desain" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pindah ke Selesai" }));
+    await waitFor(() => expect(api.patchTask).toHaveBeenCalledWith("t1", { status: "done", order: 0 }));
+    fireEvent.click(await screen.findByRole("button", { name: "Urungkan" }));
+    await waitFor(() => expect(api.patchTask).toHaveBeenLastCalledWith("t1", { status: "backlog" }));
   });
 });

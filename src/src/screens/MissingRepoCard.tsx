@@ -8,7 +8,8 @@
 
    Audit 2026-10: clone hanya dikonfirmasi SATU kali — tombol "Clone" di modal, dengan dampaknya
    ditulis di badan modal. Dialog konfirmasi kedua dihapus: clone tak menimpa apa pun (git menolak
-   folder yang sudah berisi), jadi tak ada alasan destruktif untuk dialog tambahan. */
+   folder yang sudah berisi), jadi tak ada alasan destruktif untuk dialog tambahan.
+   Redesign 3P: banner memakai kelas (tanpa inline style); modal clone terkunci lewat `dismissible`. */
 import React from "react";
 import { Callout, Button, Modal, Input } from "../ds";
 import { api } from "../api/client";
@@ -16,14 +17,9 @@ import { FolderPicker } from "./FolderPicker";
 import { cloneErrorText, cloneTargetInto, repoBasename } from "./git-remote";
 import type { ProjectVM } from "./types";
 import { failureMessage } from "../lib/report-error";
+import "./styles/projects.css";
 
 type Toast = (msg: string, kind?: string, icon?: string) => void;
-
-const LABEL: React.CSSProperties = {
-  display: "block", fontFamily: "var(--font-ui)", fontSize: 12.5, fontWeight: 600,
-  color: "var(--text-strong)", marginBottom: 6,
-};
-const MONO: React.CSSProperties = { fontFamily: "var(--font-mono)", wordBreak: "break-all" };
 
 function CloneRepoModal({ open, p, onClose, onDone, onToast }:
   { open: boolean; p: ProjectVM; onClose: () => void;
@@ -54,15 +50,14 @@ function CloneRepoModal({ open, p, onClose, onDone, onToast }:
       setBusy(false);
       onClose();
     } catch (e) {
-      // Kegagalan tinggal DI DALAM modal: stderr git adalah satu-satunya keterangan yang berguna
-      // di sini, dan toast yang lewat tak bisa dibaca ulang saat operator memperbaiki path-nya.
+      // Kegagalan tinggal DI DALAM modal: stderr git adalah satu-satunya keterangan yang berguna.
       setErr(cloneErrorText(e));
       setBusy(false);
     }
   }
 
   return (
-    <Modal open={open} onClose={busy ? () => {} : onClose} icon="git-branch" eyebrow={p.id} title="Clone dari git remote"
+    <Modal open={open} onClose={onClose} dismissible={!busy} icon="git-branch" eyebrow={p.id} title="Clone dari git remote"
       footer={<>
         {/* "Tutup", bukan "Batal": clone sudah dimulai begitu tombol Clone ditekan. */}
         <Button variant="ghost" size="sm" onClick={onClose} disabled={busy}>Tutup</Button>
@@ -70,40 +65,34 @@ function CloneRepoModal({ open, p, onClose, onDone, onToast }:
           {busy ? "Meng-clone…" : err ? "Coba lagi" : "Clone"}
         </Button>
       </>}>
-      <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 14, lineHeight: 1.5 }}>
-        Menjalankan <code style={{ fontFamily: "var(--font-mono)" }}>git clone</code> dari{" "}
-        <code style={{ ...MONO }}>{remote}</code> di mesin ini, lalu menunjuk project ke hasilnya.
+      <p className="hn-prj-note">
+        Menjalankan <code className="hn-prj-mono">git clone</code> dari{" "}
+        <code className="hn-prj-mono hn-prj-wrap">{remote}</code> di mesin ini, lalu menunjuk project ke hasilnya.
         Gagal clone tak menyentuh project.
-      </div>
-      <div style={{ marginBottom: 14 }}>
-        <label htmlFor={dirId} style={LABEL}>Folder tujuan clone</label>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      </p>
+      <div className="hn-prj-field">
+        <label htmlFor={dirId} className="hn-prj-field-label">Folder tujuan clone</label>
+        <div className="hn-prj-inline">
           <Input id={dirId} value={dir} onChange={(e: React.ChangeEvent<any>) => setDir(e.target.value)}
-            leftIcon="folder" mono placeholder={`/path/ke/${repoBasename(remote)}`}
-            style={{ flex: 1, minWidth: 0 }} />
+            leftIcon="folder" mono placeholder={`/path/ke/${repoBasename(remote)}`} className="hn-prj-grow" />
           <Button size="md" variant="secondary" leftIcon="folder-open"
             onClick={() => setPicker(true)}>Pilih folder</Button>
         </div>
-        <div style={{ fontSize: 11.5, color: "var(--text-subtle)", marginTop: 6, lineHeight: 1.5 }}>
+        <div className="hn-prj-hint">
           Harus belum ada atau kosong — git menolak folder yang sudah berisi.
         </div>
       </div>
-      <ul style={{ margin: "0 0 14px", paddingLeft: 18, fontSize: 12.5, color: "var(--text-body)", lineHeight: 1.6 }}>
+      <ul className="hn-prj-list-plain">
         <li>Isi remote diunduh ke disk mesin ini — repo besar berarti unduhan besar.</li>
         <li>Sesudah berhasil, project menunjuk hasil clone (binding lokal, tak disync).</li>
       </ul>
       <FolderPicker open={picker} onClose={() => setPicker(false)} start={parent}
         onPick={(pick) => { setParent(pick); setDir(cloneTargetInto(pick, remote)); }} />
       {err && (
-        <div style={{ marginTop: 4 }}>
-          <Callout tone="err" title={err.error}>
-            Project tak tersentuh — perbaiki penyebabnya lalu coba lagi.
-            {err.stderr && (
-              <pre style={{ marginTop: 8, marginBottom: 0, whiteSpace: "pre-wrap", wordBreak: "break-all",
-                fontFamily: "var(--font-mono)", fontSize: 12, maxHeight: 160, overflow: "auto" }}>{err.stderr}</pre>
-            )}
-          </Callout>
-        </div>
+        <Callout tone="err" title={err.error}>
+          Project tak tersentuh — perbaiki penyebabnya lalu coba lagi.
+          {err.stderr && <pre className="hn-prj-stderr">{err.stderr}</pre>}
+        </Callout>
       )}
     </Modal>
   );
@@ -131,7 +120,7 @@ export function MissingRepoCard({ p, onEdit, onToast, onProjectChanged }:
     <>
       <Callout tone="warn" icon="folder-git-2" title="Belum ada checkout di mesin ini"
         action={
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div className="hn-prj-inline">
             {remote
               ? <Button size="sm" leftIcon="git-branch" onClick={() => setCloning(true)}>Clone dari git remote</Button>
               : <Button size="sm" leftIcon="pencil" onClick={onEdit}>Isi git remote</Button>}
@@ -141,7 +130,7 @@ export function MissingRepoCard({ p, onEdit, onToast, onProjectChanged }:
         }>
         {remote
           ? <>Docs, terminal, dan sesi project ini butuh checkout lokal. Clone{" "}
-              <code style={{ fontFamily: "var(--font-mono)", wordBreak: "break-all" }}>{remote}</code>{" "}
+              <code className="hn-prj-mono hn-prj-wrap">{remote}</code>{" "}
               ke mesin ini, atau tunjuk folder yang sudah kamu clone sendiri.</>
           : <>Project ini juga belum punya git remote, jadi clone tak mungkin dilakukan. Isi git
               remote-nya dulu lewat Edit project, atau tunjuk folder yang sudah ada di device ini.</>}

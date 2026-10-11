@@ -34,7 +34,10 @@ describe("kegagalan menyegarkan backlog terlihat (SPEC-857)", () => {
     backlog(toast);
 
     // Seed prop tetap terpakai — daftarnya tak dikosongkan; yang berubah cuma penandanya.
-    await waitFor(() => expect(screen.getByText(/2 spec · data mungkin usang/)).toBeTruthy());
+    // Penanda usang tampil sebagai status terbaca pembaca layar; angka segmen "Semua" tetap 2.
+    await waitFor(() => expect(screen.getByText(/data mungkin usang/i)).toBeTruthy());
+    expect(screen.getByText(/data mungkin usang/i)).toHaveAttribute("role", "status");
+    expect(screen.getByRole("tab", { name: /Semua\s*2/ })).toBeInTheDocument();
     expect(toast).toHaveBeenCalledTimes(1);
     expect(toast.mock.calls[0]![0]).toMatch(/usang/i);
     expect(toast.mock.calls[0]![1]).toBe("warn");
@@ -46,7 +49,7 @@ describe("kegagalan menyegarkan backlog terlihat (SPEC-857)", () => {
     backlog(toast);
 
     await waitFor(() => expect(api.listSpecs).toHaveBeenCalled());
-    expect(screen.getByText("2 spec")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /Semua\s*2/ })).toBeInTheDocument();
     expect(screen.queryByText(/usang/)).toBeNull();
     expect(toast).not.toHaveBeenCalled();
   });
