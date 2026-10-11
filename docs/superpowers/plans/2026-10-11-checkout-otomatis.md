@@ -354,7 +354,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
   - `cloneProjectCheckout(projectId: string, opts?: { dir?: string; token?: string | null }): Promise<string>` — mengembalikan dir, binding terpasang
   - `fetchRefIfMissing(repoDir: string, rev: string | null | undefined, token?: string | null): Promise<void>`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/project-checkout.test.ts
@@ -467,12 +467,12 @@ describe("fetchRefIfMissing", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/project-checkout.test.ts --no-file-parallelism`
 Expected: FAIL — import `../src/services/project-checkout` tidak ditemukan.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/project-checkout.ts
@@ -592,12 +592,12 @@ export async function fetchRefIfMissing(repoDir: string, rev: string | null | un
 
 Catatan untuk implementer: `fetch origin` pada remote ber-URL SSH tidak memakai token (askpass tidak dipakai SSH), sehingga perilaku mesin yang sudah punya ssh key tak berubah.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/project-checkout.test.ts --no-file-parallelism`
 Expected: PASS (10 tests). Test "pesan galat tidak memuat token" butuh jaringan atau gagal cepat di DNS; keduanya menghasilkan `CheckoutError` tanpa token, jadi aman offline.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/project-checkout.ts server/test/project-checkout.test.ts docs/superpowers/plans/2026-10-11-checkout-otomatis.md
