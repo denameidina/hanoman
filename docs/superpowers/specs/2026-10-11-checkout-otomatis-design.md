@@ -1,6 +1,6 @@
 # Checkout otomatis & kredensial git lintas device — design
 
-Tanggal: 2026-10-11 · Status: draf menunggu review
+Tanggal: 2026-10-11 · Status: direvisi setelah verifikasi kode (lihat "Revisi")
 
 ## Masalah
 
@@ -11,14 +11,13 @@ Menjalankan sesi di project server/client tidak seamless di device atau VPS lain
    dan sesi gagal sampai ada binding manual (`server/src/services/local-binding.ts:27-32`).
 2. Clone membutuhkan akses git. Di mesin baru belum ada `gh auth`/ssh key, sehingga clone repo
    private gagal sampai pengguna login manual.
-3. `POST /projects/:id/clone` berjalan sinkron di request HTTP (`server/src/routes/bindings.ts`),
-   dan tombol clone di UI belum rapi (`docs/superpowers/specs/2026-08-21-spec-867-project-tanpa-dir-lokal-design.md`).
+3. `POST /projects/:id/clone` berjalan sinkron (`spawnSync`) di request HTTP dan memblokir event loop.
 
 ## Tujuan
 
 Di device/VPS baru yang sudah terhubung ke hub, meluncurkan sesi untuk project mana pun langsung
-jalan: hanoman meng-clone repo sendiri dengan kredensial yang dibawa dari hub, memasang binding,
-lalu membuat worktree. Tanpa login git manual.
+jalan: hanoman meng-clone repo sendiri dengan token yang dibawa dari hub, memasang binding, lalu
+membuat worktree. Tanpa login git manual.
 
 ## Di luar scope
 
@@ -26,17 +25,19 @@ lalu membuat worktree. Tanpa login git manual.
 - Melanjutkan sesi/worktree lintas device.
 - Penyedia git selain GitHub.
 - Memberi token ke agen sesi (hanya hanoman yang memakainya, di luar proses agen).
+- Status "cloning" lewat `/api/events/ws` (butuh grup snapshot baru, ADR-0145): launch menunggu clone
+  di request, tetapi clone berjalan asinkron terhadap event loop.
 
 ## Keputusan
 
 | # | Keputusan | Alasan |
 |---|---|---|
-| 1 | Auto-clone saat launch bila binding kosong | Pilihan pengguna; nol klik tambahan |
+| 1 | Auto-clone saat launch bila binding kosong dan project punya `gitRemote` | Pilihan pengguna; nol klik tambahan |
 | 2 | Lokasi clone `$HANOMAN_HOME/projects/<slug>` | Satu root yang dikelola hanoman; binding manual tetap menang |
-| 3 | Token GitHub disimpan di hub, ditarik client lewat device token | Topologi hub–client sudah ada (ADR-0044); tidak perlu keypair baru |
-| 4 | Token LOCAL-only per instance, dienkripsi `secret.key` lokal | Konsisten dengan `secret-box`; tidak masuk whitelist `sync.ts` |
-| 5 | Clone berjalan asinkron, status lewat `/api/events/ws` | Clone lama; request tak boleh menggantung (ADR-0039) |
-| 6 | Agen sesi tidak menerima token | Menghindari eskalasi (alasan sama dengan ADR-0199 butir 4) |
+| 3 | Token = `GITHUB_TOKEN` lokal (RuntimeConfig, terenkripsi), lalu hub via `GET /sync/git-credential` | `GITHUB_TOKEN` + UI Settings sudah ada; topologi hub–client sudah mengautentikasi device token |
+| 4 | Client tidak menyimpan ulang token hub | Pencabutan di hub langsung berlaku; tanpa model/migration baru |
+| 5 | Clone memakai `execFile` asinkron, satu clone per project | Clone lama; `spawnSync` membekukan server (pelajaran SPEC-742) |
+| 6 | Agen sesi tidak menerima token | Menghindari eskalasi (ADR-0199 butir 4) |
 
 ## Rancangan
 
@@ -44,82 +45,61 @@ lalu membuat worktree. Tanpa login git manual.
 
 Saat `resolveRepoDir` tidak menemukan binding:
 
-1. `Project.gitRemote` kosong → launch gagal, galat menyebut project.
-2. Pastikan ada kredensial: token lokal, atau tarik dari hub (bagian 2). Bila tak ada dan git
-   tidak punya akses sendiri → galat yang menunjuk Settings → Akses Git.
-3. `git clone` ke `$HANOMAN_HOME/projects/<slug>` dengan `GIT_ASKPASS` sementara. URL remote dan
-   `.git/config` tidak memuat token; remote SSH diubah ke HTTPS hanya untuk operasi clone.
-4. Pasang `LocalBinding`, lanjut ke `addWorktree`.
-5. `git fetch` sebelum `addWorktree` bila `branchFrom` tidak ada lokal; ref yang tetap tak
-   ditemukan = galat jelas, tidak jatuh diam-diam ke HEAD.
+1. Tanpa `gitRemote` → `LaunchError needs-bind` (perilaku lama dipertahankan).
+2. `cloneProjectCheckout(projectId)`: token dari `resolveGitToken()`; `git clone` ke
+   `$HANOMAN_HOME/projects/<slug>` dengan `GIT_ASKPASS` env-only. Remote SSH GitHub diubah ke
+   HTTPS hanya untuk operasi git hanoman. Token hanya dipakai untuk `https://github.com/`.
+3. Pasang `LocalBinding`, lanjut ke `addWorktree`.
+4. `git fetch origin` best-effort bila `branchFrom` tak ada lokal maupun di `origin/*`. Bila tetap
+   tak resolve, `addWorktree` melempar dengan nama revisinya — tanpa fallback diam-diam ke HEAD.
 
-Kunci per project: dua launch bersamaan untuk project yang sama menghasilkan satu clone; yang
-lain menunggu hasilnya. Clone terputus → hapus folder sisa, tandai launch gagal, bisa dicoba ulang.
-Folder tujuan yang sudah berisi repo dengan remote yang cocok dipakai ulang sebagai binding;
-folder lain yang sudah ada tidak pernah ditimpa.
+Kunci per project: panggilan bersamaan menghasilkan satu clone. Clone gagal → folder sisa dihapus,
+tanpa binding. Folder tujuan berisi repo dengan remote yang sama dipakai ulang; folder berisi hal
+lain tidak pernah ditimpa. Kegagalan clone → `LaunchError kind "checkout"` (HTTP 422).
 
-Status "cloning" disiarkan lewat kanal `/api/events/ws` agar kartu sesi menampilkan progres.
+### 2. Token
 
-### 2. Kredensial git
-
-Model baru `GitCredential` (LOCAL-only, tanpa `version`, tidak disync sebagai record biasa):
-`host`, `tokenEnc` (secret-box), `scopeNote`, `source` (`manual` | `hub`), `createdAt`.
-
-- **Hub**: pengguna mengisi token GitHub sekali di Settings; hanoman memvalidasi lewat
-  `GET /user` dan menampilkan akun + scope. Disarankan fine-grained token terbatas ke repo yang dipakai.
-  API tidak pernah mengembalikan token dalam plaintext.
-- **Client**: endpoint baru `GET /sync/git-credential` (Bearer device token, TLS) mengembalikan
-  token dari hub. Client menyimpannya terenkripsi dengan `secret.key` lokal (`source: hub`).
-  Diambil saat siklus sync dan saat launch bila token lokal tidak ada.
-- **Pencabutan**: menghapus token di hub membuat endpoint menjawab 404 pada sync berikutnya;
-  client menghapus salinan `source: hub`-nya. Device token yang dicabut kehilangan akses otomatis.
-- **Pemakaian**: skrip `GIT_ASKPASS` membaca token dari proses hanoman via env sementara pada
-  proses git anak; tidak ditulis ke disk, tidak masuk log.
+- Hub: pengguna mengisi `GITHUB_TOKEN` di Settings (sudah ada). Tidak ada penyimpanan baru.
+- Client: `GET /api/sync/git-credential` (Bearer device token, TLS) → `{ token: string | null }`,
+  `cache-control: no-store`. Dipanggil hanya saat clone/fetch dan token lokal kosong.
+- Pencabutan: hapus `GITHUB_TOKEN` di hub, atau cabut device token client.
+- Token tidak muncul di URL remote, `.git/config`, argv, log, atau galat (stderr git di-redact).
 
 ### 3. UI
 
-- Settings → "Akses Git": kolom token (write-only), status validasi, asal token, tombol Hapus.
-- Kartu sesi: status "Cloning repo…" selama clone.
-- Project tanpa checkout: badge "Belum ada di device ini" + tombol "Clone sekarang" (jalur sama
-  dengan auto-clone; menutup celah spec-867). Mengikuti `internal/docs/design-system/**`.
+Tidak berubah. Tombol "Jalankan git clone" sudah ada di `src/src/screens/MissingRepoCard.tsx`
+dan memanggil `POST /projects/:id/clone`, yang kini memakai service yang sama (token, kunci,
+penolakan folder terisi).
 
 ### 4. Galat
 
 | Kondisi | Hasil |
 |---|---|
-| `gitRemote` kosong | Launch berhenti, menyebut project |
-| Tanpa token dan git tak punya akses | Pesan menunjuk Settings → Akses Git |
-| Token ditolak (401/403) | "Token kedaluwarsa atau tanpa akses ke repo ini", dengan nama repo |
-| Disk penuh / folder tujuan terisi repo lain | Launch berhenti, tidak menimpa |
-| Clone terputus | Folder sisa dihapus, launch gagal, bisa retry |
-| `branchFrom` tak ada setelah fetch | Galat jelas, tanpa fallback HEAD |
-| Launch bersamaan | Satu clone, lainnya menunggu |
+| `gitRemote` kosong | `needs-bind` (400) |
+| Tanpa token dan git tak punya akses | `checkout` (422), pesan menunjuk `GITHUB_TOKEN` / hubungkan ke hub |
+| Token ditolak (401/403) | `checkout` (422): "token GitHub ditolak atau tanpa akses ke <remote>" |
+| Folder tujuan terisi hal lain | `checkout`, tidak menimpa |
+| Clone terputus / gagal | `checkout`, folder sisa dihapus |
+| `branchFrom` tak ada setelah fetch | galat `worktree` dari `addWorktree` (menyebut revisi) |
+| Launch bersamaan | satu clone, lainnya menunggu |
 
 ## Kontrak & dokumen (satu commit yang sama)
 
-- Migration Prisma `GitCredential` + ADR baru (0203) karena perubahan skema.
-- ADR itu juga mencatat jalur `GET /sync/git-credential` sebagai kanal mesin-ke-mesin Bearer
-  device token (mengikuti ADR-0199 butir 4: tidak dibungkus MCP, masuk `UNWRAPPED`).
-- Settings "Akses Git": keputusan MCP wajib (ADR-0202) — tool status token tanpa nilai token,
-  atau pengecualian beralasan di `COOKIE_ONLY`. Tidak ada tool yang mengembalikan token.
-- Update `internal/docs/architecture/data-model.md`, `api-contract.md`, dan `internal/docs/README.md`.
-- Ganti `POST /projects/:id/clone` sinkron dengan jalur asinkron yang sama, atau jadikan tipis di atasnya.
+- Tanpa perubahan skema Prisma, tanpa migration.
+- ADR-0203; `GET /sync/git-credential` dicatat di `UNWRAPPED` mcp-coverage (kanal mesin-ke-mesin,
+  ADR-0199 butir 4) dan di `internal/docs/architecture/api-contract.md`; tautan di `internal/docs/README.md`.
+- Tool MCP `hanoman_project_clone` tidak berubah (parameter `dir` tetap wajib).
 
 ## Test
 
-- Unit `session-launch`: binding kosong → clone → binding terpasang; binding ada → tanpa clone;
-  satu kasus per baris tabel galat. Git dipalsukan lewat seam `realGit`.
-- Unit kredensial: enkripsi bolak-balik, token tidak muncul di log/URL/`.git/config`,
-  pencabutan di hub menghapus salinan client.
-- Konkurensi: dua launch paralel = satu clone.
-- Gerbang: agent token (bukan device token) ditolak 401 di `/sync/git-credential`
-  (pola `instance-sync-gate.test.ts`).
-- Integrasi lokal: clone nyata dari repo git sementara dengan askpass, lalu curl endpoint tersentuh.
-- Test server dijalankan dengan `--no-file-parallelism` dan `TEST_DATABASE_URL` terpisah.
+Lihat `docs/superpowers/plans/2026-10-11-checkout-otomatis.md`: unit helper askpass, resolusi
+token, service clone (reuse, occupied, gagal, konkurensi, redaksi token), integrasi
+`startSpecSession`, route clone, gate agent token 401, dan uji nyata curl di lokal.
 
-## Pertanyaan terbuka
+## Revisi (hasil verifikasi kode)
 
-- Apakah `Project.gitRemote` sudah terisi untuk semua project yang dipakai lintas device? Project
-  tanpa remote tidak bisa di-auto-clone dan perlu diisi dulu.
-- Apakah tombol clone spec-867 sudah ada di `src/`? Belum diperiksa; bila sudah, rancangan UI
-  cukup memakai ulang.
+Draf pertama mengusulkan model `GitCredential`, migration, halaman "Akses Git", status cloning di
+kanal events, dan sealed box per instance. Verifikasi menunjukkan:
+`GITHUB_TOKEN` sudah ada sebagai config secret terenkripsi dengan UI-nya
+(`shared/src/config-registry.ts:42`); tombol clone sudah ada di `MissingRepoCard.tsx`; sync berjalan
+hub–client dengan device token sehingga lapisan enkripsi kedua tidak perlu. Semuanya dihapus.
