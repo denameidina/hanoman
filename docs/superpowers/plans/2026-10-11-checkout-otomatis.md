@@ -814,15 +814,15 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Interfaces:** tidak ada kode baru.
 
-- [ ] **Step 1: Tulis ADR**
+- [x] **Step 1: Tulis ADR**
 
 Isi `internal/docs/adr/0203-checkout-otomatis-token-git-dari-hub.md` (format mengikuti ADR-0199): Tanggal 2026-10-11, Status diterima; **Konteks** (checkout LOCAL-only tak ikut sync — ADR-0135; device baru butuh clone + login git manual); **Keputusan** (1. launch tanpa binding meng-clone otomatis ke `$HANOMAN_HOME/projects/<id>`; 2. token = `GITHUB_TOKEN` lokal lalu hub via `GET /sync/git-credential` Bearer device-token, tidak disimpan ulang di client; 3. askpass env-only, hanya `https://github.com/`; 4. clone asinkron, satu per project; 5. folder terisi tak pernah ditimpa; 6. endpoint credential masuk `UNWRAPPED` — agent token tak bisa memakainya, ADR-0199 butir 4); **Alternatif ditolak** (model `GitCredential` + sealed box per instance: topologi hub–client sudah mengautentikasi device token, jadi lapisan kedua hanya menambah permukaan; token yang di-cache di client: pencabutan di hub tak berlaku); **Konsekuensi** (tanpa migration; hub offline = clone repo private gagal dengan pesan jelas; token hub dapat dibaca setiap device token aktif — cabut device token untuk mencabut akses).
 
-- [ ] **Step 2: Perbarui kontrak dan indeks**
+- [x] **Step 2: Perbarui kontrak dan indeks**
 
 Tambahkan di `api-contract.md` baris `GET /sync/git-credential   # Bearer device token → 200 { token: string | null }, cache-control: no-store; tanpa token → 401; agent token → 401`. Tambahkan tautan ADR-0203 di `internal/docs/README.md` pada daftar ADR.
 
-- [ ] **Step 3: Uji nyata end-to-end di lokal**
+- [x] **Step 3: Uji nyata end-to-end di lokal**
 
 Run:
 ```bash
@@ -836,12 +836,12 @@ curl -s -i localhost:<port>/api/sync/git-credential   # Expected: 401 tanpa Bear
 ```
 Expected: clone → `201 {"repoDir":…}`; credential tanpa Bearer → `401`. Catat port dan output di komentar commit.
 
-- [ ] **Step 4: Jalankan seluruh set test yang tersentuh**
+- [x] **Step 4: Jalankan seluruh set test yang tersentuh**
 
 Run: `pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism` dengan `TEST_DATABASE_URL` terpisah.
 Expected: PASS. Bila gagal 404/P2022 masif, itu isolasi DB (SPEC-479), bukan regresi — ulangi dengan `TEST_DATABASE_URL` baru.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs/adr/0203-checkout-otomatis-token-git-dari-hub.md internal/docs/architecture/api-contract.md internal/docs/README.md docs/superpowers/plans/2026-10-11-checkout-otomatis.md
