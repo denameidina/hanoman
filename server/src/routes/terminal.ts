@@ -1,8 +1,8 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { existsSync } from "node:fs";
 import { prisma } from "../db";
 import {
-  zTerminalSession, zIntegrate, zTerminalSteerInput, zSessionDialogAnswer, METHODS, type Stage,
+  zTerminalSession, zIntegrate, zTerminalSteerInput, zSessionDialogAnswer, METHODS, grantsCapability, type Stage,
 } from "@hanoman/shared";
 import { resolveHome, realGit, startProjectPrompt, startPrdPrompt, startScaffoldPrompt, startBreakdownPrompt, RESUMED_WORKTREE_NOTE, CODE_STYLE_CLAUSE, buildPhaseAgents, projectContext, scaffoldContext, prdContext, breakdownContext, PROJECT_METHOD, type Flow } from "@hanoman/runner";
 import { phaseFilePath, decisionFilePath, readPhases, stageForRun } from "../services/session-phases";
@@ -40,6 +40,9 @@ import {
 } from "../services/session-dialog";
 import { isDeciding, isTakenOver } from "../services/lead/deciding";
 import { takeOverAsk } from "../services/lead/ask";
+import { SESSION_HEADER, recordLauncher, refuseSelfDecision } from "../services/decision-guard";
+import { readDialogScreen } from "../services/tui-dialog";
+import { telegramGatewayAgentTokenId } from "../services/telegram/runtime";
 
 // SPEC-816 · lampiran gambar sesi terminal. Berkas + path, bukan gambar inline: yang bisa dikirim
 // ke PTY hanyalah teks, dan CLI-lah yang menyusun blok image dari berkas yang dibacanya.
@@ -85,10 +88,25 @@ const phaseResume = (reused: boolean, repoDir: string, id: string, flow: Flow) =
     .filter((p) => p.state === "done" || p.state === "skipped").map((p) => `${p.name} ${p.state}`) } }
   : {};
 
+// ADR-0192 · mencatat TOKEN AGEN yang meluncurkan/menyambung sebuah sesi, untuk gerbang "agen tak
+// boleh menjawab dialog sesi yang ia luncurkan sendiri". Dipasang sebagai `onSend`, bukan di dalam
+// handler: handler ini punya enam jalur lahir sesi (backlog, reverse, scaffold, prd, breakdown,
+// shell/terminal) dan semuanya bermuara pada `201 {id}` — satu pencatat di ujung menangkap
+// semuanya tanpa menyentuh satu pun dari enam jalur itu. Cookie (manusia) tak dicatat.
+async function recordAgentLauncher(req: FastifyRequest, reply: FastifyReply, payload: unknown): Promise<unknown> {
+  if (req.agent && reply.statusCode === 201 && typeof payload === "string") {
+    try {
+      const id = (JSON.parse(payload) as { id?: unknown }).id;
+      if (typeof id === "string") recordLauncher(id, req.agent.id);
+    } catch { /* bukan JSON {id}: tak ada yang dicatat */ }
+  }
+  return payload;
+}
+
 export default async function (app: FastifyInstance, opts: { allowedOrigins?: Set<string> }) {
   app.get("/terminal/sessions", async () => listSessions());
 
-  app.post("/terminal/sessions", async (req, reply) => {
+  app.post("/terminal/sessions", { onSend: recordAgentLauncher }, async (req, reply) => {
     const parsed = zTerminalSession.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid body" });
     // ADR-0161: kemampuan meluncurkan sesi tidak memberi otomasi hak mengabaikan gerbang host.
@@ -389,7 +407,30 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
   app.post("/terminal/sessions/:id/steer", async (req, reply) => {
     const parsed = zTerminalSteerInput.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid body" });
-    const ok = await sendToPane((req.params as { id: string }).id, parsed.data.text);
+    const steerId = (req.params as { id: string }).id;
+    // ADR-0192 · `sendToPane` MENJAWAB dialog AskUserQuestion bila layarnya dialog (kolom bebas,
+    // multi-select, catatan) — dan menekan Enter di dialog trust/izin (baris 1 = "ya"). Tanpa
+    // gerbang ini `sessions:write` (yang cukup untuk steer) adalah pintu belakang menuju persis
+    // yang dijaga `sessions:decide`. Hanya principal AGEN yang dinilai, dan hanya bila SEKARANG ada
+    // dialog di layar: steer ke pane biasa tak berubah satu byte pun.
+    // Token gateway Telegram dikecualikan: setiap requestnya wajib membawa korelasi update dari
+    // manusia Telegram yang tervalidasi (telegram/security.ts) — ia perantara operator, bukan agen.
+    if (req.agent && req.agent.id !== telegramGatewayAgentTokenId()) {
+      const live = getSession(steerId);
+      if (live && !live.exited && dialogOnScreen(steerId)) {
+        if (!grantsCapability(req.agent.capabilities, "sessions:decide"))
+          return reply.code(403).send({
+            error: "capability required", need: "sessions:decide", reason: "dialog-on-screen",
+            detail: "sesi ini sedang menampilkan dialog pertanyaan; mengetik ke sana = menjawabnya",
+          });
+        const refused = await selfDecisionRefusal(req, steerId, live.specId);
+        if (refused) return reply.code(403).send(refused);
+        if (isDeciding(steerId) && !isTakenOver(steerId))
+          return reply.code(409)
+            .send({ error: "hanoman-lead sedang menyusun keputusan untuk sesi ini", reason: "deciding" });
+      }
+    }
+    const ok = await sendToPane(steerId, parsed.data.text);
     if (!ok) return reply.code(404).send({ error: "live session not found" });
     return reply.code(202).send({ accepted: true });
   });
@@ -406,6 +447,24 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
   // layar yang ditampilkan (`screenHash`). Capability datang dari peta yang sudah ada
   // (`rw("sessions")` untuk seluruh prefix /terminal), dan endpoint ini sengaja DI LUAR katalog
   // MCP: agen yang bisa memanggilnya bisa menjawab pertanyaannya sendiri.
+  // ADR-0190/0192 MEMBALIK itu: sub-pohon `/dialog` kini capability `sessions:decide` (opt-in, tak
+  // diimplikasikan `sessions:write`) DAN agen yang meluncurkan sesinya / memanggil dari dalam sesi
+  // ditolak 403 `reason: self|in-session|launcher` (services/decision-guard.ts). 409
+  // deciding/answering tetap berlaku sesudahnya, tanpa perubahan.
+  // ADR-0192 · hanya principal AGEN yang dinilai. Cookie = manusia; relay = operator hub (manusia di
+  // mesin lain, digerbangi grant `sessions:write` miliknya). Pemanggil tanpa `req.agent` lolos.
+  const dialogOnScreen = (id: string): boolean => {
+    try { return readDialogScreen(sessionPaneIO(id).capture()) !== null; } catch { return false; }
+  };
+  const selfDecisionRefusal = async (req: FastifyRequest, sessionId: string, specId?: string) => {
+    if (!req.agent) return null;
+    const r = await refuseSelfDecision({
+      agentId: req.agent.id, sessionId, specId, header: req.headers[SESSION_HEADER],
+    });
+    if (r) req.log.warn({ agent: req.agent.id, session: sessionId, reason: r.reason }, "keputusan dialog sesi ditolak");
+    return r ? { error: r.error, reason: r.reason } : null;
+  };
+
   app.get("/terminal/sessions/:id/dialog", async (req, reply) => {
     const { id } = req.params as { id: string };
     const s = getSession(id);
@@ -422,6 +481,10 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     const { id } = req.params as { id: string };
     const s = getSession(id);
     if (!s || s.exited) return reply.code(404).send({ error: "live session not found" });
+    // ADR-0192 · SEBELUM 409 deciding/answering: agen yang ditolak karena menjawab sesinya sendiri
+    // tak boleh belajar dari status 409 apakah lead sedang memegang sesi itu.
+    const refused = await selfDecisionRefusal(req, id, s.specId);
+    if (refused) return reply.code(403).send(refused);
     // ADR-0091 ditegakkan apa adanya: selama lead memegang sesi ini, dialah yang berhak menjawab.
     // SPEC-909 · ADR-0146 · KECUALI sesudah operator mengambil alih — di situ lead sudah dibatalkan,
     // dan menolak operator berarti tak ada satu pun pihak yang bisa menjawab pertanyaannya.
@@ -438,6 +501,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
       // manusia sudah menjawab — kembarannya untuk jalur SPEC-899. Tanpa baris ini pil hanya padam
       // saat pane kebetulan diam (gerbang `paneQuiet`), bukan saat jawabannya mendarat.
       if (s.decisionFile) clearMarker(s.decisionFile);
+      if (req.agent) req.log.warn({ agent: req.agent.id, session: id }, "dialog sesi dijawab oleh agent token");
       return reply.code(202).send({ accepted: true });
     } finally {
       endAnswer(id);
@@ -446,17 +510,22 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
 
   // SPEC-909 · ADR-0146 · AC-6 · operator merebut sesi dari hanoman-lead SEBELUM lead mengetik ke
   // pane. Di bawah prefix `terminal` supaya capability-nya turun dari peta yang sudah ada
-  // (`rw("sessions")` → sessions:write, sama dengan menjawab dialog): siapa yang boleh menjawab,
-  // boleh mengambil alih. Pemenang perebutannya ditentukan `beginAnswer()` — Set sinkron yang sama
+  // (sub-pohon `/dialog` → sessions:decide sejak ADR-0190, sama dengan menjawab dialog): siapa yang
+  // boleh menjawab, boleh mengambil alih. Pemenang perebutannya ditentukan `beginAnswer()` — Set sinkron yang sama
   // yang mencegah dua POST manusia menyilangkan keystroke, dan yang sejak SPEC ini juga dilewati
   // jalur lead. Jadi tak pernah ada dua jawaban terketik ke pane yang sama.
   app.post("/terminal/sessions/:id/dialog/takeover", async (req, reply) => {
     const { id } = req.params as { id: string };
+    // ADR-0192 · merebut sesi dari lead = bagian dari memutuskan; aturan self-decision sama persis.
+    // Sesi yang tak ada di tmux tidak membuat gerbang ini lolos: `takeOverAsk` yang menjawab 404.
+    const refused = await selfDecisionRefusal(req, id, getSession(id)?.specId);
+    if (refused) return reply.code(403).send(refused);
     const r = takeOverAsk(id);
     if (r === "none") return reply.code(404).send({ error: "tak ada pertanyaan hidup untuk sesi ini" });
     if (r === "answering")
       return reply.code(409)
         .send({ error: "hanoman-lead sudah mengirim jawabannya ke pane", reason: "answering" });
+    if (req.agent) req.log.warn({ agent: req.agent.id, session: id }, "sesi direbut dari lead oleh agent token");
     return reply.code(202).send({ accepted: true });
   });
 

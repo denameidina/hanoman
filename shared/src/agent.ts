@@ -39,6 +39,14 @@ export const CAPABILITY_IDS = [
   // `:write` TIDAK mengimplikasikannya (lihat grantsCapability di bawah): kalau diimplikasikan,
   // pemecahan ini kosmetik dan tak menghasilkan batas apa pun.
   "sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec",
+  // ADR-0190 · ADR-0192 · MENJAWAB/merebut dialog `AskUserQuestion` sebuah sesi. Akses `danger`
+  // dengan domain tampilan SENDIRI (`decisions`): ia gerbang "manusia yang memutuskan" (ADR-0142),
+  // bukan bagian dari mengendalikan sesi, jadi `sessions:write` tak pernah mengimplikasikannya.
+  "sessions:decide",
+  // ADR-0191 · cronjob per project (`/api/scheduler/crons*`). Sebuah baris cron = `POST
+  // /terminal/sessions` yang ditunda (ADR-0112); karena itu server MENUNTUT `sessions:spawn` juga
+  // untuk membuat/mengubah/menjalankannya — capability ini saja tidak pernah cukup untuk eksekusi.
+  "scheduler:read", "scheduler:write",
 ] as const;
 export const zCapability = z.enum(CAPABILITY_IDS);
 export type Capability = z.infer<typeof zCapability>;
@@ -87,6 +95,12 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "ide:git", domain: "ide", access: "danger", label: "IDE/Git — operasi git", desc: "merge, rebase, pull, drop, hapus branch, hapus worktree. Mengubah sejarah dan menghapus pekerjaan yang tak dipegang berkas mana pun; dipisah dari menulis berkas working tree.", risk: "exec" },
   { id: "backlog:lifecycle", domain: "backlog", access: "danger", label: "Backlog — siklus hidup", desc: "Integrate, hapus backlog, dan geser stage. Ketiganya menghapus artefak dokumen; dipisah dari menyunting isi backlog.", risk: "exec" },
   { id: "vps:exec", domain: "vps", access: "danger", label: "VPS — remote exec", desc: "console, session, provision, harden, remediate, probe, test, audit. Menjalankan perintah di VPS produksi; dipisah dari mengelola daftar VPS & checklist kepatuhan.", risk: "exec" },
+  // ADR-0190 · ADR-0192 · domain tampilan `decisions` (bukan `sessions`): grid Settings hanya punya
+  // SATU sel `berbahaya` per domain, dan `sessions` sudah dipakai `sessions:spawn`.
+  { id: "sessions:decide", domain: "decisions", access: "danger", label: "Keputusan — jawab dialog sesi", desc: "Membaca, menjawab, dan merebut dialog AskUserQuestion sebuah sesi dari lead. Ini gerbang \"manusia yang memutuskan\": beri HANYA ke token yang tidak dipakai agen di dalam sesi hanoman. Server menolak token yang meluncurkan sesi itu dan panggilan dari dalam sesi.", risk: "exec" },
+  // ADR-0191
+  { id: "scheduler:read", domain: "scheduler", access: "read", label: "Cronjob — baca", desc: "Lihat cronjob per project (jadwal, prompt, agen) dan riwayat run-nya." },
+  { id: "scheduler:write", domain: "scheduler", access: "write", label: "Cronjob — tulis", desc: "Buat/ubah/hapus/jalankan cronjob. Membuat, mengubah prompt/agen/jadwal, mengaktifkan, dan menjalankan cron juga menuntut Sesi — buka sesi baru (cron = sesi agen tertunda).", risk: "exec" },
 ];
 
 // SPEC-264 · Metadata per-domain untuk grid capability di Settings (label ramah + cakupan).
@@ -109,6 +123,8 @@ export const CAPABILITY_DOMAINS: { domain: string; label: string; desc: string }
   { domain: "telegram", label: "Telegram", desc: "Status, binding, memory, reply, dan audit kanal operator Telegram." },
   { domain: "team", label: "Tim", desc: "Kartu papan Tim (kerja manusia), direktori anggota, eskalasi kartu ke backlog." },
   { domain: "qa", label: "QA", desc: "Laporan QA per project: test case, temuan, lampiran, ekspor/impor." },
+  { domain: "decisions", label: "Keputusan sesi", desc: "Jawab/rebut dialog AskUserQuestion sesi — gerbang manusia yang memutuskan." },
+  { domain: "scheduler", label: "Cronjob", desc: "Cronjob per project: sesi agen terjadwal. Eksekusinya juga menuntut Sesi — buka sesi baru." },
 ];
 
 // write meng-implikasikan read pada domain yang sama.

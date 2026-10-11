@@ -20,11 +20,12 @@ const CORE: readonly McpToolDef[] = [
 
 // ADR-0155 · sisa permukaan domain `sessions`.
 //
-// TIGA endpoint dialog (`/dialog`, `/dialog/answer`, `/dialog/takeover`) SENGAJA tak dibungkus,
-// dan itu bukan kelalaian: SPEC-899 · ADR-0142 menuliskannya di route-nya sendiri — agen yang bisa
-// menjawab `AskUserQuestion` bisa menjawab pertanyaannya SENDIRI, dan gerbang "manusia yang
-// terakhir memutuskan" runtuh lewat pintu itu. `server/test/mcp-capability.test.ts` menegakkannya
-// dengan assert bahwa tak ada samplePath katalog yang memuat `/dialog`. Jangan menambahkannya.
+// ADR-0190 · ADR-0192 · TIGA endpoint dialog (`/dialog`, `/dialog/answer`, `/dialog/takeover`) dulu
+// SENGAJA tak dibungkus (SPEC-899 · ADR-0142: agen yang bisa menjawab `AskUserQuestion` bisa menjawab
+// pertanyaannya SENDIRI). Pemilik meminta pembungkusan itu, jadi larangannya diganti gerbang di
+// SERVER — bukan dihapus: tool-nya ada di `gates.ts` dengan capability `sessions:decide`, dan server
+// menolak token yang meluncurkan sesinya / memanggil dari dalam sesi. Dan `hanoman_session_steer`
+// di bawah juga DIGERBANGI di server bila layar sesi sedang menampilkan dialog.
 const MORE: readonly McpToolDef[] = [
   {
     name: "hanoman_session_phases",
@@ -121,7 +122,7 @@ const MORE: readonly McpToolDef[] = [
     name: "hanoman_session_steer",
     title: "Kirim teks ke sesi hidup",
     description:
-      "Mengetik teks ke pane sesi yang sedang berjalan, seolah operator mengetiknya. Sesi yang sudah berakhir menjawab 404. Tak bisa dipakai menjawab dialog `AskUserQuestion` — itu sengaja hanya bisa dijawab manusia.",
+      "Mengetik teks ke pane sesi yang sedang berjalan, seolah operator mengetiknya. Sesi yang sudah berakhir menjawab 404. Bila layar sesi sedang menampilkan dialog pertanyaan (`AskUserQuestion`, trust, izin), mengetik ke sana sama dengan MENJAWABNYA — karena itu server menolak 403 (`need: sessions:decide`) kecuali token juga memegang `sessions:decide` dan lolos aturan agen-tak-menjawab-sesinya-sendiri; gunakan hanoman_session_dialog_answer yang eksplisit.",
     inputSchema: obj({
       properties: { session: str("Id sesi hidup."), text: str("Teks yang diketikkan ke pane.") },
       required: ["session", "text"],

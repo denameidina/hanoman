@@ -33,6 +33,9 @@ export function createCaller(cfg: McpConfig, fetchImpl: typeof fetch): Caller {
       method: req.method,
       headers: {
         ...(req.headers ?? {}),
+        // ADR-0192 · identitas sesi dari ENV proses ini, tak pernah dari argumen model; dipasang
+        // SESUDAH `req.headers` supaya `build()` sebuah tool tak bisa menimpanya.
+        ...(cfg.sessionId ? { "x-hanoman-session": cfg.sessionId } : {}),
         Authorization: `Bearer ${cfg.token}`,
         Accept: "application/json",
         ...(req.body !== undefined ? { "Content-Type": "application/json" } : {}),

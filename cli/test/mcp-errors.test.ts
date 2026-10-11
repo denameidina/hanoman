@@ -71,6 +71,18 @@ describe("explainHttpError", () => {
     expect(msg).toMatch(/tak akan pernah|tidak akan pernah/);
   });
 
+  // ADR-0192 · 403 gerbang self-decision tak membawa `need`; tanpa cabang sendiri ia dibaca sebagai
+  // "route cookie-only", yang menyuruh agen berhenti dengan alasan yang SALAH.
+  it("403 self-decision dijelaskan sebagai penolakan PEMANGGIL, bukan cookie-only atau capability", () => {
+    for (const reason of ["self", "in-session", "launcher"]) {
+      const msg = explainHttpError(403, { error: "agen tak boleh memutuskan dialog sesinya sendiri", reason },
+        ctx({ method: "POST", path: "/terminal/sessions/s1/dialog/answer" }));
+      expect(msg, reason).toContain(reason);
+      expect(msg, reason).toMatch(/bukan soal capability/i);
+      expect(msg, reason).not.toMatch(/tak akan pernah bisa mengaksesnya/);
+    }
+  });
+
   it("400 zod flatten diterjemahkan per-field, bukan objek mentah", () => {
     const msg = explainHttpError(
       400,

@@ -4,7 +4,7 @@
 // membuat panel Settings menyuruh manusia mencentang capability yang salah.
 import { describe, expect, it } from "vitest";
 import { MCP_TOOLS } from "@hanoman/shared";
-import { capabilityForRoute } from "../src/services/agent-capabilities";
+import { capabilityForRoute, checkAgentCapability } from "../src/services/agent-capabilities";
 
 const withApi = (p: string) => `/api${p}`;
 
@@ -53,14 +53,51 @@ describe("kontrak capability katalog MCP", () => {
     expect(capabilityForRoute("POST", "/api/vps/1/run")).toBe("vps:write");
   });
 
-  // SPEC-899 · ADR-0142 · inbox keputusan. Dua sifatnya dikunci sekaligus: capability-nya
-  // diturunkan dari METHOD (bukan dari prefix — kelas bug SPEC-405), dan ia TAK ADA di katalog MCP.
-  // Yang terakhir bukan kelalaian: agen yang bisa menjawab `AskUserQuestion` bisa menjawab
-  // pertanyaannya sendiri, dan gerbang "manusia terakhir yang memutuskan" runtuh lewat pintu itu.
-  it("dialog sesi memakai capability sessions menurut method, dan tak muncul di katalog MCP", () => {
-    expect(capabilityForRoute("GET", "/api/terminal/sessions/s1/dialog")).toBe("sessions:read");
-    expect(capabilityForRoute("POST", "/api/terminal/sessions/s1/dialog/answer")).toBe("sessions:write");
-    for (const t of MCP_TOOLS) expect(t.samplePath, t.name).not.toMatch(/\/dialog/);
+  // SPEC-899 · ADR-0142 · inbox keputusan. ADR-0190 MEMBALIK larangan "tak ada di katalog MCP" —
+  // pemilik meminta dialog dibungkus — tetapi pembaliknya bukan pelonggaran: sub-pohon `/dialog`
+  // kini capability `sessions:decide` (akses danger; TAK diimplikasikan `sessions:write`) pada
+  // SEMUA method, tool-nya bermode danger, dan gerbang self-decision hidup di server
+  // (server/test/decision-gate.test.ts). Yang dikunci di sini: peta + katalog tak bisa berselisih.
+  it("dialog sesi = sessions:decide pada semua method; tool-nya danger dan hanya tiga", () => {
+    expect(capabilityForRoute("GET", "/api/terminal/sessions/s1/dialog")).toBe("sessions:decide");
+    expect(capabilityForRoute("POST", "/api/terminal/sessions/s1/dialog/answer")).toBe("sessions:decide");
+    expect(capabilityForRoute("POST", "/api/terminal/sessions/s1/dialog/takeover")).toBe("sessions:decide");
+    // tetangga dialog TIDAK ikut tergeser (kelas bug SPEC-405: prefix tanpa lihat segmen)
+    expect(capabilityForRoute("POST", "/api/terminal/sessions/s1/steer")).toBe("sessions:write");
+    expect(capabilityForRoute("GET", "/api/terminal/sessions/s1/phases")).toBe("sessions:read");
+    const dialogTools = MCP_TOOLS.filter((t) => /\/dialog/.test(t.samplePath));
+    expect(dialogTools.map((t) => t.name).sort()).toEqual([
+      "hanoman_session_dialog_answer", "hanoman_session_dialog_get", "hanoman_session_dialog_takeover",
+    ]);
+    for (const t of dialogTools) {
+      expect(t.capability, t.name).toBe("sessions:decide");
+      expect(t.mode, t.name).toBe("danger");
+    }
+    // `sessions:write` — capability yang cukup untuk steer — TIDAK cukup untuk dialog.
+    expect(checkAgentCapability(["sessions:write", "sessions:spawn"], "POST", "/api/terminal/sessions/s1/dialog/answer"))
+      .toMatchObject({ ok: false, status: 403, need: "sessions:decide" });
+    expect(checkAgentCapability(["sessions:decide"], "POST", "/api/terminal/sessions/s1/dialog/answer")).toEqual({ ok: true });
+  });
+
+  // ADR-0191 · cron. Capability-nya `scheduler:*`, TIDAK diwarisi `settings:*`; yang mengeksekusi
+  // (create/patch/run) dilabeli dalam deskripsi bahwa `sessions:spawn` juga dituntut — penegakannya
+  // di handler (server/test/scheduler-cron-gate.test.ts), sebab peta tak melihat body.
+  it("cron: scheduler:read|write, bukan settings; tool eksekusi menyebut sessions:spawn", () => {
+    expect(checkAgentCapability(["settings:write"], "GET", "/api/scheduler/crons"))
+      .toMatchObject({ ok: false, need: "scheduler:read" });
+    expect(checkAgentCapability(["scheduler:write"], "GET", "/api/scheduler/crons")).toEqual({ ok: true });
+    const cron = MCP_TOOLS.filter((t) => t.samplePath.startsWith("/scheduler/crons"));
+    expect(cron.map((t) => t.name).sort()).toEqual([
+      "hanoman_scheduler_cron_create", "hanoman_scheduler_cron_delete", "hanoman_scheduler_cron_run",
+      "hanoman_scheduler_cron_runs", "hanoman_scheduler_cron_update", "hanoman_scheduler_crons_list",
+    ]);
+    for (const t of cron) {
+      const reads = t.sampleMethod === "GET";
+      expect(t.mode, t.name).toBe(reads ? "read" : "danger");
+      expect(t.capability, t.name).toBe(reads ? "scheduler:read" : "scheduler:write");
+    }
+    for (const n of ["hanoman_scheduler_cron_create", "hanoman_scheduler_cron_update", "hanoman_scheduler_cron_run"])
+      expect(MCP_TOOLS.find((t) => t.name === n)!.description, n).toContain("sessions:spawn");
   });
 
   // ADR-0099 §4 dulu melarang tool merge/rebase/hapus/stage hadir sama sekali; ADR-0155

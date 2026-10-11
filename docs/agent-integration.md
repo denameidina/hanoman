@@ -101,11 +101,11 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 |---|---|---|
 | `projects` | `/api/projects*` | project, branch, binding, Help Center |
 | `backlog` | `/api/specs*` | spec/backlog, dokumen, review diff, integrate |
-| `sessions` | `/api/terminal*` (+ WS terminal) | jalankan sesi agen/shell, kirim input, baca & jawab dialog sesi (SPEC-899) — **high-risk (RCE)** |
+| `sessions` | `/api/terminal*` (+ WS terminal) | jalankan sesi agen/shell, kirim input — **high-risk (RCE)**. Sub-pohon `/dialog` **bukan** domain ini sejak ADR-0190: lihat `decisions`. `steer` ke sesi yang sedang menampilkan dialog juga digerbangi `sessions:decide` |
 | `docs` | `/api/prds*`, `/api/projects/:id/{docs,prds}*` | dokumen SoT project & PRD |
 | `ide` | `/api/projects/:id/{tree,file,file-diff,working-status,graph,commit,git,status,stashes,remotes,compare,archive,pr-url}*` | tree/file working tree, operasi git |
 | `vps` | `/api/vps*` | kelola VPS, audit, harden, konsol — **high-risk (remote exec)** |
-| `settings` | `/api/settings*`, `/api/config*`, `/api/scheduler*` | setelan instance & config runtime |
+| `settings` | `/api/settings*`, `/api/config*`, `/api/scheduler*` kecuali `/api/scheduler/crons*` | setelan instance & config runtime |
 | `support` | `/api/tickets*`, `/api/github-issues*`, `/api/projects/:id/github*` | tiket Help Center & issue GitHub (triase) |
 | `notifications` | `/api/notifications*` | notifikasi |
 | `lead` | `/api/lead*` | minta putusan ke hanoman-lead & baca jejaknya — **`lead:write` bisa menggerakkan sesi** (ADR-0091) |
@@ -113,6 +113,8 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 | `skills` | `/api/skills*` | skill global hanoman, user, plugin (baca-saja) & per project, termasuk isi berkasnya — **`skills:write` pada skill global hanoman mengubah instruksi SETIAP sesi baru di semua project** |
 | `telegram` | `/api/telegram*` kecuali sub-path kredensial | context/memory/reply/audit kanal operator Telegram (ADR-0096) |
 | `team` | `/api/tasks*`, `/api/members*` | papan **Tim**: kartu kerja MANUSIA & direktori anggota (ADR-0157). `status` kartu milik manusia — ia **bukan** `stage` backlog. `POST /api/tasks/:id/escalate` melahirkan backlog item dan tetap `team:write` (cermin `POST /api/tickets/:id/accept`) |
+| `decisions` | `/api/terminal/sessions/:id/dialog*` (capability `sessions:decide`, akses `danger`) | **gerbang manusia-yang-memutuskan** (ADR-0190, ADR-0192): baca, jawab, dan rebut dialog `AskUserQuestion` sebuah sesi. **Tak diimplikasikan `sessions:write`.** Beri HANYA ke token yang tidak dipakai agen di dalam sesi hanoman — lihat §13 |
+| `scheduler` | `/api/scheduler/crons*` | cronjob per project — **cron = sesi agen berizin penuh yang ditunda** (ADR-0191). Membuat, mengubah prompt/agen/model/effort/jadwal, mengaktifkan, dan menjalankan cron menuntut **`scheduler:write` DAN `sessions:spawn`**; server menjawab 403 `need: sessions:spawn` bila yang kedua tak dicentang |
 
 ## 4. Aturan gate & kode status
 
@@ -442,13 +444,35 @@ penghapusan backlog, dan perubahan `stage`. Batasan ini ada di katalog toolnya, 
 token yang punya `sessions:write` sekalipun tak akan menemukan tool untuk memakainya. Lihat §8.
 
 **Menjawab dialog sesi** (`GET /api/terminal/sessions/:id/dialog`,
-`POST /api/terminal/sessions/:id/dialog/answer`, dan sejak SPEC-909 · ADR-0146 juga
-`POST /api/terminal/sessions/:id/dialog/takeover` — merebut sesi dari hanoman-lead) sengaja **tak
-punya tool** — dan alasannya lebih tajam dari sekadar "mengeksekusi": endpoint itu menjawab pertanyaan
-yang **secara desain ditujukan kepada manusia** (`AskUserQuestion`). Agen yang bisa memanggilnya
-bisa menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang memutuskan" runtuh lewat
-pintu belakang. Capability-nya tetap ada (`sessions:read`/`sessions:write`) karena peta itu berlaku
-untuk seluruh permukaan HTTP, bukan hanya untuk yang muncul di MCP.
+`POST /api/terminal/sessions/:id/dialog/answer`, `POST /api/terminal/sessions/:id/dialog/takeover`)
+dulu sengaja tak punya tool (SPEC-899 · ADR-0142: agen yang bisa menjawab `AskUserQuestion` bisa
+menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang memutuskan" runtuh). Sejak
+**ADR-0190/ADR-0192** pemilik membungkusnya sebagai tool `hanoman_session_dialog_get|answer|takeover`
+(semuanya `danger`, hanya muncul dengan `--danger`) — dengan gerbang di **server**, bukan di
+deskripsi:
+
+- capability **`sessions:decide`** (domain `decisions`), terpisah dari `sessions:write`; `steer` ke
+  pane yang sedang menampilkan dialog pun menuntutnya;
+- **403** bila token ITU yang meluncurkan sesinya (`reason: "launcher"`), atau bila panggilan datang
+  dari dalam sesi hanoman — proses MCP yang diwarisi `HANOMAN_SESSION_ID` mengirim header
+  `x-hanoman-session` (`reason: "self"` / `"in-session"`);
+- **409** `deciding` (hanoman-lead sedang menyusun keputusan; rebut dulu lewat `takeover`) dan
+  `answering` tetap berlaku. 403 mendahului 409 supaya penolakan tak membocorkan keadaan lead.
+
+**Batas yang jujur:** server tak bisa membuktikan siapa di balik sebuah request Bearer — sesi tidak
+menerima agent token dari hanoman, jadi tak ada ikatan token↔sesi. Header `x-hanoman-session`
+bisa dilepas oleh klien yang sengaja memakai token yang sama lewat `curl`. Yang menutupnya adalah
+praktik: **jangan pasang token ber-`sessions:decide` di konfigurasi yang dibaca sesi hanoman**
+(mis. `~/.claude.json` tingkat-user diwarisi setiap sesi). Pakai token terpisah, di klien MCP yang
+dijalankan manusia di luar sesi.
+
+**Cronjob** (`/api/scheduler/crons*`, ADR-0191 membalik ADR-0112) kini punya tool
+`hanoman_scheduler_crons_list|cron_runs` (baca, `scheduler:read`) dan
+`hanoman_scheduler_cron_create|update|delete|run` (`danger`, `scheduler:write`). Karena sebuah cron
+adalah `POST /terminal/sessions` yang ditunda, **create, update yang menyentuh prompt/agen/model/
+effort/jadwal atau mengaktifkan, dan run** juga menuntut `sessions:spawn` — ditegakkan di handler
+server (403 `need: sessions:spawn`), bukan hanya disebut di deskripsi. Mengganti nama, menonaktifkan,
+dan menghapus cron cukup dengan `scheduler:write`.
 
 **Lampiran backlog** (`/api/specs/:id/attachments*`, SPEC-843 · ADR-0124) juga sengaja **tak punya
 tool**: berkasnya lahir dari disk manusia, bukan dari model, dan tool MCP berbentuk JSON sehingga

@@ -86,6 +86,14 @@ describe("remoteCapabilityFor", () => {
     expect(remoteCapabilityFor("GET", "/api/terminal/sessions/spec-1/ws", "write")).toBeNull();
     expect(remoteCapabilityFor("GET", "/api/terminal/sessions", "read")).toBeNull();
   });
+  it("ADR-0190 · dialog sesi: baca = sessions:read, jawab/rebut = sessions:write (operator hub bukan agen)", () => {
+    expect(remoteCapabilityFor("GET", "/api/terminal/sessions/s1/dialog", "write")).toBe("sessions:read");
+    expect(remoteCapabilityFor("POST", "/api/terminal/sessions/s1/dialog/answer", "write")).toBe("sessions:write");
+    expect(remoteCapabilityFor("POST", "/api/terminal/sessions/s1/dialog/takeover", "read")).toBe("sessions:write");
+    // pola persis: tetangga dialog tak ikut tergeser
+    expect(remoteCapabilityFor("POST", "/api/terminal/sessions/s1/dialog/lain", "write")).toBeNull();
+    expect(remoteCapabilityFor("POST", "/api/terminal/sessions/s1/steer", "write")).toBeNull();
+  });
 });
 
 describe("validateRemoteGrant", () => {

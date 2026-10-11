@@ -37,12 +37,10 @@ const UNWRAPPED = new Map<string, string>([
   ["GET /specs/:id/attachments/:attId", "biner (unduhan lampiran)"],
   ["GET /tickets/:id/attachments/:attId", "biner (unduhan lampiran)"],
   ["POST /terminal/sessions/:id/attachments", "multipart"],
-  // SPEC-899 · ADR-0142 · BUKAN kelalaian: agen yang bisa menjawab `AskUserQuestion` bisa menjawab
-  // pertanyaannya SENDIRI, dan gerbang "manusia yang terakhir memutuskan" runtuh lewat pintu itu.
-  // Assert terpisah di mcp-capability.test.ts menjaga agar tak ada samplePath yang memuat /dialog.
-  ["GET /terminal/sessions/:id/dialog", "gerbang keputusan manusia (SPEC-899)"],
-  ["POST /terminal/sessions/:id/dialog/answer", "gerbang keputusan manusia (SPEC-899)"],
-  ["POST /terminal/sessions/:id/dialog/takeover", "gerbang keputusan manusia (SPEC-899)"],
+  // ADR-0190 · tiga route dialog sesi (`/dialog`, `/dialog/answer`, `/dialog/takeover`) DIKELUARKAN
+  // dari daftar ini: kini dibungkus `gates.ts` di balik `sessions:decide` + gerbang self-decision.
+  // ADR-0191 · `/scheduler/crons*` (6 route) tadinya COOKIE_ONLY sehingga tak tampil di sini; kini
+  // terjangkau `scheduler:*` dan dibungkus `gates.ts`.
   // Workspace QA · sengaja tanpa tool: hapus tak punya jalan pulang (dilakukan manusia di dashboard),
   // sisanya biner/multipart. Agen membaca laporan lewat hanoman_qa_report_get.
   ["DELETE /projects/:pid/qa/reports/:rid", "destruktif — dihapus manusia di dashboard"],

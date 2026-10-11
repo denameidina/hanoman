@@ -20,7 +20,7 @@ describe("/agent-tokens routes (cookie-only)", () => {
     expect((await app.inject({ method: "GET", url: "/api/agent-tokens" })).statusCode).toBe(401);
   });
 
-  it("capabilities catalog lists 32 entries", async () => {
+  it("capabilities catalog lists 37 entries", async () => {
     const cookie = await login();
     const r = await app.inject({ method: "GET", url: "/api/agent-tokens/capabilities", headers: { cookie } });
     expect(r.statusCode).toBe(200);
@@ -45,7 +45,10 @@ describe("/agent-tokens routes (cookie-only)", () => {
     // global hanoman yang disuntik ke SETIAP sesi baru di semua project — pelebaran yang disengaja.
     // Workspace QA menambahkan `qa:read`/`qa:write` → 34: laporan QA per project (`/projects/:id/qa/**`)
     // sebelumnya jatuh ke `projects:*`; kini domain sendiri.
-    expect(r.json().capabilities).toHaveLength(34);
+    // ADR-0190 menambahkan `sessions:decide` (akses danger; gerbang menjawab dialog sesi) dan
+    // ADR-0191 menambahkan `scheduler:read`/`scheduler:write` (cronjob) → 37. Keduanya pelebaran
+    // permukaan yang disengaja: dialog sesi dan cron dulu tertutup bagi agent token.
+    expect(r.json().capabilities).toHaveLength(37);
     expect(r.json().capabilities[0]).toMatchObject({ id: expect.any(String), domain: expect.any(String), access: expect.any(String) });
   });
 

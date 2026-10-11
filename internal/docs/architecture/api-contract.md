@@ -1111,7 +1111,9 @@ GET    /terminal/sessions/:id/dialog        # (SPEC-899, ADR-0142) 200 { dialog,
 #   204 = pane mati, layar bukan dialog, layar rekap rantai, ATAU dialog tanpa kolom bebas & tanpa
 #     kolom catatan. Yang terakhir itu dialog trust & prompt izin: `sendToPane` sengaja tak
 #     menyentuhnya, dan tombol dashboard yang menjawab prompt izin adalah kebalikan ADR-0037.
-#   Capability `sessions:read` — dari peta `rw("sessions")` yang sudah ada, nol perubahan peta.
+#   Capability `sessions:decide` (ADR-0190; dulu `sessions:read` dari `rw("sessions")`) untuk SEMUA method
+#   di sub-pohon `/dialog`. Agent token yang meluncurkan sesinya atau memanggil dari dalam sesi (header
+#   `x-hanoman-session`) → 403 `reason: launcher|self|in-session` (ADR-0192), SEBELUM 409 deciding/answering.
 POST   /terminal/sessions/:id/dialog/answer { screenHash, choice?, choices?[], text? }
 #   (SPEC-899, ADR-0142) 202 { accepted:true }. `choice`/`choices` = NOMOR BARIS yang dipancarkan
 #   GET (`options[].n`), bukan indeks array; keduanya saling eksklusif; salah satu dari ketiganya
@@ -1912,8 +1914,11 @@ POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # cance
 > ### Cronjob per project (SPEC-646 · [ADR-0112](../adr/0112-cronjob-per-project-scheduler.md))
 >
 > Jadwal jam tertentu (HH:MM) yang ditunda ADR-0072, di atas engine yang SAMA — tanpa timer kedua.
-> Seluruhnya **COOKIE_ONLY**: sebuah cron adalah `POST /terminal/sessions` yang DITUNDA, jadi
-> `settings:write` tak pernah cukup untuknya (`capabilityForRoute` punya cabang `seg[1] === "crons"`).
+> Capability (ADR-0191, membalik "COOKIE_ONLY" ADR-0112): `scheduler:read` (GET) / `scheduler:write`
+> (lainnya) — BUKAN `settings:*`. Sebuah cron adalah `POST /terminal/sessions` yang DITUNDA, jadi agent
+> token juga wajib `sessions:spawn` untuk `POST /crons`, `POST /crons/:id/run`, dan `PATCH` yang
+> menyentuh `prompt`/`agent`/`model`/`effort`/`expr` atau `enabled:true` → 403
+> `{ need: "sessions:spawn", reason: "cron-executes" }` (ditegakkan di handler; cookie tak dinilai).
 >
 > | Method | Path | Keterangan |
 > |---|---|---|

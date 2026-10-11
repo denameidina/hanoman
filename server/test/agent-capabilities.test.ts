@@ -181,8 +181,12 @@ describe("route berbahaya pindah ke capability danger", () => {
   it("membuka sesi BARU ≠ mengendalikan sesi yang sudah ada", () => {
     expect(capabilityForRoute("POST", "/api/terminal/sessions")).toBe("sessions:spawn");
     expect(capabilityForRoute("GET", "/api/terminal/sessions")).toBe("sessions:read");
-    for (const sub of ["steer", "interrupt", "dialog/answer", "dialog/takeover", "integrate"])
+    for (const sub of ["steer", "interrupt", "integrate"])
       expect(capabilityForRoute("POST", `/api/terminal/sessions/s1/${sub}`), sub).toBe("sessions:write");
+    // ADR-0190 · dialog pindah dari sessions:write → sessions:decide (semua method, termasuk baca).
+    for (const sub of ["dialog/answer", "dialog/takeover"])
+      expect(capabilityForRoute("POST", `/api/terminal/sessions/s1/${sub}`), sub).toBe("sessions:decide");
+    expect(capabilityForRoute("GET", "/api/terminal/sessions/s1/dialog")).toBe("sessions:decide");
     expect(capabilityForRoute("DELETE", "/api/terminal/sessions/s1")).toBe("sessions:write");
     // Panjang segmen PERSIS, bukan prefix: `/terminal/sessions/:id/…` berawalan sama.
     expect(capabilityForRoute("POST", "/api/terminal/sessions/s1/attachments")).toBe("sessions:write");

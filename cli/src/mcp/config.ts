@@ -10,6 +10,12 @@ export type McpConfig = {
   maxBytes: number;
   /** Keluhan konfigurasi. Non-kosong = setiap panggilan tool menjawab dengan kalimat ini. */
   problems: string[];
+  /**
+   * ADR-0192 · `HANOMAN_SESSION_ID` yang diwarisi bila proses MCP ini berjalan di dalam sesi
+   * hanoman. Dikirim sebagai `x-hanoman-session`; server memakainya untuk menolak agen-di-dalam-
+   * sesi memutuskan dialog. Id sesi bukan rahasia.
+   */
+  sessionId?: string;
 };
 
 const flagValue = (argv: string[], name: string): string | undefined => {
@@ -64,5 +70,6 @@ export function resolveMcpConfig(
   const parsed = rawMax === undefined ? NaN : Number(rawMax);
   const maxBytes = Number.isFinite(parsed) && parsed >= 512 ? Math.floor(parsed) : DEFAULT_MAX_BYTES;
 
-  return { host, token, level, maxBytes, problems };
+  const sessionId = (env.HANOMAN_SESSION_ID ?? "").trim();
+  return { host, token, level, maxBytes, problems, ...(sessionId ? { sessionId } : {}) };
 }
