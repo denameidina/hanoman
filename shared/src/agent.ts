@@ -77,13 +77,17 @@ export const CAPABILITY_IDS = [
   "logs:read", "logs:write",
   "presence:read",
   "metrics:read", "metrics:write",
+  // ADR-0199 · ADR-0200 · sync UI (antrean konflik, pemicu manual) dan operasi instance (pasang
+  // pembaruan, restart). Opt-in, tak diimplikasikan capability lama mana pun. `sync:resolve`
+  // membuang data satu sisi; `instance:admin` memasang paket npm dan me-restart proses.
+  "sync:read", "sync:write", "sync:resolve", "instance:admin",
 ] as const;
 export const zCapability = z.enum(CAPABILITY_IDS);
 export type Capability = z.infer<typeof zCapability>;
 
 export const zCapabilityInfo = z.object({
   id: zCapability, domain: z.string(), access: z.enum(["read", "write", "danger"]),
-  label: z.string(), desc: z.string(), risk: z.enum(["rce", "exec"]).optional(),
+  label: z.string(), desc: z.string(), risk: z.enum(["rce", "exec", "data"]).optional(),
 });
 export type CapabilityInfo = z.infer<typeof zCapabilityInfo>;
 
@@ -159,6 +163,11 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "presence:read", domain: "presence", access: "read", label: "Presence — baca", desc: "Peta sesi yang sedang hidup di seluruh device operator." },
   { id: "metrics:read", domain: "metrics", access: "read", label: "Metrik custom agent — baca", desc: "Metrik pemakaian & disposisi (diterima/ditolak) custom agent." },
   { id: "metrics:write", domain: "metrics", access: "write", label: "Metrik custom agent — tulis", desc: "Menyetel disposisi satu invokasi (accepted/partial/rejected/false-positive). Disposisi adalah vonis MANUSIA atas mutu agen; agen yang menilai dirinya sendiri merusak sinyal itu.", risk: "exec" },
+  // ADR-0199 · ADR-0200 · sync UI & operasi instance. Opt-in: tak ikut default dan tak diwarisi capability lama.
+  { id: "sync:read", domain: "sync", access: "read", label: "Sync — baca", desc: "Lihat antrean konflik rekonsil dan penghapusan yang belum menyeberang ke hub." },
+  { id: "sync:write", domain: "sync", access: "write", label: "Sync — jalankan", desc: "Picu siklus sync manual ke hub (termasuk tarik ulang penuh dari kursor 0). Tidak termasuk memutuskan konflik." },
+  { id: "sync:resolve", domain: "sync", access: "danger", label: "Sync — putuskan konflik", desc: "Memilih sisi lokal atau hub untuk sebuah konflik rekonsil; sisi yang kalah DIBUANG tanpa jalan pulang. Dipisah dari Sync — jalankan.", risk: "data" },
+  { id: "instance:admin", domain: "instance", access: "danger", label: "Instance — pasang pembaruan & restart", desc: "Memasang versi hanoman terbaru dari registry npm dan me-restart proses server (koneksi terputus sesaat; sesi tmux selamat). Hanya sah bila instance punya supervisor.", risk: "exec" },
 ];
 
 // SPEC-264 · Metadata per-domain untuk grid capability di Settings (label ramah + cakupan).
@@ -197,6 +206,8 @@ export const CAPABILITY_DOMAINS: { domain: string; label: string; desc: string }
   { domain: "logs", label: "Log terpusat", desc: "Pencarian log lintas device, transkrip, retensi." },
   { domain: "presence", label: "Presence", desc: "Sesi yang sedang hidup di seluruh device operator." },
   { domain: "metrics", label: "Metrik custom agent", desc: "Metrik pemakaian custom agent & disposisi per invokasi." },
+  { domain: "sync", label: "Sync", desc: "Antrean konflik rekonsil, penghapusan tertunda, pemicu sync manual ke hub." },
+  { domain: "instance", label: "Instance", desc: "Pasang pembaruan hanoman dan restart proses server." },
 ];
 
 // write meng-implikasikan read pada domain yang sama.

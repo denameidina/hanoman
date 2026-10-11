@@ -43,7 +43,8 @@ describe("katalog tool MCP", () => {
   // (cookie sesi & bootstrap) dan `sync` (Bearer device-token mesin-ke-mesin).
   it("tak ada tool yang menyentuh route cookie-only", () => {
     for (const t of MCP_TOOLS) {
-      expect(t.samplePath, t.name).not.toMatch(/^\/(auth\/(status|setup|login|logout)|sync|session-events|portal|client-accounts|webhooks)\b/);
+      // ADR-0199 · `sync` dibelah: now/conflicts/pending punya tool; kanal mesin-ke-mesin ber-device-token tetap terlarang.
+      expect(t.samplePath, t.name).not.toMatch(/^\/(auth\/(status|setup|login|logout)|sync\/(pull|bootstrap|push|logs|attachments|qa-attachments|ws|relay)|session-events|webhooks)\b/);
       expect(t.samplePath, t.name).not.toMatch(/^\/terminal\/workspace/);
     }
   });
@@ -210,7 +211,7 @@ describe("tingkat mode", () => {
 // seseorang memakainya.
 const DANGER_CAPS = new Set([
   "sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete", "sessions:decide", "telegram:admin",
-  "access:admin", "remote:control", "relay:exec",
+  "access:admin", "remote:control", "relay:exec", "sync:resolve", "instance:admin",
 ]);
 
 // Tool DESTRUKTIF yang capability-nya tetap `:write` — bukan karena ringan, melainkan karena tak

@@ -16,6 +16,40 @@ export function requestConfigRestart(delayMs = 50): void {
   setTimeout(() => process.exit(CONFIG_RESTART_EXIT), delayMs);
 }
 
+/** Bagian `ServerResponse` yang dibutuhkan `afterReplyFlushed` — `reply.raw` memenuhinya. */
+export type FlushSignal = {
+  once(event: "finish" | "close", cb: () => void): unknown;
+  removeListener(event: "finish" | "close", cb: () => void): unknown;
+};
+
+/**
+ * ADR-0200 · menjalankan `fn` (jadwal exit) HANYA SESUDAH balasan selesai ditulis ke socket
+ * (`finish`), atau socket peminta sudah tertutup (`close` — tak ada lagi yang bisa dijawab), atau
+ * plafon `maxWaitMs` lewat (klien menggantung; operator sudah memberi `confirm:true`, jadi restart
+ * tak boleh tertahan selamanya). Sekali jalan: peristiwa berikutnya diabaikan.
+ *
+ * Kenapa ada: `POST /update/apply` dan `POST /restart` kini terjangkau agent token. Pemanggil yang
+ * menerima koneksi putus tanpa balasan tak bisa membedakan "restart berjalan" dari "server mati" —
+ * jadi urutan "jawab dulu, mati kemudian" ditegakkan di kode, bukan diandalkan dari jeda timer
+ * yang dimulai SEBELUM balasan mengalir. `finish` hanya menandai byte sudah diserahkan ke kernel,
+ * karena itu `requestRestartForUpdate/requestManualRestart` tetap menambah jeda sendiri sesudahnya.
+ */
+export function afterReplyFlushed(raw: FlushSignal, fn: () => void, maxWaitMs = 5_000): void {
+  let done = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const run = () => {
+    if (done) return;
+    done = true;
+    if (timer) clearTimeout(timer);
+    raw.removeListener("finish", run);
+    raw.removeListener("close", run);
+    fn();
+  };
+  raw.once("finish", run);
+  raw.once("close", run);
+  timer = setTimeout(run, maxWaitMs);
+}
+
 /** Tombol "Mulai ulang" di dashboard. Sama seperti di atas, tapi tanpa jatah di supervisor. */
 export function requestManualRestart(delayMs = 250): void {
   setTimeout(() => process.exit(MANUAL_RESTART_EXIT), delayMs);
