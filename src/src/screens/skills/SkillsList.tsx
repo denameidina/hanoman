@@ -2,7 +2,7 @@
 // (Global · Project · Plugin). Redesign 3K: tak ada grup lipat; pencarian dan chip menyaring satu daftar.
 import React from "react";
 import type { SkillEntry, SkillLibraryView } from "@hanoman/shared";
-import { Badge, Icon, Input, StateBlock } from "../../ds";
+import { Badge, Callout, Icon, Input, StateBlock } from "../../ds";
 import "../styles/skills.css";
 import "../styles/projects.css";
 
@@ -77,10 +77,14 @@ export function SkillsList({ library, selected, onSelect, projectFirst = false }
           ))}
         </div>
       </div>
+      {/* Galat pemuatan project adalah banner di atas daftar, bukan item di dalamnya (role=alert dari Callout). */}
+      {failedProjects.length > 0 && (
+        <Callout tone="err" title="Sebagian skill belum bisa dimuat">
+          {failedProjects.map((p) => <div key={p.projectId}>{p.name}: {p.error}</div>)}
+          <div>Periksa lokasi repo project itu di Projects.</div>
+        </Callout>
+      )}
       <div className="hn-skill-list-scroll">
-        {failedProjects.map((p) => (
-          <div key={p.projectId} role="alert" className="hn-skill-list-error">{p.name}: {p.error}</div>
-        ))}
         {shownRows.length > 0 && (
           <ul role="list" aria-label="Daftar skill" className="hn-skill-rows">
             {shownRows.map((s) => <Row key={s.key} s={s} selected={s.key === selected} onSelect={onSelect}

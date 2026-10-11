@@ -9,12 +9,14 @@ import { parseRoute, routePath } from "./routes";
 import { LazyBoundary } from "./ds/LazyBoundary";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
-import { Shell, HN_NAV, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, useToast, ToastHost, StateBlock, useConfirm } from "./ds";
+import { Shell, HN_NAV, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, useToast, ToastHost, StateBlock, useConfirm, useResponsiveTier } from "./ds";
 import { SectionTabs } from "./ds/section-tabs";
+import { PetDockContext } from "./ds/shell";
 
 import { CommandPalette, ShortcutHelp, ProjectScopeContext, buildPaletteCommands, useGlobalShortcuts } from "./palette";
 import { waitingSessions } from "./screens/pet-state";
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
+import { usePetEnabled, petVisibleOn } from "./ui-state/pet-pref";
 import { api, ApiError, createApi, type TerminalSession, type SourceResetPending } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, SpecSlim, SpecListItem, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView, PendingCounts } from "@hanoman/shared";
@@ -833,7 +835,6 @@ export default function App() {
 }
 
 function AppInner() {
-  useModelCatalog();
   // ADR-0160 · halaman = URL. `section` diturunkan dari pathname (`routes.ts`), bukan disimpan
   // sebagai state; tombol Kembali/Maju browser dan link yang dibagikan bekerja dengan sendirinya.
   const location = useLocation();
@@ -900,14 +901,26 @@ function AppInner() {
   const [auth, setAuth] = React.useState<AuthStatus | null>(null);
   const onLoggedOut = React.useCallback(() => setAuth({ needsSetup: false, user: null }), []);
   React.useEffect(() => { api.authStatus().then(setAuth).catch(() => setAuth({ needsSetup: false, user: null })); }, []);
+  // SPEC-617 · ADR-0110 · gerbang peran untuk SEMUA efek operator di bawah. Klien tak punya kuasa atas
+  // endpoint operator (403 di konsol: ws-tickets, models, projects, specs, terminal/sessions,
+  // setup/status), jadi efek-efek itu hanya berjalan setelah login operator diketahui. Sebelum login
+  // diketahui (splash) tak ada yang dimuat — sama dengan perilaku lama untuk pengguna tanpa sesi.
+  const operatorSession = auth?.user != null && auth.user.role !== "client";
+  // Katalog model dimuat hanya untuk operator: ia memanggil `/api/models` dan membuka socket `events`.
+  useModelCatalog(operatorSession);
+  // Pet Hanoman: tampil di desktop secara default; tablet dan ponsel mati sampai dinyalakan dari palet
+  // atau Pengaturan. Keputusannya di sini, bukan di dalam pet, supaya palet dan pet membaca satu nilai.
+  const [petEnabled, setPetEnabled] = usePetEnabled();
+  const petTier = useResponsiveTier();
+  const petOn = operatorSession && petVisibleOn(petEnabled, petTier);
   // SPEC-884 · ADR-0139 · wizard setup awal berdiri DI DEPAN AuthScreen: pilihannya menentukan
   // apakah akun pertama nanti diminta setup token. Status yang sama juga menyalakan penanda
-  // permanen sesudah login, jadi ia dimuat pada kedua keadaan.
+  // permanen sesudah login, jadi ia dimuat pada kedua keadaan operator.
   const [setupStatus, setSetupStatus] = React.useState<SetupStatus | null>(null);
   const [setupDone, setSetupDone] = React.useState(false);
   React.useEffect(() => {
-    if (auth?.needsSetup || auth?.user) api.setupStatus().then(setSetupStatus).catch(() => setSetupStatus(null));
-  }, [auth?.needsSetup, auth?.user?.id]);
+    if (auth?.needsSetup || operatorSession) api.setupStatus().then(setSetupStatus).catch(() => setSetupStatus(null));
+  }, [auth?.needsSetup, operatorSession, auth?.user?.id]);
   // SPEC-740 · ADR-0115 · state dari versi kunci lama tak pernah dibaca lagi (versi hidup
   // di dalam kunci) — disapu sekali di sini supaya storage tak tumbuh selamanya.
   React.useEffect(() => { pruneUiState(); }, []);
@@ -969,8 +982,8 @@ function AppInner() {
         showToast("Gagal memuat data dari server", "err", "x-circle");
       });
   }, [showToast, onLoggedOut]);
-  // Muat data hanya setelah login; run baru pada perubahan status login.
-  React.useEffect(() => { if (auth?.user) load(); }, [load, auth?.user]);
+  // Muat data hanya setelah login operator; klien tak memuat daftar operator sama sekali.
+  React.useEffect(() => { if (operatorSession) load(); }, [load, operatorSession, auth?.user?.id]);
 
   // ProjectVM dulu membawa daftar tipe trigger per project; trigger sudah tak ada (SPEC-162).
   const projectsView: ProjectVM[] = projects;
@@ -999,23 +1012,28 @@ function AppInner() {
   // Stage tetap forward-only & write-through di server (liveSpecs) — board hanya menampilkan.
   // SPEC-198 · bump dataVersion tiap snapshot specs tiba supaya layar self-fetch (Backlog,
   // Projects) yang berpaginasi-server ikut me-refetch dan tetap segar selama sesi hidup.
-  React.useEffect(() => subscribe((m) => {
-    if (m.t === "specs") {
-      const digest = specsDigestOf(m.specs);
-      if (digest !== lastSpecsDigest.current) {
-        lastSpecsDigest.current = digest;
-        setBacklog(m.specs);
-        setDataVersion((v) => v + 1);
+  // SPEC-617 · socket ini dibuka hanya untuk operator: membukanya bagi klien meminta ws-ticket yang
+  // ditolak server (403) dan tak pernah dipakai portal klien.
+  React.useEffect(() => {
+    if (!operatorSession) return undefined;
+    return subscribe((m) => {
+      if (m.t === "specs") {
+        const digest = specsDigestOf(m.specs);
+        if (digest !== lastSpecsDigest.current) {
+          lastSpecsDigest.current = digest;
+          setBacklog(m.specs);
+          setDataVersion((v) => v + 1);
+        }
       }
-    }
-    else if (m.t === "sessions") applyIfChanged(shown.current.sessions, m.sessions as TerminalSession[], setSessions);
-    else if (m.t === "leadAsks") applyIfChanged(shown.current.leadAsks, m.asks, setLeadAsks);
-    else if (m.t === "presence") {
-      const next = { enabled: m.enabled, devices: m.devices, hubVersion: m.hubVersion };
-      setPresence((cur) => (presenceKeyOf(cur) === presenceKeyOf(next) ? cur : next));
-    }
-    else if (m.t === "pending") applyIfChanged(shown.current.pending, m.counts, setPending);
-  }), []);
+      else if (m.t === "sessions") applyIfChanged(shown.current.sessions, m.sessions as TerminalSession[], setSessions);
+      else if (m.t === "leadAsks") applyIfChanged(shown.current.leadAsks, m.asks, setLeadAsks);
+      else if (m.t === "presence") {
+        const next = { enabled: m.enabled, devices: m.devices, hubVersion: m.hubVersion };
+        setPresence((cur) => (presenceKeyOf(cur) === presenceKeyOf(next) ? cur : next));
+      }
+      else if (m.t === "pending") applyIfChanged(shown.current.pending, m.counts, setPending);
+    });
+  }, [operatorSession]);
 
   const proj = projectsView.find((p) => p.id === projectId) || projectsView[0];
   // SPEC-198 · search project via API di ProjectsScreen (bukan filter klien di App).
@@ -1064,7 +1082,9 @@ function AppInner() {
     openSession: (sessionId) => openTerminal(sessionId),
     newSpec: () => setModal("brief"), newProject: () => setModal("project"),
     setScope: setProjectFilter,
-  }), [backlog, sessions, scopeProjects, presence.enabled, projectFilter, specTitles, setSection, navigate, openTerminal]);
+    petOn, setPetOn: setPetEnabled,
+  }), [backlog, sessions, scopeProjects, presence.enabled, projectFilter, specTitles, setSection, navigate, openTerminal,
+    petOn, setPetEnabled]);
   // Dalang keluar kembali ke layar sebelumnya, bukan selalu Overview. Ref menyimpan layar nav terakhir
   // yang BUKAN dalang; tanpa riwayat (dibuka langsung dari URL) ia jatuh ke Overview seperti dulu.
   const lastPageRef = React.useRef<string | null>(null);
@@ -1816,11 +1836,18 @@ function AppInner() {
         <UnhardenedBanner status={setupStatus} />
         <ProjectScopeContext.Provider value={scopeValue}>
           <NavGate.Provider value={{ clients: presence.enabled }}>
-            <NavPending.Provider value={pending}>{screen}</NavPending.Provider>
+            <NavPending.Provider value={pending}>
+              {/* Pet dibuat sekali di sini, lalu Shell menaruhnya di slot-nya (footer sidebar atau lajur bawah).
+                  Layar tanpa Shell (Dalang) tak punya slot: pet tak tampil di sana. */}
+              <PetDockContext.Provider value={petOn ? (
+                <HanomanPet sessions={sessions} backlog={backlog} asks={leadAsks}
+                  onOpen={(t) => { if (t.sessionId) setFocusSession(t.sessionId); setSection(t.section); }} />
+              ) : null}>
+                {screen}
+              </PetDockContext.Provider>
+            </NavPending.Provider>
           </NavGate.Provider>
         </ProjectScopeContext.Provider>
-        <HanomanPet sessions={sessions} backlog={backlog} asks={leadAsks}
-          onOpen={(t) => { if (t.sessionId) setFocusSession(t.sessionId); setSection(t.section); }} />
         <NewSpecModal open={modal === "brief"} onClose={() => { setModal(null); setSpecPrefill(null); }}
           projects={projectsView} defaultProject={proj ? proj.id : ""} onCreate={createSpec}
           prefill={specPrefill ?? undefined} specs={backlog} />   {/* SPEC-447 · kandidat dependency */}

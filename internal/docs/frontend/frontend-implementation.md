@@ -1539,8 +1539,8 @@ elemen sendiri, keyframe hanya menulis `transform`/`opacity`, tanpa JS per frame
 rAF/interval.
 
 ```
-pet-root     fixed · left:0 right:0 · bottom: max(safe-bottom, 0) · tinggi 1 sel × s · pointer-events:none · z 80
-             SPEC-905 · selagi held/falling: top: max(0px, var(--safe-top)) menggantikan tingginya
+pet-root     relative · width 100% · tinggi 1 sel × s (66 px saat disembunyikan) · pointer-events:none · z 80
+             di slot Shell: .hn-shell-dock (desktop) atau .hn-shell-lane (tablet/ponsel) — bukan fixed
 └─ pet-actor   transform: translate(var(--x), calc(-1 * var(--y))) · transition: transform <segmen> <linear|fall>
    ├─ pet-bubble  gelembung bicara · di LUAR live region · pointer-events:none (tombol rekap auto)
    ├─ pet-stage   role=status aria-live=polite · hn-pet-reveal
@@ -1603,14 +1603,11 @@ dari kodenya:
 - **Koordinat dihitung sebagai SELISIH, bukan dari `getBoundingClientRect()`**
   (`dx = clientX − currentX()`, `dy = clientY + y`). Offset jalur saling menghilangkan, jadi rumus
   yang sama benar di browser **dan** bisa di-assert di jsdom yang memberi rect nol.
-- **Plafon angkat dibaca dari jalur yang SUDAH melebar**, bukan diparsing dari custom property:
-  `getComputedStyle(...).getPropertyValue("--safe-top")` mengembalikan token `env(...)` yang belum
-  di-resolve. Terukur: 661 px di 1280×800, 725 px di 390×844 — persis `tinggi jalur − tinggi sel`.
-- **Jalur melebar HANYA selagi `held`/`falling`,** dan tepi **bawah**nya tak bergerak, jadi sprite,
-  panel, dan gelembung tak bergeser satu piksel pun. `pointer-events: none` tak disentuh; terukur,
-  `elementFromPoint` di tengah layar tetap mengembalikan konten dashboard selagi jalur melebar.
-  Alasannya **bukan** clipping — `pet-root` ber-`overflow: visible` dan sprite 300 px di atas jalur
-  tetap tergambar & tetap dijawab `elementFromPoint` (ADR-0144 Konsekuensi).
+- **Jalur TIDAK melebar saat diangkat (lajur pet, Audit UI/UX 2026-10).** Dulu jalur `position: fixed` melebar
+  ke `var(--safe-top)` selagi `held`/`falling`, dan plafonnya dibaca dari rect yang sudah melebar. Sekarang
+  jalur ada di alur layout: melebar berarti konten bergeser. Pet yang diangkat melayang di atas konten
+  (manipulasi langsung oleh manusia); plafonnya tinggi viewport (`laneHeight()`), dan `pointer-events: none`
+  di root tetap berlaku — `elementFromPoint` di bawah jalur tetap mengembalikan konten dashboard.
 - **Satu properti `transform` untuk kedua sumbu, juga saat `y = 0`.** Daftar properti yang
   di-transisi tak boleh berganti di tengah rantai berjalan → diangkat → jatuh → mendarat.
   `ease: "fall"` = `cubic-bezier(0.55, 0.085, 0.68, 0.53)` (easeInQuad — percepatan, bukan linear).
@@ -1735,12 +1732,14 @@ sebelum SPEC-909**, termasuk kalimat `"Pertanyaannya tak terbaca dari sini"`.
 Gelembung pose `waiting` menawarkan **"Jawab di sini"** yang menutup gelembung lalu membuka panel —
 jalur yang sama persis dengan tombol `Lihat` milik rekap.
 
-**Penempatan & mount.** `HanomanPet` dipasang **sekali** di `App.tsx` sebagai saudara `{screen}`,
-bukan di dalam `Shell`: `<Shell>` ditulis ulang di tiap cabang `section`, jadi pet yang tinggal di
-sana lahir kembali tiap navigasi (animasi mulai dari nol, keadaan transient hilang persis saat
-operator pindah layar untuk melihatnya). Jalur `position: fixed` selebar viewport di tepi bawah —
-dan sejak SPEC-905 setinggi **seluruh** viewport selagi pet diangkat/jatuh — `z-index: 80` → di
-bawah header (90), terminal fullscreen (100), Modal (150), Toast (200).
+**Penempatan & mount (Audit UI/UX 2026-10 · lajur pet).** `HanomanPet` dibuat **sekali** di `App.tsx`
+(satu elemen, di dalam `PetDockContext.Provider` yang membungkus `{screen}`; `petOn` = preferensi
+`hn.ui.v1.pet.enabled` atau default tier, lihat `ui-state/pet-pref.ts`). `Shell` menaruhnya di slot:
+`.hn-shell-dock` di footer sidebar (desktop) atau `.hn-shell-lane` di bawah `<main>` (tablet/ponsel).
+Pet tak lagi `position: fixed`: jalurnya ada di alur layout, sehingga tak ada kontrol yang tertutup dan
+tak ada `z-index` pet yang harus dijaga terhadap header, modal, dan toast. Layar tanpa Shell (Dalang)
+tak punya slot dan tak menampilkan pet. Pet tetap dibuat di App, bukan di Shell, karena `<Shell>` ditulis
+ulang di tiap cabang `section`: pet yang tinggal di sana lahir kembali tiap navigasi.
 
 **Interaksi & preferensi.** Klik = panel + `wave` sekali + berhenti; hover/fokus = berhenti +
 `wave` **berulang** sampai hover lepas (SPEC-905). Gerbangnya `canWave()`, dan daftarnya jangan
@@ -1779,13 +1778,12 @@ tentu pojok. Gelembung bicara
 tetap **tampil** di sana (ia informasi, bukan gerak) hanya tanpa `hn-pet-bubble-in`; hati tak
 dirender sama sekali.
 
-**Gerbang tap (SPEC-763, diperluas).** Jalur pet kini selebar viewport — dan selagi pet
-diangkat/jatuh **setinggi viewport juga** (SPEC-905) — jadi "tak menutupi kontrol" harus ditegakkan
-struktur, bukan koordinat: `pet-root` dan seluruh pembungkusnya `pointer-events: none`; hanya tombol
-44 px di kaki sprite (ikut berpindah bersama pet), pegangan, dan panel yang `auto`. Pelebaran
-vertikal itu karena itu **tak boleh** dijadikan permanen dan tak boleh membawa satu pun anak
-ber-`pointer-events: auto` baru; terukur SPEC-905, `elementFromPoint` di tengah layar tetap
-mengembalikan konten dashboard di setiap langkah seret. Terukur lewat CDP: 1280×800 jalur 1265 px: atlas termuat, `animation-name: hn-pet-frames`, transform frame −256 → −640 px dalam 400 ms, actor 1136 → 1027,4 px (`mode: walk`, baris `working` lalu `walk-left`), dan tombol di bawah jalur tetap dijawab `elementFromPoint`; 390×844: actor diam di rumah 264 px, `mode: stand`, tak satu pun baris walk muncul, frame tetap berjalan, tap tetap tembus.
+**Gerbang tap (SPEC-763, diperluas).** Jalur pet selebar slotnya dan setinggi satu sel — ia duduk di alur
+layout, jadi "tak menutupi kontrol" ditegakkan oleh tata letak, bukan koordinat. `pet-root` dan seluruh
+pembungkusnya `pointer-events: none`; hanya tombol 44 px di kaki sprite (ikut berpindah bersama pet),
+pegangan, dan panel yang `auto`. Tak boleh ada anak ber-`pointer-events: auto` baru yang tak perlu.
+Pengukuran SPEC-905 di bawah ini dibuat saat jalur masih `fixed`; angka posisinya tetap berlaku, tetapi
+pelebaran vertikalnya sudah dicabut. Terukur lewat CDP: 1280×800 jalur 1265 px: atlas termuat, `animation-name: hn-pet-frames`, transform frame −256 → −640 px dalam 400 ms, actor 1136 → 1027,4 px (`mode: walk`, baris `working` lalu `walk-left`), dan tombol di bawah jalur tetap dijawab `elementFromPoint`; 390×844: actor diam di rumah 264 px, `mode: stand`, tak satu pun baris walk muncul, frame tetap berjalan, tap tetap tembus.
 
 **Tanpa ADR untuk SPEC-897, dan itu disengaja.** Tak ada endpoint, skema, poll, atau channel yang
 berubah; status koneksi adalah pengamat socket `events` yang sudah ada, dan dua baris atlas

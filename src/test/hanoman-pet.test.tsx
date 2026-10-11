@@ -293,7 +293,8 @@ describe("HanomanPet (sprite)", () => {
 
   it("tidak menangkap klik di area kosong jalur; hanya tombol 44 px di kaki", () => {
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
-    expect(screen.getByTestId("pet-root")).toHaveStyle({ pointerEvents: "none", left: "0px", right: "0px", bottom: "max(0px, var(--safe-bottom))" });
+    // Jalur ada di alur layout (footer sidebar / lajur bawah), bukan overlay fixed: tak menangkap pointer.
+    expect(screen.getByTestId("pet-root")).toHaveStyle({ pointerEvents: "none", position: "relative", width: "100%", height: `${CELL_H}px` });
     expect(hit()).toHaveStyle({
       pointerEvents: "auto", width: "44px", height: "44px", bottom: "0px",
       left: `${Math.round(PET_MANIFEST.anchor.x * CELL_W - 22)}px`,
@@ -689,9 +690,9 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
     expect(actor()).toHaveAttribute("data-mode", "held");
     // selisih: x −40, y +200 dari HOME/0
     expect(actor()).toHaveStyle({ transform: `translate(${HOME - 40}px, -200px)`, transition: "none" });
-    // jalur melebar HANYA sekarang, dan tetap tak menangkap pointer
-    expect(laneOf()).toHaveStyle({ top: "max(0px, var(--safe-top))", pointerEvents: "none" });
-    expect(laneOf().style.height).toBe("");
+    // jalur TAK melebar saat diangkat (ia di alur layout: melebar berarti konten bergeser). Tinggi tetap,
+    // dan tetap tak menangkap pointer; sprite yang terangkat melayang di atas konten, bukan jalurnya.
+    expect(laneOf()).toHaveStyle({ height: `${CELL_H}px`, pointerEvents: "none" });
   });
 
   it("plafon angkat jatuh ke viewport selama jalur belum melebar; jalur tak dilewati ke bawah", () => {
@@ -703,7 +704,7 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
     expect(actor()).toHaveStyle({ transform: `translate(${HOME}px, 0px)` });
   });
 
-  it("plafon angkat MENGIKUTI tinggi jalur yang sudah melebar, bukan viewport", () => {
+  it("plafon angkat tetap viewport: tinggi rect jalur tak mengubahnya (jalur tak melebar lagi)", () => {
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
     // jsdom memberi rect nol untuk semua elemen, jadi cabang "baca jalur yang sudah melebar" hanya
     // bisa dijalankan dengan memalsukan rect-nya — tanpa ini yang teruji cuma fallback viewport.
@@ -711,7 +712,7 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
       .mockReturnValue({ height: 500, width: 1024, top: 268, bottom: 768, left: 0, right: 1024, x: 0, y: 268, toJSON: () => ({}) } as DOMRect);
     pointer(hit(), "pointerdown", 500, 700);
     pointer(hit(), "pointermove", 500, -9_000);
-    expect(actor()).toHaveStyle({ transform: `translate(${HOME}px, -${500 - CELL_H}px)` });
+    expect(actor()).toHaveStyle({ transform: `translate(${HOME}px, -${CEILING}px)` });
   });
 
   it("dilepas: jatuh dengan easing percepatan, lalu pusing, lalu baris pose — jalur menyusut lagi", () => {
@@ -727,7 +728,7 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
         transform: `translate(${HOME - 40}px, 0px)`,
         transition: "transform 1000ms var(--ease-fall)",
       });
-      expect(laneOf()).toHaveStyle({ top: "max(0px, var(--safe-top))" });   // masih melebar selagi jatuh
+      expect(laneOf()).toHaveStyle({ height: `${CELL_H}px` });   // jalur tetap setinggi satu sel selagi jatuh
 
       // Mendarat. Waktu dimajukan LEBIH DULU: `transitionend` di browser tiba tepat saat durasinya
       // habis, dan mesin menilai pendaratan dari jam, bukan dari peristiwanya (pola test jalan kaki).
@@ -737,7 +738,7 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
 
       expect(rowshift()).toHaveAttribute("data-row", "dizzy");
       expect(atlas()).toHaveStyle({ animation: `hn-pet-frames ${durationMs("dizzy")}ms steps(8, end) 1 forwards` });
-      expect(laneOf()).toHaveStyle({ height: `${CELL_H}px` });   // menyusut kembali begitu mendarat
+      expect(laneOf()).toHaveStyle({ height: `${CELL_H}px` });   // tinggi jalur tak pernah berubah
 
       act(() => { vi.advanceTimersByTime(durationMs("dizzy") + 50); });
       expect(rowshift()).toHaveAttribute("data-row", "idle");

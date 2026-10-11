@@ -168,9 +168,16 @@ function ReportForm({ slug }: { slug: string }) {
           </div>
           <div className="hn-public-field">
             <label htmlFor="hc-files" className="hn-public-label">Lampiran gambar (opsional, maks {MAX_FILES})</label>
-            <input id="hc-files" className="hn-portal-file" type="file" accept="image/png,image/jpeg,image/webp" multiple
-              onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, MAX_FILES))} />
-            {files.length > 0 && <div className="hn-public-files">{files.map((f) => f.name).join(", ")}</div>}
+            {/* Input native disembunyikan tetapi tetap fokusabel; nama aksesibelnya dari label di atas.
+                Tombol yang tampak adalah label yang menunjuk input itu, jadi tak dibacakan dua kali. */}
+            <div className="hn-public-file">
+              <input id="hc-files" className="hn-public-file-input" type="file" accept="image/png,image/jpeg,image/webp" multiple
+                onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, MAX_FILES))} />
+              <label htmlFor="hc-files" className="hn-public-file-btn" aria-hidden="true">Pilih berkas</label>
+              <span className="hn-public-files" aria-live="polite">
+                {files.length > 0 ? files.map((f) => f.name).join(", ") : "Belum ada berkas dipilih"}
+              </span>
+            </div>
           </div>
           {/* honeypot — disembunyikan dari manusia; bot cenderung mengisinya. SPEC-352: namanya
               WAJIB netral dan autocomplete-nya WAJIB `new-password`. Versi lama bernama `hp`

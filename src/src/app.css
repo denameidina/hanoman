@@ -66,13 +66,32 @@ textarea:focus-visible,
 
 .hn-shell-wordmark { padding: 2px 4px 20px; }
 .hn-shell-nav { display: flex; min-height: 0; flex-direction: column; gap: 2px; overflow-y: auto; }
+/* Ikon nav tak boleh menyusut: di rail, badge sebagai flex item dulu mendorong svg sampai 7 px (C). */
+.hn-shell-nav svg { flex: 0 0 auto; }
+/* Pet di footer sidebar (desktop). Ia duduk dalam alur sidebar, di bawah daftar hub: `margin-top: auto`
+   mendorongnya ke dasar, dan daftar hub yang lebih panjang dari layar menggulir sendiri di atasnya. Slot
+   kosong (`:empty`) tak memesan ruang sama sekali — itulah keadaan pet mati dan keadaan tablet/ponsel. */
+.hn-shell-dock { flex: 0 0 auto; margin-top: auto; padding-top: 8px; }
+.hn-shell-dock:empty { display: none; }
+/* Lajur pet di tablet dan ponsel: anak kolom di bawah <main>, jadi area gulir berakhir di atasnya. */
+.hn-shell-lane { flex: 0 0 auto; }
+.hn-shell-lane:empty { display: none; }
+.hn-shell-lane:not(:empty) { padding-bottom: var(--safe-bottom); }
+/* Lencana status sekunder di topbar: `display: contents` membiarkan anaknya tetap menjadi item kluster. */
+.hn-topbar-extra { display: contents; }
+/* Baris kedua topbar (desktop): pilihan project, kotak cari, aksi halaman. Ia duduk di kiri kluster alat. */
+.hn-shell-subrow { display: flex; align-items: center; gap: 10px; min-width: 0; margin-left: auto; }
+.hn-shell-subrow + .hn-shell-tools { margin-left: 0; }
 /* ADR-0205 · tiga grup berlabel (Kerja · Otomasi · Sistem). Label grup sekecil eyebrow; pemisah antar
    grup memakai jarak, bukan garis, supaya di sidebar penuh terbaca sebagai daftar biasa. */
 .hn-nav-group { display: flex; flex-direction: column; gap: 2px; }
 .hn-nav-group + .hn-nav-group { margin-top: 14px; }
 .hn-nav-group-label { padding: 0 10px 6px; }
 /* ADR-0205 · bar tab hub di atas konten layar anak hub (SectionTabs). */
-.hn-section-tabs { margin-bottom: var(--space-4); }
+/* Bar tab hub: SATU baris yang menggulir mendatar (`.hn-tabs` sudah `overflow-x: auto` dan tab-nya
+   `flex: 0 0 auto`); wadahnya tak boleh lebih lebar dari kolom, supaya gulirnya ada di bar, bukan di halaman. */
+.hn-section-tabs { min-width: 0; max-width: 100%; margin-bottom: var(--space-4); }
+.hn-section-tabs > .hn-tabs { max-width: 100%; }
 .hn-shell-column { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .hn-shell-topbar {
   min-height: var(--topbar-h);
@@ -102,20 +121,15 @@ textarea:focus-visible,
 .hn-shell-heading { min-width: 0; }
 .hn-shell-tools { margin-left: auto; display: flex; min-width: 0; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
 .hn-shell-search { width: 220px; }
-/* Lajur pet (HanomanPet) duduk di tepi bawah dan menutupi apa pun di bawahnya. `--pet-h` diterbitkan
-   HanomanPet (tinggi sel, atau 66px saat disembunyikan); ruang itu dipesan di bawah scroller, jadi
-   kontrol terbawah tetap bisa digulir di atasnya. `--safe-bottom` ikut karena lajur pet sendiri
-   menempel di atas safe-area. Pada layar tanpa pet nilainya 0. */
+/* Pet (HanomanPet) TIDAK lagi melayang di atas konten: ia duduk di alur layout — footer sidebar di desktop,
+   lajur di bawah <main> di tablet dan ponsel (lihat .hn-shell-dock / .hn-shell-lane). Area gulir karena itu
+   berakhir sendiri di atas pet, tanpa padding pemesan ruang, dan sticky bar (Review, Triase) menempel di
+   dasar area gulir yang sudah di atas pet. `--pet-h` (tinggi sel pet) hanya dibaca bar yang `position: fixed`
+   di ponsel — aksi QA — supaya ikut naik di atas lajur. Tanpa pet nilainya 0. */
 :root { --pet-h: 0px; }
 .hn-shell-main {
   flex: 1; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto;
-  padding-bottom: calc(var(--pet-h) + var(--safe-bottom));
 }
-/* Bar yang menempel di tepi bawah (keputusan Review dan Triase, sticky `bottom: 0` terhadap scrollport,
-   bukan terhadap padding) dan bar aksi QA di ponsel (fixed) ikut naik ke atas lajur pet. Spesifisitas
-   sengaja lebih tinggi dari aturan layarnya: berkas CSS layar dimuat setelah app.css. */
-.hn-shell-main .hn-review-decide,
-.hn-shell-main .hn-triage-decision { bottom: calc(var(--pet-h) + var(--safe-bottom)); }
 @media (max-width: 767px) {
   .hn-shell .hn-qa-bar-actions { bottom: calc(var(--pet-h) + var(--safe-bottom)); }
 }
@@ -190,9 +204,13 @@ textarea:focus-visible,
 
 @media (min-width: 768px) and (max-width: 1199px) {
   .hn-shell-sidebar { width: var(--sidebar-w); padding: 14px 8px; }
-  /* Label disembunyikan di tier ini, jadi `margin-left: auto` tak lagi punya sisa ruang untuk
-     mendorong; badge duduk rapat di samping ikon dan tombolnya tetap terpusat. */
-  .hn-shell-sidebar .hn-nav-badge { margin-left: 0; }
+  /* Rail: badge hitungan DILEPAS dari aliran flex (absolut di pojok kanan-atas tombol). Sebagai flex item ia
+     tadinya ikut membagi lebar dengan ikon, dan ikon Backlog/Triase menyusut dari 17 ke 7 px (C). */
+  .hn-shell-sidebar .hn-nav-item { position: relative; }
+  .hn-shell-sidebar .hn-nav-badge {
+    position: absolute; top: 3px; right: 5px; margin-left: 0;
+    min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px;
+  }
 
   .hn-shell-sidebar .hn-nav-label,
   .hn-shell-sidebar .hn-nav-group-label,
@@ -226,16 +244,32 @@ textarea:focus-visible,
     border: 0;
     background: color-mix(in srgb, var(--ink-900) 42%, transparent);
   }
-  .hn-shell-topbar { align-items: flex-start; flex-wrap: wrap; gap: 8px 10px; padding: calc(6px + var(--safe-top)) var(--page-gutter-x) 8px; backdrop-filter: none; }
-  .hn-shell-heading { flex: 1 1 calc(100% - 54px); align-self: center; }
-  .hn-shell-tools { flex: 1 1 100%; margin-left: 0; justify-content: flex-start; gap: 6px; }
-  .hn-shell-search { flex: 1 1 100%; width: 100%; order: 1; }
-  /* Header dua baris: judul di baris pertama bersama tombol menu, barisan ikon (cari, notifikasi, batas,
-     akun, aksi halaman) di baris kedua. Pilihan project turun ke baris ketiga bersama kotak cari layar
-     (`order: 1`). Crumb dan judul dipotong satu baris dengan elipsis: header tak lagi membungkus. */
-  .hn-shell-crumb,
+  /* Topbar ponsel = SATU baris setinggi 44 px di dalam padding 6 px atas-bawah (total 56 px): menu, judul
+     (ellipsis), cari (ikon), notifikasi, akun. Lencana sekunder disembunyikan. Baris kedua (40 px) hanya ada
+     bila layar memakainya: pilihan project, kotak cari layar, dan aksi halaman. Tanpa itu header 56 px. */
+  .hn-shell-topbar {
+    align-items: center; flex-wrap: wrap; gap: 0 8px; min-height: 0;
+    padding: calc(6px + var(--safe-top)) var(--page-gutter-x) 6px; backdrop-filter: none;
+  }
+  .hn-shell-menu { order: 0; }
+  .hn-shell-heading { order: 1; flex: 1 1 0; align-self: center; }
+  .hn-shell-tools { order: 2; flex: 0 0 auto; margin-left: 0; gap: 4px; flex-wrap: nowrap; }
+  .hn-shell-subrow {
+    order: 3; flex: 0 0 100%; margin: 6px 0 0; margin-left: 0; height: 40px;
+    gap: 8px; min-width: 0;
+  }
+  .hn-shell .hn-shell-subrow > * { min-width: 0; }
+  .hn-shell .hn-shell-subrow .hn-shell-scope,
+  .hn-shell .hn-shell-subrow .hn-shell-search { width: auto; flex: 1 1 0; }
+  .hn-shell .hn-shell-subrow button,
+  .hn-shell .hn-shell-subrow input { min-height: 40px; }
+  .hn-topbar-extra { display: none; }
+  .hn-shell .hn-shell-cmdk { width: var(--touch-target); min-width: var(--touch-target); padding: 0; justify-content: center; }
+  .hn-shell .hn-shell-cmdk .hn-kbd { display: none; }
+  /* Crumb (deskripsi layar) dilepas dari baris judul: ia memakan baris kedua yang tak ada gunanya di ponsel.
+     Judul dipotong satu baris dengan elipsis: header tak lagi membungkus. */
+  .hn-shell-crumb { display: none; }
   .hn-shell-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .hn-shell-scope { flex: 1 1 100%; order: 1; }
   /* SPEC-763 · label topbar yang panjang (pil update) diringkas di mobile supaya barisan tools muat
      satu baris; kontrolnya tetap ada, namanya dipikul aria-label/title, dan versinya tetap terbaca. */
   .hn-topbar-label { display: none; }

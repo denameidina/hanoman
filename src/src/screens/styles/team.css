@@ -23,7 +23,8 @@
 .hn-tm-prio-low::before { background: transparent; border-color: var(--ink-400); }
 
 /* Papan: kolom = status. Kartu hanya judul, prioritas, penanggung jawab, dan satu menu. */
-.hn-tm-board { flex: 1 1 auto; min-height: 0; gap: var(--space-2); align-items: stretch; padding-bottom: var(--space-1); }
+/* Kolom bertetap lebar: papan HARUS flex mendatar. Di ponsel papan ini tak dirender (lihat `hn-tm-mobile`). */
+.hn-tm-board { display: flex; overflow-x: auto; flex: 1 1 auto; min-height: 0; gap: var(--space-2); align-items: stretch; padding-bottom: var(--space-1); }
 .hn-tm-col {
   flex: 0 0 248px; display: flex; flex-direction: column; min-height: 0; padding: var(--space-2);
   border-radius: var(--radius-lg); background: var(--bone-100); border: 1px solid var(--border-hair);

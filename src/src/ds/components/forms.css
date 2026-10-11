@@ -1,0 +1,12 @@
+/* Kontrol pilihan DS (`.hn-choice-control`: checkbox, radio, switch) — area sentuh.
+   Checkbox dan radio sudah 24×24 lewat style inline. Switch (track 40×22 di dalamnya) memakai batas
+   minimum ini supaya area sentuhnya 24 px tinggi di pointer halus. Track tetap digambar di tengah
+   (inline-grid, place-items center): hanya kotak pembungkusnya yang membesar, tampilannya tak berubah.
+   Pointer kasar/ponsel naik ke 44 px (--touch-target), sesuai kontrak sentuh DS. Berkas ini sengaja
+   berdampingan dengan forms.tsx; aturan dasar dan blok coarse-nya memakai nilai yang sama di kedua
+   tempat, jadi urutan pemuatan stylesheet tak mengubah hasilnya. */
+.hn-choice-control { min-width: 24px; min-height: 24px; }
+
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-choice-control { min-width: var(--touch-target); min-height: var(--touch-target); }
+}

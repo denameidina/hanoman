@@ -3,9 +3,14 @@ import { subscribe } from "./events";
 import { installModelCatalog, modelCatalogSnapshot, subscribeModelCatalog } from "./model-catalog-state";
 
 let users = 0;
-export function useModelCatalog() {
+/**
+ * `enabled = false` (klien, atau login belum diketahui) tak memanggil `/api/models` dan tak membuka
+ * socket. Katalog yang sudah terpasang atau bundel tetap dikembalikan apa adanya.
+ */
+export function useModelCatalog(enabled = true) {
   const catalog = useSyncExternalStore(subscribeModelCatalog, modelCatalogSnapshot, modelCatalogSnapshot);
   useEffect(() => {
+    if (!enabled) return undefined;
     const disconnect = subscribe(() => {});
     if (users++ === 0) {
       const before = modelCatalogSnapshot();
@@ -18,6 +23,6 @@ export function useModelCatalog() {
         }).catch(() => { /* Bundled/last-good remains usable while HTTP or WS reconnects. */ });
     }
     return () => { users--; disconnect(); };
-  }, []);
+  }, [enabled]);
   return catalog;
 }

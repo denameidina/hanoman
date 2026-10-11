@@ -204,3 +204,38 @@ describe("ReviewScreen · bar keputusan (Fase 3L)", () => {
     expect(screen.getByText(/2 berkas berubah/)).toBeInTheDocument();
   });
 });
+
+// QA Chrome (P2) · belum ada worktree (409): kalimat manusiawi dan dua tujuan; pesan teknis tak tampil.
+describe("ReviewScreen · belum ada worktree (409)", () => {
+  const notYet = () => Object.assign(new Error("GET /api/specs/SPEC-142/review → 409"), { status: 409 });
+
+  it("menjelaskan dengan bahasa manusia dan menawarkan Backlog serta Terminal", async () => {
+    (api.specReview as any).mockRejectedValue(notYet());
+    const onGoto = vi.fn();
+    render(<ReviewScreen specId="SPEC-142" title="Judul" onBack={() => {}} onGoto={onGoto} />);
+    expect(await screen.findByText("Belum ada perubahan untuk ditinjau")).toBeInTheDocument();
+    expect(screen.getByText("Sesi belum membuat worktree. Jalankan atau lanjutkan sesinya dulu, lalu muat ulang.")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/GET \/api|→ 409|409/);
+    fireEvent.click(screen.getByRole("button", { name: "Buka di Backlog" }));
+    expect(onGoto).toHaveBeenLastCalledWith({ section: "backlog", specId: "SPEC-142" });
+    fireEvent.click(screen.getByRole("button", { name: "Buka di Terminal" }));
+    expect(onGoto).toHaveBeenLastCalledWith({ section: "terminal" });
+  });
+
+  it("detail teknis hanya di atribut data-detail untuk penelusuran", async () => {
+    (api.specReview as any).mockRejectedValue(notYet());
+    const { container } = render(<ReviewScreen specId="SPEC-142" title="Judul" onBack={() => {}} />);
+    await screen.findByText("Belum ada perubahan untuk ditinjau");
+    const empty = container.querySelector("[data-review-state='empty']");
+    expect(empty?.getAttribute("data-status")).toBe("409");
+    expect(empty?.getAttribute("data-detail")).toBe("GET /api/specs/SPEC-142/review → 409");
+  });
+
+  it("sesi PRD tanpa worktree tak menawarkan Backlog", async () => {
+    (api.sessionReview as any).mockRejectedValue(notYet());
+    render(<ReviewScreen specId="S1" title="PRD" kind="session" onBack={() => {}} />);
+    await screen.findByText("Belum ada perubahan untuk ditinjau");
+    expect(screen.queryByRole("link", { name: "Buka di Backlog" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Buka di Terminal" })).toBeInTheDocument();
+  });
+});

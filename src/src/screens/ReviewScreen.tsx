@@ -6,7 +6,7 @@
    tetap dikerjakan di Backlog (integrate) atau Terminal (sesi konflik). Tiga tombol di bar hanya
    berpindah layar: lewat `onGoto` bila layar induk memberikannya, selain itu tautan biasa. */
 import React from "react";
-import { Button, Badge, Icon, StateBlock, DocPreviewModal, isMarkdownPath, ResponsivePanels } from "../ds";
+import { Button, Badge, Icon, Inline, StateBlock, DocPreviewModal, isMarkdownPath, ResponsivePanels } from "../ds";
 import { api, type SpecReview, type ReviewFile } from "../api/client";
 import { buildFileTree, TreeRow, TreeRoot, ChangedSection } from "./file-tree";
 import { DiffView } from "./diff-view";
@@ -48,9 +48,12 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto }:
       setSelected(r.changed[0]?.path ?? r.files[0] ?? "");
     }).catch((e) => {
       if (!alive) return;
-      // 409 (worktree/repoDir) → empty jelas, bukan error merah.
-      if (e?.status === 409) { setState("empty"); setErrMsg(String(e?.message ?? "")); }
-      else setState("error");
+      // 409 (worktree/repoDir) → empty jelas, bukan error merah. Pesan teknisnya tak ditampilkan:
+      // ia hanya di atribut data-detail dan di console untuk penelusuran.
+      if (e?.status === 409) {
+        setState("empty"); setErrMsg(String(e?.message ?? ""));
+        console.debug("review: belum ada worktree", e?.message);
+      } else setState("error");
     });
     return () => { alive = false; };
   }, [specId, tries]);
@@ -80,16 +83,28 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto }:
     ? "Merge dan konflik dikerjakan di Terminal."
     : "Merge dan konflik dikerjakan di Backlog. Buka Terminal untuk melanjutkan sesinya.";
 
-  if (state === "loading") return <StateBlock kind="loading" title="Memuat review…" hint={specId} />;
-  if (state === "error") return <StateBlock kind="error" title="Gagal memuat review" hint={specId} action={() => setTries((n) => n + 1)} />;
-  if (state === "empty") return <StateBlock kind="empty" icon="git-branch" title="Belum ada worktree untuk di-review"
-    hint={errMsg || "Jalankan atau lanjutkan sesi backlog item ini dulu."} action={onBack} actionLabel="Kembali ke backlog" />;
-
   // Tiga tujuan keputusan. Di sesi PRD, merge dan konflik hanya ada di Terminal.
   const goTerminal: Route = { section: "terminal" };
   const goIde: Route = { section: "ide" };
   const goBacklog: Route = { section: "backlog", specId };
   const go = (to: Route) => onGoto?.(to);
+  // Tujuan sebagai tombol bila layar induk memberi `onGoto`; selain itu tautan biasa ke rute hanoman.
+  const goButton = (to: Route, label: string, icon: string, variant: "primary" | "secondary") => onGoto
+    ? <Button size="sm" variant={variant} leftIcon={icon} onClick={() => go(to)}>{label}</Button>
+    : <Button size="sm" variant={variant} leftIcon={icon} as="a" href={routePath(to)}>{label}</Button>;
+
+  if (state === "loading") return <StateBlock kind="loading" title="Memuat review…" hint={specId} />;
+  if (state === "error") return <StateBlock kind="error" title="Gagal memuat review" hint={specId} action={() => setTries((n) => n + 1)} />;
+  if (state === "empty") return <div className="hn-review-empty" data-review-state="empty" data-status="409"
+    data-detail={errMsg || undefined}>
+    <StateBlock kind="empty" icon="git-branch" title="Belum ada perubahan untuk ditinjau"
+      hint="Sesi belum membuat worktree. Jalankan atau lanjutkan sesinya dulu, lalu muat ulang." />
+    <Inline gap={2} justify="center">
+      {kind === "spec" && goButton(goBacklog, "Buka di Backlog", "list-checks", "primary")}
+      {goButton(goTerminal, "Buka di Terminal", "terminal", kind === "session" ? "primary" : "secondary")}
+      <Button size="sm" variant="ghost" leftIcon="arrow-left" onClick={onBack}>{backLabel}</Button>
+    </Inline>
+  </div>;
 
   return <div className="hn-review">
     <header className="hn-review-topbar">
@@ -168,15 +183,9 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto }:
     <div className="hn-review-decide" role="region" aria-label="Keputusan">
       <p className="hn-review-decide-hint">{hint}</p>
       <div className="hn-review-decide-actions">
-        {kind === "spec" && (onGoto
-          ? <Button size="sm" variant="primary" leftIcon="list-checks" onClick={() => go(goBacklog)}>Buka di Backlog</Button>
-          : <Button size="sm" variant="primary" leftIcon="list-checks" as="a" href={routePath(goBacklog)}>Buka di Backlog</Button>)}
-        {onGoto
-          ? <Button size="sm" variant={kind === "session" ? "primary" : "secondary"} leftIcon="terminal" onClick={() => go(goTerminal)}>Buka di Terminal</Button>
-          : <Button size="sm" variant={kind === "session" ? "primary" : "secondary"} leftIcon="terminal" as="a" href={routePath(goTerminal)}>Buka di Terminal</Button>}
-        {onGoto
-          ? <Button size="sm" variant="secondary" leftIcon="code" onClick={() => go(goIde)}>Buka di IDE</Button>
-          : <Button size="sm" variant="secondary" leftIcon="code" as="a" href={routePath(goIde)}>Buka di IDE</Button>}
+        {kind === "spec" && goButton(goBacklog, "Buka di Backlog", "list-checks", "primary")}
+        {goButton(goTerminal, "Buka di Terminal", "terminal", kind === "session" ? "primary" : "secondary")}
+        {goButton(goIde, "Buka di IDE", "code", "secondary")}
       </div>
     </div>
     {preview && canPreview && (

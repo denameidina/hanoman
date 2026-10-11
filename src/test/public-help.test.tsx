@@ -103,7 +103,12 @@ describe("SPEC-253 · PublicHelpApp routing", () => {
     expect(kategori.closest(".hn-public-field")).toBeTruthy();
     const berkas = screen.getByLabelText(/Lampiran gambar/);
     expect(berkas.tagName).toBe("INPUT");
-    expect(berkas.classList.contains("hn-portal-file")).toBe(true);
+    expect(berkas.classList.contains("hn-public-file-input")).toBe(true);
+    // Tombol yang tampak memakai teks Indonesia dan disembunyikan dari pembaca layar (nama tetap dari label).
+    const wadah = berkas.parentElement!;
+    expect(wadah.querySelector(".hn-public-file-btn")).toHaveTextContent("Pilih berkas");
+    expect(wadah.querySelector(".hn-public-file-btn")).toHaveAttribute("aria-hidden", "true");
+    expect(wadah).toHaveTextContent("Belum ada berkas dipilih");
   });
 
   it("field honeypot tak bernama `hp` dan memakai autocomplete yang dihormati browser", async () => {

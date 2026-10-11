@@ -91,6 +91,12 @@ function HnWordmark() {
    karena memang tak ada yang menunggu. */
 export const NavPending = React.createContext<PendingCounts | null>(null);
 
+/* Maskot pet dibuat SEKALI di App dan disalurkan lewat konteks ini, lalu Shell yang menaruhnya di slot-nya:
+   footer sidebar di desktop, lajur di bawah kolom di tablet dan ponsel. Konteks, bukan portal, sebab pet
+   harus tetap berdiri di tempat yang sama di DOM selama Shell hidup — navigasi antar-layar tak boleh
+   melahirkannya kembali. Nilai `null` = pet mati atau layar tanpa Shell (Dalang). */
+export const PetDockContext = React.createContext<React.ReactNode>(null);
+
 function HnNavBadge({ count }: { count: number }) {
   return (
     // `aria-hidden`: angkanya SUDAH masuk ke nama tombolnya (`aria-label` di bawah). Tanpa ini
@@ -114,6 +120,7 @@ function HnHubItem({ hub, on, target, badge, onNavigate }:
   return (
     <button
       type="button"
+      className="hn-nav-item"
       onClick={interactive ? () => onNavigate!(target) : undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -196,6 +203,9 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
   const tier = useResponsiveTier();
   const mobile = tier === "mobile";
   const crumbHub = mobile ? undefined : hubCrumb;
+  const pet = React.useContext(PetDockContext);
+  // Baris kedua topbar (pilihan project, kotak cari layar, aksi halaman) hanya ada bila layar memakainya.
+  const hasSubrow = (scope && scoped) || showSearch || !!actions;
   const [navOpen, setNavOpen] = React.useState(false);
   const navRef = React.useRef<HTMLElement>(null);
   const toggleRef = React.useRef<HTMLButtonElement>(null);
@@ -288,6 +298,8 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             </div>
           ))}
         </nav>
+        {/* Footer sidebar: pet "tinggal" di sini di desktop. `:empty` di CSS menutupnya bila pet tak tampil. */}
+        <div className="hn-shell-dock" data-pet-slot="sidebar">{tier === "desktop" ? pet : null}</div>
       </aside>
 
       <div ref={columnRef} className="hn-shell-column" aria-hidden={mobile && navOpen ? "true" : undefined}>
@@ -304,8 +316,8 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             <Icon name="menu" size={20} />
           </button>
           <div className="hn-shell-heading">
-            {/* Di ponsel crumb hub dilepas: judulnya sudah nama tab (h1) dan barisnya dijajar tab di atas
-                konten. Crumb yang tersisa dipotong satu baris (app.css `.hn-shell-crumb`). */}
+            {/* Di ponsel crumb disembunyikan CSS (app.css `.hn-shell-crumb`): judulnya sudah nama layar (h1) dan
+                barisnya dijajar tab hub di atas konten. Crumb hub sudah dikosongkan di atas (`crumbHub`). */}
             {(crumbHub || breadcrumb || scopeName) && (
               <div className="hn-shell-crumb" style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", marginBottom: 1 }}>
                 {crumbHub && <span data-testid="hub-crumb">{crumbHub}</span>}
@@ -324,28 +336,34 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
               {title}
             </h1>
           </div>
+          {/* Baris kedua: hanya layar yang memakainya. Di desktop ia duduk di kiri kluster alat; di ponsel
+              ia turun ke barisnya sendiri setinggi 40px (app.css). */}
+          {hasSubrow && (
+            <div className="hn-shell-subrow">
+              {scope && scoped && <ProjectSwitcher scope={scope} />}
+              {showSearch && (
+                <Input className="hn-shell-search" aria-label="Cari" placeholder="mis. hanoman atau erp" leftIcon="search" size="sm"
+                  value={searchValue}
+                  onChange={onSearchChange ? (e: React.ChangeEvent<HTMLInputElement>) => onSearchChange(e.target.value) : undefined}
+                  readOnly={!onSearchChange} />
+              )}
+              {actions}
+            </div>
+          )}
           <div className="hn-shell-tools">
             {/* Pintu palet perintah (⌘K). Nama "Cari" tetap milik tombol ini; kotak cari layar
-                (showSearch) tetap ada untuk pencarian yang memfilter daftar. */}
+                (showSearch) tetap ada untuk pencarian yang memfilter daftar. Di ponsel ia ikon saja. */}
             <button type="button" className="hn-shell-cmdk" aria-label="Cari"
               aria-keyshortcuts={isMac ? "Meta+K" : "Control+K"} title={`Palet perintah (${shortcutHint})`}
               onClick={() => openPalette()}>
               <Icon name="search" size={16} />
               <kbd className="hn-kbd" aria-hidden="true">{shortcutHint}</kbd>
             </button>
-            {scope && scoped && <ProjectSwitcher scope={scope} />}
-            {showSearch && (
-              <Input className="hn-shell-search" aria-label="Cari" placeholder="mis. hanoman atau erp" leftIcon="search" size="sm"
-                value={searchValue}
-                onChange={onSearchChange ? (e: React.ChangeEvent<HTMLInputElement>) => onSearchChange(e.target.value) : undefined}
-                readOnly={!onSearchChange} />
-            )}
-            <UpdateBadge />
+            {/* Lencana status sekunder: di ponsel disembunyikan (tercapai dari palet dan Pengaturan). */}
+            <div className="hn-topbar-extra"><UpdateBadge /></div>
             <ReloadBadge />
             <NotificationBell />
-            <LimitBadge />
-            <CodexLimitBadge />
-            {actions}
+            <div className="hn-topbar-extra"><LimitBadge /><CodexLimitBadge /></div>
             <AccountMenu />
           </div>
         </header>
@@ -361,6 +379,9 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             {children}
           </div>
         </main>
+        {/* Lajur pet di tablet dan ponsel: berada DI BAWAH <main>, sehingga area gulir berakhir di atasnya
+            dan tak ada kontrol yang tertutup. Kosong (`:empty`) = tak memesan ruang sama sekali. */}
+        <div className="hn-shell-lane" data-pet-slot="lane">{tier === "desktop" ? null : pet}</div>
       </div>
     </div>
   );

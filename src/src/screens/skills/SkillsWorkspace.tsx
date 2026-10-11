@@ -6,7 +6,7 @@
 // custom agent (CustomAgentsPanel). Hapus skill pindah ke ⋯ di kepala detail.
 import React from "react";
 import type { SkillEntry, SkillLibraryView, SkillTreeView } from "@hanoman/shared";
-import { Button, Field, Input, Modal, OverflowActions, ResponsivePanels, Select, StateBlock, Tabs, TabPanel, useConfirm } from "../../ds";
+import { Button, Callout, Field, Input, Modal, OverflowActions, ResponsivePanels, Select, StateBlock, Tabs, TabPanel, useConfirm } from "../../ds";
 import { useApi } from "../../api/instance";
 import { CustomAgentsPanel } from "../CustomAgentsPanel";
 import { SkillsList } from "./SkillsList";
@@ -115,7 +115,7 @@ export function SkillsWorkspace({ projectId, projectName, onToast }:
                   ]} />
                 )}
               </div>
-              {treeError && <div role="alert" className="hn-skill-list-error">Struktur berkas gagal dimuat.</div>}
+              {treeError && <Callout tone="err">Struktur berkas gagal dimuat.</Callout>}
               <div className="hn-skill-detail-body">
                 <div className="hn-skill-detail-structure">
                   <SkillStructure skill={skill} tree={tree} selected={path} onSelect={(p) => void selectPath(p)} onChanged={() => loadTree(skill)} />

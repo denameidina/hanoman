@@ -127,6 +127,21 @@
 }
 .hn-portal-file::file-selector-button:hover { background: var(--bone-100); }
 .hn-portal-file:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+/* Help Center publik: input berkas native disembunyikan (tetap fokusabel, namanya dari label field), dan
+   yang tampak adalah tombol DS "Pilih berkas" (label yang menunjuk input). Teks bawaan browser
+   ("Choose Files") tak pernah tampil, jadi bahasa tombolnya ikut bahasa layar. */
+.hn-public-file { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
+.hn-public-file > input[type="file"].hn-public-file-input {
+  position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; opacity: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+.hn-public-file-btn {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; cursor: pointer;
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--text-strong);
+  background: var(--surface-card); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); white-space: nowrap;
+}
+.hn-public-file-btn:hover { background: var(--bone-100); }
+.hn-public-file-input:focus-visible + .hn-public-file-btn { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 .hn-portal-files { margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); color: var(--text-subtle);
   overflow-wrap: anywhere; }
 .hn-portal-summary { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--bone-100);
@@ -200,6 +215,7 @@ textarea.hn-public-input { min-height: 140px; resize: vertical; line-height: 1.5
   .hn-public .hn-input-core,
   .hn-public select { min-height: var(--touch-target); }
   .hn-portal-file::file-selector-button { min-height: var(--touch-target); }
+  .hn-public-file-btn { min-height: var(--touch-target); }
   .hn-portal select,
   .hn-portal .hn-input-core,
   .hn-public select,
@@ -235,7 +251,8 @@ textarea.hn-public-input { min-height: 140px; resize: vertical; line-height: 1.5
 .hn-portal-pager { margin-top: 14px; border: 1px solid var(--border-hair); border-radius: var(--radius-lg); overflow: hidden; }
 .hn-portal-cases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .hn-portal-case-title {
-  flex: 1 1 200px; min-width: 0; padding: 0; margin: 0; border: none; background: none; cursor: pointer;
+  /* Tinggi area klik ≥24 px lewat padding (baris teks 14 px hanya 19 px). Pointer kasar: 44 px dari `.hn-portal button`. */
+  flex: 1 1 200px; min-width: 0; min-height: 24px; padding: 3px 0; margin: 0; border: none; background: none; cursor: pointer;
   font: inherit; font-size: var(--text-md); font-weight: 600; color: var(--text-strong); text-align: left;
   overflow-wrap: anywhere; line-height: 1.35; text-decoration: underline; text-decoration-color: var(--border-strong);
   text-underline-offset: 3px;

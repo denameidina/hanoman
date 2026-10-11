@@ -62,6 +62,8 @@ const counts = { triage: 0, backlog: 0, prd: 0, lead: 0 };
 
 beforeEach(() => {
   localStorage.clear();
+  // Pet tablet/ponsel default MATI (SPEC-pet lajur). Test ini mengukur render pet, jadi nyalakan dulu.
+  localStorage.setItem("hn.ui.v1.pet.enabled", "true");
   window.location.hash = "";
   subs.clear();
   pet.renders = 0;

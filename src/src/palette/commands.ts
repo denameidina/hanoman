@@ -52,6 +52,10 @@ export type PaletteSource = {
   newSpec: () => void;
   newProject: () => void;
   setScope: (projectId: string) => void;
+  /** Pet Hanoman sedang tampil (sudah memperhitungkan default tier). */
+  petOn: boolean;
+  /** Menyalakan/mematikan pet lewat preferensi bersama (ui-state `hn.ui.v1.pet.enabled`). */
+  setPetOn: (on: boolean) => void;
 };
 
 export function buildPaletteCommands(src: PaletteSource): PaletteCommand[] {
@@ -77,6 +81,13 @@ export function buildPaletteCommands(src: PaletteSource): PaletteCommand[] {
       keywords: "dalang panggung orkestrasi sinematik wayang", run: () => src.go("dalang") },
     { id: "action:scope", group: "Aksi", label: "Ganti project aktif", hint: scopeName,
       keywords: "project scope filter", prefill: "project ", run: () => undefined },
+    // Pet hanya satu dari dua: yang tampil di palet adalah kebalikan keadaan sekarang. Tablet dan ponsel
+    // mulai tanpa pet; perintah ini satu-satunya jalan cepat untuk menyalakannya.
+    src.petOn
+      ? { id: "action:pet-hide", group: "Aksi", label: "Sembunyikan Hanoman", hint: "pet",
+          keywords: "pet maskot hanoman sembunyi matikan tutup", run: () => src.setPetOn(false) }
+      : { id: "action:pet-show", group: "Aksi", label: "Tampilkan Hanoman", hint: "pet",
+          keywords: "pet maskot hanoman tampil nyalakan munculkan", run: () => src.setPetOn(true) },
   );
 
   for (const n of src.nav) {

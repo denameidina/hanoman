@@ -200,7 +200,7 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
         {attention.length === 0
           ? <StateBlock kind="empty" compact icon="book-open" title="Dokumen sudah sesuai standar"
               hint="Semua project tidak punya masalah dokumen yang perlu ditindak." />
-          : <RowList label="Perlu perhatian">
+          : <RowList label="Perlu perhatian" className="hn-ov-attn">
               {attention.map((p) => <AttnRow key={p.id} p={p} onOpen={onOpenProject} />)}
             </RowList>}
       </Section>

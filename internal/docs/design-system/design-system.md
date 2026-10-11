@@ -32,16 +32,31 @@ Primitive bersama:
   `min-width:0` dan `overflow-x:hidden` — overflow lokal tidak boleh merambat ke halaman. `LocalOverflow`
   wajib membungkus konten yang punya lebar intrinsik: anak **blok** selalu selebar induknya, jadi
   scroller yang membungkusnya tak pernah punya konten lebih lebar untuk digulir (SPEC-879).
+- **Papan kolom** (`.hn-bl-board`, `.hn-tm-board`): kolom bertetap lebar (`flex: 0 0 248px`) hanya
+  tersusun mendatar bila papannya `display: flex`; papan itu sendiri menggulir mendatar (`overflow-x: auto`).
+  Di ponsel kolom menumpuk satu kolom. Dikunci `src/test/board-layout-css.test.ts` (tiap kolom bertetap lebar
+  wajib punya papan induk flex/grid).
 - `.hn-ide-head` + `.hn-ide-toolbar` adalah baris kepala layar IDE: strip tab `flex: 0 0 auto` di
   samping toolbar ber-**basis dinyatakan** `flex: 1 1 480px`, yang turun ke barisnya sendiri dan
   menggulir saat ruangnya kurang. Basis `auto` membuat pecah-baris ditentukan lebar isi, dan dengan
   itu bentuk kepala berubah hanya karena label tab aktif ditebalkan atau nama project bertambah
   panjang (SPEC-879).
-- **Lajur pet memesan ruangnya sendiri.** `HanomanPet` menerbitkan `--pet-h` di `<html>` (tinggi sel sprite,
-  atau 66 px saat disembunyikan). `.hn-shell-main` memakai `calc(var(--pet-h) + var(--safe-bottom))` sebagai
-  padding-bawah, sehingga kontrol terbawah bisa digulir di atas pet. Bar keputusan yang menempel di bawah
-  (Review, Triase) dan bar aksi QA ponsel ikut naik lewat aturan di `app.css`. Dokumen (`html`/`body`) tak
-  pernah menggulir: satu-satunya scroller adalah `.hn-shell-main` atau scroller 100dvh milik permukaan mandiri.
+- **Pet Hanoman duduk di alur layout, tak pernah melayang.** Pet dibuat sekali di `App` dan disalurkan lewat
+  `PetDockContext`; `Shell` menaruhnya di slot-nya. Desktop (≥1200): **footer sidebar** (`.hn-shell-dock`, di
+  bawah daftar hub, `margin-top: auto`). Tablet dan ponsel: **lajur di bawah `<main>`** (`.hn-shell-lane`),
+  sehingga area gulir berakhir di atasnya dan tak ada kontrol yang tertutup. Slot kosong (`:empty`) tak
+  memesan ruang. Satu-satunya overlay adalah gelembung bicara dan panel status: keduanya sementara dan
+  ditutup Esc atau klik di luar. Pet yang diseret boleh melayang saat diangkat; lajurnya tak pernah melebar.
+- **Default per tier, dan pilihan eksplisit.** Preferensi `hn.ui.v1.pet.enabled` (`ui-state/pet-pref.ts`;
+  `null` = belum dipilih): desktop tampil, tablet dan ponsel **mati** (lajur 0). Palet "Tampilkan Hanoman" dan
+  "Sembunyikan Hanoman" menulisnya. "Sembunyikan" di panel pet menciutkan ke chip di desktop dan mematikan
+  pet di tablet/ponsel. Tombol di Pengaturan belum ada (layar itu dikerjakan terpisah): pakai `usePetEnabled()`.
+- **Tak ada sinyal penting yang hanya ada di pet.** Keputusan sesi tetap sampai lewat notifikasi `decision`
+  (toast dan bell dengan "Buka terminal"), layar Terminal (`awaiting`), dan "Jawab sesi yang menunggu" di palet.
+  Dalang (layar penuh tanpa Shell) tak punya slot, sehingga pet tak tampil di sana.
+- `--pet-h` hanya dipublikasikan (tinggi sel) untuk satu hal: bar `position: fixed` di ponsel (aksi QA) yang
+  ikut naik di atas lajur. `.hn-shell-main` tak lagi memesan ruang pet. Dokumen (`html`/`body`) tak pernah
+  menggulir: satu-satunya scroller adalah `.hn-shell-main` atau scroller 100dvh milik permukaan mandiri.
 - `--page-gutter-x/y`, `--sidebar-w`, `--touch-target`, dan `--safe-*` adalah token lintas-screen.
   Semua kontrol utama memiliki area sentuh minimum 44×44px pada pointer kasar/mobile, meskipun
   kepadatan visual desktop boleh tetap lebih kecil.
@@ -63,6 +78,12 @@ Konten di belakang drawer menjadi `inert`. Popover topbar memakai `usePopoverFoc
 Escape/outside-click menutup, fokus kembali, dan menu mendukung Arrow/Home/End.
 Target responsif bukan menyederhanakan fitur: data, status, field penting, dan aksi yang tersedia di
 desktop wajib tetap dapat dicapai di tablet/mobile; yang berubah hanya susunan dan cara berpindah panel.
+
+**Topbar ponsel (Audit UI/UX 2026-10 · P2).** Satu baris 44 px di dalam padding 6 px (topbar 56 px): menu,
+judul (ellipsis), cari (ikon, membuka palet ⌘K), notifikasi, akun. Lencana sekunder (update, batas) dan crumb
+(deskripsi layar) disembunyikan. Baris kedua 40 px hanya ada bila layar memakainya: pilihan project, kotak cari
+layar, dan aksi halaman (`.hn-shell-subrow`). Bar tab hub (`SectionTabs`) satu baris yang menggulir dengan fade,
+di atas konten. Di rail tablet, badge hitungan absolut di pojok ikon dan ikon nav tak menyusut (`flex: 0 0 auto`).
 
 ## Kontras, konfirmasi, dan error (Audit UI/UX 2026-10 · Fase 1)
 
@@ -107,6 +128,9 @@ Aturan:
    dengan padding transparan sebagai area klik: 24×24 di desktop, 44×44 di pointer kasar. Input file minimal
    24 px, 44 px di pointer kasar. Kotak native tak bisa dibesarkan dengan width/height (Chrome dan Safari
    mengabaikannya), jadi area kliknya lewat padding, bukan ukuran kotak.
+   Switch (`role=switch`, `ds/components/forms.css`) punya area 24 px tinggi di desktop dan 44 px di pointer kasar;
+   track 40×22 tetap digambar di tengahnya. Input berkas di Help Center disembunyikan (tetap fokusabel) dan
+   tombol tampaknya "Pilih berkas" memakai gaya tombol DS (`.hn-public-file-btn`, `portal/portal.css`).
 
 ## Primitif layout (Audit UI/UX 2026-10 · Fase 2A)
 

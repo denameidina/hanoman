@@ -9,7 +9,7 @@ import {
 function source(over: Partial<PaletteSource> = {}) {
   const fns = {
     go: vi.fn(), openSpec: vi.fn(), openSession: vi.fn(), newSpec: vi.fn(),
-    newProject: vi.fn(), setScope: vi.fn(),
+    newProject: vi.fn(), setScope: vi.fn(), setPetOn: vi.fn(),
   };
   const src: PaletteSource = {
     nav: HN_NAV,
@@ -18,6 +18,7 @@ function source(over: Partial<PaletteSource> = {}) {
     specs: [{ id: "SPEC-1", title: "Login ulang", projectId: "erp" }, { id: "SPEC-2", title: "Ekspor laporan", projectId: "crm" }],
     waiting: [],
     scope: "all",
+    petOn: false,
     ...fns,
     ...over,
   };
@@ -96,6 +97,19 @@ describe("buildPaletteCommands", () => {
     answer.run();
     expect(fns.openSession).toHaveBeenCalledWith("s1");
     expect(byId(cmds, "wait:s2").label).toBe("Jawab · SPEC-2");
+  });
+
+  it("Tampilkan/Sembunyikan Hanoman: hanya satu yang tampil, menurut keadaan pet sekarang", () => {
+    const off = buildPaletteCommands(source({ petOn: false }).src);
+    expect(off.some((c) => c.id === "action:pet-hide")).toBe(false);
+    const { src, fns } = source({ petOn: false });
+    byId(buildPaletteCommands(src), "action:pet-show").run();
+    expect(fns.setPetOn).toHaveBeenLastCalledWith(true);
+
+    const on = source({ petOn: true });
+    expect(buildPaletteCommands(on.src).some((c) => c.id === "action:pet-show")).toBe(false);
+    byId(buildPaletteCommands(on.src), "action:pet-hide").run();
+    expect(on.fns.setPetOn).toHaveBeenLastCalledWith(false);
   });
 
   it("aksi buat backlog, project baru, pengaturan, dan spec memanggil fungsi sumbernya", () => {

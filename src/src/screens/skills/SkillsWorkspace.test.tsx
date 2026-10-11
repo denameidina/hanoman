@@ -43,6 +43,10 @@ describe("SkillsWorkspace (/skills)", () => {
     expect(screen.getByText("Alpha")).toBeTruthy();
     expect(screen.getByText("deploy")).toBeTruthy();
     expect(screen.getByText(/repo tidak ditemukan/)).toBeTruthy();
+    // Galat repo adalah banner (Callout, role=alert) di atas daftar, bukan item di dalam area daftar.
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Beta: repo tidak ditemukan");
+    expect(alert.closest(".hn-skill-list-scroll")).toBeNull();
     expect(screen.getByText(".agents")).toBeTruthy();
   });
 
