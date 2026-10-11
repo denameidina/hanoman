@@ -12,12 +12,14 @@ describe("agent capabilities", () => {
   // ADR-0157 · +domain `team` (papan Tim: `/api/tasks` & `/api/members`) → 13 domain, 30 id.
   // ADR-0172 · +domain `skills` (skill library: `/api/skills*`) → 14 domain, 32 id.
   // ADR-0174 · +domain `qa` (Workspace QA: `/api/projects/:id/qa/**`, `/api/qa/**`) → 15 domain, 34 id.
-  it("has 16 domains, 36 capability ids across three access levels, all in metadata", () => {
-    expect(CAPABILITY_IDS.length).toBe(36);
-    expect(new Set(CAPABILITY_IDS).size).toBe(36);
-    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(16);
+  // ADR-0199 · +domain `sync` (read/write/resolve) dan `instance` (admin) → 17 domain, 38 id.
+  // (Angka lama di sini, 16/36, sudah basi sebelum ADR-0199: yang nyata 15 domain/34 id.)
+  it("has 17 domains, 38 capability ids across three access levels, all in metadata", () => {
+    expect(CAPABILITY_IDS.length).toBe(38);
+    expect(new Set(CAPABILITY_IDS).size).toBe(38);
+    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(17);
     expect(CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id).sort())
-      .toEqual(["backlog:lifecycle", "ide:git", "sessions:spawn", "vps:exec"]);
+      .toEqual(["backlog:lifecycle", "ide:git", "instance:admin", "sessions:spawn", "sync:resolve", "vps:exec"]);
     expect(CAPABILITIES.map((c) => c.id).sort()).toEqual([...CAPABILITY_IDS].sort());
     expect(zCapability.safeParse("projects:read").success).toBe(true);
     expect(zCapability.safeParse("telegram:write").success).toBe(true);
@@ -34,6 +36,12 @@ describe("agent capabilities", () => {
     expect(grantsCapability(["vps:exec"], "vps:exec")).toBe(true);
     // dan sebaliknya: danger tak memberi baca.
     expect(grantsCapability(["vps:exec"], "vps:read")).toBe(false);
+    // ADR-0199/0200 · dua capability danger baru: sync:write TIDAK memutuskan konflik; instance:admin berdiri sendiri.
+    expect(grantsCapability(["sync:write"], "sync:resolve")).toBe(false);
+    expect(grantsCapability(["sync:write"], "sync:read")).toBe(true);
+    expect(grantsCapability(["sync:resolve"], "sync:read")).toBe(false);
+    expect(grantsCapability(["settings:write", "sessions:write", "vps:exec"], "instance:admin")).toBe(false);
+    expect(grantsCapability(["instance:admin"], "instance:admin")).toBe(true);
   });
 
   it("write implies read; unrelated caps do not grant", () => {
@@ -70,7 +78,7 @@ describe("agent capabilities", () => {
     expect(risky).toContain("vps:write");
     // ADR-0155 · keempat capability `danger` wajib bertanda risk; tanpa itu grid Settings
     // merendernya tanpa ⚠ dan pemecahannya kehilangan separuh gunanya.
-    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"])
+    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "sync:resolve", "instance:admin"])
       expect(risky, id).toContain(id);
   });
 

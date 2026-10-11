@@ -116,9 +116,14 @@ describe("katalog GLOBAL_READ", () => {
   });
 
   // SPEC-405 · ADR-0088 · `/update` baca terjangkau siapa pun, `POST /update/apply` me-restart
-  // instance. Tak boleh ada tool untuk yang kedua, di tingkat mana pun — termasuk `--danger`.
-  it("tak ada tool yang memasang pembaruan", () => {
-    expect(MCP_TOOLS.filter((t) => t.samplePath.startsWith("/update") && t.sampleMethod !== "GET"))
-      .toHaveLength(0);
+  // instance. ADR-0200 MEMBALIK larangan "tak ada tool sama sekali": pemasangan kini ada, tetapi
+  // HANYA satu tool, bermode `danger`, dan menuntut capability `instance:admin` yang opt-in —
+  // bukan GLOBAL_READ, bukan `settings:write`. Sisi lain tetap dikunci: tool baca tak pernah memasang.
+  it("satu-satunya tool yang memasang pembaruan menuntut instance:admin dan bermode danger", () => {
+    const writers = MCP_TOOLS.filter((t) => t.samplePath.startsWith("/update") && t.sampleMethod !== "GET");
+    expect(writers.map((t) => t.name)).toEqual(["hanoman_update_apply"]);
+    expect(writers[0]!.capability).toBe("instance:admin");
+    expect(writers[0]!.mode).toBe("danger");
+    expect(MCP_TOOLS.find((t) => t.name === "hanoman_update_status")!.sampleMethod).toBe("GET");
   });
 });

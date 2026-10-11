@@ -113,6 +113,8 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 | `skills` | `/api/skills*` | skill global hanoman, user, plugin (baca-saja) & per project, termasuk isi berkasnya — **`skills:write` pada skill global hanoman mengubah instruksi SETIAP sesi baru di semua project** |
 | `telegram` | `/api/telegram*` kecuali sub-path kredensial | context/memory/reply/audit kanal operator Telegram (ADR-0096) |
 | `team` | `/api/tasks*`, `/api/members*` | papan **Tim**: kartu kerja MANUSIA & direktori anggota (ADR-0157). `status` kartu milik manusia — ia **bukan** `stage` backlog. `POST /api/tasks/:id/escalate` melahirkan backlog item dan tetap `team:write` (cermin `POST /api/tickets/:id/accept`) |
+| `sync` | `GET /api/sync/{conflicts,pending}`, `POST /api/sync/now`, `POST /api/sync/conflicts/:entity/:recordId/resolve` | **hanya tiga permukaan UI sync** (ADR-0199): antrean konflik & hapus-tertunda (`sync:read`), pemicu sync manual (`sync:write`), memutuskan konflik (`sync:resolve`, akses `danger` — **membuang data satu sisi tanpa jalan pulang**, tak diimplikasikan `sync:write`). Kanal mesin-ke-mesin (`/api/sync/{pull,bootstrap,push,logs,attachments,qa-attachments,ws,relay}`) tetap bukan milik agen — lihat §5 |
+| `instance` | `POST /api/update/apply`, `POST /api/restart` | satu capability `instance:admin` (akses `danger`, ADR-0200): memasang versi hanoman terbaru dari registry npm dan me-**restart** proses server. Hanya sah bila instance punya supervisor (`canApply` di `GET /api/update`); wajib `{ "confirm": true }` dan balasan 202 dikirim **sebelum** proses keluar |
 
 ## 4. Aturan gate & kode status
 
@@ -136,7 +138,13 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
 
 - `/api/auth/*` — kelola user & password
 - `/api/agent-tokens*` — agen tak boleh mencetak/menaikkan token sendiri
-- `/api/device-tokens*`, `/api/sync*` — identitas mesin & sync hub
+- `/api/device-tokens*`, `/api/sync*` — identitas mesin & sync hub. **Pengecualian sempit (ADR-0199):**
+  tiga permukaan UI sync (`GET /api/sync/conflicts`, `GET /api/sync/pending`, `POST /api/sync/now`) dan
+  `POST /api/sync/conflicts/:entity/:recordId/resolve` terbuka lewat domain `sync` (§3). SEMUA sisanya
+  — `/api/sync/{pull,bootstrap,push,logs,attachments,qa-attachments,ws,relay/ws}` — adalah kanal
+  mesin-ke-mesin ber-**Bearer device-token** yang ditegakkan route-nya sendiri; agent token bukan
+  device token, dan membungkusnya berarti menyerahkan kredensial mesin ke agen. `POST /api/ws-tickets`
+  (tiket WebSocket sekali-pakai untuk sesi cookie) juga cookie-only
 - `/api/webhooks*` — memegang secret penandatanganan **dan** menentukan ke mana data workspace
   mengalir keluar (ADR-0100)
 - `/api/telegram/settings`, `/api/telegram/test`, `/api/telegram/credentials` — permukaan
@@ -164,13 +172,16 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
   mesin mana", dan agen yang bisa membacanya atau memendekkan retensinya bisa menyembunyikan atau
   memalsukan seluruh jejak sesi. Cookie-only apa pun method-nya — beda dari `POST /api/sync/logs`
   (pengiriman batch **dari** klien), yang tetap device-token seperti jalur sync lain
-- `POST /api/update/apply` dan tulis lain di bawah prefix status (`/api/limits`, `/api/update`,
-  `/api/events`, `/api/fs`, `/api/health`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya
-  cookie-only
+- Tulis lain di bawah prefix status (`/api/limits`, `/api/update`, `/api/events`, `/api/fs`,
+  `/api/health`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya cookie-only. Satu-satunya
+  pengecualian (ADR-0200): `POST /api/update/apply` dan `POST /api/restart` lewat capability danger
+  `instance:admin` (§3), tidak lewat capability lain
 
 Route yang tak dikenal peta juga **default cookie-only** (aman): endpoint baru tak pernah terbuka
 karena kelalaian. Endpoint `/api/help*` (Help Center publik) punya otorisasi sendiri (kunci tiket)
-dan tak memakai agent token.
+dan tak memakai agent token: ia anonim by design (honeypot + rate-limit dirancang untuk manusia
+pelapor), jadi **tak ada tool MCP** untuknya (ADR-0201) — operator membaca tiket lewat
+`hanoman_tickets_list`/`hanoman_ticket_get` dan URL publik lewat `hanoman_help_center_get`.
 
 ## 6. Endpoint yang paling sering dipakai
 
@@ -250,6 +261,8 @@ capability-nya. Capability menjawab "boleh?", bukan "sebaiknya?".
 | `POST /api/terminal/sessions` | melahirkan proses agen `--dangerously-skip-permissions` di sebuah worktree — **RCE efektif**. Batas satu-satunya adalah isolasi git worktree (ADR-0037). |
 | `POST`/`PUT`/`DELETE` di bawah `/api/vps` | **remote exec** di server produksi. |
 | `POST /api/lead/decisions` | putusannya bisa **menggerakkan sesi** (integrate ke main, menghentikan sesi) dan selalu melahirkan baris jejak permanen (ADR-0091/0098). |
+| `POST /api/update/apply`, `POST /api/restart` | memasang paket npm dan **me-restart server** (ADR-0200): dashboard & koneksi MCP putus beberapa detik; pane tmux selamat. Selalu `confirm: false` dulu untuk membaca jumlah sesi hidup. |
+| `POST /api/sync/conflicts/:entity/:recordId/resolve` | **membuang data satu sisi** (lokal atau hub) tanpa jalan pulang (ADR-0199). Baca `differs` dari `hanoman_sync_conflicts` dulu. |
 
 Perlakukan `POST /api/specs/:id/integrate`, `DELETE /api/specs/:id`, dan perubahan `stage` dengan
 disiplin yang sama: ketiganya mengubah sejarah git atau membuang pekerjaan. `POST /api/specs/:id/done`
@@ -433,6 +446,11 @@ Panduan siap salin untuk keempat klien, berikut tabel tool → capability, ada d
 | `hanoman_backlog_create`, `hanoman_backlog_update` | tulis | `backlog:write` |
 | `hanoman_notifications_mark_read` | tulis | `notifications:write` |
 | `hanoman_lead_ask` | tulis | `lead:write` |
+| `hanoman_sync_conflicts`, `hanoman_sync_pending` | baca | `sync:read` |
+| `hanoman_sync_now` | tulis | `sync:write` |
+| `hanoman_sync_conflict_resolve` | **danger** | `sync:resolve` |
+| `hanoman_update_apply`, `hanoman_instance_restart` | **danger** | `instance:admin` |
+| `hanoman_agent_guide` | baca | — (membaca halaman ini lewat `GET /api/agent-integration.md`, publik) |
 
 ### Yang sengaja TIDAK tersedia lewat MCP
 

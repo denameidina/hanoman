@@ -16,8 +16,17 @@ function routeInventory(): { method: string; path: string }[] {
   const out: { method: string; path: string }[] = [];
   for (const f of readdirSync(ROUTES_DIR).filter((x) => x.endsWith(".ts"))) {
     const src = readFileSync(join(ROUTES_DIR, f), "utf8");
-    for (const m of src.matchAll(/^\s*app\.(get|post|patch|put|delete)\(\s*"([^"]+)"/gm))
+    // ADR-0199 · regex LAMA hanya mengenal receiver `app.`, jadi route di scope bersarang
+    // (`logs.post("/sync/logs")`, `qb.get|put("/sync/qa-attachments/:id")` di sync.ts) tak pernah
+    // masuk inventaris. Receiver apa pun boleh, tetapi path WAJIB berawalan "/" — itu yang
+    // membedakan route dari `map.get("kunci")`.
+    for (const m of src.matchAll(/^\s*[A-Za-z_$][\w$]*\.(get|post|patch|put|delete)\(\s*"(\/[^"]*)"/gm))
       out.push({ method: m[1]!.toUpperCase(), path: m[2]! });
+    // `app.route({ method, url })` (devices-relay.ts). Method literal → satu entri; array/identifier
+    // (mis. `NON_GET_METHODS`) tak bisa dibaca statis → semua method bermutasi, supaya tak ada yang lolos.
+    for (const m of src.matchAll(/\.route\(\{\s*method:\s*(?:"(\w+)"|[^,]+),\s*url:\s*"([^"]+)"/g))
+      for (const method of m[1] ? [m[1].toUpperCase()] : ["POST", "PUT", "PATCH", "DELETE"])
+        out.push({ method, path: m[2]! });
   }
   return out;
 }
@@ -56,6 +65,26 @@ const UNWRAPPED = new Map<string, string>([
   ["POST /projects/:pid/qa/reports/:rid/cases/import", "multipart (XLSX/CSV)"],
   ["GET /qa/template.md", "unduhan template untuk manusia"],
   ["GET /qa/template.xlsx", "biner (template Excel untuk manusia), sama dengan template.md"],
+  // ADR-0199 §3 · kanal sync MESIN-KE-MESIN. Semuanya COOKIE_ONLY di peta capability (jadi gerbang
+  // di atas tak menuntutnya), dan dicatat di sini supaya alasannya terbaca: auth-nya Bearer
+  // DEVICE-TOKEN (atau tiket WS) yang ditegakkan route-nya sendiri. Agent token BUKAN device token —
+  // membungkusnya berarti mengeluarkan kredensial mesin ke agen, atau tool yang pasti 401. Yang
+  // dibungkus hanya tiga permukaan UI sync (now/conflicts/pending → hanoman_sync_*).
+  ["GET /sync/pull", "mesin-ke-mesin: Bearer device-token, bukan permukaan agen (ADR-0199)"],
+  ["GET /sync/bootstrap", "mesin-ke-mesin: Bearer device-token (ADR-0199)"],
+  ["POST /sync/push", "mesin-ke-mesin: Bearer device-token (ADR-0199)"],
+  ["POST /sync/logs", "mesin-ke-mesin: Bearer device-token, gzip (ADR-0199)"],
+  ["GET /sync/attachments/:storageKey", "mesin-ke-mesin: Bearer device-token + biner (ADR-0199)"],
+  ["GET /sync/qa-attachments/:id", "mesin-ke-mesin: Bearer device-token + biner (ADR-0199)"],
+  ["PUT /sync/qa-attachments/:id", "mesin-ke-mesin: Bearer device-token + biner (ADR-0199)"],
+  ["GET /sync/ws", "WebSocket mesin-ke-mesin, Bearer device-token (ADR-0199)"],
+  ["GET /sync/relay/ws", "WebSocket relay mesin-ke-mesin, Bearer device-token (ADR-0199)"],
+  ["POST /ws-tickets", "menerbitkan tiket WebSocket sekali-pakai untuk sesi cookie; tiket = kredensial, bukan data (ADR-0199)"],
+  // ADR-0201 · Help Center publik: ANONIM by design, bypass gerbang /api (app.ts), dan tak pernah
+  // memegang capability — tool apa pun di atasnya tak menambah akses, hanya menambah jalur masuk.
+  ["GET /help/:slug", "publik anonim; operator memakai hanoman_help_center_get (ADR-0201)"],
+  ["POST /help/:slug/tickets", "publik anonim + honeypot + rate-limit untuk MANUSIA; agen yang mengirim = membanjiri jalur anonim (ADR-0201)"],
+  ["GET /help/:slug/tickets/:key", "publik anonim, otorisasi kunci opaque pelapor; status mentah tiket sudah terbaca operator lewat hanoman_ticket_get/support:read (ADR-0201)"],
 ]);
 
 // Route yang TERCAKUP tool bercabang. Tool semacam itu memilih endpoint menurut argumen (isi `q` →
@@ -85,6 +114,11 @@ describe("cakupan katalog MCP", () => {
     expect(inv.length).toBeGreaterThan(200);
     expect(inv).toContainEqual({ method: "GET", path: "/specs" });
     expect(inv).toContainEqual({ method: "POST", path: "/terminal/sessions" });
+    // ADR-0199 · bentuk yang DULU lolos dari regex: receiver bersarang (`logs.`, `qb.`) dan `.route({...})`.
+    expect(inv).toContainEqual({ method: "POST", path: "/sync/logs" });
+    expect(inv).toContainEqual({ method: "PUT", path: "/sync/qa-attachments/:id" });
+    expect(inv).toContainEqual({ method: "GET", path: "/devices/:deviceId/relay/*" });
+    expect(inv).toContainEqual({ method: "DELETE", path: "/devices/:deviceId/relay/*" });
   });
 
   it("setiap route yang TERJANGKAU agent token punya tool, atau terdaftar dikecualikan", () => {

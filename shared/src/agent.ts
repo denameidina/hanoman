@@ -39,13 +39,17 @@ export const CAPABILITY_IDS = [
   // `:write` TIDAK mengimplikasikannya (lihat grantsCapability di bawah): kalau diimplikasikan,
   // pemecahan ini kosmetik dan tak menghasilkan batas apa pun.
   "sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec",
+  // ADR-0199 · ADR-0200 · sync UI (antrean konflik, pemicu manual) dan operasi instance (pasang
+  // pembaruan, restart). Opt-in, tak diimplikasikan capability lama mana pun. `sync:resolve`
+  // membuang data satu sisi; `instance:admin` memasang paket npm dan me-restart proses.
+  "sync:read", "sync:write", "sync:resolve", "instance:admin",
 ] as const;
 export const zCapability = z.enum(CAPABILITY_IDS);
 export type Capability = z.infer<typeof zCapability>;
 
 export const zCapabilityInfo = z.object({
   id: zCapability, domain: z.string(), access: z.enum(["read", "write", "danger"]),
-  label: z.string(), desc: z.string(), risk: z.enum(["rce", "exec"]).optional(),
+  label: z.string(), desc: z.string(), risk: z.enum(["rce", "exec", "data"]).optional(),
 });
 export type CapabilityInfo = z.infer<typeof zCapabilityInfo>;
 
@@ -87,6 +91,11 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "ide:git", domain: "ide", access: "danger", label: "IDE/Git — operasi git", desc: "merge, rebase, pull, drop, hapus branch, hapus worktree. Mengubah sejarah dan menghapus pekerjaan yang tak dipegang berkas mana pun; dipisah dari menulis berkas working tree.", risk: "exec" },
   { id: "backlog:lifecycle", domain: "backlog", access: "danger", label: "Backlog — siklus hidup", desc: "Integrate, hapus backlog, dan geser stage. Ketiganya menghapus artefak dokumen; dipisah dari menyunting isi backlog.", risk: "exec" },
   { id: "vps:exec", domain: "vps", access: "danger", label: "VPS — remote exec", desc: "console, session, provision, harden, remediate, probe, test, audit. Menjalankan perintah di VPS produksi; dipisah dari mengelola daftar VPS & checklist kepatuhan.", risk: "exec" },
+  // ADR-0199 · ADR-0200 · sync UI & operasi instance. Opt-in: tak ikut default dan tak diwarisi capability lama.
+  { id: "sync:read", domain: "sync", access: "read", label: "Sync — baca", desc: "Lihat antrean konflik rekonsil dan penghapusan yang belum menyeberang ke hub." },
+  { id: "sync:write", domain: "sync", access: "write", label: "Sync — jalankan", desc: "Picu siklus sync manual ke hub (termasuk tarik ulang penuh dari kursor 0). Tidak termasuk memutuskan konflik." },
+  { id: "sync:resolve", domain: "sync", access: "danger", label: "Sync — putuskan konflik", desc: "Memilih sisi lokal atau hub untuk sebuah konflik rekonsil; sisi yang kalah DIBUANG tanpa jalan pulang. Dipisah dari Sync — jalankan.", risk: "data" },
+  { id: "instance:admin", domain: "instance", access: "danger", label: "Instance — pasang pembaruan & restart", desc: "Memasang versi hanoman terbaru dari registry npm dan me-restart proses server (koneksi terputus sesaat; sesi tmux selamat). Hanya sah bila instance punya supervisor.", risk: "exec" },
 ];
 
 // SPEC-264 · Metadata per-domain untuk grid capability di Settings (label ramah + cakupan).
@@ -109,6 +118,8 @@ export const CAPABILITY_DOMAINS: { domain: string; label: string; desc: string }
   { domain: "telegram", label: "Telegram", desc: "Status, binding, memory, reply, dan audit kanal operator Telegram." },
   { domain: "team", label: "Tim", desc: "Kartu papan Tim (kerja manusia), direktori anggota, eskalasi kartu ke backlog." },
   { domain: "qa", label: "QA", desc: "Laporan QA per project: test case, temuan, lampiran, ekspor/impor." },
+  { domain: "sync", label: "Sync", desc: "Antrean konflik rekonsil, penghapusan tertunda, pemicu sync manual ke hub." },
+  { domain: "instance", label: "Instance", desc: "Pasang pembaruan hanoman dan restart proses server." },
 ];
 
 // write meng-implikasikan read pada domain yang sama.

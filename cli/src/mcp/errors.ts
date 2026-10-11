@@ -76,6 +76,20 @@ export function explainHttpError(status: number, body: unknown, ctx: ErrorCtx): 
     return said ? `Tidak ditemukan: ${said}` : `Tidak ditemukan: ${ctx.method} ${ctx.path}.`;
 
   if (status === 409) {
+    // ADR-0200 · `POST /update/apply` & `POST /restart` menjawab 409 dengan KODE, dan bodinya memuat
+    // angka yang dibutuhkan keputusan manusia (sesi hidup, versi). Kalimat generik "Bentrok: …"
+    // membuangnya — padahal `confirm:false` ada justru untuk membaca angka itu.
+    if (said === "confirm-required") {
+      const b = body as { liveSessions?: number; from?: string; to?: string };
+      return `Belum dijalankan: ${ctx.method} ${ctx.path} butuh \`confirm: true\` dan TIDAK mengubah apa pun. `
+        + (typeof b.liveSessions === "number" ? `Sesi hidup saat ini: ${b.liveSessions} (pane tmux selamat dari restart, tapi koneksi sesi putus sesaat). ` : "")
+        + (b.from && b.to ? `Versi ${b.from} → ${b.to}. ` : "")
+        + "Ulangi dengan confirm: true HANYA bila manusia sudah menyetujui.";
+    }
+    if (said === "unsupervised")
+      return "Instance ini tidak berjalan di bawah supervisor (`hanoman start`), jadi tak ada yang akan menghidupkannya lagi setelah keluar — restart/pembaruan ditolak dan proses TIDAK berhenti. Manusia harus menjalankan `hanoman update` / memulai ulang dari terminal.";
+    if (said === "up-to-date")
+      return "Sudah versi terbaru — tak ada yang dipasang dan proses TIDAK di-restart.";
     if (isLead)
       return `hanoman-lead tidak aktif untuk permintaan ini (lead mati, dijeda, atau proyeknya belum opt-in). Kembali ke perilaku biasa: berhenti dan tunggu manusia. ${said ?? ""}`.trim();
     if (ctx.toolName === "hanoman_backlog_update")

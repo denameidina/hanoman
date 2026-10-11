@@ -40,7 +40,9 @@ describe("katalog tool MCP", () => {
 
   it("tak ada tool yang menyentuh route cookie-only", () => {
     for (const t of MCP_TOOLS)
-      expect(t.samplePath, t.name).not.toMatch(/^\/(auth|agent-tokens|device-tokens|sync)\b/);
+      // ADR-0199 · `sync` dibelah: tiga permukaan UI (now/conflicts/pending) kini punya tool; yang
+      // tetap terlarang adalah kanal mesin-ke-mesin ber-device-token.
+      expect(t.samplePath, t.name).not.toMatch(/^\/(auth|agent-tokens|device-tokens|sync\/(pull|bootstrap|push|logs|attachments|qa-attachments|ws|relay))\b/);
   });
 
   it("setiap tool punya deskripsi yang menyebut apa yang dikembalikan", () => {
@@ -203,7 +205,7 @@ describe("tingkat mode", () => {
 // dijaga adalah INVARIANNYA. Dua arah dikunci, dan arah kedua yang paling mudah lolos: sebuah tool
 // bisa bermode `danger` sambil menuntut capability yang lemah, dan tak ada yang menyadarinya sampai
 // seseorang memakainya.
-const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"]);
+const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "sync:resolve", "instance:admin"]);
 
 // Tool DESTRUKTIF yang capability-nya tetap `:write` — bukan karena ringan, melainkan karena tak
 // ada capability `danger` di domainnya. Mode `danger`-nya murni ergonomi (mencegah salah pilih),

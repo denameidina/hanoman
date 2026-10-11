@@ -492,6 +492,13 @@ Pakai skill lebih sempit saat task cocok:
   *(default)* (129) → `--danger` (165); yang lebih sempit **menghilangkan** tool, bukan menolaknya
   saat dipanggil, dan yang lebih sempit selalu menang. Tingkat itu **BUKAN kontrol keamanan** —
   ia mencegah salah pilih; yang menahan sungguhan adalah capability pada token.
+  **ADR-0199/0200/0201** menambah empat capability opt-in: `sync:read|write` + `sync:resolve` (danger;
+  hanya tiga permukaan UI sync — `now`, `conflicts`, `pending` — sedangkan kanal mesin-ke-mesin
+  ber-device-token dan `POST /ws-tickets` tetap cookie-only) dan `instance:admin` (danger;
+  `POST /update/apply` + `POST /restart`, wajib `confirm`, balasan 202 dikirim SEBELUM proses keluar via
+  `afterReplyFlushed`). Tool baru: `hanoman_sync_*`, `hanoman_update_apply`, `hanoman_instance_restart`,
+  `hanoman_agent_guide` (baca `GET /agent-integration.md` berpotongan). Help Center publik `/help/*`
+  sengaja TANPA tool (anonim by design).
   **Yang tetap di luar katalog, dan alasannya:** empat route kredensial Telegram (ADR-0097), tiga
   route dialog sesi (SPEC-899 — agen yang bisa menjawab `AskUserQuestion` bisa menjawab
   pertanyaannya sendiri), enam route `scheduler/crons` (ADR-0112 — cron adalah

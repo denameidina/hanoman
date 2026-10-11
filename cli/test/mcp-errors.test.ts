@@ -102,6 +102,30 @@ describe("explainHttpError", () => {
     expect(msg).toContain("editable");
   });
 
+  // ADR-0200 · 409 dengan KODE pada update/restart: angka di body (sesi hidup, versi) adalah alasan
+  // `confirm:false` ada, dan kalimat generik "Bentrok: …" akan membuangnya.
+  it("409 confirm-required pada update/restart menyebut sesi hidup, versi, dan bahwa tak ada yang berubah", () => {
+    const msg = explainHttpError(
+      409, { error: "confirm-required", liveSessions: 3, from: "0.9.20", to: "0.9.21" },
+      ctx({ method: "POST", path: "/update/apply", toolName: "hanoman_update_apply" }),
+    );
+    expect(msg).toContain("confirm: true");
+    expect(msg).toContain("3");
+    expect(msg).toContain("0.9.20 → 0.9.21");
+    expect(msg).toMatch(/TIDAK mengubah/);
+    const rs = explainHttpError(409, { error: "confirm-required", liveSessions: 0 },
+      ctx({ method: "POST", path: "/restart", toolName: "hanoman_instance_restart" }));
+    expect(rs).toContain("0");
+    expect(rs).not.toContain("undefined");
+  });
+
+  it("409 unsupervised / up-to-date dijelaskan sebagai 'proses tidak berhenti'", () => {
+    expect(explainHttpError(409, { error: "unsupervised" }, ctx({ method: "POST", path: "/restart" })))
+      .toMatch(/supervisor.*TIDAK berhenti/s);
+    expect(explainHttpError(409, { error: "up-to-date" }, ctx({ method: "POST", path: "/update/apply" })))
+      .toMatch(/TIDAK di-restart/);
+  });
+
   it("409 pada lead menyuruh kembali menunggu manusia", () => {
     const msg = explainHttpError(409, { error: "lead tak aktif" }, ctx({ method: "POST", path: "/lead/decisions", toolName: "hanoman_lead_ask" }));
     expect(msg).toMatch(/tunggu manusia|menunggu manusia/);

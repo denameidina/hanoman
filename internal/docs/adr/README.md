@@ -174,4 +174,7 @@ setiap sesi agen, riwayat ADR hanya saat seseorang butuh alasannya.
 - [0002 — Isolasi run dengan git worktree](0002-git-worktree-isolation.md)
 - [0001 — Docs sebagai Source of Truth](0001-docs-as-source-of-truth.md) — *superseded by 0023*
 
+- [0199 — Permukaan UI sync lewat capability `sync:read|write|resolve`](0199-sync-ui-capability-sync.md) — mengamandemen 0066/0067/0119; kanal mesin-ke-mesin tetap cookie-only.
+- [0200 — `instance:admin`: pasang pembaruan & restart lewat agent token](0200-instance-admin-update-restart.md) — mengamandemen SPEC-405/0088; balasan dikirim sebelum proses mati.
+- [0201 — Help Center publik anonim tidak dibungkus tool MCP](0201-help-center-publik-tanpa-tool-mcp.md)
 - [0182 — Hapus memori project dan changelog](0182-hapus-memori-project-dan-changelog.md) — penghapusan fitur dan data atas permintaan pengguna; menggantikan 0105 (changelog), 0178/0179/0181, dan bagian memori 0180.

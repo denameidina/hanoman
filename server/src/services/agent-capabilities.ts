@@ -45,6 +45,26 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // (preseden `remote-control`).
   // SPEC-1217 · `logs` memaparkan lajur event/server/transcript SELURUH mesin operator (LogEntry
   // lintas device) — preseden `presence`: tak ada capability yang berarti apa pun untuk itu.
+  // ADR-0199 · `sync` DIBELAH: tiga permukaan UI (pemicu manual, antrean konflik, hapus-tertunda)
+  // dibuka lewat capability `sync:*` yang opt-in; SEMUA sisanya — pull/bootstrap/push/logs/
+  // attachments/qa-attachments/ws/relay/ws — tetap COOKIE_ONLY. Itu kanal mesin-ke-mesin ber-Bearer
+  // DEVICE-TOKEN (route-nya sendiri yang menegakkan, app.ts mem-bypass gate cookie untuknya);
+  // agent token bukan device token, dan membungkusnya berarti menyerahkan device-token ke agen.
+  // Dicocokkan ke PANJANG segmen + method PERSIS, bukan prefix (kelas bug SPEC-405).
+  if (top === "sync") {
+    if (method === "POST" && seg.length === 2 && seg[1] === "now") return "sync:write";
+    if (read && seg.length === 2 && (seg[1] === "conflicts" || seg[1] === "pending")) return "sync:read";
+    // Memilih sisi pemenang MEMBUANG sisi yang kalah — capability danger tersendiri, bukan `sync:write`.
+    if (method === "POST" && seg.length === 5 && seg[1] === "conflicts" && seg[4] === "resolve") return "sync:resolve";
+    return "COOKIE_ONLY";
+  }
+  // ADR-0200 · memasang pembaruan & me-restart instance: capability danger tersendiri. Dicocokkan ke
+  // method + panjang segmen — `GET /update` tetap GLOBAL_READ (status), `POST /update/apply` dan
+  // `POST /restart` menuntut `instance:admin`, sisanya cookie-only.
+  if (!read && top === "update" && seg.length === 2 && seg[1] === "apply") return "instance:admin";
+  if (top === "restart") return !read && seg.length === 1 ? "instance:admin" : "COOKIE_ONLY";
+  // ADR-0200 · panduan agen: PUBLIK (app.ts PUBLIC) — dipetakan agar tool baca-nya sah tanpa capability.
+  if (top === "agent-integration.md") return read ? "GLOBAL_READ" : "COOKIE_ONLY";
   if (top === "auth" || top === "agent-tokens" || top === "device-tokens" || top === "sync"
     || top === "presence" || top === "models" || top === "remote-control" || top === "logs"
     || top === "portal" || top === "client-accounts" || top === "session-events"

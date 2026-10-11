@@ -112,10 +112,21 @@ describe("status global read-only tak boleh tembus lewat method tulis (SPEC-405 
     expect(capabilityForRoute("GET", "/api/update")).toBe("GLOBAL_READ");
     expect(checkAgentCapability([], "GET", "/api/update")).toEqual({ ok: true });
   });
-  it("POST /api/update/apply DITOLAK — bahkan untuk token ber-capability penuh", () => {
-    expect(capabilityForRoute("POST", "/api/update/apply")).toBe("COOKIE_ONLY");
-    const caps = ["backlog:write", "sessions:write", "settings:write", "projects:write"];
-    expect(checkAgentCapability(caps, "POST", "/api/update/apply")).toMatchObject({ ok: false, status: 403 });
+  // ADR-0200 · membalik bagian SPEC-405: `POST /update/apply` kini terjangkau agent token, TAPI hanya
+  // lewat capability danger `instance:admin` — capability lain (termasuk yang paling berkuasa) tetap ditolak.
+  it("POST /api/update/apply menuntut instance:admin — capability lain TIDAK cukup", () => {
+    expect(capabilityForRoute("POST", "/api/update/apply")).toBe("instance:admin");
+    const caps = ["backlog:write", "sessions:write", "sessions:spawn", "settings:write", "projects:write", "vps:exec", "ide:git"];
+    expect(checkAgentCapability(caps, "POST", "/api/update/apply")).toMatchObject({ ok: false, status: 403, need: "instance:admin" });
+    expect(checkAgentCapability(["instance:admin"], "POST", "/api/update/apply")).toEqual({ ok: true });
+  });
+  it("POST /api/restart menuntut instance:admin; metode lain & sub-path tetap cookie-only", () => {
+    expect(capabilityForRoute("POST", "/api/restart")).toBe("instance:admin");
+    expect(capabilityForRoute("GET", "/api/restart")).toBe("COOKIE_ONLY");
+    expect(capabilityForRoute("POST", "/api/restart/now")).toBe("COOKIE_ONLY");
+    expect(capabilityForRoute("GET", "/api/update/apply")).toBe("GLOBAL_READ");   // method baca tetap status (kelas SPEC-405 tertutup di sisi sebaliknya)
+    expect(capabilityForRoute("POST", "/api/update")).toBe("COOKIE_ONLY");
+    expect(checkAgentCapability(["instance:admin"], "GET", "/api/restart")).toMatchObject({ ok: false, reason: "cookie-only" });
   });
   it("prefix status lain ikut: POST /api/limits & /api/health ditolak", () => {
     expect(capabilityForRoute("POST", "/api/limits")).toBe("COOKIE_ONLY");
@@ -247,5 +258,58 @@ describe("route berbahaya pindah ke capability danger", () => {
     expect(checkAgentCapability(["ide:git"], "POST", "/api/projects/p/git/merge").ok).toBe(true);
     expect(checkAgentCapability(["vps:exec"], "POST", "/api/vps/v1/console").ok).toBe(true);
     expect(checkAgentCapability(["backlog:lifecycle"], "DELETE", "/api/specs/SPEC-1").ok).toBe(true);
+  });
+});
+
+// ADR-0199 · `sync` DIBELAH. Tiga permukaan UI dibuka lewat capability opt-in; kanal mesin-ke-mesin
+// (device-token) TETAP cookie-only. Dicocokkan ke method + PANJANG segmen, jadi tetangga sepasang
+// (pull/push/logs/ws…) tak ikut terseret — kelas bug SPEC-405 untuk prefix.
+describe("sync UI = capability sync:*, kanal mesin-ke-mesin tetap cookie-only (ADR-0199)", () => {
+  it("tiga permukaan UI dipetakan menurut method", () => {
+    expect(capabilityForRoute("POST", "/api/sync/now")).toBe("sync:write");
+    expect(capabilityForRoute("GET", "/api/sync/conflicts")).toBe("sync:read");
+    expect(capabilityForRoute("GET", "/api/sync/pending")).toBe("sync:read");
+    expect(capabilityForRoute("POST", "/api/sync/conflicts/spec/SPEC-1/resolve")).toBe("sync:resolve");
+  });
+
+  it("method/segmen yang menyimpang jatuh ke cookie-only, bukan ke capability tetangganya", () => {
+    expect(capabilityForRoute("GET", "/api/sync/now")).toBe("COOKIE_ONLY");
+    expect(capabilityForRoute("POST", "/api/sync/pending")).toBe("COOKIE_ONLY");
+    expect(capabilityForRoute("POST", "/api/sync/conflicts")).toBe("COOKIE_ONLY");
+    expect(capabilityForRoute("GET", "/api/sync/conflicts/spec/SPEC-1/resolve")).toBe("COOKIE_ONLY");
+    expect(capabilityForRoute("POST", "/api/sync/conflicts/spec/SPEC-1")).toBe("COOKIE_ONLY");
+    expect(capabilityForRoute("GET", "/api/sync")).toBe("COOKIE_ONLY");
+  });
+
+  it("kanal mesin-ke-mesin & tiket WS TIDAK terjangkau capability apa pun", () => {
+    const all = ["sync:read", "sync:write", "sync:resolve", "instance:admin", "settings:write", "projects:write"];
+    for (const [m, p] of [
+      ["GET", "/api/sync/pull"], ["GET", "/api/sync/bootstrap"], ["POST", "/api/sync/push"],
+      ["POST", "/api/sync/logs"], ["GET", "/api/sync/attachments/k"], ["GET", "/api/sync/qa-attachments/i"],
+      ["PUT", "/api/sync/qa-attachments/i"], ["GET", "/api/sync/ws"], ["GET", "/api/sync/relay/ws"],
+      ["POST", "/api/ws-tickets"],
+    ] as const) {
+      expect(checkAgentCapability(all, m, p), `${m} ${p}`).toMatchObject({ ok: false, status: 403, reason: "cookie-only" });
+    }
+  });
+
+  it("sync:write TIDAK memutuskan konflik, dan sync:resolve TIDAK membaca antrean", () => {
+    expect(checkAgentCapability(["sync:write"], "POST", "/api/sync/conflicts/spec/SPEC-1/resolve"))
+      .toMatchObject({ ok: false, status: 403, need: "sync:resolve" });
+    expect(checkAgentCapability(["sync:resolve"], "GET", "/api/sync/conflicts"))
+      .toMatchObject({ ok: false, status: 403, need: "sync:read" });
+    expect(checkAgentCapability(["sync:write"], "GET", "/api/sync/conflicts").ok).toBe(true);   // write ⊇ read
+    expect(checkAgentCapability(["sync:read"], "POST", "/api/sync/now"))
+      .toMatchObject({ ok: false, status: 403, need: "sync:write" });
+  });
+
+  it("panduan agen publik dipetakan GLOBAL_READ hanya untuk method baca", () => {
+    expect(capabilityForRoute("GET", "/api/agent-integration.md")).toBe("GLOBAL_READ");
+    expect(capabilityForRoute("POST", "/api/agent-integration.md")).toBe("COOKIE_ONLY");
+  });
+
+  it("Help Center publik tak mendapat capability: bypass gerbang, bukan domain agen (ADR-0201)", () => {
+    expect(capabilityForRoute("GET", "/api/help/p1")).toBeNull();
+    expect(capabilityForRoute("POST", "/api/help/p1/tickets")).toBeNull();
   });
 });

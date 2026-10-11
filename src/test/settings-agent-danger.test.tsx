@@ -46,7 +46,7 @@ describe("grid capability — kolom berbahaya", () => {
     render(<AgentAccessPanel />);
     await screen.findByText((t, el) => el?.tagName === "DIV" && t === "berbahaya");
     const danger = CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id);
-    expect(danger).toHaveLength(4);
+    expect(danger).toHaveLength(6);   // ADR-0199 · +sync:resolve, +instance:admin
     expect(screen.queryByLabelText("docs:danger")).toBeNull();
     expect(screen.queryByLabelText("support:danger")).toBeNull();
   });
