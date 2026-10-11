@@ -11,7 +11,7 @@ import { PET_HIDDEN_KEY, PET_ROAM_KEY } from "../src/screens/pet-state";
 import { PET_MANIFEST, durationMs, rowIndex } from "../src/screens/pet-sprite";
 import { LANE_MARGIN, homeX } from "../src/screens/pet-walk";
 import { PET_SPEECH_MS } from "../src/screens/pet-speech";
-import { MOBILE_QUERY } from "../src/ds/responsive";
+import { MOBILE_QUERY, TABLET_QUERY } from "../src/ds/responsive";
 
 // Status koneksi datang dari socket `events` yang sudah ada; test mendorongnya lewat `h.status`.
 const h = vi.hoisted(() => ({ status: { connected: true, since: 0, paused: false } }));
@@ -272,6 +272,8 @@ describe("HanomanPet (sprite)", () => {
   it("di tier mobile pet 96 px, selalu diam di pojok, dan toggle berkeliaran disembunyikan", () => {
     mockMatchMedia((q) => q === MOBILE_QUERY);
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    // Lajur ponsel mulai sebagai chip; sprite baru ada setelah dibangkitkan.
+    fireEvent.click(screen.getByRole("button", { name: "Tampilkan pet Hanoman" }));
     const scale = 96 / PET_MANIFEST.character.h;
     const cellW = Math.round(PET_MANIFEST.cell.w * scale);
     expect(screen.getByTestId("pet-viewport")).toHaveStyle({ width: `${cellW}px` });
@@ -982,5 +984,60 @@ describe("HanomanPet — pet diseret (SPEC-905)", () => {
     pointer(hit(), "pointerup", 460, 460);
     expect(rowshift()).toHaveAttribute("data-row", "idle");
     expect(actor()).toHaveStyle({ transform: `translate(${HOME - 40}px, 0px)`, transition: "none" });
+  });
+});
+
+describe("HanomanPet — lajur tablet dan ponsel (chip 56 px, overlay sementara)", () => {
+  const chip = () => screen.getByRole("button", { name: "Tampilkan pet Hanoman" });
+
+  it.each([["tablet", TABLET_QUERY], ["ponsel", MOBILE_QUERY]])("%s: mulai sebagai chip 44 px di lajur 56 px, tanpa sprite", (_, query) => {
+    mockMatchMedia((q) => q === query);
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    expect(laneOf()).toHaveStyle({ height: "56px" });
+    expect(screen.queryByTestId("pet-actor")).toBeNull();
+    expect(chip()).toHaveStyle({ width: "44px", height: "44px", bottom: "6px" });
+  });
+
+  it("dibangkitkan: sprite tampil di atas lajur, lajur tetap 56 px, dan pilihan tak disimpan", () => {
+    mockMatchMedia((q) => q === TABLET_QUERY);
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    fireEvent.click(chip());
+    expect(actor()).toBeInTheDocument();
+    expect(laneOf()).toHaveStyle({ height: "56px" });
+    expect(localStorage.getItem(PET_HIDDEN_KEY)).toBeNull();
+  });
+
+  it("Esc menutup overlay dan kembali ke chip", () => {
+    mockMatchMedia((q) => q === MOBILE_QUERY);
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    fireEvent.click(chip());
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByTestId("pet-actor")).toBeNull();
+    expect(chip()).toBeInTheDocument();
+  });
+
+  it("klik di luar lajur menutup overlay; klik pada pet sendiri tidak", () => {
+    mockMatchMedia((q) => q === TABLET_QUERY);
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    fireEvent.click(chip());
+    fireEvent.mouseDown(hit());
+    expect(actor()).toBeInTheDocument();
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByTestId("pet-actor")).toBeNull();
+  });
+
+  it("Esc saat panel terbuka menutup panel dulu; overlay bertahan sampai Esc berikutnya", () => {
+    mockMatchMedia((q) => q === MOBILE_QUERY);
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    fireEvent.click(chip());
+    fireEvent.click(hit());
+    expect(screen.getByTestId("pet-panel")).not.toHaveAttribute("aria-hidden");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.getByTestId("pet-panel")).toHaveAttribute("aria-hidden", "true");
+    expect(actor()).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByTestId("pet-actor")).toBeNull();
   });
 });

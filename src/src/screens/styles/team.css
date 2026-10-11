@@ -34,6 +34,13 @@
 .hn-tm-col[data-active] { border-style: dashed; }
 .hn-tm-col[data-hot] { background: var(--brass-100); border-color: var(--brass-500); }
 .hn-tm-col[data-dimmed] { opacity: 0.5; }
+/* Tablet (768–1199 px): empat kolom HARUS muat, tanpa kolom terakhir terpotong di luar layar. Di 820 px papan
+   selebar 708 px; 4 × 200 px + 3 × 8 px gap = 824 px meluap, dan "Selesai" terpotong tanpa penanda. Kolom di sini
+   berbagi lebar sama dengan minimum 150 px: 4 × 150 + 3 × 8 = 624 px muat di 656 px, lebar papan terkecil tablet
+   (768 − rail 72 − gutter 2 × 20). Desktop tetap basis 220 px. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .hn-tm-col { flex: 1 1 0; min-width: 150px; }
+}
 .hn-tm-col-head { display: flex; align-items: center; gap: var(--space-1); margin-bottom: var(--space-2); min-height: 20px; }
 .hn-tm-col-count { margin-left: auto; font: var(--weight-regular, 400) var(--text-2xs)/1 var(--font-mono); color: var(--text-subtle); }
 .hn-tm-col-body { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; flex: 1 1 auto; overflow-y: auto; }

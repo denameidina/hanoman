@@ -186,3 +186,26 @@ describe("topbar tablet: satu baris judul+alat, crumb dan judul tak membungkus",
     expect(tablet).toMatch(/\.hn-shell \.hn-shell-cmdk \.hn-kbd \{ display: none; \}/);
   });
 });
+
+// QA Chrome run4 · P2 desktop 1280: /review memuat select project + "Kembali" di baris judul, alat topbar membungkus
+// (avatar turun ke y=44) dan topbar jadi 79 px, sedangkan layar lain 56 px. Kontrak: alat tak pernah membungkus di tier
+// mana pun; yang menyusut adalah judul dan baris kedua, dengan elipsis.
+describe("topbar desktop: alat tak membungkus di tier mana pun, topbar tetap 56 px", () => {
+  const toolRules = [...css.matchAll(/^\s*\.hn-shell-tools \{([^}]*)\}/gm)].map((m) => m[1]);
+
+  it("aturan alat ada di tiap tier (desktop, tablet, ponsel)", () => {
+    expect(toolRules.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("tak satu pun aturan alat memuat flex-wrap: wrap", () => {
+    for (const rule of toolRules) expect(rule).not.toMatch(/flex-wrap:\s*wrap/);
+  });
+
+  it("bawaan desktop: alat nowrap dan tak menyusut (lebarnya isi), judul/baris kedua yang menyusut", () => {
+    expect(toolRules[0]).toMatch(/flex:\s*0 0 auto;/);
+    expect(toolRules[0]).toMatch(/flex-wrap:\s*nowrap;/);
+    expect(body(css, ".hn-shell-topbar")).not.toMatch(/flex-wrap:\s*wrap/);
+    expect(body(css, ".hn-shell-subrow")).toMatch(/min-width: 0;/);
+    expect(css).toMatch(/\.hn-shell-subrow > button \{ flex: 0 0 auto; white-space: nowrap; \}/);
+  });
+});

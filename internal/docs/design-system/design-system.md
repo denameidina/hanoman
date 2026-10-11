@@ -33,7 +33,9 @@ Primitive bersama:
   wajib membungkus konten yang punya lebar intrinsik: anak **blok** selalu selebar induknya, jadi
   scroller yang membungkusnya tak pernah punya konten lebih lebar untuk digulir (SPEC-879).
 - **Papan kolom** (`.hn-bl-board`, `.hn-tm-board`): kolom Backlog bertetap lebar (`flex: 0 0 248px`); kolom Tim
-  lentur (`flex: 1 1 220px; min-width: 200px`) agar empat kolom muat di 1280 tanpa terpotong. Kolom yang bertetap
+  lentur (`flex: 1 1 220px; min-width: 200px`) agar empat kolom muat di 1280 tanpa terpotong; di tablet (768–1199)
+  kolomnya berbagi lebar (`flex: 1 1 0; min-width: 150px`) agar empat kolom muat di 768 (4×150 + 3×8 ≤ 656 px
+  konten), karena 4×200 meluap di 820 dan kolom "Selesai" terpotong tanpa penanda. Kolom yang bertetap
   lebar hanya tersusun mendatar bila papannya `display: flex`; papan itu sendiri menggulir mendatar (`overflow-x: auto`).
   Di ponsel kolom menumpuk satu kolom. Dikunci `src/test/board-layout-css.test.ts` (tiap kolom bertetap lebar
   wajib punya papan induk flex/grid).
@@ -45,9 +47,12 @@ Primitive bersama:
 - **Pet Hanoman duduk di alur layout, tak pernah melayang.** Pet dibuat sekali di `App` dan disalurkan lewat
   `PetDockContext`; `Shell` menaruhnya di slot-nya. Desktop (≥1200): **footer sidebar** (`.hn-shell-dock`, di
   bawah daftar hub, `margin-top: auto`). Tablet dan ponsel: **lajur di bawah `<main>`** (`.hn-shell-lane`),
-  sehingga area gulir berakhir di atasnya dan tak ada kontrol yang tertutup. Slot kosong (`:empty`) tak
-  memesan ruang. Satu-satunya overlay adalah gelembung bicara dan panel status: keduanya sementara dan
-  ditutup Esc atau klik di luar. Pet yang diseret boleh melayang saat diangkat; lajurnya tak pernah melebar. Lebar jalur hanya dari ukuran slot
+  sehingga area gulir berakhir di atasnya dan tak ada kontrol yang tertutup. Di lajur itu pet selalu duduk
+  sebagai **chip** setinggi 56 px, rata kanan (tombol bangkitkan 44 px); dibangkitkan, sprite-nya melayang di
+  atas lajur sebagai overlay sementara dan lajur tetap 56 px. Slot kosong (`:empty`) tak memesan ruang. Overlay
+  yang disengaja: gelembung bicara, panel status, dan sprite yang dibangkitkan di tablet/ponsel; semuanya
+  sementara dan ditutup Esc atau klik di luar (sprite tablet/ponsel juga, kecuali Esc saat panel terbuka,
+  yang menutup panel dulu). Pet yang diseret boleh melayang saat diangkat; lajurnya tak pernah melebar. Lebar jalur hanya dari ukuran slot
   (root pet, `width: 100%`): belum terukur = 0, dan pet tak dirender; tanpa fallback ke lebar viewport. Desktop
   pendek (≤ 760 px tinggi, `PET_COMPACT_QUERY`) menciutkan pet ke chip sampai dibangkitkan, sementara, tanpa
   menyimpan preferensi, supaya 8 hub + footer muat tanpa gulir di 661 px.
@@ -94,6 +99,11 @@ di atas konten. Di rail tablet, badge hitungan absolut di pojok ikon dan ikon na
 **Topbar tablet (QA run3 · P2).** Judul dan alat satu baris (alat `nowrap`); lencana update dan batas memakai bentuk
 pendek; crumb dan judul di semua tier satu baris dengan elipsis. Baris kedua (project, cari, aksi) hanya bila layar
 memakainya, dan menggulir mendatar sendiri. Target: ≤ 64 px tanpa baris kedua, +40 px dengan baris kedua.
+
+**Topbar desktop (QA run4 · P2).** Alat topbar tak pernah membungkus (`flex-wrap: nowrap` di semua tier; dulu
+`wrap` di desktop memindahkan avatar Akun ke baris kedua di /review dan topbar jadi 79 px). Yang menyusut adalah
+crumb/judul dan baris kedua (project, cari, aksi) dengan elipsis; tombol dan lencana alat utuh. Topbar 56 px di
+semua rute. Dikunci `src/test/responsive-chrome-css.test.ts`.
 **Daftar hub yang meluap** diberi cue gulir (`data-cue-start/end` di `.hn-shell-nav`, dihitung di `shell.tsx`), dan hub
 aktif digulir ke layar saat pindah layar.
 

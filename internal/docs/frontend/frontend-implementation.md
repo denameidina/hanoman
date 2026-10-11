@@ -23,7 +23,7 @@ menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
 
 - React + TypeScript (Vite). Komponen dari Hanoman Design System.
 - Layout responsif (SPEC-763): drawer mobile `<768px`, rail 72px pada tablet `768–1199px`, sidebar
-  248px pada desktop `≥1200px`; topbar minimum 56px dan dapat wrap; konten maks 1200px (Docs full-width).
+  248px pada desktop `≥1200px`; topbar 56px dengan alat yang tak pernah membungkus (QA run4); konten maks 1200px (Docs full-width).
 - Bagian: Overview, Projects (list + pagination + cari + hapus project per baris) → **detail project** (identitas, coverage, edit `name`/`desc` lewat `PATCH /projects/:id`, dan pintu: Source of Truth, Terminal, Backlog, Reverse docs). `id` tak pernah dapat diubah — ia kunci asing spec (SPEC-146). Hapus project ada di detail dan di header Docs — konfirmasi dulu, ditolak bila ada sesi tmux aktif; rename tidak ditolak, karena `id` tak bergerak. **PRD** (SPEC-210 · ADR-0041 — layar nav sebelum Backlog, **two-pane**: sidebar kiri daftar dokumen PRD yang bisa diklik + pane kanan preview `MarkdownView` inline. Filter project punya opsi **"Semua project"** → `GET /prds` lintas-project (item dikelompokkan per project); satu project terpilih → `GET /projects/:id/prds`; keduanya freshest-wins. **PRD baru** membuka sesi `flow:"prd"` project-level; project target dipilih **di dalam modal** (field `Select` project, default ikut filter aktif atau project pertama saat "Semua project") — tombol selalu aktif, tak perlu memfilter daftar dulu (SPEC-212); **Take ke backlog** membuka `NewSpecModal` ter-prefill dengan tautan PRD di teks Konteks, ke project asal PRD), Backlog (cari teks + filter project/stage/prioritas + tab sumber + tiga mode tampilan grid/list/board + aksi per spec + detail spec via modal: judul, stage bar, objective, field brief/QA), Terminal (sesi Claude Code interaktif di tmux), Docs (tree realtime semua `.md` di repo via `GET /docs`, dikelompokkan per direktori; kategori di luar `docsDir` masuk grup **Lainnya (tidak dinilai)** tanpa status linked — hanya kategori berskor yang masuk coverage, lihat ADR-0013; tombol **Muat ulang** membaca ulang tree, **Hapus** menghapus file asli, path ditampilkan repo-relative tanpa prefix `internal/docs`), VPS (daftar + audit/harden + Test connection + Open Console shell ssh + buka sesi Claude, SPEC-211; **klik baris membuka satu modal** berisi detail VPS — last audit + health disk/mem/load — menyatu dengan checklist kepatuhan 232 item, SPEC-220/221; tak ada lagi side panel terpisah), Tim (papan kerja **manusia** — tiga mode tampilan: Papan kanban empat kolom, Linimasa Gantt rencana, dan Lintas project satu baris ringkas per project; SPEC-946/948/949), Settings (model & effort sesi — **default global**; model/effort dipilih **per sesi saat Start** lewat picker `StartSessionModal`, matrix per-fase dicabut, SPEC-252/ADR-0061; notifikasi, akun, users).
 - **Dikte suara** ([ADR-0177](../adr/0177-dikte-suara-seam-speech-engine.md)) — `TerminalPane` menampilkan baris
   `VoiceControls` (tombol mic toggle, pemilih bahasa `id-ID`/`en-US`, pratinjau interim, pesan galat) di antara
@@ -561,7 +561,7 @@ hilang dicabut, dan font tak lagi memblokir render. Perilaku dan tampilan layar 
 - **Font:** `@import` Google Fonts di `ds/tokens/fonts.css` (memblokir render) dipindah ke `index.html`: `<link rel="preload"
   as="style">` yang berpindah ke `rel="stylesheet"` saat tiba, dengan `<noscript>` sebagai cadangan. Offline atau tanpa JS,
   fallback generik keluarga font di `ds/tokens/typography.css` yang berlaku. `preconnect` tetap.
-- **Ukuran `app.css`:** 64.956 → 43.102 byte (1.349 → 998 baris). Selektor `.hn-*` unik 236 → 139.
+- **Ukuran `app.css`:** 64.956 → 43.102 byte (1.349 → 998 baris). Selektor `.hn-*` unik 236 → 139. Catatan: angka ini berlaku pada `c81413cb`. Tiga commit perbaikan QA Chrome sesudahnya (`56eb30cd`, `82b5dee4`, `cfabc308`) menaikkan berkas itu lagi menjadi 54.105 byte (1.167 baris) di `cfabc308`; basis `8380d3fa` 54.592 byte (lihat § Status pelaksanaan di audit).
 - **Tes:** `test/ui-audit-tokens.test.ts` (kontras footer Dalang diganti kontras teks `dalang.css` di atas `--term-bg`;
   asersi chip Dalang diganti "tombol keluar tak disembunyikan di `dalang.css`"; kontrak font non-blocking dan fallback
   generik). `test/responsive-touch-targets.test.ts` (`.hn-project-open` dicabut dari daftar). `ds-css-contract.test.ts`
@@ -1179,7 +1179,7 @@ Susunan dan kelas ada di `screens/styles/review.css`, `screens/styles/auth.css`,
   (`<details>`); toggle tetap terkunci selama ada prasyarat merah (aturan lama tak berubah).
 - **Penomoran:** "hanoman · setup 1/2" hanya saat setup pertama. Akun pertama adalah langkah 2/2 **hanya** bila wizard tadi
   tampil. `AuthScreen` menerima `setupStep?: 2` dan baru menampilkan "setup 2/2" bila layar induk meneruskannya
-  (**butuh App.tsx**, lihat di bawah). Tanpa prop itu, layar akun tidak mengklaim nomor langkah.
+  (App.tsx sudah meneruskannya, lihat di bawah). Tanpa prop itu, layar akun tidak mengklaim nomor langkah.
 - **AuthScreen:** input `size="lg"` (16 px, mencegah zoom iOS); ilustrasi `PST-001` kecil (dekoratif) hanya di setup;
   tombol nonaktif selalu menyebut alasannya (`#auth-block-reason`); galat per penyebab tetap.
 - **AccountMenu:** gaya dipindah ke kelas `hn-account-*`; perilaku dan kontrak tes tak berubah.
@@ -1222,14 +1222,14 @@ Susunan dan kelas ada di `screens/styles/review.css`, `screens/styles/auth.css`,
   `review-screen` (bar keputusan dan header), `auth-screen-token` (penomoran), dan `ChatPanel.test` (nama "Keluhan saya").
 - Test baru: `ticket-timeline.test.tsx` (pemetaan murni untuk semua status `publicStatus()` + komponen dengan `aria-current`).
 - Verifikasi: `pnpm typecheck` bersih; 22 berkas test area ini + test sekitar App (`app-*`, `hub-nav-app`, `palette-app`,
-  `triage`, `nav-*`, `illustration-placement`) lulus. CSS baru diuji sintaksnya dengan PostCSS. **Belum ada render browser**
-  (layout 320/390/768 px dan bar sticky belum diuji visual).
+  `triage`, `nav-*`, `illustration-placement`) lulus. CSS baru diuji sintaksnya dengan PostCSS. **Render browser per layar ini tidak tercatat di sini**
+  (uji layout 320/390/768 px dan bar sticky per layar ini belum tercatat; tiga commit QA Chrome yang menyentuh Review dan Portal ada di riwayat git, lihat § Status pelaksanaan di audit).
 
-### Butuh App.tsx (prop opsional, tidak ada yang wajib)
+### Prop App.tsx (sudah tersambung; tidak ada yang wajib)
 
-1. `ReviewScreen` dipanggil di `App.tsx:1771`: tambahkan `onGoto={(to) => navigate(routePath(to))}`. Tanpa ini, tiga tujuan keputusan
+1. `ReviewScreen` menerima `onGoto` di `App.tsx:1793` (sudah tersambung). Tanpa itu, tiga tujuan keputusan
    menjadi tautan biasa (muat ulang halaman penuh, state hilang).
-2. `AuthScreen` di `App.tsx:1547`: tambahkan `setupStep={setupStatus?.needed ? 2 : undefined}`. Tanpa ini, layar akun setup
+2. `AuthScreen` menerima `setupStep` di `App.tsx:1570` (sudah tersambung). Tanpa itu, layar akun setup
    tampil tanpa nomor (aman, tidak menyesatkan).
 
 ### Risiko dan keputusan yang perlu dilihat
@@ -1738,7 +1738,10 @@ jalur yang sama persis dengan tombol `Lihat` milik rekap.
 `hn.ui.v1.pet.enabled` atau default tier, lihat `ui-state/pet-pref.ts`). `Shell` menaruhnya di slot:
 `.hn-shell-dock` di footer sidebar (desktop) atau `.hn-shell-lane` di bawah `<main>` (tablet/ponsel).
 Pet tak lagi `position: fixed`: jalurnya ada di alur layout, sehingga tak ada kontrol yang tertutup dan
-tak ada `z-index` pet yang harus dijaga terhadap header, modal, dan toast. Layar tanpa Shell (Dalang)
+tak ada `z-index` pet yang harus dijaga terhadap header, modal, dan toast. Tablet dan ponsel: lajur selalu setinggi
+**chip 56 px** (`LANE_CHIP_H`, rata kanan, tombol 44 px), tak pernah lebih tinggi meski pet dibangkitkan — sprite
+lalu melayang di atas lajur sebagai overlay sementara (`peek`), ditutup Esc atau klik di luar root (Esc saat panel
+terbuka menutup panel dulu). Layar tanpa Shell (Dalang)
 tak punya slot dan tak menampilkan pet. Pet tetap dibuat di App, bukan di Shell, karena `<Shell>` ditulis
 ulang di tiap cabang `section`: pet yang tinggal di sana lahir kembali tiap navigasi.
 

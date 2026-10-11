@@ -128,6 +128,36 @@ describe("kontrak umum: setiap papan kolom dan setiap kolom bertetap lebar punya
   });
 });
 
+describe("papan Tim di tablet: empat kolom muat di lebar terkecil tablet (QA run4 · P3: 'Selesai' terpotong di 820)", () => {
+  const TOKENS = readFileSync(join(SRC, "ds/tokens/spacing.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const tabletTokens = TOKENS.slice(TOKENS.indexOf("@media (min-width: 768px) and (max-width: 1199px)"));
+  const px = (source: string, name: string): number => Number(new RegExp(`${name}:\\s*(\\d+)px`).exec(source)?.[1]);
+
+  it("kolom Tim di tablet berbagi lebar sama (basis 0) dengan minimum 150 px", () => {
+    const d = mediaOf("min-width: 768px) and (max-width: 1199px", ".hn-tm-col");
+    expect(d.flex).toBe("1 1 0");
+    expect(d["min-width"]).toBe("150px");
+  });
+
+  it("empat kolom plus gap papan muat di lebar konten terkecil tablet (768 − rail − 2 × gutter)", () => {
+    const gap = px(TOKENS, "--space-2");
+    const rail = px(tabletTokens, "--sidebar-w");
+    const gutter = px(tabletTokens, "--page-gutter-x");
+    expect(baseOf(".hn-tm-board").gap).toBe("var(--space-2)");
+    expect(rail).toBe(72);
+    expect(gutter).toBe(20);
+    const contentAt768 = 768 - rail - 2 * gutter;
+    expect(4 * 150 + 3 * gap).toBeLessThanOrEqual(contentAt768);
+  });
+
+  it("di 820 px (lebar uji QA) empat kolom mengisi papan tanpa gulir mendatar", () => {
+    const rail = px(tabletTokens, "--sidebar-w");
+    const gutter = px(tabletTokens, "--page-gutter-x");
+    const board = 820 - rail - 2 * gutter;
+    expect(4 * 150 + 3 * px(TOKENS, "--space-2")).toBeLessThanOrEqual(board);
+  });
+});
+
 describe("papan Tim: kolom lentur muat di 1280 dan judul kartu memenuhi area sentuh 24 px", () => {
   it("kolom Tim lentur dengan basis 220 px dan lebar minimum 200 px (4 kolom muat di desktop 1280)", () => {
     const d = baseOf(".hn-tm-col");

@@ -32,6 +32,11 @@ const HIT = 44;
 // dipakai untuk memesan ruang di layout (`--pet-h`), jadi keduanya tak boleh berbeda.
 const REVEAL_EDGE = 22;
 const REVEAL_RESERVE = REVEAL_EDGE + HIT;
+// Lajur tablet dan ponsel (Audit UI/UX 2026-10 · P3): pet duduk sebagai chip setinggi 56 px, rata kanan, dan lajurnya
+// tak pernah lebih tinggi dari itu. Pet yang dibangkitkan melayang di atas lajur sebagai overlay sementara (Esc atau
+// klik di luar menutupnya) — ia tak memesan ruang. Tombol chip 44 px, 6 px dari tepi bawah lajur.
+const LANE_CHIP_H = 56;
+const LANE_CHIP_EDGE = 6;
 const PANEL_W = 268;
 const PANEL_GAP = 10;
 const PANEL_EDGE = 12;
@@ -164,6 +169,8 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
   const documentHidden = useDocumentHidden();
   // Desktop pendek: pet menciut ke chip sampai dibangkitkan (`peek`, tak dipersist — tinggi layar bisa berubah).
   const compact = useMediaMatch(PET_COMPACT_QUERY) && tier === "desktop";
+  // Tablet dan ponsel: lajurnya selalu setinggi chip. Di sana `peek` berarti pet sedang dibangkitkan sebagai overlay.
+  const lanePet = tier !== "desktop";
   const [peek, setPeek] = React.useState(false);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const actorRef = React.useRef<HTMLDivElement>(null);
@@ -487,17 +494,34 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
   // di desktop, lajur di bawah kolom di tablet/ponsel), setinggi satu sel. Ia tak pernah melebar dan tak
   // memakai `position: fixed`, sehingga tak ada kontrol yang tertutup. `pointerEvents: none` di seluruh
   // root: yang `auto` hanya tombol 44 px di kaki, pegangan, panel, dan tombol gelembung.
-  // Overlay yang disengaja hanya dua: gelembung bicara (sementara, bisa ditutup) dan panel status (buka
-  // oleh klik). Pet yang sedang diangkat boleh melayang di atas konten: itu manipulasi langsung.
+  // Overlay yang disengaja: gelembung bicara dan panel status (keduanya sementara, bisa ditutup), serta pet yang
+  // dibangkitkan di tablet/ponsel (sprite di atas lajur, lihat LANE_CHIP_H). Pet yang sedang diangkat boleh
+  // melayang di atas konten: itu manipulasi langsung.
   const lifted = walk.mode === "held" || walk.mode === "falling";
-  // Chip = pet tak tampil: disembunyikan pengguna (`hidden`), atau desktop pendek yang belum dibangkitkan.
-  const collapsed = hidden || (compact && !peek);
-  const rootH = collapsed ? REVEAL_RESERVE : cellH;
+  // Chip = pet tak tampil: disembunyikan pengguna (`hidden`), tablet/ponsel yang belum dibangkitkan, atau desktop
+  // pendek yang belum dibangkitkan.
+  const collapsed = hidden || ((compact || lanePet) && !peek);
+  const rootH = lanePet ? LANE_CHIP_H : collapsed ? REVEAL_RESERVE : cellH;
   // Posisi yang DIGAMBAR di-clamp ke slot setiap render: keadaan yang dibuat sebelum lebar berubah tak boleh
   // membuat pet tampil di luar sidebar (QA run3: pet melayang di atas konten).
   const shown = clampMove(move, laneWidth, laneHeight(), cellW, cellH);
   // Viewport mengecil saat panel terbuka: pet menjadi chip dan panelnya ikut menutup, tak tertinggal `open` di belakangnya.
   React.useEffect(() => { if (collapsed && open) { setOpen(false); setPanelMounted(false); } }, [collapsed, open]);
+  // Overlay tablet/ponsel ditutup Esc atau klik di luar root, seperti gelembung. Saat panel terbuka, Esc menutup
+  // panel lebih dulu (lewat handlernya sendiri), jadi overlay tetap sampai Esc berikutnya.
+  React.useEffect(() => {
+    if (!lanePet || !peek) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setPeek(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !open) setPeek(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [lanePet, peek, open]);
   const root: React.CSSProperties = { position: "relative", width: "100%", height: rootH, zIndex: 80, pointerEvents: "none" };
 
   // Tinggi lajur dipublikasikan sebagai `--pet-h` di <html> HANYA setelah pet benar-benar tampil (`mountReady`),
@@ -516,7 +540,8 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
       <div data-testid="pet-root" ref={rootRef} style={root}>
         <button aria-label="Tampilkan pet Hanoman" onClick={() => { if (hidden) setVisibility(false); setPeek(true); }} style={{
           pointerEvents: "auto", position: "absolute", width: HIT, height: HIT, padding: 0,
-          right: "max(22px, var(--safe-right))", bottom: REVEAL_EDGE,
+          right: lanePet ? "max(var(--page-gutter-x), var(--safe-right))" : "max(22px, var(--safe-right))",
+          bottom: lanePet ? LANE_CHIP_EDGE : REVEAL_EDGE,
           display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
           border: "1px solid var(--text-muted)", borderRadius: "var(--radius-pill)",
           background: "var(--surface-card)", color: "var(--text-strong)", boxShadow: "var(--shadow-sm)",

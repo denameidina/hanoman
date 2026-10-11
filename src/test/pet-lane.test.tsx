@@ -24,7 +24,8 @@ const cellHFor = (characterHeight: number) =>
   Math.round(PET_MANIFEST.cell.h * (characterHeight / PET_MANIFEST.character.h));
 const DESKTOP_H = `${cellHFor(112)}px`;   // tablet & desktop
 const MOBILE_H = `${cellHFor(96)}px`;     // < 768 px
-const REVEAL_H = "66px";                   // tombol bangkitkan: 22 px dari tepi + 44 px
+const REVEAL_H = "66px";                   // tombol bangkitkan desktop: 22 px dari tepi + 44 px
+const LANE_H = "56px";                     // lajur tablet & ponsel: chip rata kanan, sprite tak memesan ruang
 
 // Tier dari matchMedia (ds/responsive.tsx): tanpa query yang cocok = desktop.
 function mockTier(tier: "mobile" | "tablet" | "desktop"): void {
@@ -58,11 +59,18 @@ describe("--pet-h: tinggi lajur untuk bar fixed ponsel", () => {
     expect(reserved()).toBe(DESKTOP_H);
   });
 
-  it("ponsel: sprite lebih kecil (96 px karakter), jadi ruang yang dipesan ikut mengecil", () => {
+  it("ponsel: lajur setinggi chip (56 px), bukan sel sprite, sebelum pet dibangkitkan", () => {
     mockTier("mobile");
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
-    expect(reserved()).toBe(MOBILE_H);
-    expect(MOBILE_H).not.toBe(DESKTOP_H);
+    expect(reserved()).toBe(LANE_H);
+    expect(LANE_H).not.toBe(MOBILE_H);
+  });
+
+  it("tablet: lajur juga setinggi chip (56 px), tak lagi memesan sel sprite 112 px", () => {
+    mockTier("tablet");
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    expect(reserved()).toBe(LANE_H);
+    expect(LANE_H).not.toBe(DESKTOP_H);
   });
 
   it("pet disembunyikan: hanya tombol bangkitkan yang perlu ruang (66 px)", () => {
@@ -90,6 +98,13 @@ describe("root pet berada di alur layout, bukan overlay fixed", () => {
     localStorage.setItem(PET_HIDDEN_KEY, "1");
     render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
     expect(screen.getByTestId("pet-root")).toHaveStyle({ height: REVEAL_H });
+  });
+
+  it.each(["tablet", "mobile"] as const)("%s: root setinggi chip 56 px dan sprite tak dirender sebelum dibangkitkan", (tier) => {
+    mockTier(tier);
+    render(<HanomanPet sessions={[]} backlog={[]} onOpen={vi.fn()} />);
+    expect(screen.getByTestId("pet-root")).toHaveStyle({ height: LANE_H });
+    expect(screen.queryByTestId("pet-actor")).toBeNull();
   });
 });
 

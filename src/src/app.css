@@ -93,6 +93,13 @@ textarea:focus-visible,
 /* Baris kedua topbar (desktop): pilihan project, kotak cari, aksi halaman. Ia duduk di kiri kluster alat. */
 .hn-shell-subrow { display: flex; align-items: center; gap: 10px; min-width: 0; margin-left: auto; }
 .hn-shell-subrow + .hn-shell-tools { margin-left: 0; }
+/* Topbar desktop (QA Chrome run4 · P2): alat TAK membungkus di tier mana pun. Dulu `flex-wrap: wrap` di desktop
+   memindahkan avatar akun ke baris kedua di /review (topbar 79 px, layar lain 56 px). Yang menyusut kini kolom
+   judul dan baris kedua (project, cari, aksi); tombol dan lencana alat utuh. Target: topbar 56 px di semua rute. */
+.hn-shell-subrow > * { min-width: 0; }
+.hn-shell-subrow > button { flex: 0 0 auto; white-space: nowrap; }
+.hn-shell .hn-shell-subrow .hn-shell-scope { min-width: 0; max-width: 100%; }
+.hn-shell .hn-shell-subrow .hn-shell-scope select { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ADR-0205 · tiga grup berlabel (Kerja · Otomasi · Sistem). Label grup sekecil eyebrow; pemisah antar
    grup memakai jarak, bukan garis, supaya di sidebar penuh terbaca sebagai daftar biasa. */
 .hn-nav-group { display: flex; flex-direction: column; gap: 2px; }
@@ -130,7 +137,7 @@ textarea:focus-visible,
   color: var(--text-body);
 }
 .hn-shell-heading { min-width: 0; }
-.hn-shell-tools { margin-left: auto; display: flex; min-width: 0; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.hn-shell-tools { margin-left: auto; display: flex; flex: 0 0 auto; min-width: 0; align-items: center; justify-content: flex-end; flex-wrap: nowrap; gap: 10px; }
 /* Crumb dan judul SATU baris di semua tier: crumb panjang (nama project, "Hub › Tab · deskripsi") menyusut dengan
    elipsis, tak membungkus menjadi beberapa baris yang mendorong tinggi topbar (QA run3: /docs 121–207 px). */
 .hn-shell-crumb { min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
