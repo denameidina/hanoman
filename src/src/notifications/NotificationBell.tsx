@@ -13,7 +13,7 @@ function timeAgo(iso: string): string {
 }
 
 export function NotificationBell() {
-  const { items, unread, total, markAllRead, clear, onOpen } = useNotifications();
+  const { items, unread, total, markAllRead, markRead, clear, onOpen } = useNotifications();
   const [open, setOpen] = React.useState(false);
   const [archive, setArchive] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
@@ -27,7 +27,8 @@ export function NotificationBell() {
   }, [open]);
 
   // Audit UI/UX 2026-10 · membuka bell TIDAK menandai apa pun terbaca: itu membuat notifikasi yang
-  // belum dilihat diam-diam hilang dari badge. Tandai terbaca hanya lewat "Tandai semua dibaca".
+  // belum dilihat diam-diam hilang dari badge. Tandai terbaca lewat "Tandai semua dibaca" atau, per
+  // item, lewat "Buka" (ADR-0204): item yang dibuka memang sudah dilihat operator.
   function toggle() {
     setOpen((v) => !v);
   }
@@ -87,7 +88,7 @@ export function NotificationBell() {
                 </div>
               </div>
               {onOpen && (
-                <button role="menuitem" onClick={() => { onOpen(n); setOpen(false); }} style={{
+                <button role="menuitem" onClick={() => { markRead(n.id); onOpen(n); setOpen(false); }} style={{
                   flex: "0 0 auto", border: "none", background: "transparent", cursor: "pointer",
                   color: ticket ? "var(--brass-600)" : decision ? "var(--amber-600)" : "var(--text-muted)", fontSize: 12, fontFamily: "var(--font-ui)", whiteSpace: "nowrap" }}>
                   {openLabel}

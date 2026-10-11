@@ -113,7 +113,7 @@ export function LogsPanel() {
                   <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{row.lane}</span>
                   <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{row.level}</span>
                   <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>{row.kind}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)" }}>{row.msg}</span>
+                  <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)" }}>{row.msg}</span>
                 </li>
               ))}
             </ul>

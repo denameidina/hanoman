@@ -304,7 +304,7 @@ export function TeamTimeline({ tasks, members, zoom, today, hidden, onOpen }: {
         emptyHint="Belum ada tugas bertanggal — isi mulai atau tenggat di kartunya." />
       {hidden > 0 && (
         <div data-testid="timeline-truncated" style={{
-          ...FIXED_ROW_STYLE, marginTop: 8, fontSize: "var(--text-xs)", color: "var(--amber-600)",
+          ...FIXED_ROW_STYLE, marginTop: 8, fontSize: "var(--text-xs)", color: "var(--status-warn)",
         }}>
           {hidden} tugas tak termuat karena plafon 200 per kolom — persempit penyaring
         </div>
@@ -470,7 +470,7 @@ export function TeamProjectTimeline({
         emptyHint="Belum ada project bertanggal — isi mulai atau tenggat di kartunya." />
       {hidden > 0 && (
         <div data-testid="projects-truncated" style={{
-          ...FIXED_ROW_STYLE, marginTop: 8, fontSize: "var(--text-xs)", color: "var(--amber-600)",
+          ...FIXED_ROW_STYLE, marginTop: 8, fontSize: "var(--text-xs)", color: "var(--status-warn)",
         }}>
           {hidden} tugas tak termuat karena plafon 200 per kolom — amplop project bisa
           lebih pendek dari rentang sebenarnya; persempit kolom, anggota, atau pencarian

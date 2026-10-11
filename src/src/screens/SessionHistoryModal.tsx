@@ -132,7 +132,7 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
                   {new Date(r.startedAt).toLocaleString("id-ID")}
                 </span>
                 <Badge size="sm" tone="neutral">{labelOfKind(r.kind)}</Badge>
-                <span className="hn-picker-title" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)",
+                <span className="hn-grow hn-picker-title" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)",
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {r.title ?? r.specId ?? nameOf(r.projectId)}
                 </span>

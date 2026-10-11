@@ -24,7 +24,7 @@ function open(t: TaskView) {
     onClose={onClose} onDone={onDone} onToast={onToast} />);
   return { onDone, onClose, onToast };
 }
-const submit = () => screen.getByRole("button", { name: /^eskalasi$/i });
+const submit = () => screen.getByRole("button", { name: /^kirim ke backlog$/i });
 
 beforeEach(() => vi.restoreAllMocks());
 
@@ -104,7 +104,7 @@ describe("TeamScreen · wiring eskalasi", () => {
     vi.spyOn(api, "listMembers").mockResolvedValue(page([]) as any);
   });
 
-  it("klik Eskalasi membuka dialog untuk kartu itu", async () => {
+  it("klik Kirim ke Backlog membuka dialog untuk kartu itu", async () => {
     vi.spyOn(api, "listTasks").mockImplementation(async (p: any) =>
       page(p.status === "doing" ? [task()] : []) as any);
     render(<TeamScreen projects={projects} projectFilter="all"

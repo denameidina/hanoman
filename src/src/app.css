@@ -22,14 +22,19 @@ textarea:focus-visible,
 [role="radio"]:focus-visible,
 [role="switch"]:focus-visible,
 [role="separator"]:focus-visible {
-  outline: 2px solid var(--border-focus) !important;
+  outline: 2px solid var(--border-focus);
   outline-offset: 2px;
 }
 
 /* Select kit: pembungkusnya sudah menandai fokus lewat border + ring, jadi outline
    bawaan hanya menggambar kotak kedua di dalam field. */
 .hn-select select:focus,
-.hn-select select:focus-visible { outline: none !important; }
+.hn-select select:focus-visible { outline: none; }
+/* Input & textarea DS (ds/components/forms.tsx, kit.tsx) menggambar fokus lewat pembungkus (border +
+   ring). Outline `input:focus-visible` di atas menggambar kotak kedua; kelas yang lebih spesifik ini
+   mematikannya dan tetap berlaku bila aturan global kembali ber-!important. */
+.hn-input-core:focus-visible,
+.hn-textarea-core:focus-visible { outline: none; }
 
 .hn-shell {
   display: flex;
@@ -127,6 +132,9 @@ textarea:focus-visible,
 .hn-wrap-mobile,
 .hn-dense-row,
 .hn-vps-row { min-width: 0; }
+/* Header Card. Susunan dasar di sini (sebelum blok mobile), bukan inline, supaya `align-items: stretch`
+   di mobile menang lewat urutan kaskade biasa. */
+.hn-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 
 /* Baris VPS · baris atas (identitas · pil status · aksi) dan baris bawah (status instalasi).
    Aksi dikunci ke kanan lewat margin-left auto supaya kolom tombol tetap sejajar antar-baris
@@ -294,7 +302,7 @@ textarea:focus-visible,
   .hn-vps-actions { margin-left: 0; width: 100%; justify-content: flex-start; }
   .hn-vps-actions > button { flex: 1 1 auto; }
   .hn-vps-sep { display: none; }
-  .hn-dense-row > [style*="flex: 1"] { min-width: min(220px, 100%); }
+  .hn-dense-row > .hn-grow { min-width: min(220px, 100%); }
   /* SPEC-763 · baris pemilih (Ambil backlog, Riwayat sesi): judul adalah satu-satunya pembeda
      antar-baris, tapi `flex-basis: 0` membuatnya kalah dari tetangga yang basis-nya selebar isi —
      terukur di 390px judul tersisa "Ba…" (konten terpotong 667px) sementara id project yang
@@ -308,7 +316,7 @@ textarea:focus-visible,
     white-space: normal !important;
     overflow: visible !important;
   }
-  .hn-card-header { align-items: stretch !important; flex-direction: column; }
+  .hn-card-header { align-items: stretch; flex-direction: column; }
   .hn-card-actions { max-width: 100%; }
   .hn-card-actions > * { max-width: 100%; }
   .hn-settings-layout { width: 100%; }
@@ -1190,3 +1198,144 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   .hn-dalang-blencong { display: none; }
   .hn-dalang-live { width: 100%; }
 }
+
+/* ============================================================
+   Primitif layout & daftar (Audit UI/UX 2026-10 · Fase 2A)
+   Kontrak: internal/docs/design-system/design-system.md, "Primitif layout".
+   Gap dan warna datang dari token (var inline); kelas di sini hanya menyusun.
+   ============================================================ */
+
+/* Utilitas: bagian flex yang menyerap sisa ruang. Pengganti inline `flex: 1` supaya aturan mobile
+   bisa mengenalinya lewat kelas, bukan lewat `[style*="flex: 1"]`. */
+.hn-grow { flex: 1 1 0%; }
+
+.hn-stack { display: flex; flex-direction: column; min-width: 0; }
+.hn-inline { display: flex; flex-direction: row; flex-wrap: wrap; min-width: 0; }
+.hn-inline.hn-inline-nowrap { flex-wrap: nowrap; }
+
+/* PageHeader · judul layar = h2 (shell sudah punya h1). */
+.hn-page-header {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: var(--space-3) var(--space-5); min-width: 0;
+}
+.hn-page-header-text { flex: 1 1 260px; min-width: 0; }
+.hn-page-eyebrow { margin-bottom: var(--space-1); }
+.hn-page-title {
+  margin: 0; font-family: var(--font-display); font-size: var(--text-2xl); font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight); line-height: var(--leading-tight); color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.hn-page-description {
+  margin: var(--space-1) 0 0; max-width: 64ch; font-size: var(--text-sm);
+  line-height: var(--leading-normal); color: var(--text-muted);
+}
+.hn-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+
+/* FilterBar · pencarian, chip filter aktif, popover "Filter", Reset. */
+.hn-filter-bar { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.hn-filter-bar-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.hn-filter-search { flex: 1 1 220px; min-width: min(220px, 100%); max-width: 360px; }
+.hn-filter-actions { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+.hn-filter-bar-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; }
+.hn-filter-chip {
+  display: inline-flex; align-items: center; gap: var(--space-1); min-height: 28px; padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
+  background: var(--accent-tint); color: var(--text-strong);
+  font: var(--weight-medium) var(--text-xs)/1 var(--font-ui); cursor: pointer;
+}
+.hn-filter-chip:hover { background: var(--brass-300); }
+.hn-filter-popover-anchor { position: relative; display: inline-flex; }
+.hn-filter-trigger {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 32px; padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface-card); color: var(--text-body);
+  font: var(--weight-medium) var(--text-sm)/1 var(--font-ui); cursor: pointer;
+}
+.hn-filter-trigger:hover { background: var(--bone-100); color: var(--text-strong); }
+.hn-filter-trigger[aria-expanded="true"] { border-color: var(--border-focus); }
+.hn-filter-count {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: var(--radius-pill); background: var(--brass-700); color: var(--bone-000);
+  font: var(--weight-semibold) var(--text-2xs)/1 var(--font-mono);
+}
+.hn-filter-popover {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; min-width: 260px;
+  max-width: min(360px, calc(100vw - 2 * var(--page-gutter-x)));
+  display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3);
+  background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+.hn-filter-chip:focus-visible,
+.hn-filter-trigger:focus-visible,
+.hn-row-main:focus-visible,
+.hn-overflow-item:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* RowList / DenseRow · satu pola untuk baris klik (button/a) dan non-klik (div). */
+.hn-row-list { list-style: none; margin: 0; padding: 0; min-width: 0; }
+.hn-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); min-width: 0;
+  padding: 0 var(--space-3); border-bottom: 1px solid var(--border-hair);
+}
+.hn-row:last-child { border-bottom: 0; }
+.hn-row-main {
+  flex: 1 1 200px; min-width: 0; display: flex; align-items: center; gap: var(--space-3);
+  margin: 0; padding: 10px 0; border: 0; background: transparent; color: inherit;
+  font: inherit; text-align: left;
+}
+a.hn-row-main, a.hn-row-main:hover { color: inherit; border: 0; }
+button.hn-row-main { cursor: pointer; }
+.hn-row-interactive { transition: background var(--dur-fast) var(--ease-out); }
+.hn-row-interactive:hover,
+.hn-row-interactive:focus-within { background: var(--surface-sunken); }
+.hn-row-selected { background: var(--brass-050); box-shadow: inset 3px 0 0 var(--accent); }
+.hn-row-actions { display: flex; align-items: center; gap: var(--space-1); flex: 0 0 auto; }
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-row-interactive .hn-row-main,
+  .hn-row-actions button { min-height: var(--touch-target); }
+}
+
+/* Skeleton · shimmer hanya bila gerak diizinkan. */
+.hn-skeleton {
+  display: block; max-width: 100%;
+  background: linear-gradient(90deg, var(--bone-200) 0%, var(--bone-300) 50%, var(--bone-200) 100%);
+  background-size: 200% 100%;
+  animation: hn-skeleton-shimmer 1.4s var(--ease-inout) infinite;
+}
+.hn-skeleton-r-xs { border-radius: var(--radius-xs); }
+.hn-skeleton-r-sm { border-radius: var(--radius-sm); }
+.hn-skeleton-r-md { border-radius: var(--radius-md); }
+.hn-skeleton-r-pill { border-radius: var(--radius-pill); }
+.hn-skeleton-list { display: flex; flex-direction: column; gap: var(--space-2); }
+@keyframes hn-skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .hn-skeleton { animation: none; } }
+
+/* StatusPill/Badge dot · titik berdenyut untuk status yang hidup. Keyframes dipindah ke sini dari
+   inline <style> per-pill (dulu diinjeksi berulang di setiap StatusPill). */
+.hn-status-dot-pulse { animation: hn-pulse 1.4s ease-in-out infinite; }
+@keyframes hn-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .hn-status-dot-pulse { animation: none; } }
+
+/* LiveConnectionBadge · wilayah status selalu ada; saat kosong ia tak memakan ruang dan tak ikut gap. */
+.hn-live-status { display: inline-flex; align-items: center; min-width: 0; }
+.hn-live-status:empty {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* OverflowActions · item dialog. Warna dan hover lewat kelas agar `:hover` tetap berlaku. */
+.hn-overflow-item {
+  display: flex; align-items: center; gap: var(--space-3); width: 100%;
+  min-height: var(--touch-target); padding: 8px 10px; text-align: left;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-body);
+  font: var(--weight-medium) var(--text-md)/1.3 var(--font-ui); cursor: pointer;
+}
+.hn-overflow-item:hover:not(:disabled),
+.hn-overflow-item:focus-visible { background: var(--surface-sunken); color: var(--text-strong); }
+.hn-overflow-item:focus-visible { outline-offset: -2px; }
+.hn-overflow-item:disabled { color: var(--text-subtle); opacity: 0.5; cursor: not-allowed; }
+.hn-overflow-item-danger { color: var(--clay-600); }
+.hn-overflow-item-danger:hover:not(:disabled),
+.hn-overflow-item-danger:focus-visible { background: var(--status-err-tint); color: var(--clay-600); }
+
+/* Tabs · panel tab. Yang tak aktif memakai atribut `hidden` dari DOM. */
+.hn-tabpanel { min-width: 0; }
+.hn-tabpanel[hidden] { display: none; }

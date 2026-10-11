@@ -95,7 +95,7 @@ function CloneRepoModal({ open, p, onClose, onDone, onToast }:
       <FolderPicker open={picker} onClose={() => setPicker(false)} start={parent}
         onPick={(pick) => { setParent(pick); setDir(cloneTargetInto(pick, remote)); }} />
       {err && (
-        <div role="alert" style={{ marginTop: 4 }}>
+        <div style={{ marginTop: 4 }}>
           <Callout tone="err" title={err.error}>
             Project tak tersentuh — perbaiki penyebabnya lalu coba lagi.
             {err.stderr && (

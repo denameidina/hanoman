@@ -192,6 +192,74 @@ Test baru Fase 1 (berkas tak terlacak di `main`): `test/app-snapshot-digest.test
 `test/report-error.test.ts`, `test/sched-lead-shared.test.tsx`, `test/shell-a11y.test.tsx`,
 `test/task-modal-busy.test.tsx`, `test/ui-audit-tokens.test.ts`, dan `lib/snapshot-digest.test.ts`.
 
+## Audit UI/UX 2026-10 · Fase 2C · Palet perintah & shortcut
+
+Fase 2C dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md): palet perintah ⌘K,
+shortcut `g` + huruf, `?`, `/`, dan project switcher tunggal di topbar. Aturan interaksinya ada di
+[design-system](../design-system/design-system.md#palet-perintah-dan-shortcut-audit-uiux-2026-10--fase-2c).
+Tak ada endpoint baru: palet membaca state App yang sudah ada (`projects`, `backlog`, `sessions`,
+`projectFilter`) dan menyimpan riwayatnya di ui-state (`hn.ui.v1.palette.recent`).
+
+Berkas di `src/src/palette/`:
+
+- `commands.ts` — sumber perintah murni (`buildPaletteCommands`) dan pencarian (`searchCommands`). Kueri kosong
+  menampilkan Riwayat, Menunggu kamu, Aksi, dan Pindah ke; Backlog dan Project hanya muncul saat diketik
+  (dipangkas `SEARCH_CAP` = 8). Layar bergerbang (`gate`) tak muncul selama gerbangnya mati.
+- `fuzzy.ts` — pencocokan urutan karakter, tanpa membedakan huruf besar dan diakritik. Kata yang muncul utuh
+  selalu mengalahkan kecocokan berpencar.
+- `shortcuts.ts` — peta chord `CHORD_KEYS` (17 huruf, satu per entri `HN_NAV`), `stepChord` dengan jendela
+  1 dtk, dan `shortcutSections` untuk dialog bantuan.
+- `useGlobalShortcuts.ts` — satu listener `keydown` di window. Tidak aktif saat fokus di input, textarea,
+  select, atau contenteditable; di dalam `.xterm` (termasuk ⌘K, karena Ctrl+K milik readline); saat ada
+  `[aria-modal="true"]`; saat memakai Ctrl/⌘/Alt; dan saat `enabled=false` (login, portal klien).
+- `ui-store.ts` — status buka palet dan bantuan. Store modul, bukan context, supaya tombol topbar di setiap
+  cabang `App` bisa membukanya tanpa prop baru (alasan yang sama dengan `NavGate`).
+- `CommandPalette.tsx` — `Modal` DS berisi combobox + listbox. Fokus tetap di kotak kueri dan opsi aktif
+  ditunjuk lewat `aria-activedescendant`. Panah melewati perintah nonaktif, Enter menjalankan, Esc menutup
+  dan fokus kembali ke pemicu. Riwayat ditulis langsung ke storage karena komponen unmount saat palet
+  tertutup, sehingga state `usePersistedState` tak sempat tersimpan.
+- `ShortcutHelp.tsx` — dialog `?`. Isinya dibangkitkan dari `shortcuts.ts`, sehingga tak bisa menyimpang dari
+  shortcut yang benar-benar bekerja.
+- `ProjectSwitcher.tsx` — `ProjectScopeContext` (diisi App dari state `projectFilter`) dan `Select`
+  "Project aktif". Hanya tampil di layar `PROJECT_SCOPED_KEYS` (backlog, team, prd) — layar yang benar-benar
+  membaca filter itu. Nama scope masuk breadcrumb (`data-testid="scope-crumb"`).
+- `palette.css` — gaya palet, dialog bantuan, dan `.hn-shell-cmdk`. Pada `(pointer: coarse), (max-width: 767px)`
+  tombol ≥ `--touch-target` dan petunjuk ⌘K/Ctrl K disembunyikan.
+
+Shell (`ds/shell.tsx`): tombol topbar `aria-label="Cari"` membuka palet dan memasang `aria-keyshortcuts`
+(`Meta+K` di Mac, `Control+K` di lainnya). Kotak cari layar (`showSearch`, Projects) tetap ada berdampingan.
+
+App (`App.tsx`):
+
+- `useGlobalShortcuts` diberi `navKeys` = `HN_NAV` yang sudah tersaring gerbang; hook dipanggil sebelum gerbang
+  auth, sehingga urutan hook tetap.
+- `paletteCommands` disusun dari state App. "Jawab sesi yang menunggu" memakai `waitingSessions` dari
+  `screens/pet-state.ts` dan membuka Terminal ter-fokus ke sesi itu.
+- Dalang keluar ke layar sebelumnya: `lastPageRef` menyimpan layar nav terakhir yang bukan dalang dan dipakai
+  sebagai `previous`. Tanpa riwayat (dibuka langsung dari URL) ia jatuh ke Overview.
+- `TeamScreen` menerima `onOpenSpec` → `/backlog/<id>` (Backlog dengan SpecDetail terbuka).
+- `AuthScreen` menerima `setupTokenPath` dari `/auth/status`. Field itu sudah ada di `AuthStatus`
+  (`shared/src/dto.ts`) dan server (`server/src/routes/auth.ts`).
+- Toast: App merender `ToastHost` (antrean dari `ds/kit.tsx`), diimpor langsung dari `./ds/kit`.
+
+Tes:
+
+- `src/palette/commands.test.ts` — fuzzy, perintah, pencarian, dan "setiap layar HN_NAV bisa dicapai lewat
+  palet" (termasuk layar bergerbang yang mati).
+- `src/palette/shortcuts.test.ts` — chord dan jendelanya; setiap entri HN_NAV punya huruf; isi bantuan.
+- `src/palette/CommandPalette.test.tsx` — dialog, navigasi panah, perintah nonaktif, prefill, Esc + fokus,
+  riwayat.
+- `src/palette/useGlobalShortcuts.test.tsx` — chord, pengecualian fokus/xterm/dialog/modifier, ⌘K, `?`, `/`.
+- `src/palette/shell-topbar.test.tsx` — tombol Cari, petunjuk Ctrl K, project switcher, breadcrumb scope.
+- `src/routes.test.ts` — setiap entri HN_NAV kembali ke section-nya lewat `routePath`/`parseRoute`.
+- `src/test/palette-app.test.tsx` — ⌘K lalu Backlog, `g p` lalu `?`, Dalang kembali ke Projects.
+
+Belum di Fase 2C (lihat [§Status pelaksanaan](ui-ux-audit-2026-10.md#status-pelaksanaan)):
+
+- Tombol "Buat project pertama" di Overview masih `onGoto("projects")`. Membuka modal project baru langsung
+  butuh prop `onCreateProject` di `OverviewScreen` (`screens/`, milik Fase 2F).
+- Tombol "Jawab" pada toast dan notifikasi keputusan (`notifications/`, milik Fase 2G).
+
 ## Kontrak responsive seluruh frontend (SPEC-763)
 
 Semua permukaan — seluruh `HN_NAV`, section transien App, Auth/setup, Modal/form, Pet Hanoman, Help
@@ -1869,8 +1937,10 @@ bersandar pada notifikasi yang **dibuat server-side** (`GET /notifications`) —
 - **`NotificationBell`** (`.../NotificationBell.tsx`) dirender di topbar `Shell` (konsumsi context,
   nol prop-threading ke ~9 call-site `<Shell>`; nilai context default aman untuk test tanpa provider):
   tombol lonceng + badge unread (`--clay-500`), dropdown daftar (`SPEC-x · judul`, "selesai · Xm lalu",
-  dot unread). Membuka dropdown = `POST /notifications/read` (unread → 0). Tombol "Bersihkan" =
-  `DELETE /notifications`.
+  dot unread). Membuka dropdown TIDAK menandai apa pun (audit 2026-10). "Buka" pada satu item =
+  `POST /notifications/:id/read` (ADR-0204): optimistik, galat → item kembali belum-dibaca + toast err;
+  arsip "Semua notifikasi" memakai jalur yang sama. "Tandai semua dibaca" = `POST /notifications/read`.
+  Tombol "Bersihkan" = `DELETE /notifications`.
 - **`UpdateBadge`** (`screens/UpdateIndicator.tsx`) — pil topbar **dua wajah dalam satu kontrol**
   (SPEC-906), keduanya bersumber dari `useUpdate()` (store WS grup `update`, pola `useLimits`).
   `updateAvailable` → pil **brass** `Update · <latest>`; popover: heading, perintah update dalam blok

@@ -55,7 +55,8 @@ describe("SPEC-763 · tab tak menyusut sampai labelnya tumpah", () => {
 describe("SPEC-763 · baris padat memberi teks lebar minimum di mobile", () => {
   it("menyatakan aturan hn-dense-row di media query mobile", () => {
     expect(mobile).toMatch(/\.hn-dense-row[^}]*flex-wrap:\s*wrap/s);
-    expect(mobile).toMatch(/\.hn-dense-row > \[style\*="flex: 1"\]\s*\{\s*min-width/);
+    // Audit 2026-10 · anak ber-flex inline ditandai kelas `hn-grow`, bukan selektor atribut `[style*=]`.
+    expect(mobile).toMatch(/\.hn-dense-row > \.hn-grow\s*\{\s*min-width/);
   });
 
   it("memakai aturan itu pada baris yang terukur terjepit", () => {

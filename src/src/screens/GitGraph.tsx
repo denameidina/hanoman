@@ -157,7 +157,7 @@ function Menu({ x, y, items, onClose, returnFocus }: { x: number; y: number; ite
   const top = Math.max(8 + safeTop, Math.min(y, window.innerHeight - safeBottom - menuHeight - 8));
   return (
     <div ref={rootRef} role="menu" onKeyDown={onKeyDown} style={{ position: "fixed", left, top, zIndex: 150, background: "var(--surface-card)",
-      border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", boxShadow: "var(--shadow-pop, 0 6px 24px rgba(0,0,0,.15))",
+      border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", boxShadow: "var(--shadow-lg)",
       padding: 4, minWidth: 180, maxWidth: "calc(100vw - var(--safe-left) - var(--safe-right) - 16px)",
       maxHeight: "calc(100dvh - var(--safe-top) - var(--safe-bottom) - 16px)", overflowY: "auto" }}>
       {items.map((it) => (
@@ -628,7 +628,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                 onClick={(e) => { e.stopPropagation(); setStashMenu({ x: e.clientX, y: e.clientY, s, anchor: e.currentTarget }); }}
                 onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setStashMenu({ x: e.clientX, y: e.clientY, s, anchor: e.currentTarget }); }}
                 style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, padding: "2px 8px", borderRadius: 999, border: "none",
-                  cursor: "pointer", background: "var(--ink-100, #e7e6e1)", color: "var(--text-muted)", flex: "0 0 auto" }}>
+                  cursor: "pointer", background: "var(--bone-200)", color: "var(--text-muted)", flex: "0 0 auto" }}>
                 {s.ref}: {s.message.length > 40 ? s.message.slice(0, 40) + "…" : s.message}
               </button>
             ))}
@@ -675,7 +675,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
               const sel = detail?.sha === c.sha;
               const hit = findHits.includes(c.sha);
               const activeHit = findHits[findIdx] === c.sha;
-              const rowBg = sel ? "var(--brass-100)" : activeHit ? "var(--brass-200, #ecd9ac)" : hit ? "var(--bone-100)" : "transparent";
+              const rowBg = sel ? "var(--brass-100)" : activeHit ? "var(--brass-300)" : hit ? "var(--bone-100)" : "transparent";
               return (
                 <div key={c.sha} ref={(el) => { if (el) rowRefs.current.set(c.sha, el); }}
                   onClick={(e) => onRowClick(e, c.sha)}
@@ -831,7 +831,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
       {compareFrom && (
         <div style={{ position: "fixed", bottom: "max(16px, var(--safe-bottom))", left: "50%", transform: "translateX(-50%)", zIndex: 140,
           background: "var(--brass-500)", color: "#fff", padding: "6px 14px", borderRadius: 999, fontSize: 12.5,
-          boxShadow: "var(--shadow-pop, 0 6px 24px rgba(0,0,0,.15))", display: "flex", alignItems: "center", gap: 10 }}>
+          boxShadow: "var(--shadow-lg)", display: "flex", alignItems: "center", gap: 10 }}>
           Compare dari {compareFrom.slice(0, 7)} — Ctrl/Cmd-klik commit kedua
           <button type="button" aria-label="Batalkan perbandingan" onClick={() => setCompareFrom(null)} style={{ border: "none", background: "transparent", color: "#fff", cursor: "pointer", fontWeight: 700 }}>✕</button>
         </div>

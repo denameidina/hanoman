@@ -13,7 +13,7 @@ export const SOURCE_META: Record<string, { label: string; icon: string; tone: "e
   audit: { label: "Audit",         icon: "search",    tone: "info",  color: "var(--wind-600)" },
   brief: { label: "feature brief", icon: "lightbulb", tone: "brass", color: "var(--brass-500)" },
   // SPEC-407 · ADR-0089 · backlog goal: sesi dua fase (Goal → Verifikasi), tanpa perencanaan.
-  goal:  { label: "Goal",          icon: "target",    tone: "brass", color: "var(--brass-600)" },
+  goal:  { label: "Goal",          icon: "target",    tone: "brass", color: "var(--brass-700)" },
   help:  { label: "Help Center",   icon: "life-buoy", tone: "info",  color: "var(--wind-500)" },
   // SPEC-825 · ADR-0123 · task remeh: satu fase `Kerjakan`, tanpa perencanaan maupun verifikasi.
   no_effort: { label: "Tanpa effort", icon: "zap", tone: "brass", color: "var(--brass-400)" },

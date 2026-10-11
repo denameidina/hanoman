@@ -1123,7 +1123,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
                 kebenaran — operator harus tahu ia sedang membaca nilai basi, bukan backlog yang
                 menyusut. `role="status"` supaya perubahannya juga terdengar pembaca layar. */}
             <span className="hn-eyebrow" role="status"
-              style={stale ? { color: "var(--amber-600)" } : undefined}
+              style={stale ? { color: "var(--status-warn)" } : undefined}
               title={stale ? "Server tak menjawab saat menyegarkan — angka ini dari muatan terakhir yang berhasil" : undefined}>
               {data.total} spec{stale ? " · data mungkin usang" : ""}
             </span>

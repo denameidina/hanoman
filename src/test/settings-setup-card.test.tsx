@@ -34,7 +34,7 @@ describe("kartu Setup awal (SPEC-884)", () => {
     render(<SettingsScreen {...props} />);
     openTab();
     await waitFor(() => expect(screen.getByTestId("setup-card")).toBeTruthy());
-    expect(screen.getByText(/Device saya sendiri/)).toBeTruthy();
+    expect(screen.getByText(/Perangkat ini/)).toBeTruthy();
     expect(screen.getByText(/Hardening mati/)).toBeTruthy();
     expect(api.setupStatus).toHaveBeenCalled();
   });
@@ -44,6 +44,16 @@ describe("kartu Setup awal (SPEC-884)", () => {
     openTab();
     await waitFor(() => expect(screen.getByTestId("setup-card")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: /Jalankan ulang setup/ }));
-    expect(screen.getByLabelText("Device saya sendiri")).toBeTruthy();
+    expect(screen.getByLabelText("Perangkat ini")).toBeTruthy();
+  });
+
+  // Batal di wizard yang diulang harus kembali ke kartu, bukan membiarkan operator terkunci di wizard.
+  it("Batal di wizard yang diulang kembali ke kartu Setup awal", async () => {
+    render(<SettingsScreen {...props} />);
+    openTab();
+    await waitFor(() => expect(screen.getByTestId("setup-card")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /Jalankan ulang setup/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
+    expect(await screen.findByTestId("setup-card")).toBeTruthy();
   });
 });

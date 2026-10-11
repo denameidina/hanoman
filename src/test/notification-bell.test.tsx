@@ -4,7 +4,8 @@ import { NotificationBell } from "../src/notifications/NotificationBell";
 import { NotificationsContext } from "../src/notifications/NotificationsContext";
 
 function Harness({ items, onOpen, markAllRead = () => {} }: { items: any[]; onOpen?: (n: any) => void; markAllRead?: () => void }) {
-  const ctx = { items, unread: items.filter((n) => !n.readAt).length, total: items.length, markAllRead, clear: () => {}, onOpen };
+  // ADR-0204 · markRead per item (tes perilakunya ada di src/notifications/notifications.test.tsx).
+  const ctx = { items, unread: items.filter((n) => !n.readAt).length, total: items.length, markAllRead, markRead: () => {}, clear: () => {}, onOpen };
   return <NotificationsContext.Provider value={ctx}><NotificationBell /></NotificationsContext.Provider>;
 }
 const now = () => new Date().toISOString();

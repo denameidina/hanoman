@@ -2,55 +2,168 @@
    ESM + typed; window global removed. No visual change. */
 import React from "react";
 import { Icon } from "./icon";
+import { FieldLinkContext, ariaInvalid, useFieldLink, type FieldLinkValue } from "./components/forms";
 
 const modalStack: symbol[] = [];
 
-export type ToastData = { message: React.ReactNode; tone?: string; icon?: string; k: number };
-export type ShowToast = (message: React.ReactNode, tone?: string, icon?: string) => void;
-
-export function useToast(): [ToastData | null, ShowToast] {
-  const [toast, setToast] = React.useState<ToastData | null>(null);
-  const tRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const show = React.useCallback<ShowToast>((message, tone = "ok", icon) => {
-    setToast({ message, tone, icon, k: Date.now() });
-    if (tRef.current) clearTimeout(tRef.current);
-    tRef.current = setTimeout(() => setToast(null), 2600);
-  }, []);
-  return [toast, show];
+// Audit UI/UX 2026-10 · Fase 2B · latar modal inert. Saat modal terbuka, setiap saudara (sibling)
+// dari leluhur panelnya — sampai anak `body` — diberi `inert`: fokus, klik, dan pembaca layar tak
+// bisa masuk ke belakang modal. Hitungan per elemen menjaga modal bertumpuk: latar baru dilepas
+// bila modal terakhir yang menandainya sudah tutup. Toast (`data-hn-toast-host`) dikecualikan agar
+// tetap diumumkan dan bisa diurungkan selagi modal terbuka.
+const inertCount = new Map<Element, number>();
+function inertBackground(from: Element): () => void {
+  const marked: Element[] = [];
+  let node: Element = from;
+  while (node !== document.body && node.parentElement) {
+    for (const sib of Array.from(node.parentElement.children)) {
+      if (sib === node || sib.hasAttribute("data-hn-toast-host")) continue;
+      const n = inertCount.get(sib) ?? 0;
+      inertCount.set(sib, n + 1);
+      if (n === 0) sib.setAttribute("inert", "");
+      marked.push(sib);
+    }
+    node = node.parentElement;
+  }
+  return () => {
+    for (const el of marked) {
+      const n = (inertCount.get(el) ?? 1) - 1;
+      if (n > 0) { inertCount.set(el, n); continue; }
+      inertCount.delete(el);
+      el.removeAttribute("inert");
+    }
+  };
 }
 
-export function Toast({ toast }: { toast: ToastData | null }) {
-  if (!toast) return null;
+// ── Toast · antrean (Audit UI/UX 2026-10 · Fase 2B) ─────────────────────────────────────
+// Maksimal TOAST_VISIBLE terlihat sekaligus; sisanya menunggu dan baru tampil ketika ada slot.
+// Tiap toast punya timernya sendiri yang mulai saat ia terlihat dan berhenti selama kursor atau
+// fokus ada di dalamnya. Toast ber-aksi ("Urungkan") bertahan lebih lama. Wadah live region
+// (`role="status"`) selalu ada di DOM; toast bernada `err` membawa `role="alert"` sendiri.
+export const TOAST_VISIBLE = 3;
+const TOAST_MS = 2600;
+const TOAST_ACTION_MS = 7000;
+
+export type ToastAction = { label: string; onAction: () => void };
+export type ToastOptions = { action?: ToastAction; duration?: number };
+export type ToastData = { message: React.ReactNode; tone?: string; icon?: string; k: number;
+  action?: ToastAction; duration?: number };
+/** Keadaan antrean yang dikembalikan `useToast()` dan dirender `ToastHost` / `Toast`. */
+export type ToastQueue = { items: ToastData[]; dismiss: (k: number) => void };
+export type ShowToast = (message: React.ReactNode, tone?: string, icon?: string, opts?: ToastOptions) => void;
+
+export function useToast(): [ToastQueue, ShowToast] {
+  const [items, setItems] = React.useState<ToastData[]>([]);
+  const seq = React.useRef(0);
+  const show = React.useCallback<ShowToast>((message, tone = "ok", icon, opts) => {
+    const k = ++seq.current;
+    setItems((prev) => [...prev, { k, message, tone, icon, action: opts?.action, duration: opts?.duration }]);
+  }, []);
+  const dismiss = React.useCallback((k: number) => setItems((prev) => prev.filter((t) => t.k !== k)), []);
+  const queue = React.useMemo<ToastQueue>(() => ({ items, dismiss }), [items, dismiss]);
+  return [queue, show];
+}
+
+function ToastItem({ toast, onDone }: { toast: ToastData; onDone?: (k: number) => void }) {
   const tone = toast.tone || "ok";
-  const color = tone === "err" ? "var(--clay-500)" : tone === "warn" ? "var(--amber-500)"
+  const err = tone === "err";
+  const color = err ? "var(--clay-500)" : tone === "warn" ? "var(--amber-500)"
     : tone === "info" ? "var(--wind-600)" : "var(--leaf-500)";
-  const icon = toast.icon || (tone === "err" ? "x-circle" : tone === "warn" ? "alert-triangle"
+  const icon = toast.icon || (err ? "x-circle" : tone === "warn" ? "alert-triangle"
     : tone === "info" ? "info" : "check-circle-2");
+  const action = toast.action;
+  const duration = toast.duration ?? (action ? TOAST_ACTION_MS : TOAST_MS);
+  const [hover, setHover] = React.useState(false);
+  const [focus, setFocus] = React.useState(false);
+  const [gone, setGone] = React.useState(false);
+  const paused = hover || focus;
+  const left = React.useRef(duration);
+  const since = React.useRef(0);
+  const doneRef = React.useRef(onDone);
+  doneRef.current = onDone;
+  const k = toast.k;
+  const dismiss = () => { if (doneRef.current) doneRef.current(k); else setGone(true); };
+
+  // Timer berjalan hanya saat tidak dijeda. Saat dijeda, sisa waktu dikurangi dengan yang sudah
+  // berlalu — jadi toast yang disorot tak hilang di tengah dibaca.
+  React.useEffect(() => {
+    if (paused) return;
+    since.current = Date.now();
+    const timer = setTimeout(() => {
+      if (doneRef.current) doneRef.current(k); else setGone(true);
+    }, left.current);
+    return () => {
+      clearTimeout(timer);
+      left.current = Math.max(0, left.current - (Date.now() - since.current));
+    };
+  }, [paused, k]);
+
+  if (gone) return null;
   return (
-    <div key={toast.k} className="hn-toast" role="status" aria-live="polite" style={{
-      position: "fixed", left: "50%", bottom: "calc(28px + var(--safe-bottom))", transform: "translateX(-50%)", zIndex: 200,
-      display: "flex", alignItems: "center", gap: 10, padding: "11px 16px",
-      background: "var(--surface-inverse)", color: "var(--term-fg)",
-      borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-xl)",
-      fontFamily: "var(--font-sans)", fontSize: 13.5,
-      maxWidth: "min(460px, calc(100vw - var(--safe-left) - var(--safe-right) - 28px))",
-      animation: "hn-toast-in 220ms var(--ease-out, ease-out)",
-    }}>
+    <div className="hn-toast" role={err ? "alert" : undefined} aria-live={err ? "assertive" : undefined}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onFocus={() => setFocus(true)}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocus(false); }}
+      style={{
+        pointerEvents: "auto", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 10,
+        padding: action ? "9px 10px 9px 16px" : "11px 16px",
+        background: "var(--surface-inverse)", color: "var(--term-fg)",
+        borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-xl)",
+        fontFamily: "var(--font-sans)", fontSize: 13.5, maxWidth: "100%",
+        animation: "hn-fade-in 180ms var(--ease-out, ease-out)",
+      }}>
       <Icon name={icon} size={16} color={color} />
-      <span>{toast.message}</span>
+      <span style={{ minWidth: 0, flex: "1 1 auto" }}>{toast.message}</span>
+      {action && (
+        <button type="button" onClick={() => { action.onAction(); dismiss(); }} style={{
+          border: "none", background: "transparent", cursor: "pointer", color: "var(--brass-300)",
+          font: "var(--weight-medium) 13px/1 var(--font-ui)", padding: "6px 8px", borderRadius: "var(--radius-sm)",
+          flex: "0 0 auto",
+        }}>{action.label}</button>
+      )}
     </div>
   );
 }
 
-export function Modal({ open, title, eyebrow, icon, onClose, footer, width = 560, closeOnEscape = true, fillHeight = false, children }:
+/** Wadah live region toast. Selalu dirender — pembaca layar menangkap toast yang masuk walau
+ *  wadahnya kosong saat itu. Tiap toast bernada `err` diumumkan assertive lewat `role="alert"`. */
+export function ToastHost({ toast }: { toast?: ToastQueue | ToastData | null }) {
+  const queue = toast && "items" in toast ? toast : null;
+  const single = toast && !("items" in toast) ? toast : null;
+  const items = queue ? queue.items : single ? [single] : [];
+  const dismiss = queue ? queue.dismiss : undefined;
+  const visible = items.slice(0, TOAST_VISIBLE);
+  return (
+    <div data-hn-toast-host="" role="status" aria-live="polite" style={{
+      position: "fixed", left: "50%", bottom: "calc(28px + var(--safe-bottom))", transform: "translateX(-50%)", zIndex: 200,
+      display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+      width: "max-content", maxWidth: "min(460px, calc(100vw - var(--safe-left) - var(--safe-right) - 28px))",
+      pointerEvents: "none",
+    }}>
+      {visible.map((t) => <ToastItem key={t.k} toast={t} onDone={dismiss} />)}
+    </div>
+  );
+}
+
+/** Nama lama. Tetap dipakai pemanggil lama tanpa perubahan — kini merender antrean lewat `ToastHost`. */
+export function Toast({ toast }: { toast?: ToastQueue | ToastData | null }) {
+  return <ToastHost toast={toast} />;
+}
+
+// Audit UI/UX 2026-10 · Fase 2B · `dismissible=false` mematikan Escape, klik latar, dan tombol ×
+// (dipakai ConfirmDialog selama mutasi berjalan). Judul adalah <h2> yang dirujuk aria-labelledby.
+export function Modal({ open, title, eyebrow, icon, onClose, footer, width = 560, closeOnEscape = true, dismissible = true, fillHeight = false, children }:
   { open: boolean; title?: React.ReactNode; eyebrow?: React.ReactNode; icon?: string;
     onClose?: () => void; footer?: React.ReactNode; width?: number; closeOnEscape?: boolean;
-    fillHeight?: boolean; children?: React.ReactNode }) {
+    dismissible?: boolean; fillHeight?: boolean; children?: React.ReactNode }) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const stackId = React.useRef(Symbol("modal"));
   const titleId = React.useId();
   const closeRef = React.useRef(onClose);
   closeRef.current = onClose;
+  const dismissRef = React.useRef(dismissible);
+  dismissRef.current = dismissible;
+  const canDismiss = dismissible && !!onClose;
 
   React.useLayoutEffect(() => {
     if (!open || !panelRef.current) return;
@@ -58,10 +171,14 @@ export function Modal({ open, title, eyebrow, icon, onClose, footer, width = 560
     const panel = panelRef.current;
     const id = stackId.current;
     modalStack.push(id);
+    const releaseBackground = inertBackground(panel);
     const controls = () => Array.from(panel.querySelectorAll<HTMLElement>(
       'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
     ));
-    const initial = panel.querySelector<HTMLElement>("[autofocus]")
+    // Fokus awal: `data-initial-focus` (mis. "Batal" pada konfirmasi destruktif) lebih dulu, lalu
+    // isian pertama, lalu tombol pertama.
+    const initial = panel.querySelector<HTMLElement>("[data-initial-focus]:not([disabled])")
+      ?? panel.querySelector<HTMLElement>("[autofocus]")
       ?? panel.querySelector<HTMLElement>('input:not([disabled]), textarea:not([disabled]), select:not([disabled])')
       ?? panel.querySelector<HTMLElement>('button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])');
     initial?.focus();
@@ -69,6 +186,7 @@ export function Modal({ open, title, eyebrow, icon, onClose, footer, width = 560
     const onKeyDown = (event: KeyboardEvent) => {
       if (modalStack.at(-1) !== id) return;
       if (event.key === "Escape" && closeOnEscape) {
+        if (!dismissRef.current) return;
         event.preventDefault();
         closeRef.current?.();
         return;
@@ -93,13 +211,14 @@ export function Modal({ open, title, eyebrow, icon, onClose, footer, width = 560
       window.removeEventListener("keydown", onKeyDown);
       const index = modalStack.lastIndexOf(id);
       if (index >= 0) modalStack.splice(index, 1);
+      releaseBackground();
       previous?.focus();
     };
   }, [closeOnEscape, open]);
 
   if (!open) return null;
   return (
-    <div className="hn-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose && onClose(); }} style={{
+    <div className="hn-modal-overlay" onMouseDown={(e) => { if (canDismiss && e.target === e.currentTarget) onClose?.(); }} style={{
       position: "fixed", inset: 0, zIndex: 150, display: "flex", alignItems: "center", justifyContent: "center",
       background: "color-mix(in srgb, var(--ink-900) 42%, transparent)",
       animation: "hn-fade-in 160ms ease-out",
@@ -131,10 +250,13 @@ export function Modal({ open, title, eyebrow, icon, onClose, footer, width = 560
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             {eyebrow && <div className="hn-eyebrow" style={{ marginBottom: 3 }}>{eyebrow}</div>}
-            <div id={titleId} style={{ fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-strong)", lineHeight: 1.15 }}>{title}</div>
+            {title && (
+              <h2 id={titleId} style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--text-strong)", lineHeight: 1.15 }}>{title}</h2>
+            )}
           </div>
-          <button onClick={onClose} aria-label="Tutup" style={{
-            border: "none", background: "transparent", cursor: "pointer", color: "var(--text-muted)",
+          <button type="button" onClick={() => { if (canDismiss) onClose?.(); }} disabled={!canDismiss} aria-label="Tutup" style={{
+            border: "none", background: "transparent", cursor: canDismiss ? "pointer" : "not-allowed", color: "var(--text-muted)",
+            opacity: canDismiss ? 1 : 0.4,
             width: 44, height: 44, alignItems: "center", justifyContent: "center",
             padding: 0, borderRadius: "var(--radius-sm)", display: "inline-flex", flex: "0 0 auto",
           }}><Icon name="x" size={18} /></button>
@@ -152,32 +274,69 @@ export function Modal({ open, title, eyebrow, icon, onClose, footer, width = 560
   );
 }
 
-export function Field({ label, hint, children }: { label?: React.ReactNode; hint?: React.ReactNode; children?: React.ReactNode }) {
+// Audit UI/UX 2026-10 · Fase 2B · label dan hint dipisah. Label adalah <label htmlFor> ke kontrol
+// pemilik (kontrol pertama di dalamnya); hint dan error ditautkan lewat aria-describedby; error
+// tampil dengan role="alert" dan menyalakan aria-invalid pada kontrol. Pembungkus tak lagi
+// memuat seluruh isi di dalam <label>.
+export function Field({ label, hint, error, children }: {
+  label?: React.ReactNode; hint?: React.ReactNode; error?: React.ReactNode; children?: React.ReactNode;
+}) {
+  const uid = React.useId();
+  const hintId = hint ? `${uid}-hint` : undefined;
+  const errorId = error ? `${uid}-error` : undefined;
+  const [claims, setClaims] = React.useState<{ token: string; id: string }[]>([]);
+  const register = React.useCallback((token: string, explicitId?: string) => {
+    const id = explicitId ?? `${uid}-control`;
+    setClaims((prev) => {
+      const at = prev.findIndex((c) => c.token === token);
+      if (at < 0) return [...prev, { token, id }];
+      return prev[at]!.id === id ? prev : prev.map((c, i) => (i === at ? { token, id } : c));
+    });
+  }, [uid]);
+  const unregister = React.useCallback((token: string) => {
+    setClaims((prev) => prev.filter((c) => c.token !== token));
+  }, []);
+  const owner = claims[0] ?? null;
+  const describedBy = [errorId, hintId].filter(Boolean).join(" ") || undefined;
+  const link = React.useMemo<FieldLinkValue>(() => ({
+    owner, describedBy, invalid: !!error, register, unregister,
+  }), [owner, describedBy, error, register, unregister]);
   return (
-    <label style={{ display: "block", marginBottom: 14 }}>
-      <div style={{ fontFamily: "var(--font-ui)", fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)", marginBottom: 6 }}>{label}</div>
-      {children}
-      {hint && <div style={{ fontSize: 11.5, color: "var(--text-subtle)", marginTop: 5 }}>{hint}</div>}
-    </label>
+    <FieldLinkContext.Provider value={link}>
+      <div className="hn-field" style={{ display: "block", marginBottom: 14 }}>
+        {label && (
+          <label htmlFor={owner?.id} style={{ display: "block", fontFamily: "var(--font-ui)", fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)", marginBottom: 6 }}>{label}</label>
+        )}
+        {children}
+        {hint && <div id={hintId} style={{ fontSize: 11.5, color: "var(--text-subtle)", marginTop: 5 }}>{hint}</div>}
+        {error && <div id={errorId} role="alert" style={{ fontSize: 12, color: "var(--status-err)", marginTop: 5, lineHeight: 1.4 }}>{error}</div>}
+      </div>
+    </FieldLinkContext.Provider>
   );
 }
 
 // SPEC-407 · `...rest` diteruskan ke <textarea> supaya atribut aksesibilitas (`aria-label`,
 // `id`, `data-testid`) bisa dipasang dari call site — `Input` sudah lama begitu, dan tanpa ini
 // textarea di modal tak punya nama yang bisa dipegang pembaca layar maupun test.
-export function HnTextarea({ value, onChange, rows = 3, placeholder, mono = false, ...rest }:
-  { value?: string; onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void; rows?: number; placeholder?: string; mono?: boolean }
+// Fase 2B: `onFocus`/`onBlur` pemanggil DIGABUNG (dulu ditimpa), dan `invalid`/`aria-invalid` menyalakan
+// border error. Kelas `hn-textarea-core` mematikan outline bawaan agar fokus hanya tergambar sekali.
+export function HnTextarea({ value, onChange, rows = 3, placeholder, mono = false, invalid = false, onFocus, onBlur, ...rest }:
+  { value?: string; onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void; rows?: number; placeholder?: string; mono?: boolean; invalid?: boolean }
   & Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "onChange" | "rows" | "placeholder" | "style">) {
   const [focus, setFocus] = React.useState(false);
+  const link = useFieldLink({ id: rest.id, describedBy: rest["aria-describedby"], invalid: invalid || ariaInvalid(rest["aria-invalid"]) });
+  const bad = link.invalid;
   return (
-    <textarea {...rest} value={value} onChange={onChange} rows={rows} placeholder={placeholder}
-      onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} style={{
+    <textarea {...rest} id={link.id} aria-describedby={link.describedBy} aria-invalid={bad ? true : rest["aria-invalid"]}
+      className="hn-textarea-core" value={value} onChange={onChange} rows={rows} placeholder={placeholder}
+      onFocus={(e) => { setFocus(true); onFocus?.(e); }}
+      onBlur={(e) => { setFocus(false); onBlur?.(e); }} style={{
         display: "block", width: "100%", boxSizing: "border-box", resize: "vertical",
         fontFamily: mono ? "var(--font-mono)" : "var(--font-ui)", fontSize: 13,
         color: "var(--text-strong)", background: "var(--surface-card)",
-        border: `1px solid ${focus ? "var(--border-focus)" : "var(--border-strong)"}`,
+        border: `1px solid ${bad ? "var(--status-err)" : focus ? "var(--border-focus)" : "var(--border-strong)"}`,
         borderRadius: "var(--radius-sm)", padding: "9px 11px", lineHeight: 1.5,
-        boxShadow: focus ? "var(--ring)" : "var(--shadow-inset)", outline: "none",
+        boxShadow: focus ? "var(--ring)" : bad ? "none" : "var(--shadow-inset)", outline: "none",
       }} />
   );
 }

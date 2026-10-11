@@ -3,6 +3,7 @@ import type { PendingCounts } from "./pending";
 import { z } from "zod";
 import type { SessionAsk } from "./session-ask";
 import type { TaskView } from "./team";
+import type { Scheduler } from "./entities";
 import { zProject, zBriefPayload, zQaPayload, zGoalPayload, zSpec, zScheduler, zAgent, zLead, zPhaseOverrides } from "./entities";
 import {
   zLeadGate, zLeadKind, zLeadConfidence, zLeadAction, zLeadStatus, zLeadChoice,
@@ -202,6 +203,10 @@ export const zSchedulerQueueCounts = z.object({
 });
 export type SchedulerQueueCounts = z.infer<typeof zSchedulerQueueCounts>;
 
+// ADR-0204 · `serverTimeZone` = zona waktu LOKAL server, tempat cron benar-benar dihitung
+// (shared/src/cron-expr.ts memakai penanda lokal). UI menampilkan preview dalam zona ini, bukan
+// zona browser. OPSIONAL di skema: respons server lama dan fixture yang belum membawanya tetap valid
+// (aditif). Server selalu mengirimkannya; klien memakai zona browser bila tak ada.
 export const zSchedulerState = z.object({
   config: zScheduler,
   cap: z.number(), liveCount: z.number(),
@@ -209,8 +214,12 @@ export const zSchedulerState = z.object({
   sources: z.array(zSchedulerSourceView),
   queueCounts: zSchedulerQueueCounts,
   sessions: z.array(zSchedulerSessionView),
+  serverTimeZone: z.string().optional(),
 });
 export type SchedulerStateView = z.infer<typeof zSchedulerState>;
+// ADR-0204 · GET /scheduler/config = setelan + zona waktu server (field tambahan, bukan bagian setelan:
+// PUT tetap menerima `zScheduler` polos, dan zod membuang field asing).
+export type SchedulerConfigView = Scheduler & { serverTimeZone: string };
 
 // SPEC-409 · ADR-0091 · satu baris jejak keputusan hanoman-lead (AC-23). Tanggal = string ISO.
 // `refs` sudah tersaring di server: hanya rujukan yang benar-benar ada di repo (AC-6).

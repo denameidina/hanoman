@@ -193,7 +193,7 @@ export function WorktreesPanel({ projectId, focus, onOpenBranch }: {
                   background: focus === w.name ? "var(--surface-sunken)" : undefined }}>
                 <Checkbox data-testid={`pick-${w.name}`} checked={picked.has(w.name)}
                   disabled={!w.deletable} onChange={() => toggle(w.name)} />
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", flex: 1 }}>
+                <span className="hn-grow" style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", flex: 1 }}>
                   {w.name}
                 </span>
                 {w.branch

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseRoute, routePath } from "./routes";
+import { HN_NAV } from "./ds/shell";
 
 const KEYS = ["overview", "projects", "backlog", "skills", "qa", "settings"];
 
@@ -27,5 +28,15 @@ describe("routes · qa", () => {
     expect(routePath({ section: "qa", projectId: "p 1" })).toBe("/qa/p%201");
     expect(parseRoute(routePath({ section: "qa", projectId: "p 1" }), KEYS)).toEqual({ section: "qa", projectId: "p 1" });
     expect(parseRoute("/qa/a/b", KEYS)).toBeNull();
+  });
+});
+
+describe("routes · setiap halaman bernavigasi", () => {
+  // Palet perintah dan shortcut `g`+huruf berpindah lewat routePath; jalur itu harus kembali ke section yang sama.
+  it("routePath lalu parseRoute kembali ke section-nya untuk setiap entri HN_NAV", () => {
+    const keys = HN_NAV.map((n) => n.key);
+    for (const key of keys) {
+      expect(parseRoute(routePath({ section: key }), keys), key).toEqual({ section: key });
+    }
   });
 });

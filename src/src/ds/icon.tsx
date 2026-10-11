@@ -5,9 +5,14 @@ type IconProps = {
   name: string; size?: number; stroke?: number; color?: string;
   className?: string; style?: React.CSSProperties;
 } & Record<string, unknown>;
+// Audit UI/UX 2026-10 · Fase 2B · ikon DEKORATIF (tanpa aria-label/aria-labelledby/title) disembunyikan
+// dari pembaca layar: teks di sebelahnya sudah menjelaskan. Ikon yang diberi nama dirender sebagai
+// `role="img"` dengan nama itu. Caller tetap bisa menimpa lewat `aria-hidden` eksplisit.
 export function Icon({ name, size = 16, stroke, color, style, ...rest }: IconProps) {
   const Cmp = resolve(name) ?? ICONS.Circle!;
-  return <Cmp data-icon={name} size={size} color={color} strokeWidth={stroke} style={style} {...rest} />;
+  const named = rest["aria-label"] != null || rest["aria-labelledby"] != null || rest.title != null;
+  return <Cmp data-icon={name} aria-hidden={named ? undefined : true} role={named ? "img" : undefined}
+    size={size} color={color} strokeWidth={stroke} style={style} {...rest} />;
 }
 // ADR-0160 · lookup ke registry STATIS (`icon-registry.ts`, dibangkitkan dari literal di sumber),
 // bukan peta `icons` lucide: peta itu memuat ±1 500 ikon dan menyeret ±1 MB ke chunk utama.

@@ -51,7 +51,10 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
     }).catch((e: unknown) => {
       setSettingsNotice(`${failureMessage("memuat pengaturan", e)} · memakai default bawaan`);
     });
-    api.getCodexVersion().then((v) => setCodexVer(v.version)).catch(() => {});
+    // Versi Codex hanya dasar peringatan kompatibilitas model; galatnya tetap ditulis di notice, bukan diam.
+    api.getCodexVersion().then((v) => setCodexVer(v.version)).catch((e: unknown) => {
+      setSettingsNotice((n) => (n ? `${n} · ` : "") + failureMessage("membaca versi Codex CLI", e));
+    });
   }, [open]);
 
   const pickAgent = (a: Agent) => {
@@ -114,7 +117,7 @@ export function NewTerminalModal({ open, projectId, projectName, onClose, onCrea
       {agent === "codex" && codexClientTooOld(model, codexVer) && (
         <div data-testid="codex-version-note" style={{
           fontSize: 12, lineHeight: 1.5, marginBottom: 12, padding: "8px 10px",
-          borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-muted)",
+          borderRadius: 8, background: "var(--status-warn-tint)", color: "var(--text-muted)",
         }}>
           Codex CLI terpasang <b>{codexVer}</b>, sedangkan <b>{model}</b> butuh <b>{codexModel(model)?.minClient}</b>.
           Sesi tetap boleh dijalankan, tapi modelnya belum tentu dikenali CLI ini.

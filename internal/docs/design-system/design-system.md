@@ -100,6 +100,151 @@ Aturan:
    `ds/components/forms.tsx`) mendapat area 44×44 pada `(pointer: coarse), (max-width: 767px)`
    (`app.css`). Checkbox/radio native tetap 24×24 di desktop; itu disengaja.
 
+## Primitif layout (Audit UI/UX 2026-10 · Fase 2A)
+
+Primitif ini menggantikan layout inline yang diaudit (1.416 `style={{` di `screens/`) dengan satu pola.
+Kontraknya: **susunan dan hover/fokus lewat kelas `hn-*` di `app.css`**; inline hanya boleh berisi nilai
+token (`var(--space-*)`, `var(--text-*)`). `hover` dengan `useState` dilarang untuk baris dan item menu.
+Sumber: `ds/components/layout.tsx`, `skeleton.tsx`, dan bagian yang diubah di `feedback.tsx`, `ui.tsx`,
+`live.tsx`, `surfaces.tsx`. Ekspor dari `ds/index.ts`.
+
+| Primitif | API inti | Catatan |
+|---|---|---|
+| `PageHeader` | `title`, `eyebrow?`, `description?`, `actions?` | Judul = `<h2>`; shell memegang `<h1>`. Eyebrow hanya untuk level seksi. |
+| `FilterBar` | `label`, `search?` (wajib `placeholder` berisi contoh), `chips?` (`{key,label,onRemove}`), `filters?` (isi popover "Filter"), `onReset?`, `actions?` | Reset muncul hanya bila ada filter/pencarian aktif. Popover memakai `usePopoverFocus` (Escape, fokus kembali). |
+| `RowList` + `DenseRow` | `label` · `onClick?` / `href?` / `selected?` / `actions?` | Baris klik = `<button>`, baris tautan = `<a>`, baris biasa = `<div>`. Aksi selalu di luar elemen klik (tak ada tombol di dalam tombol). `aria-current` untuk terpilih. |
+| `Stack` / `Inline` | `gap` (0–12, skala spacing), `align?`, `wrap?` (Inline) | Gap = `var(--space-N)`. `Inline` membungkus secara default. |
+| `Text` | `size` 11 \| 12 \| 13 \| 14 \| 16, `tone` body \| muted \| subtle \| strong | Ukuran di luar skala token tak bisa diketik. |
+| `Skeleton` / `SkeletonList` | `height?`, `radius?` / `rows?`, `label?` | `SkeletonList` = `role="status"` + `aria-busy`; blok skeleton `aria-hidden`. Shimmer mati di `prefers-reduced-motion`. |
+| `Tabs` + `TabPanel` | `children` = `TabPanel` anak langsung | Tab punya `id` dan `aria-controls` (hanya bila ada panelnya). Panel tak aktif tetap di DOM dengan `hidden`. Keyboard tak berubah. |
+
+**Feedback yang diubah.** `Badge` dan `StatusPill` mendapat `variant="dot"` (titik status + teks, tanpa latar;
+titik `aria-hidden`, maknanya selalu ikut sebagai teks). `ProgressBar`: `aria-*` berjalan ke elemen
+`role="progressbar"` (track), `label` string menjadi nama aksesibel bila tak ada `aria-label`, dan `valueText`
+menjadi `aria-valuetext`. `Callout`: `err` → `role="alert"`, `warn` dan `ok` → `role="status"`, `info` dan
+`brass` → `role="note"`; prop `role` eksplisit tetap menang. `LiveConnectionBadge` kini selalu merender
+wilayah `role="status"` (aria-live polite) dan hanya isinya yang berubah.
+
+**Token teks yang lolos 4,5:1 (dihitung dari hex).** Warna teks di atas tint memakai token ini; token
+fill (`--amber-600`, `--brass-600`, `--wind-600`, `--clay-600` sebagai titik/batas) tak pernah jadi teks.
+
+| pasangan (teks di atas latar) | rasio | keputusan |
+|---|---:|---|
+| `--amber-700` di atas `--amber-100` | 4,80 | teks warning (`--status-warn`) |
+| `--brass-700` di atas `--brass-100` | 5,45 | teks running, badge brass, angka tab |
+| `--wind-700` di atas `--wind-100` | 6,42 | teks queued/scanning |
+| `--amber-600` di atas `--amber-100` | 3,13 | **gagal sebagai teks**; hanya fill |
+| `--brass-600` di atas `--brass-100` | 3,96 | **gagal sebagai teks** |
+| `--wind-600` di atas `--wind-100` | 4,47 | **gagal sebagai teks** (selisih 0,03) |
+
+**Menu aksi (`OverflowActions`).** Pemicu wajib `label` (nama aksesibelnya); `title?` mengganti judul dialog
+(default `label`). Item `tone: "danger"` memakai `--clay-600` (6,45:1 di kartu). Panel tetap **dialog**
+(sheet Modal), bukan `role="menu"`: pemakai dan test mencari item sebagai `button` di dalam dialog, dan
+mengganti role memutus ~11 berkas test sekaligus. Menu ARIA penuh adalah tindak lanjut terpisah.
+
+**CSS yang dipindah ke kelas.** `[style*=…]` sudah tak ada di `app.css`; anak ber-flex inline yang
+dulu dikenali selektor itu kini membawa `hn-grow` (`flex: 1 1 0%`, identik dengan inline `flex: 1`).
+Header `Card` (`.hn-card-header`) menyusun dirinya lewat kelas, sehingga `align-items` di mobile
+tak lagi butuh `!important`. `!important` yang dihapus: outline `:focus-visible` (role tab/checkbox/radio/
+switch, `.hn-select select`, `.hn-textarea-core`), karena tak ada gaya inline yang bersaing. Sisanya
+(`.hn-modal-*`, `.hn-viewport-popover`, `.hn-project-*`, `.hn-backlog-*`, `.hn-portal-*`, `.hn-setting-*`,
+`.hn-dense-row`, `.hn-grid-mobile`, `.hn-touch-target`) **masih perlu `!important`** karena menimpa layout
+inline di TSX; menghapusnya berarti memindahkan layout inline itu ke kelas (Fase 2E).
+
+Test: `src/test/ds-layout-primitives.test.tsx`, `ds-feedback-a11y.test.tsx`, `ds-css-contract.test.ts`,
+serta `use-live-topic.test.tsx` (wilayah live) dan `overflow-actions.test.tsx`.
+
+## Palet perintah dan shortcut (Audit UI/UX 2026-10 · Fase 2C)
+
+Aturan interaksi global. Implementasi dan rincian berkas di
+[frontend-implementation](../frontend/frontend-implementation.md#audit-uiux-2026-10--fase-2c--palet-perintah--shortcut).
+
+| Tombol | Aksi | Catatan |
+|---|---|---|
+| ⌘K / Ctrl K | Buka atau tutup palet perintah | Tak aktif di dalam terminal (`.xterm`); Ctrl+K milik readline shell |
+| `g` lalu huruf | Pindah layar | Jendela 1 dtk. o Overview · d Dalang · p Projects · r PRD · b Backlog · m Tim · q QA · e Triase · j Scheduler · l Lead · t Terminal · i IDE · a Skills · v VPS · k Klien · f Docs · s Settings |
+| `/` | Fokus kotak cari topbar | Bila layar tak punya kotak cari, palet yang terbuka |
+| `?` | Bantuan shortcut | Daftar yang sama dengan yang bekerja (dibangkitkan dari peta) |
+| Esc | Tutup palet atau dialog | Fokus kembali ke pemicu |
+| ↑ ↓ Enter | Pilih dan jalankan di palet | Perintah nonaktif dilewati |
+| Ctrl+Shift+Esc | Lepas fokus dari terminal | Tetap milik terminal; tak dipakai shortcut lain |
+
+Aturan:
+
+1. Shortcut huruf tunggal (`g`, `/`, `?`) tak pernah aktif saat fokus di input, textarea, select,
+   contenteditable, atau terminal, saat dialog modal terbuka, atau bersama Ctrl/⌘/Alt.
+2. `g` hanya menuju layar yang tampil di sidebar. Layar bergerbang yang mati tak pernah dituju.
+3. Tombol topbar "Cari" membuka palet dan menunjukkan `⌘K` (Mac) atau `Ctrl K` (lainnya). Di mobile dan
+   pointer kasar ia menjadi ikon ≥44px dan petunjuknya disembunyikan.
+4. Project switcher topbar hanya tampil di layar yang membaca filter project (Backlog, Tim, PRD). Scope
+   aktif ditampilkan di breadcrumb sebagai `project: <nama>`.
+5. Hasil palet dikelompokkan: Riwayat dan Menunggu kamu, Aksi, Pindah ke saat kueri kosong; Backlog dan
+   Project hanya saat diketik, dipangkas delapan per grup.
+
+## Form, Modal, Toast — Fase 2B (Audit UI/UX 2026-10)
+
+Fase 2B menutup bagian a11y fondasi untuk form dan overlay. Kontrak di bawah berlaku untuk pemakai baru;
+pemakai lama tetap berjalan tanpa perubahan kecuali yang disebut sebagai perubahan perilaku.
+
+**Field: label dipisah dari hint.** `<Field label hint error>` merender `<label htmlFor>` yang menunjuk
+*kontrol pemilik* — kontrol pertama di dalamnya (`Input`, `Select`, `HnTextarea`, atau pemicu `MultiSelect`).
+Hint dan error ditautkan lewat `aria-describedby`. `error` menyalakan `aria-invalid` pada kontrol dan
+tampil dengan `role="alert"`. `id` dan `aria-describedby` yang dipasang pemanggil langsung **menang** atas
+tautan otomatis. Elemen `<input>`/`<textarea>` native di dalam Field tak ikut ditautkan: beri `aria-label`.
+
+**Input · Select · HnTextarea.** Ketiganya menerima `invalid` (border error + `aria-invalid`), `aria-invalid`,
+dan `aria-describedby`. `HnTextarea` kini menggabungkan `onFocus`/`onBlur` pemanggil, tak lagi menimpanya.
+Fokus digambar sekali oleh pembungkus (border + ring): outline bawaan `input:focus-visible` dimatikan untuk
+kelas `hn-input-core` / `hn-textarea-core` di `app.css`, karena gaya inline tak bisa mengalahkan `!important`.
+
+**Checkbox · Radio · RadioGroup.** Area sentuh checkbox dan radio 24×24 (kotak yang tampak tetap 18px);
+di layar sentuh tetap 44×44 lewat `.hn-choice-target`. Pilihan tunggal sebagai grup memakai `RadioGroup`:
+
+```tsx
+<RadioGroup aria-label="Mode" value={mode} onChange={(v) => setMode(v)}>
+  <Radio value="a" label="A" />
+  <Radio value="b" label="B" description="penjelasan singkat" />
+</RadioGroup>
+```
+
+`RadioGroup` merender `role="radiogroup"` dengan nama dari `label` (terlihat) atau `aria-label`. Hanya satu
+item yang tabbable (roving tabindex): yang terpilih, atau item aktif pertama bila belum ada pilihan. ↑/↓/←/→
+memindahkan fokus **dan** memilih, berputar di ujung dan melewati item `disabled`; Home/End ke ujung.
+Spasi/Enter memilih item yang fokus. Radio tanpa grup (`checked` + `onChange`) tetap bekerja seperti dulu.
+
+**Modal.** Judul dirender sebagai `<h2>` dan dirujuk `aria-labelledby`. Saat terbuka, saudara dari setiap
+leluhur panel diberi `inert` ke anak `body`, sehingga fokus dan pembaca layar tak masuk ke belakang modal.
+Penghitungan per elemen menjaga modal bertumpuk: latar baru dilepas ketika modal terakhir tertutup. Wadah
+toast (`data-hn-toast-host`) dikecualikan agar tetap diumumkan. Fokus awal: elemen ber-`data-initial-focus`,
+lalu `autofocus`, lalu isian pertama, lalu tombol pertama. Saat tutup, fokus kembali ke pemicu.
+`dismissible={false}` mematikan Escape, klik latar, dan tombol ×; × juga mati bila tak ada `onClose`.
+
+**ConfirmDialog · useConfirm.** Aksi `tone="danger"` (default) memulai fokus di **Batal**, sehingga Enter
+tak mengonfirmasi penghapusan. Aksi bukan-danger memulai fokus di konfirmasi. Dengan `requireText`, fokus
+jatuh ke isiannya. Selama `busy` dialog terkunci: Batal, konfirmasi, ×, Escape, klik latar, dan isian
+ketik-ulang mati. Daftar dampak tetap `<ul>`.
+
+**Toast: antrean, aksi, live region.**
+
+```tsx
+const [toast, showToast] = useToast();
+showToast("Entri dibuang", "ok", undefined, { action: { label: "Urungkan", onAction: undo } });
+<ToastHost toast={toast} />   // satu tempat per layar; <Toast toast={toast} /> lama tetap jalan
+```
+
+- `show(message, tone?, icon?, opts?)`; `opts = { action?: { label, onAction }, duration? }`.
+- Maksimal `TOAST_VISIBLE` (3) terlihat sekaligus; sisanya menunggu slot kosong. Timer tiap toast mulai saat ia terlihat.
+- Durasi 2,6 dtk; 7 dtk bila ada aksi; `duration` menimpa keduanya. Kursor atau fokus di dalam toast menjeda timer.
+- Wadah `role="status"` (polite) selalu ada di DOM, walau kosong. Toast `tone="err"` membawa `role="alert"` assertive.
+  Konsekuensi untuk tes: `getByRole("alert")` kini juga menangkap toast galat; pilih alert berdasarkan teks.
+
+**Icon.** `Icon` tanpa `aria-label`, `aria-labelledby`, atau `title` mendapat `aria-hidden="true"` (dekoratif).
+Dengan nama, ia `role="img"` dan tak disembunyikan. Caller tetap bisa menimpa lewat `aria-hidden` eksplisit.
+
+**Ekspor barrel.** `RadioGroup` (dan `Radio`) ada di `ds/components/forms.tsx`; `ToastHost`, `ToastQueue`,
+`ToastOptions`, `ToastAction`, dan `TOAST_VISIBLE` ada di `ds/kit.tsx`. Barrel `ds/index.ts` perlu
+mengekspornya agar layar bisa mengimpornya dari `ds`.
+
 ## Ikon (SPEC-906)
 
 Semua ikon dipanggil lewat `Icon` (`src/src/ds/icon.tsx`) dengan nama **kebab-case**, tak pernah

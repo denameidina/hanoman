@@ -32,7 +32,7 @@ function hnAttention(p: ProjectVM): "high" | "low" | "none" {
 }
 const HN_ATT: Record<string, { bar: string; tint: string; text: string }> = {
   high: { bar: "var(--clay-500)", tint: "var(--clay-100)", text: "var(--clay-600)" },
-  low: { bar: "var(--amber-500)", tint: "var(--amber-100)", text: "var(--amber-600)" },
+  low: { bar: "var(--amber-500)", tint: "var(--amber-100)", text: "var(--status-warn)" },
 };
 
 function StatStrip({ projects }: { projects: ProjectVM[] }) {

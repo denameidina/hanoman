@@ -59,13 +59,13 @@ export function EscalateDialog({ task, projects, onClose, onDone, onToast }: {
 
   return (
     <Modal open onClose={busy ? undefined : onClose} icon="git-branch"
-      eyebrow="Papan tim" title="Eskalasi ke backlog"
+      eyebrow="Papan tim" title="Kirim ke Backlog"
       footer={
         <div style={{ display: "flex", gap: 8, width: "100%", alignItems: "center" }}>
           <span style={{ flex: 1 }} />
           <Button variant="secondary" onClick={onClose} disabled={busy}>Batal</Button>
           <Button onClick={submit} loading={busy} disabled={!target} leftIcon="git-branch">
-            Eskalasi
+            Kirim ke Backlog
           </Button>
         </div>}>
       <div style={{ fontSize: 13.5, color: "var(--text-strong)", lineHeight: 1.55, marginBottom: 14 }}>

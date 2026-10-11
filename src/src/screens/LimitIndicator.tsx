@@ -139,7 +139,7 @@ function LimitPill({ title, dto, square = false, emptyHint, eyebrow, footnote }:
           onKeyDown={popover.onKeyDown} className="hn-viewport-popover" style={{
           position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 40, width: 280,
           background: "var(--surface-card)", border: "1px solid var(--border-hair)",
-          borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-pop, 0 8px 24px rgba(0,0,0,.12))",
+          borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-lg)",
           padding: 14,
         }}>
           <div className="hn-eyebrow" style={{ marginBottom: 8 }}>{eyebrow ?? title}</div>

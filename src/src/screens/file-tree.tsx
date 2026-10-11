@@ -35,7 +35,7 @@ export function buildFileTree(paths: string[], dirs: string[] = []): FileNode[] 
   return root.kids;
 }
 
-export const ST_COLOR: Record<string, string> = { A: "var(--leaf-600)", M: "var(--brass-600)", D: "var(--clay-500)" };
+export const ST_COLOR: Record<string, string> = { A: "var(--leaf-600)", M: "var(--brass-700)", D: "var(--clay-500)" };
 
 // Roving tabindex: `tabPath` = baris yang terakhir difokus (tab stop), `firstPath` = cadangan
 // bila belum ada yang difokus. Dibagi lewat konteks supaya TreeRow rekursif tak perlu prop baru.

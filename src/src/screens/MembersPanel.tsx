@@ -52,7 +52,7 @@ function MemberRow({ m, busy, onSave, onToggle, onDelete }: {
       border: "1px solid var(--border-hair)", borderRadius: "var(--radius-md)",
       background: "var(--surface-card)", opacity: m.active ? 1 : 0.6,
     }}>
-      <span style={{ flex: 1, minWidth: 0 }}>
+      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontWeight: "var(--weight-semibold)", color: "var(--text-strong)" }}>{m.name}</span>
           {m.role && <Badge tone="neutral" size="sm">{m.role}</Badge>}

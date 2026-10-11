@@ -48,6 +48,9 @@ GET  /auth/status         -> { needsSetup: bool, user: {id,email,role,createdAt}
 POST /auth/setup          { email, password, setupToken? } # control host; 403 proof salah/expired;
 #   HANYA saat 0 user; tepat satu create atomik menang; set cookie; token one-use 15 mnt; 409 sesudah tertutup
 #   SPEC-884 · `setupToken` WAJIB hanya saat hardening menyala; /auth/status membawa setupTokenRequired
+#   ADR-0204 · /auth/status membawa `setupTokenPath` (lokasi berkas setup.token di HANOMAN_HOME) HANYA saat
+#   hardening menyala DAN belum ada akun; berkasnya hilang bersama token yang sudah dikonsumsi. Yang terbuka
+#   lokasinya, bukan isinya. AuthScreen memakainya untuk menunjukkan di mana token dibaca.
 
 # SPEC-884 · ADR-0139 · wizard setup awal. Publik BERSYARAT: hanya selama 0 user; sesudah itu cookie.
 GET  /setup/status        -> { needed, deployment: "local"|"public", hardening, hardeningLocked,
@@ -754,6 +757,9 @@ GET      /notifications  ?page&limit    # { items:Notification[], unread:int, to
 #   idempotensi durable — `key` unik itulah yang membuat sweep tak pernah mencoba item yang sama dua kali,
 #   lintas restart sekalipun. Ber-`specId`, jadi `notifTarget` mengarahkannya ke Backlog tanpa perubahan UI.
 POST     /notifications/read            # 204; tandai semua unread jadi terbaca
+POST     /notifications/:id/read        # 204; ADR-0204 · tandai SATU notifikasi terbaca. Idempoten (readAt pertama
+#                                         dipertahankan). 404 { error } bila id tak ada. Read-state global: tak ada
+#                                         pemeriksaan kepemilikan. MCP: hanoman_notification_mark_read (notifications:write).
 DELETE   /notifications                 # 204; clear semua
 GET      /limits                        # { …usage } dari OAuth usage API Anthropic (cache 30s, stale/unavailable fallback) — SPEC-181/ADR-0024
 GET      /update                        # UpdateStatus — status update dari registry npm. SPEC-214/398/405
@@ -1888,11 +1894,14 @@ POST   /api/projects/:id/qa/import    (multipart: file .xlsx/.zip/.md + attachme
 ## Scheduler (SPEC-294 · ADR-0072) — LOCAL per-instance
 ```
 # Fondasi scheduler otonom (cookie; agent-token → domain settings). Otomasi default mati, launchGuard default aktif.
-GET  /api/scheduler/config   -> Scheduler (zScheduler: enabled, paused, maxConcurrent, launchGuard, autonomy, sources.{backlog,triase})
+GET  /api/scheduler/config   -> Scheduler & { serverTimeZone }   # ADR-0204 · + zona waktu server (aditif); PUT tetap polos
 PUT  /api/scheduler/config   { Scheduler }  -> Scheduler   # ganti blok penuh (pola PUT /settings). Pause = { paused:true }. 400 invalid.
 GET  /api/scheduler/state    -> { config, cap, liveCount, sources:[{id,enabled,everyMin,minCount?,lastRunAt,nextRunAt}],
 #                                  queueCounts:{queued,launched,done,failed,canceled}, sessions:[sesi live ber-item 'launched'],
-#                                  admission:{enabled,liveCount,liveAgentCount,maxConcurrent,loadPerCore,maxLoadPerCore,loadStatus} }
+#                                  admission:{enabled,liveCount,liveAgentCount,maxConcurrent,loadPerCore,maxLoadPerCore,loadStatus},
+#                                  serverTimeZone }
+# ADR-0204 · `serverTimeZone` = Intl resolvedOptions().timeZone server, zona tempat cron dihitung. Preview cron
+# di UI seharusnya memakai zona ini, bukan zona browser.
 # SPEC-1108: launchGuard={enabled:true,maxLoadPerCore:2.5}, angka finite positif. Baris lama diisi default.
 # Switch baru mematikan kedua check peluncuran; batching governor tetap memakai maxConcurrent.
 # State admission juga dikirim melalui topik schedulerState; metrik Windows null/unsupported.
@@ -1902,7 +1911,11 @@ GET  /api/scheduler/queue    ?status=queued|launched|done|failed|canceled&page&l
 #                               `status` disaring di query DB, bukan di klien. Tanpa `limit` → seluruh item.
 POST /api/scheduler/queue/:id/cancel  { reason? } -> SchedulerQueueItem   # SPEC-522 · queued→canceled (CAS). 404 baris tak ada;
 #                                     409 { error, status } bila statusnya bukan `queued` (launched → "tutup dari Terminal"); 400 reason >200 char.
-POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # canceled→queued, note dikosongkan. 404 / 409 { error, status }.
+POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # canceled|failed→queued; note, sessionId, launchedAt dikosongkan.
+#                                     ADR-0204 (memperluas SPEC-522/ADR-0106): `failed` ikut. Baris `failed` juga menuntut
+#                                     `sessions:spawn` bagi token agen (403 { need:"sessions:spawn", reason:"requeue-executes" }),
+#                                     karena peluncuran ulangnya membuka sesi agen. Status lain 409 { error, status } dengan
+#                                     pesan yang menyebut yang bisa dikembalikan; requeue ulang atas `queued` = 409, tanpa efek.
 ```
 > Engine in-process (di-start dari `server.ts`, timer `.unref`; `app.ts` bebas-timer — **membalik sebagian
 > ADR-0024**): per source enable+cadence → checker terdaftar (`registerSchedulerSource`) enqueue kandidat;

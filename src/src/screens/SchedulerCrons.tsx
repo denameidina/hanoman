@@ -92,7 +92,7 @@ function RunHistory({ cronId }: { cronId: string }) {
         <div key={r.id} className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
           border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", marginBottom: 6, flexWrap: "wrap" }}>
           <Badge tone={(STATUS_TONE[r.status] ?? "neutral") as never} size="sm">{STATUS_LABEL[r.status] ?? r.status}</Badge>
-          <span style={{ flex: 1, minWidth: 0, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+          <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
             jatuh tempo {fmtLocal(r.dueAt)}
             {r.startedAt ? ` · mulai ${fmtLocal(r.startedAt)}` : ""}
             {r.manual ? " · uji coba" : ""}
@@ -224,7 +224,7 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast }: Schedule
         <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12, padding: "10px 12px",
           border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", background: "var(--surface-sunken)" }}>
           <Icon name="alert-triangle" size={16} color="var(--clay-500)" />
-          <span style={{ flex: 1, minWidth: 0, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+          <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
             Project ini belum diizinkan untuk scheduler, jadi cron-nya tidak akan pernah dijalankan.
           </span>
           {/* Label sengaja TIDAK memuat kata "izinkan" yang sama dengan tombol di `OptInPanel` pada layar

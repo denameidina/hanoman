@@ -41,10 +41,10 @@ function notifyOS(msg: string, n: Notification, onOpen?: (n: Notification) => vo
   } catch { /* sebagian browser melempar bila dipanggil tanpa service worker; abaikan */ }
 }
 
-type Ctx = { items: Notification[]; unread: number; total: number; markAllRead: () => void; clear: () => void; onOpen?: (n: Notification) => void };
+type Ctx = { items: Notification[]; unread: number; total: number; markAllRead: () => void; markRead: (id: string) => void; clear: () => void; onOpen?: (n: Notification) => void };
 // Nilai default aman: komponen yang merender <Shell> tanpa provider (mis. test) tak error.
 // Di-export agar test bell bisa membungkus dengan value palsu (Task 6).
-export const NotificationsContext = React.createContext<Ctx>({ items: [], unread: 0, total: 0, markAllRead: () => { }, clear: () => { } });
+export const NotificationsContext = React.createContext<Ctx>({ items: [], unread: 0, total: 0, markAllRead: () => { }, markRead: () => { }, clear: () => { } });
 export const useNotifications = () => React.useContext(NotificationsContext);
 
 export function NotificationsProvider({ showToast, onOpen, children }: { showToast: ShowToast; onOpen?: (n: Notification) => void; children: React.ReactNode }) {
@@ -112,6 +112,26 @@ export function NotificationsProvider({ showToast, onOpen, children }: { showToa
       showToast(failureMessage("menandai notifikasi dibaca", e), "err", "x-circle");
     });
   }, [showToast]);
+  // ADR-0204 · tandai SATU notifikasi terbaca. Optimistik: titik & badge turun seketika. Galat → HANYA
+  // item itu yang dikembalikan ke belum-dibaca (bukan seluruh daftar, supaya frame WS yang masuk di
+  // tengah tak tertimpa), lalu operator diberi tahu. Item yang sudah terbaca di daftar ini tak memicu
+  // request. Item di luar daftar bell (arsip) tetap dikirim: server idempoten, jadi itu aman.
+  const markRead = React.useCallback((id: string) => {
+    const target = shown.current.items.find((n) => n.id === id);
+    if (target?.readAt) return;
+    const readAt = new Date().toISOString();
+    if (target) {
+      setItems((prev) => prev.map((n) => (n.id === id ? { ...n, readAt } : n)));
+      setUnread((u) => Math.max(0, u - 1));
+    }
+    api.markNotificationRead(id).catch((e) => {
+      if (target) {
+        setItems((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: null } : n)));
+        setUnread((u) => u + 1);
+      }
+      showToast(failureMessage("menandai notifikasi dibaca", e), "err", "x-circle");
+    });
+  }, [showToast]);
   const clear = React.useCallback(() => {
     const before = shown.current;
     setItems([]); setUnread(0); setTotal(0);
@@ -122,7 +142,7 @@ export function NotificationsProvider({ showToast, onOpen, children }: { showToa
   }, [showToast]);
 
   return (
-    <NotificationsContext.Provider value={{ items, unread, total, markAllRead, clear, onOpen }}>
+    <NotificationsContext.Provider value={{ items, unread, total, markAllRead, markRead, clear, onOpen }}>
       {children}
     </NotificationsContext.Provider>
   );

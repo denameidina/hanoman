@@ -90,7 +90,7 @@ function QueueRow({ q, ctx, onCancel, busy }:
   { q: SchedulerQueueItemView; ctx: Ctx; onCancel: (id: string) => void; busy: boolean }) {
   return (
     <RowShell>
-      <span style={{ flex: 1, minWidth: 0 }}>
+      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
         <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, ctx.backlog)}</span>
         <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
           {ctx.projectName(q.projectId)} · {SOURCE_LABEL[q.source] ?? q.source}{q.note ? ` · ${q.note}` : ""}
@@ -112,7 +112,7 @@ function CanceledRow({ q, ctx, onRequeue, busy }:
   return (
     <RowShell>
       <Icon name="ban" size={16} color="var(--text-subtle)" />
-      <span style={{ flex: 1, minWidth: 0 }}>
+      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
         <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, ctx.backlog)}</span>
         <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
           {ctx.projectName(q.projectId)} · {SOURCE_LABEL[q.source] ?? q.source} · {q.note ?? "dibatalkan"}
@@ -127,7 +127,7 @@ function SessionRow({ s, ctx, onGotoTerminal }: { s: SchedulerSessionView; ctx: 
   const flow = s.flow ? (FLOW_LABEL[s.flow as OrchestrationFlow] ?? s.flow) : "";
   return (
     <RowShell>
-      <span style={{ flex: 1, minWidth: 0 }}>
+      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
         <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(s.specId, ctx.backlog)}</span>
         <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
           {ctx.projectName(s.projectId)}{flow ? ` · ${flow}` : ""}
@@ -143,7 +143,7 @@ function DoneRow({ q, ctx, onToast }: { q: SchedulerQueueItemView; ctx: Ctx; onT
   const link = specDeepLink(q.specId);
   return (
     <RowShell>
-      <span style={{ flex: 1, minWidth: 0 }}>
+      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
         <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, ctx.backlog)}</span>
         <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
           {/* SPEC-431 · baris yang ditutup gerbang "spec sudah selesai" tak pernah punya sesi;
@@ -163,7 +163,7 @@ function FailedRow({ q, ctx, onRequeue, busy }:
   return (
     <RowShell>
       <Icon name="x-circle" size={16} color="var(--clay-500)" />
-      <span style={{ flex: 1, minWidth: 0 }}>
+      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
         <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, ctx.backlog)}</span>
         <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
           {ctx.projectName(q.projectId)} · {q.note ?? "gagal tanpa alasan tercatat"}
@@ -412,7 +412,7 @@ function OptInPanel({ projects, onToggle, busyId }:
         ? <div style={{ fontSize: "var(--text-sm)", color: "var(--text-subtle)" }}>Belum ada project.</div>
         : projects.map((p) => (
           <RowShell key={p.id}>
-            <span style={{ flex: 1, minWidth: 0, color: "var(--text-strong)", fontWeight: 500 }}>{p.name}</span>
+            <span className="hn-grow" style={{ flex: 1, minWidth: 0, color: "var(--text-strong)", fontWeight: 500 }}>{p.name}</span>
             <Badge tone={p.schedulerOptIn ? "ok" : "neutral"} size="sm">{p.schedulerOptIn ? "diizinkan" : "tidak diizinkan"}</Badge>
             {p.schedulerOptIn
               ? <Button size="sm" variant="ghost" leftIcon="ban" disabled={busyId === p.id} onClick={() => onToggle(p.id, false)}>Cabut izin</Button>

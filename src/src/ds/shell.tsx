@@ -13,6 +13,9 @@ import { pendingFor, pendingLabel, type PendingCounts } from "@hanoman/shared";
 // Dari `../ui-state/hooks`, BUKAN barrel `../ui-state`: barrel itu memuat ResetViewButton
 // yang mengimpor komponen DS, dan lewat sana `ds → shell → ui-state → ds` jadi lingkaran impor.
 import { useScrollRestore } from "../ui-state/hooks";
+import { openPalette } from "../palette/ui-store";
+import { ProjectScopeContext, ProjectSwitcher, PROJECT_SCOPED_KEYS, scopeProjectName } from "../palette/ProjectSwitcher";
+import { isMacPlatform, paletteShortcutLabel } from "../palette/shortcuts";
 
 // Setiap key WAJIB punya cabang `section === …` di App.tsx. Bila tidak, `screen` tetap
 // null dan App merender kosong — sidebar ikut hilang, pengguna terjebak sampai reload.
@@ -156,6 +159,13 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
   // termasuk yang belum ada — ikut dapat perilakunya tanpa menyentuh kodenya. Kunci per
   // `active` supaya posisi Backlog tak terbawa ke Triase.
   const gates = React.useContext(NavGate);
+  // Project switcher tunggal (Fase 2C): hanya layar yang benar-benar membaca `projectFilter` yang
+  // menampilkannya, dan nama scope-nya ikut ke breadcrumb agar pengguna tahu apa yang tersaring.
+  const scope = React.useContext(ProjectScopeContext);
+  const scoped = !!scope && PROJECT_SCOPED_KEYS.has(active ?? "");
+  const scopeName = scoped && scope ? scopeProjectName(scope) : undefined;
+  const isMac = isMacPlatform();
+  const shortcutHint = paletteShortcutLabel(isMac);
   const mainRef = useScrollRestore(`page@${active ?? "-"}`, "scroll");
   const tier = useResponsiveTier();
   const mobile = tier === "mobile";
@@ -258,9 +268,10 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             <Icon name="menu" size={20} />
           </button>
           <div className="hn-shell-heading">
-            {breadcrumb && (
+            {(breadcrumb || scopeName) && (
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", marginBottom: 1 }}>
                 {breadcrumb}
+                {scopeName && <span data-testid="scope-crumb">{breadcrumb ? " · " : ""}project: {scopeName}</span>}
               </div>
             )}
             {/* h1: judul layar adalah heading utama halaman. `margin: 0` menimpa base.css. */}
@@ -272,6 +283,15 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             </h1>
           </div>
           <div className="hn-shell-tools">
+            {/* Pintu palet perintah (⌘K). Nama "Cari" tetap milik tombol ini; kotak cari layar
+                (showSearch) tetap ada untuk pencarian yang memfilter daftar. */}
+            <button type="button" className="hn-shell-cmdk" aria-label="Cari"
+              aria-keyshortcuts={isMac ? "Meta+K" : "Control+K"} title={`Palet perintah (${shortcutHint})`}
+              onClick={() => openPalette()}>
+              <Icon name="search" size={16} />
+              <kbd className="hn-kbd" aria-hidden="true">{shortcutHint}</kbd>
+            </button>
+            {scope && scoped && <ProjectSwitcher scope={scope} />}
             {showSearch && (
               <Input className="hn-shell-search" aria-label="Cari" placeholder="mis. hanoman atau erp" leftIcon="search" size="sm"
                 value={searchValue}

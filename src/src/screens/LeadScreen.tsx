@@ -537,7 +537,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
             return (
               <RowShell key={id}>
                 <Icon name={deciding.has(id) ? "loader" : queued.has(id) ? "clock" : "help-circle"} />
-                <span style={{ flex: 1, minWidth: 0, color: "var(--text-strong)" }}>{sessionTitle(id)}</span>
+                <span className="hn-grow" style={{ flex: 1, minWidth: 0, color: "var(--text-strong)" }}>{sessionTitle(id)}</span>
                 <Badge tone={needsYou ? "warn" : "ok"} size="sm">{label}</Badge>
                 <Button size="sm" variant="ghost" leftIcon="terminal" onClick={() => onGotoTerminal(id)}>Buka di Terminal</Button>
               </RowShell>
@@ -558,7 +558,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
             const handled = optIn.has(p.id);
             return (
               <RowShell key={p.id}>
-                <span style={{ flex: 1, minWidth: 0, color: "var(--text-strong)", fontWeight: 500 }}>{p.name}</span>
+                <span className="hn-grow" style={{ flex: 1, minWidth: 0, color: "var(--text-strong)", fontWeight: 500 }}>{p.name}</span>
                 {row && <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
                   {row.decisions24h} keputusan 24 jam terakhir · {row.openSessions} sesi terbuka
                 </span>}
@@ -587,7 +587,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
           : flows.map((f) => (
             <RowShell key={f.id}>
               <Badge tone={FLOW_TONE[f.status] ?? "neutral"} size="sm">{FLOW_LABEL[f.status] ?? f.status}</Badge>
-              <span style={{ flex: 1, minWidth: 0, color: "var(--text-strong)" }}>{f.title}</span>
+              <span className="hn-grow" style={{ flex: 1, minWidth: 0, color: "var(--text-strong)" }}>{f.title}</span>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
                 {f.steps} langkah · {agoLabel(f.openedAt)}
                 {f.closeReason ? ` · ${FLOW_CLOSE_LABEL[f.closeReason] ?? f.closeReason}` : ""}

@@ -9,7 +9,10 @@ import { parseRoute, routePath } from "./routes";
 import { LazyBoundary } from "./ds/LazyBoundary";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
-import { Shell, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
+import { Shell, HN_NAV, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, useToast, ToastHost, StateBlock, useConfirm } from "./ds";
+
+import { CommandPalette, ShortcutHelp, ProjectScopeContext, buildPaletteCommands, useGlobalShortcuts } from "./palette";
+import { waitingSessions } from "./screens/pet-state";
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { api, ApiError, createApi, type TerminalSession, type SourceResetPending } from "./api/client";
 import { subscribe } from "./api/events";
@@ -1037,6 +1040,35 @@ function AppInner() {
         : { id: route.id!, kind: route.kind!, title: backlog.find((s) => s.id === route.id)?.title ?? route.id! })
     : null;
 
+  /* Audit UI/UX 2026-10 · Fase 2C · palet perintah (⌘K), shortcut `g`+huruf, dan project switcher.
+     Semua hook di sini sebelum gerbang auth di bawah — urutan hook tak boleh berubah antar render. */
+  // Layar yang tampil di sidebar (gerbang sudah diterapkan): hanya ini yang boleh dituju shortcut dan
+  // dicantumkan di bantuan. Layar bergerbang yang tak aktif tak pernah dicapai lewat pintasan.
+  const visibleNav = React.useMemo(() => HN_NAV.filter((n) => !n.gate || presence.enabled), [presence.enabled]);
+  const chordNavKeys = React.useMemo(() => visibleNav.map((n) => n.key), [visibleNav]);
+  // Shortcut hidup hanya untuk operator yang sudah login; klien portal dan layar login tak punya palet.
+  useGlobalShortcuts({ enabled: !!auth?.user && auth.user.role !== "client", navKeys: chordNavKeys, go: setSection });
+  const scopeProjects = React.useMemo(() => projectsView.map((p) => ({ id: p.id, name: p.name })), [projects]);
+  const scopeValue = React.useMemo(() => ({ value: projectFilter, projects: scopeProjects, onChange: setProjectFilter }),
+    [projectFilter, scopeProjects, setProjectFilter]);
+  const paletteCommands = React.useMemo(() => buildPaletteCommands({
+    nav: HN_NAV, gates: { clients: presence.enabled }, projects: scopeProjects,
+    specs: backlog,
+    waiting: waitingSessions(sessions, backlog).map((s) => {
+      const title = s.specId ? specTitles[s.specId] : undefined;
+      return { id: s.id, label: `${s.specId ?? s.id}${title ? ` · ${title}` : ""}` };
+    }),
+    scope: projectFilter, go: setSection,
+    openSpec: (specId) => navigate(routePath({ section: "backlog", specId })),
+    openSession: (sessionId) => openTerminal(sessionId),
+    newSpec: () => setModal("brief"), newProject: () => setModal("project"),
+    setScope: setProjectFilter,
+  }), [backlog, sessions, scopeProjects, presence.enabled, projectFilter, specTitles, setSection, navigate, openTerminal]);
+  // Dalang keluar kembali ke layar sebelumnya, bukan selalu Overview. Ref menyimpan layar nav terakhir
+  // yang BUKAN dalang; tanpa riwayat (dibuka langsung dari URL) ia jatuh ke Overview seperti dulu.
+  const lastPageRef = React.useRef<string | null>(null);
+  React.useEffect(() => { if (section !== "dalang") lastPageRef.current = section; }, [section]);
+
   // SPEC-184 · klik aksi notifikasi. `sessions` = daftar ter-poll (cek liveness untuk notif done).
   const openNotification = React.useCallback((nt: Notification) => {
     const t = notifTarget(nt, sessions);
@@ -1510,6 +1542,7 @@ function AppInner() {
     return <SetupWizard status={setupStatus} onDone={() => setSetupDone(true)} />;
   if (!auth.user) return <AuthScreen needsSetup={auth.needsSetup}
     setupTokenRequired={auth.setupTokenRequired ?? false}
+    setupTokenPath={auth.setupTokenPath}
     onDone={(u) => setAuth({ needsSetup: false, user: u })} />;
   // SPEC-617 · ADR-0110 · akun klien mendarat di permukaannya sendiri, bukan dashboard operator.
   // Percabangan di SINI (bukan di dalam Shell) supaya tak satu pun state/efek dashboard operator
@@ -1523,15 +1556,19 @@ function AppInner() {
     screen = (
       <Shell active="overview" title="Overview" breadcrumb="nafanesia.id · ringkasan workspace" onNavigate={setSection}>
         {gate(<OverviewScreen projects={projectsView} backlog={backlog} sessions={sessions}
-          onOpenProject={openProject} onGoto={setSection}
+          onOpenProject={openProject} onGoto={setSection} onCreateProject={() => setModal("project")}
           onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }} />)}
       </Shell>
     );
   } else if (section === "dalang") {
     // Takeover layar penuh — sengaja TANPA Shell: panggung memenuhi viewport, keluar via ✕/Esc.
+    // Audit UI/UX 2026-10 · Fase 1 · `previous` mengembalikan ke layar yang tadi dibuka (bukan Overview).
+    const backKey = lastPageRef.current;
+    const backLabel = HN_NAV.find((n) => n.key === backKey)?.label;
     screen = gate(<DalangHanomanScreen projects={projectsView} backlog={backlog} sessions={sessions}
       onOpenProject={openProject} onGoto={setSection}
       onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }}
+      previous={backKey && backLabel ? { label: backLabel, onBack: () => setSection(backKey) } : undefined}
       onExit={() => setSection("overview")} />);
   } else if (section === "projects") {
     screen = (
@@ -1595,7 +1632,8 @@ function AppInner() {
     screen = (
       <Shell active="team" title="Tim" breadcrumb="tugas manusia · backlog → selesai" onNavigate={setSection}>
         <TeamScreen projects={projectsView} projectFilter={projectFilter}
-          onProjectFilter={setProjectFilter} onToast={showToast} />
+          onProjectFilter={setProjectFilter} onToast={showToast}
+          onOpenSpec={(specId) => navigate(routePath({ section: "backlog", specId }))} />
       </Shell>
     );
   } else if (section === "triage") {
@@ -1755,9 +1793,11 @@ function AppInner() {
             tidak boleh terlihat sama dengan yang dikeraskan. Di luar ClientPortal: klien tak
             punya kuasa mengubahnya, jadi baginya ini cuma kecemasan tanpa tombol. */}
         <UnhardenedBanner status={setupStatus} />
-        <NavGate.Provider value={{ clients: presence.enabled }}>
-          <NavPending.Provider value={pending}>{screen}</NavPending.Provider>
-        </NavGate.Provider>
+        <ProjectScopeContext.Provider value={scopeValue}>
+          <NavGate.Provider value={{ clients: presence.enabled }}>
+            <NavPending.Provider value={pending}>{screen}</NavPending.Provider>
+          </NavGate.Provider>
+        </ProjectScopeContext.Provider>
         <HanomanPet sessions={sessions} backlog={backlog} asks={leadAsks}
           onOpen={(t) => { if (t.sessionId) setFocusSession(t.sessionId); setSection(t.section); }} />
         <NewSpecModal open={modal === "brief"} onClose={() => { setModal(null); setSpecPrefill(null); }}
@@ -1804,7 +1844,9 @@ function AppInner() {
           }} />
         {dialog}
         {launchAdmission.dialog}
-        <Toast toast={toast} />
+        <CommandPalette commands={paletteCommands} />
+        <ShortcutHelp nav={visibleNav} />
+        <ToastHost toast={toast} />
       </NotificationsProvider>
     </AuthProvider>
   );

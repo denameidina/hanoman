@@ -102,7 +102,7 @@ export function UpdateBadge() {
         <div ref={popover.panelRef} id={popover.panelId} role="dialog" aria-label={name} tabIndex={-1}
           onKeyDown={popover.onKeyDown} className="hn-viewport-popover" style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 40, width: 320,
           background: "var(--surface-card)", border: "1px solid var(--border-hair)",
-          borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-pop, 0 8px 24px rgba(0,0,0,.12))", padding: 14 }}>
+          borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-lg)", padding: 14 }}>
           <div className="hn-eyebrow" style={{ marginBottom: 8 }}>{name}</div>
           <div style={{ fontSize: "var(--text-sm)", color: "var(--text-body)", marginBottom: 10 }}>{updateHeadline(u)}</div>
           {u.updateAvailable && (
@@ -136,7 +136,7 @@ export function UpdateBadge() {
                   )}
                   {phase.t === "failed" && (
                     <>
-                      <div style={{ fontSize: 11, color: "var(--status-err-text, var(--text-body))", marginBottom: 8 }}>{phase.message}</div>
+                      <div style={{ fontSize: 11, color: "var(--status-err)", marginBottom: 8 }}>{phase.message}</div>
                       <button onClick={() => setPhase({ t: "idle" })} style={btn}>Coba lagi</button>
                     </>
                   )}
@@ -167,7 +167,7 @@ export function UpdateBadge() {
               )}
               {rPhase.t === "failed" && (
                 <>
-                  <div style={{ fontSize: 11, color: "var(--status-err-text, var(--text-body))", marginBottom: 8 }}>{rPhase.message}</div>
+                  <div style={{ fontSize: 11, color: "var(--status-err)", marginBottom: 8 }}>{rPhase.message}</div>
                   <button onClick={() => setRPhase({ t: "idle" })} style={btn}>Coba lagi</button>
                 </>
               )}

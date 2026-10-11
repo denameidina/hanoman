@@ -117,7 +117,7 @@ export function QaFindingsPanel(p: PanelProps) {
         {openCount > 0 && <Button variant="secondary" leftIcon="git-fork" onClick={() => void sendAll()}>{`Kirim semua ke backlog (${openCount})`}</Button>}
       </div>
       {batch && (batch.error || batch.failed.length > 0) && (
-        <div role="alert">
+        <div>
           <Callout tone="err"
             title={batch.error ?? `${batch.failed.length} temuan gagal dikirim ke backlog${batch.sent ? ` (${batch.sent} berhasil)` : ""}`}
             action={<Button size="sm" variant="ghost" onClick={() => setBatch(null)}>Tutup</Button>}>

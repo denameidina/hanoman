@@ -106,7 +106,12 @@ describe("project tanpa dir lokal (SPEC-867)", () => {
     fireEvent.change(await screen.findByPlaceholderText("/path/ke/arta"),
       { target: { value: "/home/dena/code/arta" } });
     fireEvent.click(screen.getByText("Clone"));
-    const alert = await screen.findByRole("alert");
+    // Toast galat juga ber-role=alert (Fase 2B): ambil alert yang memuat stderr, bukan alert pertama.
+    const alert = await waitFor(() => {
+      const hit = screen.getAllByRole("alert").find((el) => /repository 'x' not found/.test(el.textContent ?? ""));
+      if (!hit) throw new Error("alert stderr belum tampil");
+      return hit;
+    });
     expect(alert).toHaveTextContent("git clone gagal");
     expect(alert).toHaveTextContent(/repository 'x' not found/);
     expect(screen.getAllByText("arta").length).toBeGreaterThan(0);   // project tak terhapus

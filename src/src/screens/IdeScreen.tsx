@@ -86,7 +86,7 @@ function RemotesModal({ projectId, onClose }: { projectId: string; onClose: () =
         {remotes.map((r) => (
           <div key={r.name} className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid var(--border-hair)" }}>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, fontWeight: 600, width: 90 }}>{r.name}</span>
-            <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.fetch}</span>
+            <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.fetch}</span>
             <Button size="sm" variant="ghost" leftIcon="trash-2" aria-label={`Hapus remote ${r.name}`}
               onClick={() => api.ideDeleteRemote(projectId, r.name)
                 .then((rs) => { setRemotes(rs); setErr(""); })

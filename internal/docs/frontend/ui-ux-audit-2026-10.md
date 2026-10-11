@@ -298,19 +298,21 @@ di Terminal; persist Settings yang jujur; label ramah Portal.
 
 ### Tindak lanjut Fase 1 (belum selesai)
 
-1. **Tandai terbaca per item notifikasi.** Server hanya punya `POST /notifications/read` (tandai semua)
-  (`server/src/routes/notifications.ts:9-18`). Endpoint per item butuh API baru dan keputusan MCP (ADR-0202).
-2. **`markRequeued` hanya menerima `canceled`** (`server/src/services/scheduler/queue.ts:153-158`). Baris
-  `failed` selalu 409 (`server/src/routes/scheduler.ts:73`), sehingga "Antre ulang" untuk Gagal
-  (`screens/SchedulerScreen.tsx:172`) tak pernah berhasil. Izin untuk token agen memetakan rute ini ke
-  `settings:write` (`server/src/services/agent-capabilities.ts:114-126`); izin `failed` belum diputuskan.
-  Frontend tak memeriksa izin apa pun.
+1. **Tandai terbaca per item notifikasi.** *Server dan frontend selesai (ADR-0204, Fase 2G):* `POST /notifications/:id/read`
+  (idempoten, 404 bila tak ada) dan tool `hanoman_notification_mark_read`. Bell dan arsip menandai item saat "Buka"
+  (optimistik; galat → rollback + toast). Membuka bell tetap tidak menandai apa pun.
+2. **`markRequeued` hanya menerima `canceled`** (`server/src/services/scheduler/queue.ts:153-158`). *Server
+  selesai (ADR-0204):* `failed` diterima; token agen memerlukan `sessions:spawn` untuk baris itu (403 bila tak ada),
+  karena peluncuran ulang membuka sesi agen. "Antre ulang" di `screens/SchedulerScreen.tsx` kini berhasil tanpa
+  perubahan UI. Frontend tetap tak memeriksa izin apa pun.
 3. **Preview cron memakai zona waktu browser.** `screens/SchedulerCrons.tsx:140` memanggil `nextRunFor` dengan
-  `new Date()` lokal; server belum mengekspos zona waktunya.
+  `new Date()` lokal. *Server selesai (ADR-0204):* `serverTimeZone` ada di `GET /scheduler/state` dan
+  `GET /scheduler/config`. Sisa: preview di `SchedulerCrons` perlu memakai zona itu (layar milik agen UI).
 4. **`SetupWizard` di Settings tak menerima `onCancel`.** Pemanggilan ada di `screens/SettingsScreen.tsx:754`
   (rujukan awal `:632` tidak tepat); `screens/SetupWizard.tsx:120` tak merender Batal tanpa `onCancel`.
 5. **Prop yang belum diteruskan di `App.tsx`:** `onOpenSpec` ke `TeamScreen` (`:1597-1598`), `previous` ke
-  `DalangHanomanScreen` (`:1532-1535`), dan `setupTokenPath` ke `AuthScreen` (`:1511-1513`).
+  `DalangHanomanScreen` (`:1532-1535`), dan `setupTokenPath` ke `AuthScreen` (`:1511-1513`). Server sudah
+  mengirim `setupTokenPath` di `GET /auth/status` (hanya saat hardening dan belum ada akun; ADR-0204).
 6. **Copy belum seragam.** Tombol "Kirim ke Backlog" ada di `screens/team-board.tsx:120`; `EscalateDialog`
   memakai "Eskalasi" (`screens/EscalateDialog.tsx:68`).
 7. **Teks amber-600 dan brass-600 di atas tint** memakai token fill sebagai teks: 12 pemakaian inline

@@ -74,7 +74,7 @@ function TicketRow({ t, selected, onOpen }: { t: TicketView; selected: boolean; 
         padding: "12px 14px", border: `1px solid ${selected ? "var(--accent)" : "var(--border-hair)"}`, borderRadius: "var(--radius-md)",
         background: selected ? "var(--brass-050)" : "var(--surface-card)", cursor: "pointer", marginBottom: 8,
       }}>
-      <span style={{ flex: 1, minWidth: 0 }}>
+      <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--text-strong)" }}>#{t.number}</span>
           <Badge tone="neutral" size="sm">{t.category}</Badge>
@@ -403,7 +403,7 @@ export function GithubIssuesPanel({ projectId, onAccepted }:
                       </label>
                     )}
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>#{i.number}</span>
-                    <a href={i.url} target="_blank" rel="noreferrer" className="hn-touch-target" style={{ flex: 1, minWidth: 0 }}>{i.title}</a>
+                    <a href={i.url} target="_blank" rel="noreferrer" className="hn-grow hn-touch-target" style={{ flex: 1, minWidth: 0 }}>{i.title}</a>
                     <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>@{i.authorLogin}</span>
                     {i.labels.map((l) => <Badge key={l}>{l}</Badge>)}
                     {i.status === "rejected" && <Badge tone="neutral">ditutup</Badge>}

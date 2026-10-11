@@ -188,7 +188,7 @@ export function TeamBoard({ board, totals, columns, members, projects = [], onMo
             </div>
           )}
           {hidden > 0 && (
-            <div style={{ ...FIXED_ROW_STYLE, fontSize: "var(--text-xs)", color: "var(--amber-600)" }}>
+            <div style={{ ...FIXED_ROW_STYLE, fontSize: "var(--text-xs)", color: "var(--status-warn)" }}>
               menampilkan {items.length} dari {totals[current.key]} — persempit penyaring
             </div>
           )}
@@ -241,7 +241,7 @@ export function TeamBoard({ board, totals, columns, members, projects = [], onMo
                 sebagai papan yang lengkap. */}
             {hidden > 0 && (
               <div style={{
-                ...FIXED_ROW_STYLE, marginTop: 8, fontSize: "var(--text-xs)", color: "var(--amber-600)",
+                ...FIXED_ROW_STYLE, marginTop: 8, fontSize: "var(--text-xs)", color: "var(--status-warn)",
               }}>
                 menampilkan {items.length} dari {totals[c.key]} — persempit penyaring
               </div>

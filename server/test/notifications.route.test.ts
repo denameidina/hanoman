@@ -37,6 +37,34 @@ describe("notifications routes", () => {
   });
 });
 
+// ADR-0204 · tandai SATU notifikasi terbaca. Read-state global, jadi yang dijaga hanya keberadaan.
+describe("POST /notifications/:id/read (per item)", () => {
+  it("menandai hanya item itu; item lain tetap belum dibaca", async () => {
+    const target = (await prisma.notification.findFirst({ where: { specId: "SPEC-1" } }))!;
+    const r = await app.inject({ method: "POST", url: `/api/notifications/${target.id}/read` });
+    expect(r.statusCode).toBe(204);
+    const feed = (await app.inject({ url: "/api/notifications" })).json();
+    expect(feed.unread).toBe(1);
+    expect(feed.items.find((n: { id: string }) => n.id === target.id).readAt).not.toBeNull();
+    expect(feed.items.filter((n: { readAt: unknown }) => n.readAt === null)).toHaveLength(1);
+  });
+
+  it("idempoten: permintaan kedua 204 dan waktu baca pertama tidak ditulis ulang", async () => {
+    const target = (await prisma.notification.findFirst({ where: { specId: "SPEC-2" } }))!;
+    expect((await app.inject({ method: "POST", url: `/api/notifications/${target.id}/read` })).statusCode).toBe(204);
+    const first = (await prisma.notification.findUnique({ where: { id: target.id } }))!.readAt!;
+    expect((await app.inject({ method: "POST", url: `/api/notifications/${target.id}/read` })).statusCode).toBe(204);
+    const second = (await prisma.notification.findUnique({ where: { id: target.id } }))!.readAt!;
+    expect(second.getTime()).toBe(first.getTime());
+  });
+
+  it("id yang tak ada → 404 dan tak menyentuh baris lain", async () => {
+    const r = await app.inject({ method: "POST", url: "/api/notifications/tak-ada/read" });
+    expect(r.statusCode).toBe(404);
+    expect((await app.inject({ url: "/api/notifications" })).json().unread).toBe(2);
+  });
+});
+
 // SPEC-523 · 60 baris melampaui plafon 50 lama, jadi "tanpa limit" dan "total" tak bisa tertukar.
 async function seed(n: number): Promise<void> {
   await prisma.notification.deleteMany();

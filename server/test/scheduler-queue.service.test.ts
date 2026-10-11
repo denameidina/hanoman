@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "../src/db";
-import { enqueue, listQueue, queued, markLaunched, markFailed, queueItemForSpec,
+import { enqueue, listQueue, queued, markLaunched, markFailed, markDone, queueItemForSpec,
   markCanceled, markRequeued, isQueued } from "../src/services/scheduler/queue";
 
 const clean = () => prisma.schedulerQueueItem.deleteMany();
@@ -105,5 +105,28 @@ describe("scheduler queue", () => {
     expect((await queued()).map((q) => q.specId)).toEqual(["SPEC-c6"]);
     // baris yang sudah queued tak bisa di-requeue lagi
     expect(await markRequeued(row.id)).toBe(false);
+  });
+
+  // ADR-0204 · `failed` ikut diantre ulang, dan jejak sesi matinya (sessionId, launchedAt, note)
+  // dibuang. `launched`, `done`, dan `queued` TIDAK pernah lewat sini: yang berjalan atau sudah
+  // selesai tak boleh dihidupkan dua kali.
+  it("markRequeued menerima failed dan membuang jejak sesi lama; launched/done/queued ditolak", async () => {
+    await enqueue({ specId: "SPEC-f1", projectId: "p1", source: "backlog", priority: "sedang" });
+    const row = (await queueItemForSpec("SPEC-f1"))!;
+    await markLaunched(row.id, "spec_f1");
+    await markFailed(row.id, "sesi berakhir sebelum mencapai done");
+    expect(await markRequeued(row.id)).toBe(true);
+    const back = (await queueItemForSpec("SPEC-f1"))!;
+    expect(back.status).toBe("queued");
+    expect(back.note).toBeNull();
+    expect(back.sessionId).toBeNull();
+    expect(back.launchedAt).toBeNull();
+    expect((await queued()).map((q) => q.specId)).toEqual(["SPEC-f1"]);
+
+    await markLaunched(row.id, "spec_f1_2");
+    expect(await markRequeued(row.id)).toBe(false);
+    await markDone(row.id);
+    expect(await markRequeued(row.id)).toBe(false);
+    expect((await queueItemForSpec("SPEC-f1"))!.status).toBe("done");
   });
 });

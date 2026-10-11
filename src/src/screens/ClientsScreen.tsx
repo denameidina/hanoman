@@ -64,7 +64,7 @@ function SessionRow({ s, title, onOpenSpec, now }:
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)" }}>
         {s.specId ?? s.sessionId}
       </span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "var(--text-strong)",
+      <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "var(--text-strong)",
         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {title ?? s.projectId}
       </span>

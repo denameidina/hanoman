@@ -4,6 +4,7 @@
 import React from "react";
 import type { Notification } from "@hanoman/shared";
 import { api } from "../api/client";
+import { useNotifications } from "./NotificationsContext";
 // Impor dari ds/kit LANGSUNG, bukan dari barrel ../ds: barrel mengekspor shell.tsx yang
 // mengimpor NotificationBell, dan itu menutup siklus impor.
 import { Modal, Pager, serverPage } from "../ds/kit";
@@ -21,6 +22,8 @@ function timeAgo(iso: string): string {
 
 export function NotificationsArchiveModal({ onClose, onOpen }:
   { onClose: () => void; onOpen?: (n: Notification) => void }) {
+  // ADR-0204 · "Buka" di arsip juga menandai item itu terbaca (lihat NotificationsContext.markRead).
+  const { markRead } = useNotifications();
   const [items, setItems] = React.useState<Notification[]>([]);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(1);
@@ -60,7 +63,7 @@ export function NotificationsArchiveModal({ onClose, onOpen }:
                   {timeAgo(n.createdAt)}
                 </span>
                 {onOpen && (
-                  <button onClick={() => { onOpen(n); onClose(); }} style={{
+                  <button onClick={() => { markRead(n.id); onOpen(n); onClose(); }} style={{
                     border: "none", background: "transparent", cursor: "pointer",
                     color: "var(--text-muted)", fontSize: 12, fontFamily: "var(--font-ui)",
                   }}>Buka</button>

@@ -22,11 +22,14 @@ vi.mock("../src/api/client", () => ({
 }));
 import App from "../src/App";
 
+// Toast galat juga ber-role=alert (Fase 2B); tes ini menilai alert inline (state block) saja.
+const inlineAlerts = () => screen.queryAllByRole("alert").filter((el) => !el.closest("[data-hn-toast-host]"));
+
 describe("app load states", () => {
   it("shows the error state on a failed fetch, then the empty state after retry", async () => {
     render(<App />);
     const retry = await screen.findByText("Coba lagi");
-    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(inlineAlerts()).toHaveLength(1);
     expect(screen.getByTestId("illustration-PST-006")).toBeInTheDocument();
 
     failNext = false;
@@ -35,7 +38,7 @@ describe("app load states", () => {
     // (audit UI/UX 2026-10). Menggantikan empty state lama yang berderet "Belum ada project".
     await waitFor(() => expect(screen.getByRole("button", { name: "Buat project pertama" })).toBeInTheDocument());
     expect(screen.getByText("Selamat datang di hanoman")).toBeInTheDocument();
-    expect(screen.queryByRole("alert")).toBeNull();
+    expect(inlineAlerts()).toHaveLength(0);
     expect(screen.getByTestId("illustration-PST-001")).toBeInTheDocument();
   });
 });

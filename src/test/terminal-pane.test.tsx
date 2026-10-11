@@ -1046,14 +1046,20 @@ describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", (
     expect(inputsOf(sockets[1])).toEqual(["ya"]);
   });
 
-  it("status gone menawarkan Hapus sel yang memanggil onForget", async () => {
+  it("status gone menawarkan Hapus sel; onForget baru jalan setelah dikonfirmasi", async () => {
     const onForget = vi.fn();
-    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} onForget={onForget} />);
+    render(<TerminalPane sessionId="sesi-1" label="arta · SPEC-9" onExit={() => { }} onForget={onForget} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
     act(() => { sockets[0]!.onopen?.(); });
     act(() => { sockets[0]!.readyState = 3; sockets[0]!.onclose?.({ code: 4004 }); });
     fireEvent.click(await screen.findByRole("button", { name: "Hapus sel" }));
-    expect(onForget).toHaveBeenCalledTimes(1);
+    // Judul dialog menyebut nama sel, supaya konfirmasi tak mungkin mengenai sel lain.
+    expect(await screen.findByText(/Hapus sel "arta · SPEC-9 · sesi-1"\?/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
+    expect(onForget).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Hapus sel" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Hapus dari tampilan" }));
+    await vi.waitFor(() => expect(onForget).toHaveBeenCalledTimes(1));
   });
 
   it("berhenti memprediksi begitu sesi tmux-nya dinyatakan lenyap", async () => {

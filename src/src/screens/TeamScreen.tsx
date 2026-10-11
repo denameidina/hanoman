@@ -281,7 +281,7 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast, 
               onReset={cross ? undefined : () => onProjectFilter("all")} />
             {/* `role="status"` supaya perubahannya juga terdengar pembaca layar. */}
             <span className="hn-eyebrow" role="status"
-              style={stale ? { color: "var(--amber-600)" } : undefined}
+              style={stale ? { color: "var(--status-warn)" } : undefined}
               title={stale ? "Server tak menjawab saat menyegarkan — angka ini dari muatan terakhir yang berhasil" : undefined}>
               {columns.reduce((n, c) => n + (totals[c.key] ?? 0), 0)} tugas{stale ? " · data lama" : ""}
             </span>

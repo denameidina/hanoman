@@ -10,12 +10,12 @@ import type { ChecklistView, ChecklistSection, ChecklistItem, VpsItemStatus, Vps
 const STATUS_ICON: Record<VpsItemStatus, string> = {
   pass: "check", fail: "x", warn: "alert-triangle", na: "minus", unknown: "circle" };
 const STATUS_COLOR: Record<VpsItemStatus, string> = {
-  pass: "var(--leaf-600)", fail: "var(--clay-600)", warn: "var(--amber-600)",
+  pass: "var(--leaf-600)", fail: "var(--clay-600)", warn: "var(--status-warn)",
   na: "var(--text-subtle)", unknown: "var(--text-subtle)" };
 const MODE_COLOR: Record<VpsMode, string> = {
-  AUTO: "var(--brass-700)", AUDIT: "var(--amber-600)", INFO: "var(--text-subtle)" };
+  AUTO: "var(--brass-700)", AUDIT: "var(--status-warn)", INFO: "var(--text-subtle)" };
 const SEV_COLOR: Record<VpsSeverity, string> = {
-  critical: "var(--clay-600)", high: "var(--amber-600)", medium: "var(--text-subtle)", low: "var(--text-subtle)" };
+  critical: "var(--clay-600)", high: "var(--status-warn)", medium: "var(--text-subtle)", low: "var(--text-subtle)" };
 
 // Target sentuh ≥44px pada pointer kasar (audit VPS): checkbox & select tak boleh 13–20px di ponsel.
 const VPS_TOUCH_CSS = `@media (pointer: coarse) {
@@ -76,7 +76,7 @@ function Select({ value, onChange, options, label }: {
   return (
     <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className="vps-touch-select"
       style={{ fontSize: 12, padding: "3px 6px", border: "1px solid var(--border-hair)",
-        borderRadius: "var(--radius-sm)", background: "var(--bone-50)", color: "var(--text)" }}>
+        borderRadius: "var(--radius-sm)", background: "var(--bone-000)", color: "var(--text-body)" }}>
       <option value="">{label}: semua</option>
       {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
     </select>
@@ -121,7 +121,7 @@ function SectionGroup({ section, items, expanded, onToggle, busy, selected, onTo
           {suggestNa && (
             <div data-testid={`suggestion-${section.id}`} style={{ display: "flex", alignItems: "center", gap: 8,
               margin: "6px 0", padding: "6px 10px", fontSize: 12, color: "var(--text-subtle)",
-              background: "var(--bone-50)", border: "1px dashed var(--border-hair)", borderRadius: "var(--radius-sm)" }}>
+              background: "var(--bone-000)", border: "1px dashed var(--border-hair)", borderRadius: "var(--radius-sm)" }}>
               <Icon name="info" size={13} color="var(--brass-700)" />
               <span style={{ flex: 1 }}>Stack tak terdeteksi ({section.suggestion!.detail}) — kemungkinan N/A. Cek Docker manual bila ragu.</span>
               <Button size="sm" variant="ghost" leftIcon="minus-circle" loading={busy === `section:${section.id}`}
@@ -264,19 +264,19 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, provisi
           </div>
           {driftCount > 0 && (
             <div data-testid="drift-summary" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10,
-              padding: "6px 10px", fontSize: 12, color: "var(--clay-700)",
-              background: "var(--clay-50, var(--bone-100))", border: "1px solid var(--clay-600)", borderRadius: "var(--radius-sm)" }}>
+              padding: "6px 10px", fontSize: 12, color: "var(--clay-600)",
+              background: "var(--bone-100)", border: "1px solid var(--clay-600)", borderRadius: "var(--radius-sm)" }}>
               <Icon name="alert-triangle" size={14} color="var(--clay-600)" />
               {driftCount} item drift (regresi) sejak audit sebelumnya
             </div>
           )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "1 1 180px",
-              border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", padding: "2px 8px", background: "var(--bone-50)" }}>
+              border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", padding: "2px 8px", background: "var(--bone-000)" }}>
               <Icon name="search" size={13} color="var(--text-subtle)" />
               <input aria-label="cari item" value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder="mis. ssh atau 5.2.1"
-                style={{ flex: 1, border: "none", background: "transparent", fontSize: 12, color: "var(--text)", outline: "none" }} />
+                style={{ flex: 1, border: "none", background: "transparent", fontSize: 12, color: "var(--text-body)", outline: "none" }} />
             </div>
             <Select label="seksi" value={filter.section} onChange={set("section")}
               options={view.sections.map((s) => [s.id, s.title])} />
@@ -299,7 +299,7 @@ export function VpsChecklistModal({ vpsId, vpsName, lastAuditAt, health, provisi
           )}
           {preview && (
             <div data-testid="remediate-preview" style={{ marginTop: 10, padding: "8px 10px", fontSize: 12,
-              fontFamily: "var(--font-mono)", background: "var(--bone-50)", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)" }}>
+              fontFamily: "var(--font-mono)", background: "var(--bone-000)", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)" }}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>Pratinjau (dry-run) — belum diterapkan:</div>
               {preview.map((s) => (
                 <div key={s.item} style={{ color: "var(--text-subtle)" }}>{s.item} · {s.status} {s.detail}</div>

@@ -1,52 +1,74 @@
-// Ported verbatim from _ds_bundle.js (feedback/*). ESM + typed props;
-// __ds_scope.Icon → imported Icon. No visual change.
+// Primitif umpan balik: Badge, Callout, ProgressBar, StatusPill, Tooltip.
+// Warna TEKS memakai token teks yang lolos 4,5:1 (lihat design-system.md, "Primitif layout").
+// Token fill (--amber-600, --brass-600, --clay-600 …) hanya untuk titik, batas, dan isian progres.
 import React from "react";
 import { Icon } from "../icon";
 const _extends = Object.assign;
 
 type Tone = "neutral" | "brass" | "info" | "ok" | "warn" | "err";
-type BadgeProps = { children?: React.ReactNode; tone?: Tone; icon?: string;
-  variant?: "soft" | "solid" | "outline"; size?: "sm" | "md"; style?: React.CSSProperties } & Record<string, any>;
 
-const BADGE_TONES: Record<string, { bg: string; fg: string; bd: string }> = {
-  neutral: { bg: "var(--bone-200)", fg: "var(--ink-600)", bd: "var(--bone-400)" },
-  brass: { bg: "var(--brass-100)", fg: "var(--brass-700)", bd: "var(--brass-300)" },
-  info: { bg: "var(--wind-100)", fg: "var(--wind-700)", bd: "var(--wind-500)" },
-  ok: { bg: "var(--status-ok-tint)", fg: "var(--leaf-600)", bd: "var(--leaf-500)" },
-  warn: { bg: "var(--status-warn-tint)", fg: "var(--amber-600)", bd: "var(--amber-500)" },
-  err: { bg: "var(--status-err-tint)", fg: "var(--clay-600)", bd: "var(--clay-500)" },
+// Titik status: dekoratif. Maknanya selalu ikut sebagai teks di sebelahnya (`aria-hidden`).
+function StatusDot({ color, size, pulse = false }: { color: string; size: number; pulse?: boolean }) {
+  return React.createElement("span", {
+    "aria-hidden": "true",
+    className: pulse ? "hn-status-dot hn-status-dot-pulse" : "hn-status-dot",
+    style: { width: size, height: size, borderRadius: "50%", background: color, flex: "0 0 auto" },
+  });
+}
+
+type BadgeVariant = "soft" | "solid" | "outline" | "dot";
+type BadgeProps = { children?: React.ReactNode; tone?: Tone; icon?: string; variant?: BadgeVariant;
+  size?: "sm" | "md"; style?: React.CSSProperties } & Record<string, any>;
+
+// `text` = warna teks (lolos 4,5:1 di atas `bg`); `dot` = fill titik (boleh di bawah 4,5:1, tak pernah teks).
+const BADGE_TONES: Record<Tone, { bg: string; text: string; dot: string; bd: string }> = {
+  neutral: { bg: "var(--bone-200)", text: "var(--ink-600)", dot: "var(--ink-500)", bd: "var(--bone-400)" },
+  brass: { bg: "var(--brass-100)", text: "var(--brass-700)", dot: "var(--brass-500)", bd: "var(--brass-300)" },
+  info: { bg: "var(--wind-100)", text: "var(--wind-700)", dot: "var(--wind-600)", bd: "var(--wind-500)" },
+  ok: { bg: "var(--status-ok-tint)", text: "var(--leaf-600)", dot: "var(--leaf-600)", bd: "var(--leaf-500)" },
+  warn: { bg: "var(--status-warn-tint)", text: "var(--status-warn)", dot: "var(--amber-600)", bd: "var(--amber-500)" },
+  err: { bg: "var(--status-err-tint)", text: "var(--clay-600)", dot: "var(--clay-600)", bd: "var(--clay-500)" },
 };
+
 export function Badge({ children, tone = "neutral", icon, variant = "soft", size = "md", className = "", style = {}, ...rest }: BadgeProps) {
   const t = BADGE_TONES[tone] || BADGE_TONES.neutral!;
   const sm = size === "sm";
   const solid = variant === "solid";
   const outline = variant === "outline";
-  return React.createElement("span", _extends({
-    className,
-    style: {
-      display: "inline-flex", alignItems: "center", gap: sm ? 4 : 5, height: sm ? 18 : 22,
+  const dot = variant === "dot";
+  const base: React.CSSProperties = dot
+    ? { display: "inline-flex", alignItems: "center", gap: sm ? 5 : 6, fontFamily: "var(--font-ui)",
+      fontSize: sm ? "var(--text-2xs)" : "var(--text-xs)", fontWeight: "var(--weight-medium)", lineHeight: 1,
+      color: t.text, whiteSpace: "nowrap" }
+    : { display: "inline-flex", alignItems: "center", gap: sm ? 4 : 5, height: sm ? 18 : 22,
       padding: sm ? "0 7px" : "0 9px", borderRadius: "var(--radius-pill)", fontFamily: "var(--font-ui)",
       fontSize: sm ? "var(--text-2xs)" : "var(--text-xs)", fontWeight: "var(--weight-medium)", lineHeight: 1,
-      letterSpacing: "0.01em", background: solid ? t.fg : outline ? "transparent" : t.bg,
-      color: solid ? "var(--bone-000)" : t.fg,
-      border: `1px solid ${outline ? t.bd : solid ? t.fg : "transparent"}`, whiteSpace: "nowrap", ...style,
-    },
-  }, rest), icon && React.createElement(Icon, { name: icon, size: sm ? 11 : 13 }), children);
+      letterSpacing: "0.01em", background: solid ? t.text : outline ? "transparent" : t.bg,
+      color: solid ? "var(--bone-000)" : t.text,
+      border: `1px solid ${outline ? t.bd : solid ? t.text : "transparent"}`, whiteSpace: "nowrap" };
+  return React.createElement("span", _extends({ className, style: { ...base, ...style } }, rest),
+    dot && React.createElement(StatusDot, { color: t.dot, size: sm ? 6 : 7 }),
+    icon && !dot && React.createElement(Icon, { name: icon, size: sm ? 11 : 13 }),
+    children);
 }
 
-type CalloutProps = { children?: React.ReactNode; tone?: "info" | "ok" | "warn" | "err" | "brass";
-  title?: React.ReactNode; icon?: string; action?: React.ReactNode; style?: React.CSSProperties } & Record<string, any>;
-const CALLOUT_TONES: Record<string, { fg: string; bg: string; bd: string; icon: string }> = {
-  info: { fg: "var(--wind-700)", bg: "var(--wind-050)", bd: "var(--wind-500)", icon: "info" },
-  ok: { fg: "var(--leaf-600)", bg: "var(--leaf-100)", bd: "var(--leaf-500)", icon: "check-circle-2" },
-  warn: { fg: "var(--amber-600)", bg: "var(--status-warn-tint)", bd: "var(--amber-500)", icon: "alert-triangle" },
-  err: { fg: "var(--clay-600)", bg: "var(--status-err-tint)", bd: "var(--clay-500)", icon: "octagon-alert" },
-  brass: { fg: "var(--brass-700)", bg: "var(--brass-050)", bd: "var(--brass-400)", icon: "sparkles" },
+type CalloutTone = "info" | "ok" | "warn" | "err" | "brass";
+type CalloutProps = { children?: React.ReactNode; tone?: CalloutTone;
+  title?: React.ReactNode; icon?: string; action?: React.ReactNode; role?: string;
+  style?: React.CSSProperties } & Record<string, any>;
+// `role` mengikuti keparahan: err = alert (diumumkan segera), warn/ok = status (sopan), info/brass = note.
+// Pemanggil boleh menimpa lewat prop `role`.
+const CALLOUT_TONES: Record<CalloutTone, { fg: string; bg: string; bd: string; icon: string; role: string }> = {
+  info: { fg: "var(--wind-700)", bg: "var(--wind-050)", bd: "var(--wind-500)", icon: "info", role: "note" },
+  ok: { fg: "var(--leaf-600)", bg: "var(--leaf-100)", bd: "var(--leaf-500)", icon: "check-circle-2", role: "status" },
+  warn: { fg: "var(--status-warn)", bg: "var(--status-warn-tint)", bd: "var(--amber-500)", icon: "alert-triangle", role: "status" },
+  err: { fg: "var(--clay-600)", bg: "var(--status-err-tint)", bd: "var(--clay-500)", icon: "octagon-alert", role: "alert" },
+  brass: { fg: "var(--brass-700)", bg: "var(--brass-050)", bd: "var(--brass-400)", icon: "sparkles", role: "note" },
 };
-export function Callout({ children, tone = "info", title, icon, action, className = "", style = {}, ...rest }: CalloutProps) {
+export function Callout({ children, tone = "info", title, icon, action, role, className = "", style = {}, ...rest }: CalloutProps) {
   const t = CALLOUT_TONES[tone] || CALLOUT_TONES.info!;
   return React.createElement("div", _extends({
-    className, role: "note",
+    className, role: role ?? t.role,
     style: { display: "flex", gap: 12, padding: "14px 16px", background: t.bg, border: `1px solid ${t.bd}`,
       borderLeft: `3px solid ${t.fg}`, borderRadius: "var(--radius-md)", ...style },
   }, rest),
@@ -60,56 +82,78 @@ export function Callout({ children, tone = "info", title, icon, action, classNam
 }
 
 type ProgressProps = { value?: number; max?: number; tone?: "brass" | "ok" | "warn" | "err" | "info";
-  size?: "sm" | "md" | "lg"; showLabel?: boolean; label?: React.ReactNode; style?: React.CSSProperties } & Record<string, any>;
+  size?: "sm" | "md" | "lg"; showLabel?: boolean;
+  /** Keterangan yang terlihat di atas bar. Bila string dan tanpa `aria-label`, ia juga nama aksesibelnya. */
+  label?: React.ReactNode;
+  /** Teks nilai untuk pembaca layar (`aria-valuetext`), mis. "3 dari 8 tahap". */
+  valueText?: string;
+  style?: React.CSSProperties } & Record<string, any>;
 const PROGRESS_TONES: Record<string, string> = { brass: "var(--accent)", ok: "var(--leaf-600)",
   warn: "var(--amber-600)", err: "var(--clay-600)", info: "var(--wind-600)" };
-export function ProgressBar({ value = 0, max = 100, tone = "brass", size = "md", showLabel = false, label, className = "", style = {}, ...rest }: ProgressProps) {
+export function ProgressBar({ value = 0, max = 100, tone = "brass", size = "md", showLabel = false, label,
+  valueText, className = "", style = {}, ...rest }: ProgressProps) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   const h = size === "sm" ? 5 : size === "lg" ? 10 : 7;
   const color = PROGRESS_TONES[tone] || PROGRESS_TONES.brass!;
-  return React.createElement("div", _extends({ className, style: { ...style } }, rest),
+  // `aria-*` berjalan ke elemen `role="progressbar"` (track), bukan ke pembungkus visualnya.
+  const ariaProps: Record<string, unknown> = {};
+  const wrapperProps: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(rest)) {
+    if (key.startsWith("aria-")) ariaProps[key] = val;
+    else wrapperProps[key] = val;
+  }
+  const accessibleName = (ariaProps["aria-label"] as string | undefined)
+    ?? (typeof label === "string" ? label : undefined);
+  return React.createElement("div", _extends({ className, style: { ...style } }, wrapperProps),
     (showLabel || label) && React.createElement("div", { style: { display: "flex", justifyContent: "space-between",
       alignItems: "baseline", marginBottom: 6 } },
       React.createElement("span", { style: { fontSize: "var(--text-sm)", color: "var(--text-body)" } }, label),
-      showLabel && React.createElement("span", { style: { fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)",
-        color: "var(--text-muted)" } }, Math.round(pct), "%")),
-    React.createElement("div", { role: "progressbar", "aria-valuenow": value, "aria-valuemax": max,
-      style: { height: h, background: "var(--bone-300)", borderRadius: "var(--radius-pill)", overflow: "hidden" } },
+      showLabel && React.createElement("span", { "aria-hidden": "true", style: { fontFamily: "var(--font-mono)",
+        fontSize: "var(--text-xs)", color: "var(--text-muted)" } }, Math.round(pct), "%")),
+    React.createElement("div", _extends({
+      role: "progressbar", "aria-valuemin": 0, "aria-valuenow": value, "aria-valuemax": max,
+      "aria-label": accessibleName, "aria-valuetext": valueText,
+      style: { height: h, background: "var(--bone-300)", borderRadius: "var(--radius-pill)", overflow: "hidden" },
+    }, ariaProps),
       React.createElement("div", { style: { width: pct + "%", height: "100%", background: color,
         borderRadius: "var(--radius-pill)", transition: "width var(--dur-slow) var(--ease-out)" } })));
 }
 
-type StatusPillProps = { status?: string; children?: React.ReactNode; size?: "sm" | "md"; style?: React.CSSProperties } & Record<string, any>;
-const STATUS: Record<string, { label: string; color: string; bg: string; pulse: boolean }> = {
-  ok: { label: "On convention", color: "var(--leaf-600)", bg: "var(--status-ok-tint)", pulse: false },
-  drift: { label: "Drifting", color: "var(--amber-600)", bg: "var(--status-warn-tint)", pulse: false },
-  broken: { label: "Off convention", color: "var(--clay-600)", bg: "var(--status-err-tint)", pulse: false },
-  running: { label: "Running", color: "var(--brass-600)", bg: "var(--brass-100)", pulse: true },
+type StatusPillProps = { status?: string; children?: React.ReactNode; size?: "sm" | "md";
+  /** `pill` = kapsul berlatar (default). `dot` = titik status + teks tanpa latar. */
+  variant?: "pill" | "dot"; style?: React.CSSProperties } & Record<string, any>;
+// `dot` = warna titik (fill), `text` = warna teks (lolos 4,5:1 di atas `bg`).
+const STATUS: Record<string, { label: string; dot: string; text: string; bg: string; pulse: boolean }> = {
+  ok: { label: "On convention", dot: "var(--leaf-600)", text: "var(--leaf-600)", bg: "var(--status-ok-tint)", pulse: false },
+  drift: { label: "Drifting", dot: "var(--amber-600)", text: "var(--status-warn)", bg: "var(--status-warn-tint)", pulse: false },
+  broken: { label: "Off convention", dot: "var(--clay-600)", text: "var(--clay-600)", bg: "var(--status-err-tint)", pulse: false },
+  running: { label: "Running", dot: "var(--brass-600)", text: "var(--brass-700)", bg: "var(--brass-100)", pulse: true },
   // Berdenyut: prosesnya hidup dan sedang menunggumu — tidak diam seperti `paused`.
-  awaiting: { label: "Menunggu keputusan", color: "var(--amber-600)", bg: "var(--status-warn-tint)", pulse: true },
-  queued: { label: "Queued", color: "var(--wind-600)", bg: "var(--wind-100)", pulse: false },
-  done: { label: "Done", color: "var(--leaf-600)", bg: "var(--status-ok-tint)", pulse: false },
-  failed: { label: "Failed", color: "var(--clay-600)", bg: "var(--status-err-tint)", pulse: false },
-  paused: { label: "Paused", color: "var(--amber-600)", bg: "var(--status-warn-tint)", pulse: false },
-  stopped: { label: "Stopped", color: "var(--ink-500)", bg: "var(--bone-200)", pulse: false },
-  scanning: { label: "Scanning", color: "var(--wind-600)", bg: "var(--wind-100)", pulse: true },
-  idle: { label: "Idle", color: "var(--ink-500)", bg: "var(--bone-200)", pulse: false },
+  awaiting: { label: "Menunggu keputusan", dot: "var(--amber-600)", text: "var(--status-warn)", bg: "var(--status-warn-tint)", pulse: true },
+  queued: { label: "Queued", dot: "var(--wind-600)", text: "var(--wind-700)", bg: "var(--wind-100)", pulse: false },
+  done: { label: "Done", dot: "var(--leaf-600)", text: "var(--leaf-600)", bg: "var(--status-ok-tint)", pulse: false },
+  failed: { label: "Failed", dot: "var(--clay-600)", text: "var(--clay-600)", bg: "var(--status-err-tint)", pulse: false },
+  paused: { label: "Paused", dot: "var(--amber-600)", text: "var(--status-warn)", bg: "var(--status-warn-tint)", pulse: false },
+  stopped: { label: "Stopped", dot: "var(--ink-500)", text: "var(--ink-500)", bg: "var(--bone-200)", pulse: false },
+  scanning: { label: "Scanning", dot: "var(--wind-600)", text: "var(--wind-700)", bg: "var(--wind-100)", pulse: true },
+  idle: { label: "Idle", dot: "var(--ink-500)", text: "var(--ink-500)", bg: "var(--bone-200)", pulse: false },
 };
-export function StatusPill({ status = "idle", children, size = "md", className = "", style = {}, ...rest }: StatusPillProps) {
+export function StatusPill({ status = "idle", children, size = "md", variant = "pill", className = "", style = {}, ...rest }: StatusPillProps) {
   const s = STATUS[status] || STATUS.idle!;
   const sm = size === "sm";
-  const dot = sm ? 6 : 7;
+  const dot = variant === "dot";
   return React.createElement("span", _extends({
     className,
-    style: { display: "inline-flex", alignItems: "center", gap: sm ? 5 : 6, height: sm ? 20 : 24,
-      padding: sm ? "0 8px 0 7px" : "0 10px 0 8px", borderRadius: "var(--radius-pill)", background: s.bg, color: s.color,
-      fontFamily: "var(--font-ui)", fontSize: sm ? "var(--text-2xs)" : "var(--text-xs)", fontWeight: "var(--weight-medium)",
-      lineHeight: 1, whiteSpace: "nowrap", ...style },
+    style: {
+      display: "inline-flex", alignItems: "center", gap: sm ? 5 : 6,
+      height: dot ? "auto" : sm ? 20 : 24,
+      padding: dot ? 0 : sm ? "0 8px 0 7px" : "0 10px 0 8px",
+      borderRadius: "var(--radius-pill)", background: dot ? "transparent" : s.bg, color: s.text,
+      fontFamily: "var(--font-ui)", fontSize: sm ? "var(--text-2xs)" : "var(--text-xs)",
+      fontWeight: "var(--weight-medium)", lineHeight: 1, whiteSpace: "nowrap", ...style },
   }, rest),
-    React.createElement("span", { style: { width: dot, height: dot, borderRadius: "50%", background: s.color,
-      flex: "0 0 auto", animation: s.pulse ? "hn-pulse 1.4s ease-in-out infinite" : "none" } }),
-    children || s.label,
-    React.createElement("style", null, `@keyframes hn-pulse{0%,100%{opacity:1}50%{opacity:.35}}`));
+    React.createElement(StatusDot, { color: s.dot, size: sm ? 6 : 7, pulse: s.pulse }),
+    children || s.label);
 }
 
 type TooltipProps = { content?: React.ReactNode; children?: React.ReactNode;

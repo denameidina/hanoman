@@ -487,7 +487,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   const displayControls = (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 10 }}>
       <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>Ukuran teks terminal</span>
+        <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>Ukuran teks terminal</span>
         <IconButton size="sm" icon="minus" label="Perkecil teks terminal"
           disabled={fontSize <= FONT_MIN} onClick={() => bumpFont(-1)} />
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, minWidth: 44, textAlign: "center" }}>
@@ -497,14 +497,14 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           disabled={fontSize >= FONT_MAX} onClick={() => bumpFont(1)} />
       </div>
       <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+        <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
           Papan tombol layar (Esc · panah · Enter)
         </span>
         <Button size="sm" variant="secondary" aria-pressed={keysOpen}
           onClick={() => setKeysOpen((on) => !on)}>{keysOpen ? "Sembunyikan" : "Tampilkan"}</Button>
       </div>
       <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+        <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
           Ketik responsif (huruf tampil sebelum echo server)
         </span>
         <Button size="sm" variant="secondary" aria-pressed={predict}
@@ -512,7 +512,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           onClick={() => setPredict((on) => !on)}>{predict ? "Matikan" : "Nyalakan"}</Button>
       </div>
       <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span id="terminal-reset-grid-hint" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+        <span className="hn-grow" id="terminal-reset-grid-hint" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
           Kembalikan grid ke 1 kolom × 1 baris (sesi lain pindah ke "belum di grid")
         </span>
         <Button size="sm" variant="secondary" aria-describedby="terminal-reset-grid-hint"
@@ -533,7 +533,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           Diagnostik{diag ? " · perekaman aktif" : ""}
         </summary>
         <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-          <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
+          <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: 12, color: "var(--text-muted)" }}>
             Rekam jalur ketik — mencatat setiap tombol yang ditekan di pane. Nyalakan hanya saat menyelidiki masalah ketik.
           </span>
           <Button size="sm" variant="secondary" aria-pressed={diag}
@@ -821,6 +821,8 @@ function BacklogPicker({ seed, activeIds, error, onPick, onClose }: {
   // lalu refetch dari server. Exclusi sesi aktif tetap di klien (state sesi, bukan filter/paginasi).
   const [items, setItems] = React.useState<SpecSlim[]>(seed);
   const [dq, setDq] = React.useState("");
+  // Daftar yang gagal dimuat tak boleh diam: seed tetap tampil, tapi operator tahu itu bisa basi.
+  const [listErr, setListErr] = React.useState<string | null>(null);
   React.useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
   React.useEffect(() => {
     let alive = true;
@@ -829,15 +831,17 @@ function BacklogPicker({ seed, activeIds, error, onPick, onClose }: {
       stage: stageFilter === "all" ? undefined : stageFilter,
       priority: prioFilter === "all" ? undefined : prioFilter,
     });
-    p?.then((r) => { if (alive) setItems(r.items); }).catch(() => { });
+    p?.then((r) => { if (alive) { setItems(r.items); setListErr(null); } })
+      .catch((e: unknown) => { if (alive) setListErr(failureMessage("memuat backlog", e)); });
     return () => { alive = false; };
   }, [dq, stageFilter, prioFilter]);
   const shown = items.filter((s) => !activeIds.has(s.id));
+  const notice = error ?? listErr;
   return (
     <Modal open title="Ambil backlog" icon="inbox" onClose={onClose} width={760}>
-      {error && (
-        <div style={{ marginBottom: 10, padding: "8px 10px", borderRadius: "var(--radius-sm)",
-          background: "var(--clay-100)", color: "var(--clay-600)", fontSize: 12 }}>{error}</div>
+      {notice && (
+        <div role="alert" style={{ marginBottom: 10, padding: "8px 10px", borderRadius: "var(--radius-sm)",
+          background: "var(--clay-100)", color: "var(--clay-600)", fontSize: 12 }}>{notice}</div>
       )}
       {/* baris penyaring: search + stage + prioritas (startable tak pernah `done`). */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
@@ -880,7 +884,7 @@ function BacklogPicker({ seed, activeIds, error, onPick, onClose }: {
                   color={s.source === "qa" ? "var(--clay-500)" : s.source === "audit" ? "var(--wind-600)" : "var(--brass-500)"} />
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)",
                   flex: "0 0 78px" }}>{s.id}</span>
-                <span className="hn-picker-title" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)",
+                <span className="hn-grow hn-picker-title" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)",
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</span>
                 <Badge tone={s.priority === "tinggi" ? "err" : "neutral"} size="sm">{s.priority}</Badge>
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, flex: "0 1 auto", minWidth: 0,
@@ -1340,7 +1344,7 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
               </div>
             : <TerminalPane key={session.id} sessionId={session.id} onExit={onExit} onPhases={onPhases}
                 fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag} hidden={paneHidden}
-                onForget={onForget} />}
+                onForget={onForget} label={cellLabel(session, nameOf, titleOf)} />}
         </div>
       </div>
       {docs && session.specId && <SpecDocsModal specId={session.specId} onClose={() => setDocs(false)} />}

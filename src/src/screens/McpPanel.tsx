@@ -62,7 +62,7 @@ const PRE_STYLE: React.CSSProperties = {
   borderRadius: "var(--radius-sm)", whiteSpace: "pre",
 };
 const MUTED: React.CSSProperties = { fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.55, marginBottom: 10 };
-const CELL: React.CSSProperties = { padding: "6px 10px 6px 0", borderBottom: "1px solid var(--ink-100)", verticalAlign: "top", fontSize: 12.5 };
+const CELL: React.CSSProperties = { padding: "6px 10px 6px 0", borderBottom: "1px solid var(--border-hair)", verticalAlign: "top", fontSize: 12.5 };
 
 export function McpPanel(): React.ReactElement {
   const [client, setClient] = React.useState<Client>("claude-code");

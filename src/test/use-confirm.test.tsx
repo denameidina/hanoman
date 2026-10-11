@@ -99,14 +99,13 @@ describe("useConfirm (SPEC-847)", () => {
     await waitFor(() => expect(onResult).toHaveBeenCalledWith(true));
   });
 
-  it("fokus awal bukan tombol destruktif, dan kembali ke pemicu saat tutup", async () => {
+  it("fokus awal pada Batal (aksi aman) untuk aksi danger, dan kembali ke pemicu saat tutup", async () => {
     render(<Harness options={{ title: "Hapus X?", confirmLabel: "Hapus" }} onResult={() => {}} />);
     const trigger = screen.getByRole("button", { name: "Picu" });
     trigger.focus();
     open();
     await screen.findByText("Hapus X?");
-    expect(document.activeElement).not.toBe(screen.getByRole("button", { name: "Hapus" }));
-    expect((document.activeElement as HTMLElement).getAttribute("aria-label")).toBe("Tutup");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Batal" }));
     fireEvent.click(screen.getByRole("button", { name: "Batal" }));
     await waitFor(() => expect(document.activeElement).toBe(trigger));
   });

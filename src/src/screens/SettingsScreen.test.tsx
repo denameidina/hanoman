@@ -197,6 +197,9 @@ describe("SettingsScreen · simpan jujur (audit P0)", () => {
       }
       if (path === "/api/settings") return json(setting);
       if (path === "/api/codex/version") return json({ version: null, minRequired: "0.0.0", ok: true });
+      // Tab Sesi memuat daftar project untuk pemasangan skill; galatnya kini tampil sebagai toast,
+      // jadi mock harus menjawabnya — kalau tidak, toast galat mengotori assertion "belum ada toast".
+      if (path.startsWith("/api/projects")) return json({ items: [], total: 0, page: 1, pageSize: 100 });
       if (path === "/api/models") return json(bundledModelCatalog());
       if (path === "/api/telegram/status") return json(status);
       throw new Error(`unexpected fetch ${path}`);

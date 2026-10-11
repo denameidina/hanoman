@@ -14,6 +14,13 @@ export function computeNextRun(expr: string, after: Date): Date | null {
   return spec ? nextRun(spec, after) : null;
 }
 
+// ADR-0204 · zona waktu LOKAL server: zona tempat `computeNextRun` benar-benar menghitung jatuh tempo
+// (penanda lokal, bukan UTC). Diekspos di GET /scheduler/state dan /scheduler/config supaya UI
+// menyajikan preview dalam zona yang sama, bukan zona browser yang bisa berbeda.
+export function serverTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
 // Jatuh tempo TERBARU yang ≤ now, berikut jumlah yang dilompati. Inilah yang membuat "jangan
 // menembak burst run tertunggak setelah restart" jadi sifat struktural alih-alih niat baik: jatuh
 // tempo yang dilompati tak pernah menjadi baris antrean, ia menjadi angka di dalam alasan SATU

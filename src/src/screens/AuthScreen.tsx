@@ -11,6 +11,18 @@ import { failureMessage } from "../lib/report-error";
 // default ~/.hanoman). Dipakai bila server tak mengirim lokasi konkretnya.
 const DEFAULT_SETUP_TOKEN_PATH = "~/.hanoman/setup.token";
 
+// Respons 400 setup membawa `error.fieldErrors` dari zod (`flatten()` di routes/auth.ts). Bidang yang
+// salah terbaca dari sana, jadi pesannya menyebut bidang itu, bukan menebak penyebabnya.
+function setupFieldProblem(detail: unknown): string | null {
+  const fe = (detail as { error?: { fieldErrors?: Record<string, string[] | undefined> } } | null)?.error?.fieldErrors;
+  if (!fe) return null;
+  const parts: string[] = [];
+  if (fe.email?.length) parts.push("Format email belum valid.");
+  if (fe.password?.length) parts.push("Password minimal 8 karakter.");
+  if (fe.setupToken?.length) parts.push("Setup token belum diisi.");
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
 // Galat dipisah per penyebab — "Email atau password salah" untuk semua kegagalan membuat
 // operator menebak. Kode status server diterjemahkan di sini; teks mentahnya tak ditampilkan.
 export function authErrorMessage(e: unknown, needsSetup: boolean): string {
@@ -19,7 +31,7 @@ export function authErrorMessage(e: unknown, needsSetup: boolean): string {
       if (e.status === 409) return "Akun sudah ada. Silakan masuk.";
       if (e.status === 429) return "Terlalu banyak percobaan membuat akun. Tunggu sebentar, lalu coba lagi.";
       if (e.status === 403) return "Setup token salah. Salin ulang isinya dari berkas setup.token di host server.";
-      if (e.status === 400) return "Email atau password belum valid. Password minimal 8 karakter.";
+      if (e.status === 400) return setupFieldProblem(e.detail) ?? "Data akun belum valid. Periksa email dan password, lalu coba lagi.";
     } else {
       if (e.status === 401) return "Email atau password salah.";
       if (e.status === 429) return "Terlalu banyak percobaan masuk. Tunggu sebentar, lalu coba lagi.";

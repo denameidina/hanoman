@@ -569,8 +569,10 @@ export function AgentAccessPanel({ onToast }: { onToast?: ShowToast } = {}) {
   const nameBlock = name.trim().length < 1 ? "Isi nama token dulu." : null;
   const load = React.useCallback(() => { api.listAgentTokens().then((r) => setItems(r.items)).catch(() => setItems([])); }, []);
   React.useEffect(() => {
-    api.getSettings().then(setSetting).catch(() => {});
-    api.getAgentCapabilities().then((r) => setCaps(r.capabilities)).catch(() => {});
+    api.getSettings().then(setSetting)
+      .catch((e: unknown) => onToast?.(failureMessage("memuat pengaturan akses agen", e), "err", "alert-triangle"));
+    api.getAgentCapabilities().then((r) => setCaps(r.capabilities))
+      .catch((e: unknown) => onToast?.(failureMessage("memuat daftar capability agen", e), "err", "alert-triangle"));
     load();
   }, [load]);
 
@@ -751,12 +753,13 @@ function SetupPanel() {
   }, []);
   React.useEffect(load, [load]);
   if (!setup) return <StateBlock kind="loading" title="Memuat setup…" />;
-  if (rerun) return <SetupWizard status={setup} onDone={() => { setRerun(false); load(); }} />;
+  if (rerun) return <SetupWizard status={setup} onDone={() => { setRerun(false); load(); }}
+    onCancel={() => setRerun(false)} />;
   return (
     <div data-testid="setup-card">
       <Card eyebrow="setup" title="Setup awal">
         <div style={{ fontSize: 12.5, lineHeight: 1.6, marginBottom: 12 }}>
-          Peruntukan: {setup.deployment === "local" ? "Device saya sendiri" : "Diakses orang lain"}
+          Peruntukan: {setup.deployment === "local" ? "Perangkat ini" : "Diakses orang lain"}
           <br />
           {setup.hardening ? "Hardening menyala" : "Hardening mati"}
           {setup.hardeningLocked ? " — dipasang lewat env, tak bisa diubah dari sini" : ""}
@@ -808,10 +811,13 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
   const [webhookDocs, setWebhookDocs] = React.useState(false);
   const [telegramStatus, setTelegramStatus] = React.useState<TelegramGatewayStatus | null>(null);
   const [telegramFailed, setTelegramFailed] = React.useState(false);
-  // SPEC-339 · versi codex CLI, untuk peringatan LUNAK saja. Gagal-diam: endpoint yang error tak
-  // boleh membuat layar Settings gagal render.
+  // SPEC-339 · versi codex CLI, untuk peringatan LUNAK saja. Galatnya ditampilkan sebagai toast;
+  // endpoint yang error tetap tak boleh membuat layar Settings gagal render.
   const [codexVer, setCodexVer] = React.useState<{ version: string | null; minRequired: string } | null>(null);
-  React.useEffect(() => { api.getCodexVersion().then(setCodexVer).catch(() => {}); }, []);
+  React.useEffect(() => {
+    api.getCodexVersion().then(setCodexVer)
+      .catch((e: unknown) => onToast?.(failureMessage("membaca versi Codex CLI", e), "err", "alert-triangle"));
+  }, []);
   // SPEC-739 · ADR-0114 · kesiapan skill metode per agen. Gagal-diam seperti codexVer: kartu
   // Metode harus tetap bisa dipakai walau endpoint statusnya error — ini observabilitas,
   // bukan gerbang.
@@ -823,7 +829,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
     api.getMethodStatus().then(setMethodStatuses).catch(() => setMethodStatuses(null));
     api.listProjects({ limit: 100 })
       .then((r) => setInstallProject((p) => p || (r.items.find((x) => x.binding ?? x.repoDir)?.id ?? "")))
-      .catch(() => {});
+      .catch((e: unknown) => onToast?.(failureMessage("memuat daftar project", e), "err", "alert-triangle"));
   }, [tab]);
   // Jangan fallback ke S_DEFAULTS saat GET gagal: toggle berikutnya akan mem-PUT
   // default itu menimpa pengaturan asli di server.
@@ -866,7 +872,8 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
         const fresh = await api.getSettings().catch(() => undefined);
         await api.putSettings(rebaseEdits(base, next, fresh));
       });
-      saveQueue.current = write.catch(() => {});
+      // Rantai antrean hanya perlu tetap hidup; galat `write` ditampilkan oleh write.then di bawah.
+      saveQueue.current = write.catch(() => { /* diam: galat sudah ditampilkan di write.then(…, onRejected) */ });
       write.then(
         () => { if (msg && onToast) onToast(msg, tone || "ok", icon || "check-circle-2"); },
         (e: unknown) => {
@@ -1119,7 +1126,7 @@ export function SettingsScreen({ onToast, me, onLoggedOut }:
         return (
           <div data-testid="codex-version-note" style={{
             fontSize: 12, lineHeight: 1.5, marginBottom: 10, padding: "8px 10px",
-            borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-muted)",
+            borderRadius: 8, background: "var(--status-warn-tint)", color: "var(--text-muted)",
           }}>
             Codex CLI terpasang <b>{have}</b>, sedangkan <b>{model}</b> butuh <b>{codexModel(model)?.minClient}</b>.
             Sesi tetap boleh dijalankan, tapi modelnya belum tentu dikenali CLI ini.

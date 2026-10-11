@@ -153,7 +153,7 @@ export const SETTINGS_TOOLS: readonly McpToolDef[] = [
     name: "hanoman_scheduler_queue_requeue",
     title: "Kembalikan baris ke antrean",
     description:
-      "Mengembalikan baris antrean yang sudah dibatalkan. Tanpa ini pembatalan bersifat permanen — barisnya jadi tombstone dan penjadwalan ulang biasa tak bisa menghidupkannya.",
+      "Mengembalikan baris antrean yang sudah dibatalkan (`canceled`) atau gagal (`failed`) ke antrean. Tanpa ini pembatalan bersifat permanen — barisnya jadi tombstone dan penjadwalan ulang biasa tak bisa menghidupkannya. Baris `failed` juga menuntut `sessions:spawn`, karena peluncuran ulangnya membuka sesi agen (403 bila tak ada). Baris dengan status lain dijawab 409 beserta statusnya.",
     inputSchema: obj({ properties: { item: str("Id baris antrean.") }, required: ["item"] }),
     mode: "write", capability: "settings:write",
     samplePath: "/scheduler/queue/q1/requeue", sampleMethod: "POST",

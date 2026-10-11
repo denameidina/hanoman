@@ -104,9 +104,9 @@ export function SetupWizard({ status, onDone, onCancel }: {
             <fieldset style={{ border: 0, padding: 0, margin: "0 0 16px", minWidth: 0 }}>
               <legend style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)", marginBottom: 8, padding: 0 }}>Peruntukan</legend>
               <label style={{ display: "block", marginBottom: 10, fontSize: 13 }}>
-                <input type="radio" name="deployment" aria-label="Device saya sendiri" aria-describedby="dep-local"
+                <input type="radio" name="deployment" aria-label="Perangkat ini" aria-describedby="dep-local"
                   checked={deployment === "local"} onChange={() => choose("local")} />
-                {" "}Device saya sendiri
+                {" "}Perangkat ini
                 <span id="dep-local" style={{ display: "block", marginLeft: 22, fontSize: 12, color: "var(--text-muted)" }}>Hanya saya yang memakai instance ini.</span>
               </label>
               <label style={{ display: "block", fontSize: 13 }}>

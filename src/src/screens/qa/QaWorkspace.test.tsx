@@ -300,7 +300,12 @@ describe("QaWorkspace · konfirmasi, galat yang tampil, dan info laporan (Fase 1
     expect(within(dialog).getByText("Membuat 2 item backlog.")).toBeTruthy();
     expect(within(dialog).getByText("F-02 · Gambar rusak")).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Kirim 2 temuan" }));
-    const alert = await screen.findByRole("alert");
+    // Toast galat juga ber-role=alert (Fase 2B): pilih alert inline yang memuat daftar kegagalan.
+    const alert = await waitFor(() => {
+      const hit = screen.getAllByRole("alert").find((el) => el.textContent?.includes("1 temuan gagal dikirim ke backlog"));
+      if (!hit) throw new Error("alert kegagalan sebagian belum tampil");
+      return hit;
+    });
     expect(alert).toHaveTextContent("1 temuan gagal dikirim ke backlog");
     expect(alert).toHaveTextContent("F-02 · Gambar rusak: backlog penuh");
   });

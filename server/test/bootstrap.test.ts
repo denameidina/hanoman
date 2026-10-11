@@ -101,4 +101,25 @@ describe("one-time bootstrap token", () => {
       payload: { email: "a@b.co", password: "password1" } })).statusCode).toBe(400);
     await app.close();
   });
+
+  // ADR-0204 · `setupTokenPath` (field aditif di GET /auth/status, dibaca AuthScreen) menunjuk berkas
+  // token di HANOMAN_HOME, dan HANYA saat hardening menyala DAN belum ada akun. Yang terbuka cuma
+  // lokasi berkas, bukan isinya; begitu akun pertama dibuat, field itu hilang bersama berkasnya.
+  it("hardening + belum ada akun: status menunjuk setup.token; hilang setelah akun pertama dibuat (ADR-0204)", async () => {
+    await resetDb();
+    await clearUsers();
+    const dir = await home();
+    const app = buildApp({ requireAuth: false,
+      env: { NODE_ENV: "production", HANOMAN_HARDENING: "1", HANOMAN_HOME: dir } });
+    const before = (await app.inject({ method: "GET", url: "/api/auth/status" })).json();
+    expect(before.setupTokenPath).toBe(join(dir, "setup.token"));
+    const token = (await readFile(before.setupTokenPath, "utf8")).split("\n")[0]!;
+    const r = await app.inject({ method: "POST", url: "/api/auth/setup",
+      payload: { email: "a@b.co", password: "password1", setupToken: token } });
+    expect(r.statusCode).toBe(200);
+    const after = (await app.inject({ method: "GET", url: "/api/auth/status" })).json();
+    expect(after.needsSetup).toBe(false);
+    expect(after.setupTokenPath).toBeUndefined();
+    await app.close();
+  });
 });

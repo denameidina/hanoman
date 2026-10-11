@@ -3,6 +3,47 @@ import React from "react";
 import { Icon } from "../icon";
 const _extends = Object.assign;
 
+// ── Tautan Field ↔ kontrol (Audit UI/UX 2026-10 · Fase 2B) ─────────────────────────────
+// `Field` (kit.tsx) menyediakan konteks ini. Kontrol pertama yang mendaftar menjadi PEMILIK: ia
+// memperoleh `id` (yang dituju `<label htmlFor>`), `aria-describedby` (hint + error), dan
+// `aria-invalid` bila Field itu punya error. Kontrol kedua dalam Field yang sama tak mengambil
+// alih — id tak boleh ganda. Di luar Field konteksnya null dan kontrol berperilaku seperti biasa.
+export type FieldLinkValue = {
+  owner: { token: string; id: string } | null;
+  describedBy?: string;
+  invalid: boolean;
+  register: (token: string, explicitId?: string) => void;
+  unregister: (token: string) => void;
+};
+export const FieldLinkContext = React.createContext<FieldLinkValue | null>(null);
+
+export function useFieldLink(opts: { id?: string; describedBy?: string; invalid?: boolean }) {
+  const link = React.useContext(FieldLinkContext);
+  const token = React.useId();
+  const register = link?.register;
+  const unregister = link?.unregister;
+  const explicitId = opts.id;
+  // Hanya fungsi yang stabil di dependensi: objek konteks berubah tiap kali pemilik berganti,
+  // dan memasukkannya di sini akan membuat register/unregister berputar tanpa henti.
+  React.useLayoutEffect(() => {
+    if (!register || !unregister) return;
+    register(token, explicitId);
+    return () => unregister(token);
+  }, [register, unregister, token, explicitId]);
+  const owner = link?.owner ?? null;
+  const mine = owner && owner.token === token ? owner : null;
+  return {
+    id: mine ? mine.id : explicitId,
+    // `aria-describedby` eksplisit dari pemanggil MENANG atas tautan otomatis Field: pemanggil yang
+    // menulisnya sudah menunjuk elemen pesannya sendiri (mis. galat di dalam hint).
+    describedBy: opts.describedBy ?? (mine ? link?.describedBy : undefined),
+    invalid: !!opts.invalid || (!!mine && !!link?.invalid),
+  };
+}
+
+/** `aria-invalid` boleh ditulis `true` atau `"true"`; keduanya menyalakan border error. */
+export const ariaInvalid = (v: unknown): boolean => v === true || v === "true";
+
 type Size = "sm" | "md" | "lg";
 const BTN_SIZES: Record<string, { h: number; px: number; fs: string; gap: number; icon: number }> = {
   sm: { h: 30, px: 12, fs: "var(--text-sm)", gap: 6, icon: 15 },
@@ -94,15 +135,19 @@ const INPUT_SIZES: Record<string, { h: number; px: number; fs: string; icon: num
 };
 type InputProps = { size?: Size; leftIcon?: string; rightIcon?: string; invalid?: boolean; disabled?: boolean;
   mono?: boolean; style?: React.CSSProperties } & Record<string, any>;
+// Kelas `hn-input-core` mematikan outline bawaan `input:focus-visible` (app.css, !important): fokus
+// cukup digambar sekali oleh pembungkus (border + ring). Dulu keduanya tergambar → outline ganda.
 export function Input({ size = "md", leftIcon, rightIcon, invalid = false, disabled = false, mono = false, className = "", style = {}, ...rest }: InputProps) {
   const s = INPUT_SIZES[size] || INPUT_SIZES.md!;
   const [focus, setFocus] = React.useState(false);
-  const borderColor = invalid ? "var(--status-err)" : focus ? "var(--border-focus)" : "var(--border-strong)";
+  const link = useFieldLink({ id: rest.id, describedBy: rest["aria-describedby"], invalid: invalid || ariaInvalid(rest["aria-invalid"]) });
+  const bad = link.invalid;
+  const borderColor = bad ? "var(--status-err)" : focus ? "var(--border-focus)" : "var(--border-strong)";
   return React.createElement("div", {
     className: `hn-touch-target ${className}`.trim(),
     style: { display: "flex", alignItems: "center", gap: 8, height: s.h, padding: `0 ${s.px}px`,
       background: disabled ? "var(--bone-200)" : "var(--surface-card)", border: `1px solid ${borderColor}`,
-      borderRadius: "var(--radius-sm)", boxShadow: focus ? "var(--ring)" : invalid ? "none" : "var(--shadow-inset)",
+      borderRadius: "var(--radius-sm)", boxShadow: focus ? "var(--ring)" : bad ? "none" : "var(--shadow-inset)",
       transition: "var(--transition-fast)", opacity: disabled ? 0.6 : 1, ...style },
   },
     leftIcon && React.createElement(Icon, { name: leftIcon, size: s.icon, color: "var(--text-subtle)" }),
@@ -111,6 +156,10 @@ export function Input({ size = "md", leftIcon, rightIcon, invalid = false, disab
       onFocus: (e: React.FocusEvent<HTMLInputElement>) => { setFocus(true); rest.onFocus && rest.onFocus(e); },
       onBlur: (e: React.FocusEvent<HTMLInputElement>) => { setFocus(false); rest.onBlur && rest.onBlur(e); },
     }, rest, {
+      id: link.id,
+      "aria-describedby": link.describedBy,
+      "aria-invalid": bad ? true : rest["aria-invalid"],
+      className: "hn-input-core",
       style: { flex: 1, minWidth: 0, height: "100%", boxSizing: "border-box", border: "none", outline: "none", background: "transparent",
         color: "var(--text-strong)", fontFamily: mono ? "var(--font-mono)" : "var(--font-ui)", fontSize: s.fs, lineHeight: 1.2 },
     })),
@@ -127,18 +176,26 @@ type SelectProps = { options?: Option[]; value?: string; defaultValue?: string;
 export function Select({ options = [], value, defaultValue, onChange, size = "md", disabled = false, invalid = false, placeholder, className = "", style = {}, ...rest }: SelectProps) {
   const s = SELECT_SIZES[size] || SELECT_SIZES.md!;
   const [focus, setFocus] = React.useState(false);
-  const borderColor = invalid ? "var(--status-err)" : focus ? "var(--border-focus)" : "var(--border-strong)";
+  const link = useFieldLink({ id: rest.id, describedBy: rest["aria-describedby"], invalid: invalid || ariaInvalid(rest["aria-invalid"]) });
+  const bad = link.invalid;
+  const borderColor = bad ? "var(--status-err)" : focus ? "var(--border-focus)" : "var(--border-strong)";
   const norm = options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
   return React.createElement("div", {
     className: `hn-touch-target hn-select ${className}`.trim(),
     style: { position: "relative", display: "inline-flex", alignItems: "center", height: s.h,
       background: disabled ? "var(--bone-200)" : "var(--surface-card)", border: `1px solid ${borderColor}`,
-      borderRadius: "var(--radius-sm)", boxShadow: focus ? "var(--ring)" : "var(--shadow-inset)",
+      borderRadius: "var(--radius-sm)", boxShadow: focus ? "var(--ring)" : bad ? "none" : "var(--shadow-inset)",
       transition: "var(--transition-fast)", opacity: disabled ? 0.6 : 1, ...style },
   },
     React.createElement("select", _extends({
-      value, defaultValue, onChange, disabled, onFocus: () => setFocus(true), onBlur: () => setFocus(false),
+      value, defaultValue, onChange, disabled,
     }, rest, {
+      id: link.id,
+      "aria-describedby": link.describedBy,
+      "aria-invalid": bad ? true : rest["aria-invalid"],
+      // Gabungkan dengan onFocus/onBlur pemanggil — `rest` di atas akan menimpanya bila tak digabung.
+      onFocus: (e: React.FocusEvent<HTMLSelectElement>) => { setFocus(true); rest.onFocus && rest.onFocus(e); },
+      onBlur: (e: React.FocusEvent<HTMLSelectElement>) => { setFocus(false); rest.onBlur && rest.onBlur(e); },
       style: { appearance: "none", WebkitAppearance: "none", border: "none", outline: "none", background: "transparent",
         color: "var(--text-strong)", fontFamily: "var(--font-ui)", fontSize: s.fs, height: "100%",
         // Isi penuh lebar pembungkus supaya SELURUH field (bukan cuma teksnya) membuka dropdown.
@@ -184,8 +241,9 @@ export function Checkbox({ checked, defaultChecked, onChange, label, description
         e.preventDefault();
         toggle(e);
       },
-      style: { display: "inline-grid", placeItems: "center", width: 18, height: 18,
-        marginTop: description ? 2 : 0, flex: "0 0 auto" },
+      // Area sentuh 24×24 (WCAG 2.5.8); kotak yang tampak tetap 18px di tengahnya.
+      style: { display: "inline-grid", placeItems: "center", width: 24, height: 24,
+        marginTop: description ? -1 : 0, flex: "0 0 auto" },
     }, React.createElement("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18,
       borderRadius: "var(--radius-xs)", background: on ? "var(--accent)" : "var(--surface-card)",
       border: `1.5px solid ${on ? "var(--accent)" : "var(--border-strong)"}`,
@@ -202,13 +260,32 @@ export function Checkbox({ checked, defaultChecked, onChange, label, description
 // `Checkbox` di atas — bentuknya saja yang bundar dan `role`-nya `radio`. Sengaja TANPA keadaan
 // internal: "salah satu dari sekumpulan" hanya benar bila yang memegang daftarnya satu pihak, dan
 // itu induknya, bukan tiap tombol.
-type RadioProps = { checked?: boolean; onChange?: (e: React.MouseEvent | React.KeyboardEvent) => void;
+type RadioGroupValue = {
+  value: string | null | undefined;
+  tabTarget: string | null;
+  disabled: boolean;
+  onSelect: (v: string, e: React.MouseEvent | React.KeyboardEvent) => void;
+};
+const RadioGroupContext = React.createContext<RadioGroupValue | null>(null);
+
+// Radio tanpa grup tetap memakai `checked` seperti dulu. Di dalam <RadioGroup> (butuh `value`),
+// keadaan dipegang grup dan tabindex-nya mengikuti roving tabindex grup.
+type RadioProps = { checked?: boolean; value?: string; onChange?: (e: React.MouseEvent | React.KeyboardEvent) => void;
   label?: React.ReactNode; description?: React.ReactNode; disabled?: boolean;
   style?: React.CSSProperties } & Record<string, any>;
-export function Radio({ checked = false, onChange, label, description, disabled = false, className = "", style = {}, ...rest }: RadioProps) {
+export function Radio({ checked: checkedProp = false, value, onChange, label, description, disabled: disabledProp = false, className = "", style = {}, ...rest }: RadioProps) {
   const textId = React.useId();
+  const group = React.useContext(RadioGroupContext);
+  const inGroup = !!group && value !== undefined;
+  const disabled = disabledProp || !!group?.disabled;
+  const checked = inGroup ? group.value === value : checkedProp;
+  const tabIndex = disabled ? -1 : group && value !== undefined && group.tabTarget !== value ? -1 : 0;
   const { "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy, ...outerProps } = rest;
-  const pick = (e: React.MouseEvent | React.KeyboardEvent) => { if (!disabled) onChange && onChange(e); };
+  const pick = (e: React.MouseEvent | React.KeyboardEvent) => {
+    if (disabled) return;
+    if (group && value !== undefined && group.value !== value) group.onSelect(value, e);
+    onChange && onChange(e);
+  };
   return React.createElement("label", _extends({
     className: `hn-choice-target ${className}`.trim(),
     style: { display: "inline-flex", alignItems: description ? "flex-start" : "center", gap: 10,
@@ -217,15 +294,17 @@ export function Radio({ checked = false, onChange, label, description, disabled 
     React.createElement("span", {
       role: "radio", "aria-checked": checked, "aria-disabled": disabled || undefined,
       "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy ?? (!ariaLabel && (label || description) ? textId : undefined),
+      "data-value": inGroup ? value : undefined,
       className: "hn-choice-control",
-      tabIndex: disabled ? -1 : 0, onClick: pick,
+      tabIndex, onClick: pick,
       onKeyDown: (e: React.KeyboardEvent) => {
         if (e.key !== " " && e.key !== "Enter") return;
         e.preventDefault();
         pick(e);
       },
-      style: { display: "inline-grid", placeItems: "center", width: 18, height: 18,
-        marginTop: description ? 2 : 0, flex: "0 0 auto" },
+      // Area sentuh 24×24 (WCAG 2.5.8); lingkaran yang tampak tetap 18px di tengahnya.
+      style: { display: "inline-grid", placeItems: "center", width: 24, height: 24,
+        marginTop: description ? -1 : 0, flex: "0 0 auto" },
     }, React.createElement("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18,
       borderRadius: "var(--radius-pill)", background: "var(--surface-card)",
       border: `1.5px solid ${checked ? "var(--accent)" : "var(--border-strong)"}`,
@@ -237,6 +316,72 @@ export function Radio({ checked = false, onChange, label, description, disabled 
         color: "var(--text-strong)", lineHeight: 1.4 } }, label),
       description && React.createElement("span", { style: { display: "block", fontSize: "var(--text-sm)",
         color: "var(--text-muted)", lineHeight: 1.45 } }, description)));
+}
+
+// Audit UI/UX 2026-10 · Fase 2B · pilihan tunggal sebagai GRUP, bukan sekumpulan radio lepas.
+// Pemakaian: <RadioGroup aria-label="Mode" value={mode} onChange={(v) => setMode(v)}>
+//              <Radio value="a" label="A" /> <Radio value="b" label="B" />
+// • role="radiogroup", nama dari `label` (terlihat) atau `aria-label`/`aria-labelledby`.
+// • Roving tabindex: hanya SATU item tabbable — yang terpilih, atau item aktif pertama bila belum
+//   ada yang terpilih. Tab keluar dari grup dalam satu langkah.
+// • Panah (↑↓←→) dan Home/End memindahkan fokus sekaligus memilih (pola WAI-ARIA radio), melewati
+//   item disabled dan berputar di ujung. Enter/Spasi tetap memilih item yang fokus.
+// Pemilik keadaan adalah pemanggil lewat `value`; grup tak menyimpan pilihan sendiri.
+type RadioGroupProps = {
+  value?: string | null;
+  onChange?: (value: string, e: React.MouseEvent | React.KeyboardEvent) => void;
+  label?: React.ReactNode;
+  direction?: "column" | "row";
+  disabled?: boolean;
+  children?: React.ReactNode;
+  style?: React.CSSProperties;
+} & Record<string, any>;
+
+function enabledRadios(root: HTMLElement | null): HTMLElement[] {
+  if (!root) return [];
+  return Array.from(root.querySelectorAll<HTMLElement>('[role="radio"][data-value]'))
+    .filter((el) => el.getAttribute("aria-disabled") !== "true");
+}
+
+export function RadioGroup({ value, onChange, label, direction = "column", disabled = false, children, style = {}, ...rest }: RadioGroupProps) {
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  const labelId = React.useId();
+  const [tabTarget, setTabTarget] = React.useState<string | null>(null);
+  // Setelah tiap render, tentukan item tabbable dari DOM: yang terpilih bila aktif, selain itu
+  // item aktif pertama. setState dengan nilai sama tak me-render ulang, jadi tak ada loop.
+  React.useLayoutEffect(() => {
+    const values = enabledRadios(rootRef.current).map((el) => el.dataset.value ?? "");
+    const next = value != null && values.includes(value) ? value : (values[0] ?? null);
+    setTabTarget((prev) => (prev === next ? prev : next));
+  });
+  const onSelect = React.useCallback((v: string, e: React.MouseEvent | React.KeyboardEvent) => { onChange?.(v, e); }, [onChange]);
+  const ctx = React.useMemo<RadioGroupValue>(() => ({ value, tabTarget, disabled, onSelect }), [value, tabTarget, disabled, onSelect]);
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"].includes(e.key)) return;
+    const items = enabledRadios(rootRef.current);
+    const at = items.indexOf(e.target as HTMLElement);
+    if (at < 0) return;
+    const n = items.length;
+    const next = e.key === "Home" ? 0
+      : e.key === "End" ? n - 1
+      : e.key === "ArrowDown" || e.key === "ArrowRight" ? (at + 1) % n
+      : (at - 1 + n) % n;
+    e.preventDefault();
+    const target = items[next]!;
+    target.focus();
+    const v = target.dataset.value;
+    if (v !== undefined && v !== value) onChange?.(v, e);
+  };
+  return (
+    <RadioGroupContext.Provider value={ctx}>
+      <div {...rest} ref={rootRef} role="radiogroup" aria-labelledby={label ? labelId : rest["aria-labelledby"]}
+        aria-disabled={disabled || undefined} onKeyDown={onKeyDown}
+        style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0, ...style }}>
+        {label && <div id={labelId} style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-strong)", lineHeight: 1.4 }}>{label}</div>}
+        <div style={{ display: "flex", flexDirection: direction, flexWrap: "wrap", gap: direction === "row" ? 18 : 10 }}>{children}</div>
+      </div>
+    </RadioGroupContext.Provider>
+  );
 }
 
 const SWITCH_SIZES: Record<string, { w: number; h: number; knob: number }> = {
@@ -309,6 +454,7 @@ export function MultiSelect({
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");
+  const link = useFieldLink({ id: rest.id as string | undefined, describedBy: rest["aria-describedby"] as string | undefined });
   const label = (rest["aria-label"] as string) ?? placeholder;
   const labelOf = (v: string) => options.find((o) => o.value === v)?.label ?? v;
   const needle = q.trim().toLowerCase();
@@ -347,6 +493,7 @@ export function MultiSelect({
       })),
     React.createElement(Button, {
       variant: "secondary", size: "sm", disabled,
+      id: link.id, "aria-describedby": link.describedBy, "aria-invalid": link.invalid || undefined,
       "aria-label": label, "aria-expanded": open,
       onClick: () => setOpen((v) => !v),
       rightIcon: open ? "chevron-up" : "chevron-down",
@@ -358,11 +505,14 @@ export function MultiSelect({
         background: "var(--surface-card)",
       },
     },
-      React.createElement(Input, {
-        type: "search", role: "searchbox", size: "sm", value: q,
-        placeholder: searchPlaceholder, "aria-label": `Cari ${label}`,
-        onChange: (e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value),
-      }),
+      // Kolom cari adalah milik MultiSelect, bukan milik Field: konteks dikosongkan agar ia tak
+      // merebut label/hint Field dari tombol pemicunya.
+      React.createElement(FieldLinkContext.Provider, { value: null },
+        React.createElement(Input, {
+          type: "search", role: "searchbox", size: "sm", value: q,
+          placeholder: searchPlaceholder, "aria-label": `Cari ${label}`,
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value),
+        })),
       React.createElement("div", {
         role: "listbox", "aria-multiselectable": true,
         style: { display: "flex", flexDirection: "column", maxHeight: 220, overflowY: "auto" },

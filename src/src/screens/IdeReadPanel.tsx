@@ -8,6 +8,7 @@ import { MarkdownView } from "../ds/markdown";
 import { useApi } from "../api/instance";
 import type { RepoFile, ReviewFile, WorkingStatus } from "../api/client";
 import type { GraphCommit } from "@hanoman/shared";
+import { failureMessage } from "../lib/report-error";
 import { buildFileTree, TreeRow, TreeRoot, ChangedSection } from "./file-tree";
 import { DiffView } from "./diff-view";
 
@@ -130,6 +131,7 @@ function GraphRead({ projectId }: { projectId: string }) {
   const [commits, setCommits] = React.useState<GraphCommit[] | null>(null);
   const [compareFrom, setCompareFrom] = React.useState<string | null>(null);
   const [compare, setCompare] = React.useState<{ from: string; to: string; changed: { path: string }[] } | null>(null);
+  const [compareErr, setCompareErr] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     api.ideGraph(projectId, 100).then((g) => setCommits(g.commits)).catch(() => setCommits([]));
@@ -137,7 +139,12 @@ function GraphRead({ projectId }: { projectId: string }) {
 
   const onClickCommit = (sha: string) => {
     if (!compareFrom) { setCompareFrom(sha); return; }
-    if (compareFrom !== sha) api.ideCompare(projectId, compareFrom, sha).then(setCompare).catch(() => {});
+    if (compareFrom !== sha) {
+      setCompareErr(null);
+      // Perbandingan lama dilepas saat yang baru gagal; jangan biarkan hasil basi tampil sebagai hasil ini.
+      api.ideCompare(projectId, compareFrom, sha).then(setCompare)
+        .catch((e: unknown) => { setCompare(null); setCompareErr(failureMessage("membandingkan commit", e)); });
+    }
     setCompareFrom(null);
   };
 
@@ -156,6 +163,11 @@ function GraphRead({ projectId }: { projectId: string }) {
             : compare.changed.map((f) => (
                 <div key={f.path} style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, padding: "2px 0" }}>{f.path}</div>
               ))}
+        </div>
+      )}
+      {compareErr && (
+        <div role="alert" style={{ padding: "8px 14px", fontSize: 12, color: "var(--status-err)", borderBottom: "1px solid var(--border-hair)" }}>
+          {compareErr}
         </div>
       )}
       <div style={{ padding: 8, overflow: "auto" }}>

@@ -52,7 +52,7 @@ type LinkState =
 export const TerminalPane = React.memo(TerminalPaneImpl);
 
 function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
-  predict = true, diag = false, mode = "local", hidden = false, onForget }: {
+  predict = true, diag = false, mode = "local", hidden = false, onForget, label }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
@@ -76,6 +76,8 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   // Sesi sudah lenyap dari tmux (status "gone"): pemilik sel boleh melepasnya. Tanpa prop ini strip
   // hanya menyatakan keadaan, dan sel tak punya jalan keluar selain tombol header.
   onForget?: () => void;
+  /** Nama sel untuk judul konfirmasi "Hapus sel" (mis. project · spec). Absen = id sesi saja. */
+  label?: string;
 }) {
   const wsTarget = useWsTarget(`terminal:${sessionId}`);
   const instance = useInstance();
@@ -103,8 +105,9 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   const rootRef = React.useRef<HTMLDivElement>(null);
   // Fokus xterm di dalam pane: hanya untuk memunculkan jalan keluar yang terlihat (tombol di bawah).
   const [inTerminal, setInTerminal] = React.useState(false);
-  // Buang ketikan tertahan wajib dikonfirmasi: teks yang dibuang tak bisa dipulihkan.
-  const { confirm: confirmDiscard, dialog } = useConfirm();
+  // Buang ketikan tertahan dan Hapus sel wajib dikonfirmasi lewat satu dialog: keduanya tak pernah
+  // terbuka bersamaan (tertahan vs. gone), dan konfirmasi baru menjawab yang lama dengan "batal".
+  const { confirm: confirmAction, dialog } = useConfirm();
   // onExit boleh berubah tiap render; menaruhnya di ref menjaga effect ini
   // hanya bergantung pada sessionId — remount = sesi yang benar-benar berbeda.
   const exitRef = React.useRef(onExit);
@@ -827,12 +830,23 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
 
   // Buang = membuang teks yang belum pernah sampai ke agen. Tak bisa dipulihkan, jadi dikonfirmasi.
   const discardHeld = async () => {
-    const ok = await confirmDiscard({
+    const ok = await confirmAction({
       title: `Buang ${queue.n} ketikan yang tertahan?`,
       impact: ["Teks itu belum dikirim ke sesi dan tidak bisa diambil lagi."],
       confirmLabel: "Buang ketikan", icon: "trash-2", tone: "danger",
     });
     if (ok) dropHeld.current();
+  };
+
+  const forgetCell = async () => {
+    if (!onForget) return;
+    const name = label ? `${label} · ${sessionId.slice(0, 6)}` : sessionId.slice(0, 6);
+    const ok = await confirmAction({
+      title: `Hapus sel "${name}"?`,
+      impact: ["Sel ini dihapus dari tampilan.", "Sesi tmux-nya sudah tidak ada; tak ada proses yang dihentikan."],
+      confirmLabel: "Hapus dari tampilan", icon: "x", tone: "default",
+    });
+    if (ok) onForget();
   };
 
   return (
@@ -853,7 +867,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
             <span>sesi sudah tidak ada di tmux dan tak bisa disambung ulang</span>
             {onForget && (
               <button type="button" className="hn-terminal-action hn-terminal-action--text"
-                onClick={onForget}>Hapus sel</button>
+                onClick={() => void forgetCell()}>Hapus sel</button>
             )}
           </>}
           {link.state === "lost" && <>

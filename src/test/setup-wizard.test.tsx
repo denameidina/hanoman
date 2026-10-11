@@ -32,7 +32,7 @@ beforeEach(() => vi.clearAllMocks());
 describe("SetupWizard (SPEC-884)", () => {
   it("langkah 1 default device pribadi, dan lanjut ke langkah keamanan", () => {
     render(<SetupWizard status={status()} onDone={() => {}} />);
-    expect(screen.getByLabelText("Device saya sendiri")).toBeChecked();
+    expect(screen.getByLabelText("Perangkat ini")).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: /Lanjut/ }));
     expect(screen.getByLabelText("Aktifkan hardening")).not.toBeChecked();
   });

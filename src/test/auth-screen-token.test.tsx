@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { AuthScreen } from "../src/screens/AuthScreen";
+import { AuthScreen, authErrorMessage } from "../src/screens/AuthScreen";
 import { api, ApiError } from "../src/api/client";
 
 // SPEC-884 · ADR-0139 · sebelum spec ini form mengunci tombol setiap kali `needsSetup` benar, tanpa
@@ -37,6 +37,33 @@ describe("AuthScreen · setup token (SPEC-884)", () => {
     expect(screen.getByText("Setup token")).toBeTruthy();
     fill();
     expect(screen.getByRole("button", { name: /Buat akun & masuk/ })).toBeDisabled();
+  });
+});
+
+// Respons 400 setup: pesan menyebut bidang yang benar-benar ditolak server (zod `fieldErrors`),
+// tak lagi selalu "Password minimal 8 karakter" untuk setiap 400.
+describe("authErrorMessage · setup 400 dibedakan dari fieldErrors", () => {
+  const bad400 = (fieldErrors: Record<string, string[]>) =>
+    Object.assign(new ApiError(400, "x"), { status: 400, detail: { error: { formErrors: [], fieldErrors } } });
+
+  it("password terlalu pendek menyebut password, bukan email", () => {
+    expect(authErrorMessage(bad400({ password: ["String must contain at least 8 character(s)"] }), true))
+      .toBe("Password minimal 8 karakter.");
+  });
+
+  it("email tak valid menyebut format email", () => {
+    expect(authErrorMessage(bad400({ email: ["Invalid email"] }), true)).toBe("Format email belum valid.");
+  });
+
+  it("dua bidang salah disebut keduanya", () => {
+    expect(authErrorMessage(bad400({ email: ["Invalid email"], password: ["min 8"] }), true))
+      .toBe("Format email belum valid. Password minimal 8 karakter.");
+  });
+
+  it("400 tanpa fieldErrors jatuh ke pesan generik yang jujur, tanpa menebak password", () => {
+    const msg = authErrorMessage(Object.assign(new ApiError(400, "x"), { status: 400, detail: null }), true);
+    expect(msg).toBe("Data akun belum valid. Periksa email dan password, lalu coba lagi.");
+    expect(msg).not.toMatch(/minimal 8/);
   });
 });
 

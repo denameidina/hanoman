@@ -193,7 +193,7 @@ function PrdPreviewPane({ prd, projectId, dataVersion, onTake, onStartBreakdown,
       )}
 
       {items.length > 0 && (
-        <div style={{ border: "1px solid var(--brass-200)", borderRadius: "var(--radius-sm)", background: "var(--brass-50)", padding: 12, marginBottom: 14 }}>
+        <div style={{ border: "1px solid var(--brass-300)", borderRadius: "var(--radius-sm)", background: "var(--brass-050)", padding: 12, marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", marginBottom: 8, gap: 8 }}>
             <div style={{ fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: 13, color: "var(--brass-700)" }}>
               Usulan backlog paralel ({chosen.length}/{items.length})

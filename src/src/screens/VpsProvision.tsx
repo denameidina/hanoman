@@ -41,7 +41,7 @@ function Chip({ status, children, title }:
   const color = STATUS_COLOR[status] ?? "var(--text-subtle)";
   return (
     <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 5,
-      fontSize: 11, lineHeight: "18px", color: "var(--text-primary)", background: "var(--surface-sunken)",
+      fontSize: 11, lineHeight: "18px", color: "var(--text-body)", background: "var(--surface-sunken)",
       border: "1px solid var(--border-hair)", borderRadius: 999, padding: "0 8px", whiteSpace: "nowrap" }}>
       <span aria-hidden style={{ width: 6, height: 6, borderRadius: "50%", background: color, flex: "0 0 auto" }} />
       {children}
@@ -97,7 +97,7 @@ export function ComponentSummary({ components, checkedAt }:
         ))}
       </span>
       <span style={{ fontSize: 11, color: "var(--text-subtle)", whiteSpace: "nowrap" }}>
-        <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>{okCount}/{entries.length}</strong> terpasang
+        <strong style={{ color: "var(--text-strong)", fontWeight: 600 }}>{okCount}/{entries.length}</strong> terpasang
       </span>
       {problems.map(([id, e]) => (
         <Chip key={id} status={e.status} title={badgeText(id, e)}>

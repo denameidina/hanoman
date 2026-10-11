@@ -24,9 +24,9 @@ yang tersentuh diperbarui dalam commit yang sama. Baseline gagal sebelum perubah
 - [x] 1K verifikasi gabungan: typecheck, test tersentuh, perbandingan baseline, commit
 
 ## Fase 2 — fondasi design system
-- [ ] 2A komponen DS: PageHeader, FilterBar, RowList, Stack/Inline, Text, hover CSS, StatusPill dot
-- [ ] 2B a11y DS: Field/Input/Select, Radio, Modal inert+h2, shell h1+skip link, Toast antrean + undo, Icon aria-hidden
-- [ ] 2C command palette + shortcut + notifikasi "Jawab"
+- [x] 2A komponen DS: PageHeader, FilterBar, RowList, Stack/Inline, Text, hover CSS, StatusPill dot
+- [x] 2B a11y DS: Field/Input/Select, Radio, Modal inert+h2, shell h1+skip link, Toast antrean + undo, Icon aria-hidden
+- [x] 2C command palette + shortcut + notifikasi "Jawab"
 - [ ] 2D map label terpusat + glosarium copy + skeleton/loading
 - [ ] 2E layout inline → kelas `hn-*`, hapus `!important`/`[style*=`
 

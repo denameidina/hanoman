@@ -41,6 +41,8 @@ export const paths = {
   specReviewFile: (id: string, path: string) => `${API}/specs/${id}/review/${path}`,
   settings: `${API}/settings`,
   notifications: `${API}/notifications`,
+  // ADR-0204 · tandai satu notifikasi terbaca (POST, idempoten).
+  notificationRead: (id: string) => `${API}/notifications/${encodeURIComponent(id)}/read`,
   limits: `${API}/limits`,
   // SPEC-339 · versi codex CLI (peringatan lunak model GPT-5.6).
   codexVersion: `${API}/codex/version`,

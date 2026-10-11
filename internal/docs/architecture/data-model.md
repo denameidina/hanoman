@@ -641,7 +641,9 @@ overlay sesi live — status live (running/done/failed) tetap diturunkan dari `p
   barisnya justru membuat pembatalan membatalkan dirinya sendiri dalam ≤1 cadence (spec-nya masih cocok
   `UNSTARTED_SPEC_WHERE`). Mekanisme yang sama dipakai SPEC-431 (`markDone` + `ALREADY_DONE_NOTE`).
   Transisinya `queued → canceled` (`POST /api/scheduler/queue/:id/cancel`, `note` = `dibatalkan operator`
-  ± `: <reason>`) dan `canceled → queued` (`…/requeue`, `note` dikosongkan), keduanya **CAS**
+  ± `: <reason>`) dan `canceled → queued` (`…/requeue`, `note` dikosongkan) — ADR-0204 memperluasnya ke
+  `failed → queued` (`sessionId`, `launchedAt`, `note` ikut dikosongkan; token agen menuntut `sessions:spawn`),
+  keduanya **CAS**
   (`updateMany` ber-`where` status) — itulah yang membuat "item yang sudah punya sesi aktif tak boleh
   dibunuh diam-diam" tak bisa dilanggar balapan. Governor punya **dua gerbang** sepasang: `isQueued`
   di puncak badan loop `drain` (snapshot `queued()` bisa berumur puluhan detik, dan posisi paling atas

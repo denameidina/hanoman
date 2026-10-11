@@ -535,6 +535,8 @@ Panduan siap salin untuk keempat klien, berikut tabel tool → capability, ada d
 | `hanoman_lead_decisions_list` | baca | `lead:read` |
 | `hanoman_backlog_create`, `hanoman_backlog_update` | tulis | `backlog:write` |
 | `hanoman_notifications_mark_read` | tulis | `notifications:write` |
+| `hanoman_notification_mark_read` | tulis | `notifications:write` — satu notifikasi berdasarkan `id` (ADR-0204), idempoten |
+| `hanoman_scheduler_queue_cancel`, `hanoman_scheduler_queue_requeue` | tulis | `settings:write`; requeue baris `failed` juga menuntut `sessions:spawn` (ADR-0204, 403 bila tak ada) |
 | `hanoman_lead_ask` | tulis | `lead:write` |
 | `hanoman_health`, `hanoman_models`, `hanoman_codex_version`, `hanoman_methods_status` | baca | — (`GLOBAL_READ`, ADR-0187) |
 | `hanoman_activity_list` | baca | `activity:read` |

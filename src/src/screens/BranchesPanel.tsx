@@ -176,7 +176,7 @@ export function BranchesPanel({ projectId, onOpenWorktree }: {
                   padding: "8px 14px", borderBottom: "1px solid var(--border-hair)" }}>
                 <Checkbox data-testid={`pick-${b.name}`} aria-label={`Pilih branch ${b.name}`} checked={picked.has(b.name)}
                   disabled={!deletable(b)} onChange={() => toggle(b.name)} />
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", flex: 1 }}>
+                <span className="hn-grow" style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", flex: 1 }}>
                   {b.name}
                 </span>
                 <Badge size="sm" tone={b.merged ? "ok" : "warn"}>

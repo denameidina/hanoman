@@ -1,4 +1,4 @@
-import { paths, type Paginated, type ProjectView, type Spec, type SpecListItem, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AgentRuntime, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type AgentMetricsView, type AgentInvocationView, type AgentDisposition, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry, type PresenceView,
+import { paths, type Paginated, type ProjectView, type Spec, type SpecListItem, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerConfigView, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AgentRuntime, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type AgentMetricsView, type AgentInvocationView, type AgentDisposition, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry, type PresenceView,
   type ProvisionComponent, type ComponentProbe, type ComponentId, type ProvisionProfile,
   type ProvisionStep, type ProvisionResult,
   type SessionDialogAnswer, type SessionDialogPayload,
@@ -355,6 +355,8 @@ export function createApi(o: { base?: string } = {}) {
   listNotifications: (p: { page?: number; limit?: number } = {}) =>
     j<Paginated<Notification> & { unread: number }>(paths.notifications + qs(p)),
   markNotificationsRead: () => j<void>(paths.notifications + "/read", { method: "POST" }),
+  // ADR-0204 · tandai SATU notifikasi terbaca. 404 bila id tak ada; yang sudah terbaca tetap 204.
+  markNotificationRead: (id: string) => j<void>(paths.notificationRead(id), { method: "POST" }),
   clearNotifications: () => j<void>(paths.notifications, { method: "DELETE" }),
   getLimits: () => j<LimitsDTO>(paths.limits),
   getDocs: (id: string) => j<{ coverage: number; tree: any[] }>(paths.docs(id)),
@@ -686,7 +688,7 @@ export function createApi(o: { base?: string } = {}) {
   unlinkGithubIssue: (id: string) =>
     j<{ id: string; status: string; specId: string | null }>(paths.githubIssueUnlink(id), { method: "POST", ...body({}) }),
   // SPEC-299 · ADR-0072 · panel scheduler (daun #6) — konsumen read-only fondasi.
-  getSchedulerConfig: () => j<Scheduler>(paths.schedulerConfig),
+  getSchedulerConfig: () => j<SchedulerConfigView>(paths.schedulerConfig),
   putSchedulerConfig: (cfg: Scheduler) => j<Scheduler>(paths.schedulerConfig, { method: "PUT", ...body(cfg) }),
   getSchedulerState: () => j<SchedulerStateView>(paths.schedulerState),
   // SPEC-522 · ADR-0106 · batalkan / antre lagi satu baris antrean. 409 membawa `{ error, status }`

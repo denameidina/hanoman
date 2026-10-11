@@ -23,7 +23,7 @@ function oAttention(p: ProjectVM): "high" | "low" | "none" {
 const O_ATT: Record<string, { bar: string; tint: string; text: string; label: string; reason: string }> = {
   high: { bar: "var(--clay-500)", tint: "var(--clay-100)", text: "var(--clay-600)", label: "Dokumentasi belum sesuai",
     reason: "Dokumen belum memenuhi standar" },
-  low: { bar: "var(--amber-500)", tint: "var(--amber-100)", text: "var(--amber-600)", label: "Dokumentasi tidak sinkron",
+  low: { bar: "var(--amber-500)", tint: "var(--amber-100)", text: "var(--status-warn)", label: "Dokumentasi tidak sinkron",
     reason: "Sebagian kategori dokumen belum ter-index" },
 };
 
@@ -44,7 +44,7 @@ function AttnRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }
     // SPEC-763 · tanpa `hn-dense-row` tombol "Buka dokumen" menahan lebarnya di 390px dan menyisakan
     // ~67px untuk nama project — terukur: `crm-tumbuh-ai` pecah jadi 3 baris (4 karakter/baris).
     <div className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 4px", borderBottom: "1px solid var(--border-hair)", borderLeft: `3px solid ${meta.bar}`, paddingLeft: 12 }}>
-      <div style={{ minWidth: 0, flex: 1 }}>
+      <div className="hn-grow" style={{ minWidth: 0, flex: 1 }}>
         <div className="hn-wrap-mobile" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Icon name="box" size={13} color="var(--text-muted)" />
           <span title={p.name} style={{ fontFamily: "var(--font-mono)", fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)" }}>{p.name}</span>
@@ -66,7 +66,7 @@ function LiveSessionRow({ s, name, stage, onOpenSession }: {
   return (
     <button type="button" className="hn-dense-row" onClick={() => onOpenSession(s.id)} style={rowBtn}>
       <StatusPill status="running" size="sm">{stage ?? FLOW_LABEL[s.flow ?? ""] ?? "Sesi"}</StatusPill>
-      <span title={name} style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+      <span className="hn-grow" title={name} style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{s.specId ?? ""}</span>
     </button>
   );
@@ -105,10 +105,12 @@ function MiniStat({ icon, label, value, tone }: { icon: string; label: string; v
   );
 }
 
-export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onGoto, onOpenSession }:
+export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onGoto, onOpenSession, onCreateProject }:
   { projects: ProjectVM[]; backlog: SpecSlim[]; sessions: TerminalSession[];
     onOpenProject: (p: ProjectVM) => void; onGoto: (s: string) => void;
-    onOpenSession: (id: string) => void }) {
+    onOpenSession: (id: string) => void;
+    /** Membuka modal project baru langsung (CTA onboarding); tanpa ini jatuh ke halaman Projects. */
+    onCreateProject?: () => void }) {
   const limits = useLimits();
   const codexLimits = useCodexLimits();   // SPEC-338 · kartu limit codex (grup siar terpisah)
   const [limitTab, setLimitTab] = React.useState<"claude" | "codex">("claude");
@@ -130,7 +132,7 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
         <StateBlock kind="empty" illustration="PST-001" illustrationDecorative
           title="Buat project pertama"
           hint="hanoman mengerjakan backlog di dalam sebuah project. Tambahkan project (folder repo) dulu; dokumen, backlog, dan sesi Claude Code-nya akan tampil di sini."
-          action={() => onGoto("projects")} actionLabel="Buat project pertama" />
+          action={() => (onCreateProject ? onCreateProject() : onGoto("projects"))} actionLabel="Buat project pertama" />
       </Card>
     );
   }
@@ -193,7 +195,7 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
           <Card eyebrow="dari brief sampai eksekusi" title="Backlog"
             actions={<Button size="sm" variant="ghost" leftIcon="list-checks" onClick={() => onGoto("backlog")}>Buka</Button>}>
             <div className="hn-grid-mobile" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 6 }}>
-              <MiniStat icon="lightbulb" label="dari brief" value={briefN} tone="var(--brass-600)" />
+              <MiniStat icon="lightbulb" label="dari brief" value={briefN} tone="var(--brass-700)" />
               <MiniStat icon="bug" label="dari QA" value={qaN} tone="var(--clay-500)" />
               <MiniStat icon="flame" label="prioritas tinggi" value={hiPrio} tone="var(--clay-500)" />
             </div>
@@ -210,7 +212,7 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
                   style={{ ...rowBtn, alignItems: "center", gap: 12, padding: "9px 4px" }}>
                   <StatusPill status={a.live ? "running" : "idle"} size="sm">{a.live ? "Berjalan" : "Diam"}</StatusPill>
                   <span title={a.project.name} style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--text-strong)", width: 120, flex: "0 0 auto", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.project.name}</span>
-                  <span title={a.text} style={{ fontSize: 12.5, color: "var(--text-body)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.text}</span>
+                  <span className="hn-grow" title={a.text} style={{ fontSize: 12.5, color: "var(--text-body)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.text}</span>
                   <span title={a.commit} style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>{a.commit}</span>
                 </button>
               </li>

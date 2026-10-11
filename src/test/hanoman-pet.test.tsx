@@ -157,7 +157,7 @@ describe("HanomanPet (sprite)", () => {
       projectId: "hanoman", createdAt: new Date().toISOString(), readAt: null,
     };
     render(
-      <NotificationsContext.Provider value={{ items: [fresh], unread: 1, total: 1, markAllRead: () => {}, clear: () => {} }}>
+      <NotificationsContext.Provider value={{ items: [fresh], unread: 1, total: 1, markAllRead: () => {}, markRead: () => {}, clear: () => {} }}>
         <HanomanPet sessions={[]} backlog={backlog} onOpen={vi.fn()} />
       </NotificationsContext.Provider>,
     );

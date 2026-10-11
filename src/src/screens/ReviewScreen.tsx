@@ -3,7 +3,7 @@
 import React from "react";
 import { Card, Badge, Button, Icon, StateBlock, DocPreviewModal, isMarkdownPath, ResponsivePanels } from "../ds";
 import { api, type SpecReview, type ReviewFile } from "../api/client";
-import { buildFileTree, TreeRow, ChangedSection } from "./file-tree";
+import { buildFileTree, TreeRow, TreeRoot, ChangedSection } from "./file-tree";
 import { DiffView } from "./diff-view";
 
 // SPEC-171/230 · review worktree. kind="spec" (backlog item) atau "session" (sesi project-level
@@ -83,7 +83,9 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec" }:
           <ChangedSection label="Changed" changed={changed} selected={selected} onSelect={selectFile}
             view={chView} onView={setChView} />
           <div className="hn-eyebrow" style={{ padding: "6px 8px", marginTop: 8, borderTop: "1px solid var(--border-hair)" }}>Files</div>
-          {tree.map((n) => <TreeRow key={n.path} node={n} selected={selected} onSelect={selectFile} />)}
+          <TreeRoot label="Pohon berkas" nodes={tree}>
+            {tree.map((n) => <TreeRow key={n.path} node={n} selected={selected} onSelect={selectFile} />)}
+          </TreeRoot>
         </div>
         {/* Legenda status git — huruf di kanan tiap baris changed/Badge file. */}
         <div style={{ fontSize: 11, color: "var(--text-subtle)", padding: "6px 12px", borderTop: "1px solid var(--border-hair)" }}>
