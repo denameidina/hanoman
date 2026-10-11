@@ -157,6 +157,33 @@ const isLastTab = (v: unknown): v is Record<string, string> =>
    pernah menampilkan halaman yang tak bisa ia isi. */
 export const NavGate = React.createContext<Record<string, boolean>>({});
 
+/* Cue gulir daftar hub (QA run3: di viewport pendek "Pengaturan" tak terlihat dan tak ada tanda bahwa daftarnya
+   masih berlanjut). Tepi daftar hanya diberi gradasi saat ia meluap dan tepinya belum sampai ujung — sama dengan
+   `.hn-tabs` (ds/components/ui.tsx). Dihitung dari scroll dan ukuran kotak, bukan dari jumlah hub. */
+type NavEdges = { start: boolean; end: boolean };
+function useNavCue(ref: React.RefObject<HTMLElement>): NavEdges {
+  const [edges, setEdges] = React.useState<NavEdges>({ start: false, end: false });
+  const measure = React.useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    const next = { start: el.scrollTop > 1, end: max > 1 && el.scrollTop < max - 1 };
+    setEdges((cur) => (cur.start === next.start && cur.end === next.end ? cur : next));
+  }, [ref]);
+  // Tanpa deps: isi daftar bisa berubah tanpa mengubah ukuran kotaknya (gerbang klien, badge). `setEdges`
+  // dengan nilai yang sama tak me-render ulang, jadi mengukur di tiap render Shell itu murah.
+  React.useLayoutEffect(() => { measure(); });
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.addEventListener("scroll", measure, { passive: true });
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    ro?.observe(el);
+    return () => { el.removeEventListener("scroll", measure); ro?.disconnect(); };
+  }, [ref, measure]);
+  return edges;
+}
+
 // Audit UI/UX 2026-10 · skip link. Tak ada kelas `:focus` untuk ini di DS, jadi gayanya berpindah
 // lewat state fokus: tersembunyi secara visual (tetap terbaca pembaca layar), muncul saat menerima fokus.
 const SKIP_LINK_HIDDEN: React.CSSProperties = {
@@ -211,6 +238,13 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
   const toggleRef = React.useRef<HTMLButtonElement>(null);
   const columnRef = React.useRef<HTMLDivElement>(null);
   const restoreNavFocus = React.useRef(false);
+  const navListRef = React.useRef<HTMLElement>(null);
+  const navEdges = useNavCue(navListRef);
+  // Hub yang aktif selalu terlihat di daftar yang meluap: pindah layar menggulir daftar ke barisnya saja
+  // (`nearest`, tak menggeser apa pun bila ia sudah kelihatan).
+  React.useEffect(() => {
+    navListRef.current?.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView?.({ block: "nearest" });
+  }, [activeHub?.key]);
 
   const closeNavigation = React.useCallback((restoreFocus = true) => {
     restoreNavFocus.current = restoreFocus;
@@ -278,7 +312,8 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
         {/* ADR-0205 · delapan hub dalam tiga grup berlabel. Grup berlabel supaya pembaca layar
             mendengar konteks tiap hub; di rail tablet labelnya disembunyikan CSS dan grup tinggal
             dipisah garis tipis, sehingga kedelapan ikon muat tanpa gulir. */}
-        <nav className="hn-shell-nav" aria-label="Navigasi utama">
+        <nav ref={navListRef} className="hn-shell-nav" aria-label="Navigasi utama"
+          data-cue-start={navEdges.start ? "true" : undefined} data-cue-end={navEdges.end ? "true" : undefined}>
           {HN_GROUPS.map((g) => (
             <div key={g.key} className="hn-nav-group" role="group" aria-labelledby={`hn-nav-group-${g.key}`}>
               <div id={`hn-nav-group-${g.key}`} className="hn-eyebrow hn-nav-group-label">{g.label}</div>

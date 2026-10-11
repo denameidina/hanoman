@@ -102,8 +102,7 @@ export function Button({ children, variant = "primary", size = "md", leftIcon, r
     loading && React.createElement(Icon, { name: "loader-2", size: s.icon, style: { animation: "hn-spin 0.7s linear infinite" } }),
     !loading && leftIcon && React.createElement(Icon, { name: leftIcon, size: s.icon }),
     children != null && React.createElement("span", null, children),
-    !loading && rightIcon && React.createElement(Icon, { name: rightIcon, size: s.icon }),
-    React.createElement("style", null, `@keyframes hn-spin{to{transform:rotate(360deg)}}`));
+    !loading && rightIcon && React.createElement(Icon, { name: rightIcon, size: s.icon }));
 }
 
 const IB_SIZES: Record<string, { box: number; icon: number }> = {

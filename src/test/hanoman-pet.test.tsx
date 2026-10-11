@@ -79,8 +79,21 @@ const CELL_W = Math.round(PET_MANIFEST.cell.w * SCALE);
 const CELL_H = Math.round(PET_MANIFEST.cell.h * SCALE);
 const HOME = homeX(window.innerWidth, CELL_W);
 
+// jsdom tak menghitung tata letak: lebar slot pet (root-nya, `width: 100%`) diberikan lewat rect. HanomanPet
+// tak punya fallback ke lebar viewport, jadi tanpa ini pet tak dirender. Default = lebar viewport, seperti dulu;
+// test yang mengubah lebar memanggil `setLaneWidth`.
+const lane = { width: 0 };
+const realRect = Element.prototype.getBoundingClientRect;
+const setLaneWidth = (width: number): void => { lane.width = width; };
+
 beforeEach(() => {
   vi.restoreAllMocks();
+  setLaneWidth(window.innerWidth);
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element): DOMRect {
+    if (this.getAttribute("data-testid") !== "pet-root") return realRect.call(this);
+    const w = lane.width;
+    return { x: 0, y: 0, left: 0, top: 0, bottom: 0, right: w, width: w, height: 0, toJSON() { return this; } } as DOMRect;
+  });
   // Pet dipasang setelah idle (lihat HanomanPet). Di test, idle dijalankan langsung agar render
   // tetap sinkron seperti sebelumnya; mount yang tertunda dikunci di test pet-mount.
   window.requestIdleCallback = ((cb: () => void) => { cb(); return 0; }) as unknown as typeof window.requestIdleCallback;
@@ -673,6 +686,90 @@ describe("Pet · inbox keputusan", () => {
     await act(async () => { fireEvent.click(hit()); });
     expect(await screen.findByTestId("pet-answer-note")).toBeTruthy();
     expect(screen.queryAllByTestId("pet-answer-option")).toHaveLength(0);
+  });
+});
+
+// Posisi yang BENAR-BENAR digambar (transform aktor), bukan yang ada di keadaan: itulah yang terlihat di layar.
+const drawnX = (): number => Number(/translate\((-?[\d.]+)px/.exec(actor().style.transform)?.[1]);
+
+describe("HanomanPet — jalur & slot (QA run3 · pet melayang keluar sidebar)", () => {
+  it("slot belum terukur (lebar 0): pet tak dirender, sehingga tak ada langkah yang bisa keluar dari kotak", () => {
+    setLaneWidth(0);
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    expect(laneOf()).toBeInTheDocument();
+    expect(screen.queryByTestId("pet-actor")).toBeNull();
+  });
+
+  it("slot terukur sesudah mount: pet mulai di rumah pada lebar slot, bukan lebar viewport", () => {
+    setLaneWidth(220);
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    expect(drawnX()).toBe(homeX(220, CELL_W));
+  });
+
+  it("lebar lajur menyempit saat pet sedang berjalan: rencana lama dihentikan dan pet dipindah ke jalur baru", () => {
+    vi.useFakeTimers();
+    try {
+      render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+      expect(drawnX()).toBe(HOME);
+      // Berdiri awal 1,2 dtk, lalu berjalan ke kiri dari rumah (lajur 1024 px): rencana berjalan dengan tujuan jauh.
+      act(() => { vi.advanceTimersByTime(1_300); });
+      expect(actor()).toHaveAttribute("data-mode", "walk");
+      // Lajur menyempit ke 220 px. Resize di jsdom jatuh ke jalur fallback (debounce 150 dtk).
+      act(() => { setLaneWidth(220); window.dispatchEvent(new Event("resize")); });
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(actor()).toHaveAttribute("data-mode", "stand");
+      expect(drawnX()).toBeLessThanOrEqual(homeX(220, CELL_W));
+      expect(drawnX()).toBeGreaterThanOrEqual(LANE_MARGIN);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("HanomanPet — desktop pendek (≤ 760 px tinggi)", () => {
+  const SHORT = "(min-width: 1200px) and (max-height: 760px)";
+
+  it("pet menciut ke chip, dibangkitkan sementara, dan kembali ke chip tanpa menyimpan pilihan", () => {
+    mockMatchMedia((query) => query === SHORT);
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    expect(screen.queryByTestId("pet-actor")).toBeNull();
+    expect(laneOf()).toHaveStyle({ height: "66px" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Tampilkan pet Hanoman" }));
+    expect(actor()).toBeInTheDocument();
+
+    fireEvent.click(hit());
+    fireEvent.click(screen.getByRole("button", { name: "Sembunyikan" }));
+    expect(screen.queryByTestId("pet-actor")).toBeNull();
+    expect(localStorage.getItem(PET_HIDDEN_KEY)).toBeNull();
+  });
+
+  it("pet yang disembunyikan lewat preferensi: klik chip langsung menampilkannya, tanpa klik kedua", () => {
+    mockMatchMedia((query) => query === SHORT);
+    localStorage.setItem(PET_HIDDEN_KEY, "1");
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Tampilkan pet Hanoman" }));
+    expect(actor()).toBeInTheDocument();
+    expect(localStorage.getItem(PET_HIDDEN_KEY)).toBe("0");
+  });
+
+  it("viewport mengecil saat panel terbuka: panel ikut menutup dan tak muncul lagi saat dibangkitkan", () => {
+    let short = false;
+    mockMatchMedia((query) => query === SHORT && short);
+    const view = render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    fireEvent.click(hit());
+    expect(screen.getByTestId("pet-panel")).toBeInTheDocument();
+    short = true;
+    view.rerender(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    expect(screen.queryByTestId("pet-panel")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Tampilkan pet Hanoman" }));
+    expect(screen.queryByTestId("pet-panel")).toBeNull();
+  });
+
+  it("tinggi di atas ambang: pet tampil penuh seperti biasa", () => {
+    render(<HanomanPet sessions={[]} backlog={[spec({ id: "SPEC-1" })]} onOpen={vi.fn()} />);
+    expect(actor()).toBeInTheDocument();
+    expect(laneOf()).toHaveStyle({ height: `${CELL_H}px` });
   });
 });
 

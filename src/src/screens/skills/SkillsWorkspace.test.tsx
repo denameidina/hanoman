@@ -50,6 +50,23 @@ describe("SkillsWorkspace (/skills)", () => {
     expect(screen.getByText(".agents")).toBeTruthy();
   });
 
+  it("banner galat project memotong nama panjang dengan …, nama lengkapnya tetap di title", async () => {
+    const panjang = "proyek-kedua-dengan-nama-panjang-sekali-untuk-menguji-pembungkusan-judul";
+    mockFetch((u) => (u.includes("/api/skills?scope=all")
+      ? json({ ...library, projects: [{ projectId: "p3", name: panjang, skills: [], error: "repo tidak ditemukan" }] }) : null));
+    render(<SkillsWorkspace />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("…: repo tidak ditemukan");
+    expect(alert.textContent).not.toContain(panjang);
+    expect(alert.querySelector("[title]")?.getAttribute("title")).toBe(panjang);
+  });
+
+  it("nama project yang pendek tampil utuh di banner", async () => {
+    mockFetch();
+    render(<SkillsWorkspace />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Beta: repo tidak ditemukan");
+  });
+
   it("memilih skill memuat struktur dan SKILL.md, lalu menyimpan dengan baseHash", async () => {
     const put = vi.fn();
     mockFetch((u, init) => {

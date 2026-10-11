@@ -115,14 +115,31 @@ describe("kontrak umum: setiap papan kolom dan setiap kolom bertetap lebar punya
     expect(isTrack(baseOf(board).display)).toBe(true);
   });
 
-  const fixedCols = selectorsMatching(FIXED_COL).filter((sel) => /^0 0 \d+px$/.test(baseOf(sel).flex ?? ""));
+  // Kolom ber-basis px: bertetap (`0 0 Npx`) atau lentur dengan basis px (`1 1 Npx`, mis. kolom Tim).
+  const fixedCols = selectorsMatching(FIXED_COL).filter((sel) => /^[01] [01] \d+px$/.test(baseOf(sel).flex ?? ""));
 
-  it("kolom bertetap lebar (flex: 0 0 Npx) terdeteksi untuk Backlog dan Tim", () => {
+  it("kolom ber-basis px (flex: 0|1 0|1 Npx) terdeteksi untuk Backlog dan Tim", () => {
     expect(fixedCols).toEqual(expect.arrayContaining([".hn-bl-col", ".hn-tm-col"]));
   });
 
   it.each(fixedCols)("%s punya papan induk flex/grid dengan prefiks yang sama", (col) => {
     const prefix = FIXED_COL.exec(col)![1];
     expect(isTrack(baseOf(`.hn-${prefix}-board`).display)).toBe(true);
+  });
+});
+
+describe("papan Tim: kolom lentur muat di 1280 dan judul kartu memenuhi area sentuh 24 px", () => {
+  it("kolom Tim lentur dengan basis 220 px dan lebar minimum 200 px (4 kolom muat di desktop 1280)", () => {
+    const d = baseOf(".hn-tm-col");
+    expect(d.flex).toBe("1 1 220px");
+    expect(d["min-width"]).toBe("200px");
+  });
+
+  it("judul kartu Tim punya padding vertikal (tinggi teks ~19 px + 2×4 px ≥ 24 px)", () => {
+    expect(baseOf(".hn-tm-title").padding).toBe("var(--space-1) 0");
+  });
+
+  it("judul kartu Tim setinggi 44 px di pointer kasar dan ponsel", () => {
+    expect(mediaOf("pointer: coarse", ".hn-tm-title")["min-height"]).toBe("var(--touch-target)");
   });
 });

@@ -2,8 +2,9 @@
 // mode goal, scope verifikasi, dan metode workflow. Ini kebiasaan harian, jadi default-nya ditaruh di
 // sini dan BUKAN di "Agen & model" (satu sumber untuk setiap angka; "Agen & model" membaca default ini).
 import React from "react";
-import { Badge, Button, Card, HnTextarea, Select, Switch } from "../../ds";
+import { Badge, Button, Card, HnTextarea, Radio, RadioGroup, Select, Switch } from "../../ds";
 import type { ShowToast } from "../../ds";
+import { usePetEnabled, type PetEnabled } from "../../ui-state/pet-pref";
 import { api } from "../../api/client";
 import { failureMessage } from "../../lib/report-error";
 import { useModelCatalog } from "../../api/model-catalog";
@@ -22,6 +23,9 @@ import type { SettingsStore } from "./useSettingsStore";
 import { useSettingField } from "./useSettingField";
 
 type SwitchKey = "notifyDone" | "notifyDecision" | "notifyFail" | "autoDefault" | "autoScaffold";
+
+/** Nilai RadioGroup "Tampilkan Hanoman (pet)" → preferensi per-browser (null = default per tier). */
+const PET_PREF_OF: Record<string, PetEnabled> = { default: null, tampil: true, sembunyi: false };
 
 /** Sakelar boolean di root Setting: auto-save diskret (tanpa debounce) dengan toast "· aktif/nonaktif". */
 function useSwitchSetting(store: SettingsStore, key: SwitchKey, value: boolean, msg: string) {
@@ -47,6 +51,11 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
       .then((r) => setInstallProject((p) => p || (r.items.find((x) => x.binding ?? x.repoDir)?.id ?? "")))
       .catch((e: unknown) => onToast?.(failureMessage("memuat daftar project", e), "err", "alert-triangle"));
   }, []);
+
+  // ── Pet Hanoman (per browser) ────────────────────────────────────────────────
+  // Tiga pilihan memetakan ke `PetEnabled`: null = default per tier, true/false = pilihan eksplisit.
+  const [petPref, setPetPref] = usePetEnabled();
+  const petKey = petPref === null ? "default" : petPref ? "tampil" : "sembunyi";
 
   // ── Notifikasi ─────────────────────────────────────────────────────────────
   const notifyDone = useSwitchSetting(store, "notifyDone", s.notifyDone, "Notifikasi backlog selesai");
@@ -169,11 +178,21 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
           <Switch aria-label="Full-auto sebagai default" checked={autoDefault.value}
             onChange={(v: boolean) => autoDefault.set(v)} />
         </SettingRow>
-        <SettingRow title="Auto-scaffold doc index" last
+        <SettingRow title="Auto-scaffold doc index"
           desc="Project yang dibuat dari nol otomatis disiapkan indeks dokumennya setelah tujuannya terkunci."
           save={autoScaffold}>
           <Switch aria-label="Auto-scaffold" checked={autoScaffold.value}
             onChange={(v: boolean) => autoScaffold.set(v)} />
+        </SettingRow>
+        {/* Preferensi per-browser (ui-state/pet-pref.ts), bukan Setting server: tanpa `save`, tak ada PUT. */}
+        <SettingRow title="Tampilkan Hanoman (pet)" last search="pet hanoman maskot tampil sembunyi"
+          desc="Pendamping kecil di sudut layar. Pilihan ini hanya berlaku di browser ini. Default: aktif di desktop, mati di tablet & ponsel.">
+          <RadioGroup aria-label="Tampilkan Hanoman (pet)" direction="row" value={petKey}
+            onChange={(v: string) => setPetPref(PET_PREF_OF[v] ?? null)}>
+            <Radio value="default" label="Default" />
+            <Radio value="tampil" label="Tampilkan" />
+            <Radio value="sembunyi" label="Sembunyikan" />
+          </RadioGroup>
         </SettingRow>
       </Card>
 

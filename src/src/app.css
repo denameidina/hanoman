@@ -68,6 +68,17 @@ textarea:focus-visible,
 .hn-shell-nav { display: flex; min-height: 0; flex-direction: column; gap: 2px; overflow-y: auto; }
 /* Ikon nav tak boleh menyusut: di rail, badge sebagai flex item dulu mendorong svg sampai 7 px (C). */
 .hn-shell-nav svg { flex: 0 0 auto; }
+/* Cue gulir daftar hub: gradasi di tepi yang masih menyimpan hub di luar layar (shell.tsx `useNavCue`). Hanya saat
+   daftar meluap; lewat mask, bukan latar, sehingga warna di bawahnya tak berubah. `#000` di sini hanya alfa mask. */
+.hn-shell-nav[data-cue-start="true"],
+.hn-shell-nav[data-cue-end="true"] {
+  --hn-cue-t: 0px;
+  --hn-cue-b: 0px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--hn-cue-t), #000 calc(100% - var(--hn-cue-b)), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--hn-cue-t), #000 calc(100% - var(--hn-cue-b)), transparent 100%);
+}
+.hn-shell-nav[data-cue-start="true"] { --hn-cue-t: 16px; }
+.hn-shell-nav[data-cue-end="true"] { --hn-cue-b: 16px; }
 /* Pet di footer sidebar (desktop). Ia duduk dalam alur sidebar, di bawah daftar hub: `margin-top: auto`
    mendorongnya ke dasar, dan daftar hub yang lebih panjang dari layar menggulir sendiri di atasnya. Slot
    kosong (`:empty`) tak memesan ruang sama sekali — itulah keadaan pet mati dan keadaan tablet/ponsel. */
@@ -120,6 +131,10 @@ textarea:focus-visible,
 }
 .hn-shell-heading { min-width: 0; }
 .hn-shell-tools { margin-left: auto; display: flex; min-width: 0; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+/* Crumb dan judul SATU baris di semua tier: crumb panjang (nama project, "Hub › Tab · deskripsi") menyusut dengan
+   elipsis, tak membungkus menjadi beberapa baris yang mendorong tinggi topbar (QA run3: /docs 121–207 px). */
+.hn-shell-crumb { min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hn-shell-title { min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-bottom: 0.1em; }
 .hn-shell-search { width: 220px; }
 /* Pet (HanomanPet) TIDAK lagi melayang di atas konten: ia duduk di alur layout — footer sidebar di desktop,
    lajur di bawah <main> di tablet dan ponsel (lihat .hn-shell-dock / .hn-shell-lane). Area gulir karena itu
@@ -219,6 +234,30 @@ textarea:focus-visible,
   .hn-shell-sidebar .hn-nav-group + .hn-nav-group { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-hair); }
   .hn-shell-sidebar nav button { justify-content: center; padding-inline: 0; }
   .hn-shell-wordmark { display: flex; justify-content: center; padding-inline: 0; }
+
+  /* Topbar tablet (QA run3 · P2): baris pertama = judul + alat, SATU baris, dengan alat yang tak membungkus. Lencana
+     update dan batas memakai bentuk pendeknya (`.hn-topbar-label-short`), dan judul yang menyusut menerima sisa
+     lebar. Baris kedua (project, cari, aksi) hanya ada bila layar memakainya, dan ia menggulir mendatar sendiri
+     ketimbang mendorong tinggi topbar. Target: ≤ 64 px tanpa baris kedua, +40 px dengan baris kedua. */
+  .hn-shell-topbar { flex-wrap: wrap; gap: 6px 16px; min-height: 0; padding-block: 8px; }
+  .hn-shell-heading { flex: 1 1 0; }
+  .hn-shell-tools { flex: 0 0 auto; flex-wrap: nowrap; gap: 6px; }
+  .hn-shell-subrow { order: 3; flex: 0 0 100%; height: 40px; margin: 0; min-width: 0; overflow-x: auto; }
+  /* Pilihan project di baris kedua: lebarnya dibatasi kolom dan namanya terpotong dengan elipsis ("Semua proje" tadinya). */
+  .hn-shell .hn-shell-subrow .hn-shell-scope { max-width: 100%; min-width: 0; }
+  .hn-shell .hn-shell-subrow .hn-shell-scope select { min-width: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hn-shell .hn-shell-cmdk .hn-kbd { display: none; }
+  .hn-topbar-label { display: none; }
+  .hn-topbar-label-short { display: inline; }
+}
+
+/* Desktop pendek (tinggi ≤ 760 px): sidebar harus memuat 8 hub + footer tanpa gulir. Pet menciut menjadi chip di
+   HanomanPet (JS, ambang yang sama); di sini jarak sidebar dirapatkan. Bila daftar tetap meluap, cue gulir
+   `.hn-shell-nav[data-cue-*]` yang menjawab, dan hub aktif digulir ke layar oleh shell.tsx. */
+@media (min-width: 1200px) and (max-height: 760px) {
+  .hn-shell-wordmark { padding-bottom: 12px; }
+  .hn-nav-group + .hn-nav-group { margin-top: 10px; }
+  .hn-shell-dock { padding-top: 4px; }
 }
 
 @media (max-width: 767px) {

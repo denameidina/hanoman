@@ -40,6 +40,7 @@ export function QaReportEditor({ detail, projectId, onChange, onBack, onDeleted,
   const api = useApi();
   const { confirm, dialog } = useConfirm();
   const locked = detail.status === "closed";
+  const statusKnown = Object.prototype.hasOwnProperty.call(REPORT_LABEL, detail.status);
   const [tab, setTab] = React.useState("cases");
   const [f, setF] = React.useState<Form>(() => seed(detail));
   // Snapshot yang terakhir diterima server. Dipakai sebagai pembanding "belum disimpan" dan untuk Kembali.
@@ -148,7 +149,9 @@ export function QaReportEditor({ detail, projectId, onChange, onBack, onDeleted,
         <div className="hn-qa-bar-title">
           <Button variant="ghost" size="sm" leftIcon="arrow-left" onClick={() => void back()}>Kembali</Button>
           <Badge tone="brass" variant="outline" size="sm">{detail.code}</Badge>
-          <Badge tone={REPORT_TONE[detail.status]} size="sm">{REPORT_LABEL[detail.status]}</Badge>
+          {/* Pill hanya bila statusnya dikenal peta label (lib/labels.ts): status kosong atau tak dikenal
+              tak boleh tampil sebagai "—" atau nilai mentah. */}
+          {statusKnown && <Badge tone={REPORT_TONE[detail.status]} size="sm">{REPORT_LABEL[detail.status]}</Badge>}
           <h3 className="hn-qa-bar-name">{f.title.trim() || "Tanpa judul"}</h3>
         </div>
         <div className="hn-qa-bar-actions">

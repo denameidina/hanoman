@@ -124,3 +124,65 @@ describe("input file: tinggi tap minimum 24 px, 44 px di pointer kasar", () => {
     expect(coarse).toMatch(/input\[type="file"\] \{ min-height: var\(--touch-target\); \}/);
   });
 });
+
+// QA run3 · P2: desktop 1280×661 — "Pengaturan" tak terlihat, daftar hub meluap tanpa cue gulir (pet memakan ±147 px
+// di footer sidebar). Ambang 760 px sama dengan PET_COMPACT_QUERY di HanomanPet.tsx (pet jadi chip di bawahnya).
+describe("desktop pendek (≤ 760 px): sidebar muat 8 hub + footer; daftar yang meluap bercue", () => {
+  const SHORT = "@media (min-width: 1200px) and (max-height: 760px) {";
+  const short = css.slice(css.indexOf(SHORT), css.indexOf("\n}", css.indexOf(SHORT)));
+
+  it("media query tepat di ambang 760 px dan lebar desktop 1200 px", () => {
+    expect(css).toContain(SHORT);
+  });
+
+  it("jarak sidebar dirapatkan di rentang yang sama: wordmark, grup hub, dan footer pet", () => {
+    expect(short).toMatch(/\.hn-shell-wordmark \{ padding-bottom: 12px; \}/);
+    expect(short).toMatch(/\.hn-nav-group \+ \.hn-nav-group \{ margin-top: 10px; \}/);
+    expect(short).toMatch(/\.hn-shell-dock \{ padding-top: 4px; \}/);
+  });
+
+  it("cue gulir daftar hub: gradasi mask di tepi yang masih menyimpan hub, hanya saat daftar meluap", () => {
+    expect(css).toMatch(/\.hn-shell-nav\[data-cue-start="true"\],\s*\.hn-shell-nav\[data-cue-end="true"\] \{/);
+    expect(css).toMatch(/mask-image: linear-gradient\(to bottom, transparent 0, #000 var\(--hn-cue-t\), #000 calc\(100% - var\(--hn-cue-b\)\), transparent 100%\);/);
+    expect(css).toMatch(/\.hn-shell-nav\[data-cue-start="true"\] \{ --hn-cue-t: 16px; \}/);
+    expect(css).toMatch(/\.hn-shell-nav\[data-cue-end="true"\] \{ --hn-cue-b: 16px; \}/);
+  });
+
+  it("footer sidebar (slot pet) tak pernah position: fixed — pet duduk di alur sidebar", () => {
+    expect(body(css, ".hn-shell-dock")).not.toMatch(/fixed/);
+    expect(short).not.toMatch(/fixed/);
+  });
+});
+
+// QA run3 · P2 tablet 820 px: topbar /docs 207 px (crumb 4 baris), /overview /backlog /team 99 px (pil turun baris).
+// Kontrak: judul+alat satu baris, crumb dan judul satu baris dengan elipsis, lencana memakai bentuk pendek.
+describe("topbar tablet: satu baris judul+alat, crumb dan judul tak membungkus", () => {
+  const TABLET = "@media (min-width: 768px) and (max-width: 1199px) {";
+  const tablet = css.slice(css.indexOf(TABLET), css.indexOf("\n}\n", css.indexOf(TABLET)));
+
+  it("crumb dan judul satu baris di semua tier: nowrap + elipsis, bukan membungkus", () => {
+    expect(body(css, ".hn-shell-crumb")).toMatch(/white-space: nowrap;[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;/);
+    expect(body(css, ".hn-shell-title")).toMatch(/white-space: nowrap;[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;/);
+  });
+
+  it("alat topbar tak membungkus: barisnya satu, dan topbar hanya menambah baris untuk baris kedua", () => {
+    expect(tablet).toMatch(/\.hn-shell-topbar \{ flex-wrap: wrap; gap: 6px 16px; min-height: 0; padding-block: 8px; \}/);
+    expect(tablet).toMatch(/\.hn-shell-tools \{ flex: 0 0 auto; flex-wrap: nowrap; gap: 6px; \}/);
+    expect(tablet).toMatch(/\.hn-shell-heading \{ flex: 1 1 0; \}/);
+  });
+
+  it("baris kedua (project, cari, aksi) turun sendiri setinggi 40 px dan menggulir mendatar, bukan membungkus", () => {
+    expect(tablet).toMatch(/\.hn-shell-subrow \{ order: 3; flex: 0 0 100%; height: 40px; margin: 0; min-width: 0; overflow-x: auto; \}/);
+  });
+
+  it("pilihan project di baris kedua dibatasi kolom dan namanya terpotong elipsis, bukan terpotong di tengah kata", () => {
+    expect(tablet).toMatch(/\.hn-shell \.hn-shell-subrow \.hn-shell-scope \{ max-width: 100%; min-width: 0; \}/);
+    expect(tablet).toMatch(/\.hn-shell \.hn-shell-subrow \.hn-shell-scope select \{[^}]*text-overflow: ellipsis;[^}]*\}/);
+  });
+
+  it("lencana update dan batas memakai bentuk pendek di tablet; kbd ⌘K disembunyikan (tombol ikon)", () => {
+    expect(tablet).toMatch(/\.hn-topbar-label \{ display: none; \}/);
+    expect(tablet).toMatch(/\.hn-topbar-label-short \{ display: inline; \}/);
+    expect(tablet).toMatch(/\.hn-shell \.hn-shell-cmdk \.hn-kbd \{ display: none; \}/);
+  });
+});

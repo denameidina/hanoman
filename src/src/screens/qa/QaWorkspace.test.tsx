@@ -74,6 +74,25 @@ describe("QaWorkspace", () => {
     expect(screen.getByText("P1")).toBeTruthy();
   });
 
+  it("header editor: pill memakai label status laporan yang dikenal (Draf)", async () => {
+    mockFetch();
+    renderWs();
+    await openReport();
+    await screen.findByRole("heading", { name: "Smoke 0.9" });
+    const bar = document.querySelector(".hn-qa-bar-title") as HTMLElement;
+    expect(within(bar).getByText("Draf")).toBeTruthy();
+  });
+
+  it("header editor: status kosong atau tak dikenal tak tampil sebagai '—' (pill disembunyikan)", async () => {
+    mockFetch((u) => (u.endsWith("/api/projects/p1/qa/reports/r1") ? json({ ...detail, status: null }) : null));
+    renderWs();
+    await openReport();
+    await screen.findByRole("heading", { name: "Smoke 0.9" });
+    const bar = document.querySelector(".hn-qa-bar-title") as HTMLElement;
+    expect(bar.textContent).not.toContain("—");
+    expect(within(bar).queryByText("Draf")).toBeNull();
+  });
+
   it("menambah test case: POST ke /cases lalu menampilkan hasil jawaban server", async () => {
     const posted: { url: string; body: unknown }[] = [];
     mockFetch((u, init) => {

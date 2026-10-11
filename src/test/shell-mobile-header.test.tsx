@@ -3,7 +3,7 @@
 // dipotong satu baris. Test ini menegaskan perbedaan DOM per tier; pemotongan dan urutan barisnya
 // dijaga lewat CSS di responsive-chrome-css.test.ts.
 import { eventsStub } from "./helpers/events-stub";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Shell } from "../src/ds";
 import { MOBILE_QUERY } from "../src/ds/responsive";
@@ -63,5 +63,37 @@ describe("Shell · crumb di ponsel", () => {
     render(<Shell active="prd" title="PRD" breadcrumb="brief → brainstorm → dokumen" onNavigate={() => {}}>isi</Shell>);
     expect(screen.getByTestId("hub-crumb")).toHaveTextContent("Projects › PRD");
     expect(screen.getByText("brief → brainstorm → dokumen").closest(".hn-shell-crumb")).not.toBeNull();
+  });
+});
+
+// QA run3 · P2 desktop 661 px: daftar hub meluap tanpa tanda, dan hub aktif bisa berada di bawah lipatan.
+describe("Shell · daftar hub yang meluap", () => {
+  const prevScrollIntoView = Element.prototype.scrollIntoView;
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Element.prototype.scrollIntoView = prevScrollIntoView;
+  });
+
+  it("meluap di bawah: cue gulir hanya di tepi bawah, dan hub aktif digulir ke layar (nearest)", () => {
+    vi.spyOn(Element.prototype, "scrollHeight", "get").mockImplementation(function (this: Element) {
+      return this.classList.contains("hn-shell-nav") ? 600 : 0;
+    });
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockImplementation(function (this: Element) {
+      return this.classList.contains("hn-shell-nav") ? 400 : 0;
+    });
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    render(<Shell active="prd" title="PRD" onNavigate={() => {}}>isi</Shell>);
+    const nav = document.querySelector(".hn-shell-nav")!;
+    expect(nav).toHaveAttribute("data-cue-end", "true");
+    expect(nav).not.toHaveAttribute("data-cue-start");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+  });
+
+  it("tak meluap: tanpa cue sama sekali", () => {
+    render(<Shell active="prd" title="PRD" onNavigate={() => {}}>isi</Shell>);
+    const nav = document.querySelector(".hn-shell-nav")!;
+    expect(nav).not.toHaveAttribute("data-cue-end");
+    expect(nav).not.toHaveAttribute("data-cue-start");
   });
 });

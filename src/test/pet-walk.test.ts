@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { durationMs } from "../src/screens/pet-sprite";
 import {
   FALL_MIN_MS, FALL_PX_PER_S, LANE_MARGIN, MIN_WALK_PX, STAND_MS, WALK_MS, WALK_PX_PER_S,
-  anchored, clampX, clampY, homeX, initialWalkState, isHandled, stepWalk,
-  type PetWalkInput, type PetWalkState,
+  anchored, clampMove, clampX, clampY, fitWalk, homeX, initialWalkState, isHandled, stepWalk,
+  type PetMove, type PetWalkInput, type PetWalkState,
 } from "../src/screens/pet-walk";
 
 const LANE = 1000;
@@ -285,6 +285,46 @@ describe("SPEC-905 — pet diseret", () => {
     const step = stepWalk(parked, input({ roam: false, laneWidth: 400, currentX: 100 }), seq(0.5));
     expect(step.state.x).toBe(homeX(400, PET));
     expect(step.move).toEqual({ x: homeX(400, PET), y: 0, durationMs: 0, ease: "linear" });
+  });
+
+  // Lebar jalur berubah sesudah rencana dibuat. Rencana lama memegang tujuan dari jalur 1000 px; `until` yang
+  // masih jauh membuat stepWalk tak memeriksanya, jadi tujuan itu tetap dikejar di jalur 400 px.
+  it("fitWalk: jalur menyempit di tengah jalan — berhenti, di-clamp ke jalur baru, jadwal berdiri dimulai ulang", () => {
+    const midWalk = walking(900, 200_000, "right");
+    const fit = fitWalk(midWalk, { now: 100_000, currentX: 700, laneWidth: 400, petWidth: PET, pose: "working" });
+    expect(fit.state).toEqual({
+      x: homeX(400, PET), y: 0, facing: "right", mode: "stand", parkedX: null, until: 100_000 + STAND_MS[0],
+    });
+    expect(fit.row).toBe("working");
+    expect(fit.move).toEqual({ x: homeX(400, PET), y: 0, durationMs: 0, ease: "linear" });
+    // masukan berikutnya di jalur baru tak lagi memandang tujuan lama: tak ada langkah keluar jalur
+    const later = stepWalk(fit.state, input({ laneWidth: 400, currentX: homeX(400, PET), now: 100_000 + STAND_MS[0] }), seq(0.5, 0.9));
+    expect(later.state.x).toBeLessThanOrEqual(homeX(400, PET));
+    expect(later.state.x).toBeGreaterThanOrEqual(LANE_MARGIN);
+  });
+
+  it("fitWalk: jangkar yang keluar jalur juga di-clamp, dan posisi aktual yang sudah di dalam jalur dipertahankan", () => {
+    const parked: PetWalkState = { x: 900, y: 0, facing: "left", mode: "stand", until: Infinity, parkedX: 900 };
+    const fit = fitWalk(parked, { now: 5, currentX: 150, laneWidth: 400, petWidth: PET, pose: "ready" });
+    expect(fit.state.x).toBe(150);
+    expect(fit.state.parkedX).toBe(homeX(400, PET));
+    expect(fit.state.facing).toBe("left");
+    expect(fit.move).toEqual({ x: 150, y: 0, durationMs: 0, ease: "linear" });
+  });
+
+  it("clampMove: transform yang digambar tak pernah keluar slot, walau keadaan memuat koordinat lama", () => {
+    const stale: PetMove = { x: 880, y: 9_000, durationMs: 9_500, ease: "linear" };
+    expect(clampMove(stale, 220, LANE_H, PET, PET_H)).toEqual({
+      x: homeX(220, PET), y: CEILING, durationMs: 9_500, ease: "linear",
+    });
+    // keadaan yang sudah benar tak berubah sama sekali
+    const ok: PetMove = { x: 40, y: 0, durationMs: 0, ease: "fall" };
+    expect(clampMove(ok, 220, LANE_H, PET, PET_H)).toEqual(ok);
+  });
+
+  it("slot tak terukur (lebar 0) tak menghasilkan jalur di luar kotak: x selalu di margin kiri", () => {
+    expect(homeX(0, PET)).toBe(LANE_MARGIN);
+    expect(clampX(500, 0, PET)).toBe(LANE_MARGIN);
   });
 
   it("isHandled menamai tiga mode yang memegang panggung sendiri", () => {

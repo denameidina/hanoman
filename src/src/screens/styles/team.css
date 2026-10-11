@@ -23,10 +23,11 @@
 .hn-tm-prio-low::before { background: transparent; border-color: var(--ink-400); }
 
 /* Papan: kolom = status. Kartu hanya judul, prioritas, penanggung jawab, dan satu menu. */
-/* Kolom bertetap lebar: papan HARUS flex mendatar. Di ponsel papan ini tak dirender (lihat `hn-tm-mobile`). */
+/* Kolom lentur: empat kolom muat di 1280 (sidebar 248 + gutter) tanpa terpotong; di bawah 200 px per
+   kolom papan menggulir mendatar. Papan HARUS flex mendatar. Di ponsel papan ini tak dirender (lihat `hn-tm-mobile`). */
 .hn-tm-board { display: flex; overflow-x: auto; flex: 1 1 auto; min-height: 0; gap: var(--space-2); align-items: stretch; padding-bottom: var(--space-1); }
 .hn-tm-col {
-  flex: 0 0 248px; display: flex; flex-direction: column; min-height: 0; padding: var(--space-2);
+  flex: 1 1 220px; min-width: 200px; display: flex; flex-direction: column; min-height: 0; padding: var(--space-2);
   border-radius: var(--radius-lg); background: var(--bone-100); border: 1px solid var(--border-hair);
   transition: var(--transition-fast);
 }
@@ -45,11 +46,16 @@
 }
 .hn-tm-card[data-dragging] { opacity: 0.4; }
 .hn-tm-card-head { display: flex; align-items: flex-start; gap: var(--space-2); min-width: 0; }
+/* Area klik judul minimal 24×24 (WCAG 2.5.8): padding vertikal menambah tinggi teks ~19 px jadi ≥24 px;
+   pointer kasar/ponsel 44 px (--touch-target). */
 .hn-tm-title {
-  flex: 1 1 auto; min-width: 0; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left;
+  flex: 1 1 auto; min-width: 0; padding: var(--space-1) 0; border: 0; background: transparent; cursor: pointer; text-align: left;
   font: var(--weight-medium) var(--text-md)/1.35 var(--font-ui); color: var(--text-strong); overflow-wrap: anywhere;
 }
 .hn-tm-title:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-tm-title { min-height: var(--touch-target); display: inline-flex; align-items: center; }
+}
 .hn-tm-card-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
 .hn-tm-assignee-wrap { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .hn-tm-assignee {

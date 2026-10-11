@@ -32,8 +32,9 @@ Primitive bersama:
   `min-width:0` dan `overflow-x:hidden` — overflow lokal tidak boleh merambat ke halaman. `LocalOverflow`
   wajib membungkus konten yang punya lebar intrinsik: anak **blok** selalu selebar induknya, jadi
   scroller yang membungkusnya tak pernah punya konten lebih lebar untuk digulir (SPEC-879).
-- **Papan kolom** (`.hn-bl-board`, `.hn-tm-board`): kolom bertetap lebar (`flex: 0 0 248px`) hanya
-  tersusun mendatar bila papannya `display: flex`; papan itu sendiri menggulir mendatar (`overflow-x: auto`).
+- **Papan kolom** (`.hn-bl-board`, `.hn-tm-board`): kolom Backlog bertetap lebar (`flex: 0 0 248px`); kolom Tim
+  lentur (`flex: 1 1 220px; min-width: 200px`) agar empat kolom muat di 1280 tanpa terpotong. Kolom yang bertetap
+  lebar hanya tersusun mendatar bila papannya `display: flex`; papan itu sendiri menggulir mendatar (`overflow-x: auto`).
   Di ponsel kolom menumpuk satu kolom. Dikunci `src/test/board-layout-css.test.ts` (tiap kolom bertetap lebar
   wajib punya papan induk flex/grid).
 - `.hn-ide-head` + `.hn-ide-toolbar` adalah baris kepala layar IDE: strip tab `flex: 0 0 auto` di
@@ -46,11 +47,16 @@ Primitive bersama:
   bawah daftar hub, `margin-top: auto`). Tablet dan ponsel: **lajur di bawah `<main>`** (`.hn-shell-lane`),
   sehingga area gulir berakhir di atasnya dan tak ada kontrol yang tertutup. Slot kosong (`:empty`) tak
   memesan ruang. Satu-satunya overlay adalah gelembung bicara dan panel status: keduanya sementara dan
-  ditutup Esc atau klik di luar. Pet yang diseret boleh melayang saat diangkat; lajurnya tak pernah melebar.
+  ditutup Esc atau klik di luar. Pet yang diseret boleh melayang saat diangkat; lajurnya tak pernah melebar. Lebar jalur hanya dari ukuran slot
+  (root pet, `width: 100%`): belum terukur = 0, dan pet tak dirender; tanpa fallback ke lebar viewport. Desktop
+  pendek (≤ 760 px tinggi, `PET_COMPACT_QUERY`) menciutkan pet ke chip sampai dibangkitkan, sementara, tanpa
+  menyimpan preferensi, supaya 8 hub + footer muat tanpa gulir di 661 px.
 - **Default per tier, dan pilihan eksplisit.** Preferensi `hn.ui.v1.pet.enabled` (`ui-state/pet-pref.ts`;
   `null` = belum dipilih): desktop tampil, tablet dan ponsel **mati** (lajur 0). Palet "Tampilkan Hanoman" dan
   "Sembunyikan Hanoman" menulisnya. "Sembunyikan" di panel pet menciutkan ke chip di desktop dan mematikan
-  pet di tablet/ponsel. Tombol di Pengaturan belum ada (layar itu dikerjakan terpisah): pakai `usePetEnabled()`.
+  pet di tablet/ponsel. Pengaturan › Sesi harian punya baris "Tampilkan Hanoman (pet)" (Default · Tampilkan ·
+  Sembunyikan) yang membaca dan menulis preferensi yang sama lewat `usePetEnabled()`. Preferensi ini per browser
+  dan tak pernah disimpan ke server.
 - **Tak ada sinyal penting yang hanya ada di pet.** Keputusan sesi tetap sampai lewat notifikasi `decision`
   (toast dan bell dengan "Buka terminal"), layar Terminal (`awaiting`), dan "Jawab sesi yang menunggu" di palet.
   Dalang (layar penuh tanpa Shell) tak punya slot, sehingga pet tak tampil di sana.
@@ -84,6 +90,12 @@ judul (ellipsis), cari (ikon, membuka palet ⌘K), notifikasi, akun. Lencana sek
 (deskripsi layar) disembunyikan. Baris kedua 40 px hanya ada bila layar memakainya: pilihan project, kotak cari
 layar, dan aksi halaman (`.hn-shell-subrow`). Bar tab hub (`SectionTabs`) satu baris yang menggulir dengan fade,
 di atas konten. Di rail tablet, badge hitungan absolut di pojok ikon dan ikon nav tak menyusut (`flex: 0 0 auto`).
+
+**Topbar tablet (QA run3 · P2).** Judul dan alat satu baris (alat `nowrap`); lencana update dan batas memakai bentuk
+pendek; crumb dan judul di semua tier satu baris dengan elipsis. Baris kedua (project, cari, aksi) hanya bila layar
+memakainya, dan menggulir mendatar sendiri. Target: ≤ 64 px tanpa baris kedua, +40 px dengan baris kedua.
+**Daftar hub yang meluap** diberi cue gulir (`data-cue-start/end` di `.hn-shell-nav`, dihitung di `shell.tsx`), dan hub
+aktif digulir ke layar saat pindah layar.
 
 ## Kontras, konfirmasi, dan error (Audit UI/UX 2026-10 · Fase 1)
 

@@ -1580,7 +1580,8 @@ masukan + `rng` dan mengembalikan keadaan baru, baris yang harus diputar, dan pe
 | pose perhatian: `waiting`, `blocked` | `mode: "home"` — jalan pulang ke pojok kanan bila belum di sana, lalu berdiri memutar baris pose; kabar penting selalu di tempat yang sama |
 | `shipped` | berhenti di tempat, baris `shipped` sekali → `idle` (lewat `then`), lalu aturan tenang |
 | `hovered` ∨ `panelOpen` ∨ `documentHidden` | berhenti (transisi dipotong di posisi saat ini); masuk hover → `wave` **berulang** sampai hover lepas (SPEC-905) |
-| resize (`laneWidth` berubah) | `x` di-clamp; transisi yang sedang berjalan dipotong |
+| resize (`laneWidth` berubah) | `fitWalk` (QA run3): rencana yang sedang berjalan dihentikan, `x` di-clamp ke jalur baru, jadwal berdiri dimulai ulang. Posisi yang digambar juga di-clamp tiap render (`clampMove`) |
+| lebar jalur belum terukur (0) | tak ada langkah dan aktor tak dirender; rencana pertama dimulai di rumah (`tick` di `HanomanPet.tsx`). Tanpa fallback ke `window.innerWidth`, yang dulu menempatkan pet di 1280 px di sidebar 248 px |
 
 Penjadwalan: **satu** `setTimeout` pada `state.until` + `transitionend` pada `pet-actor` (difilter
 `propertyName === "transform"`) + `visibilitychange` + `resize` (debounce 150 ms). Tanpa interval.

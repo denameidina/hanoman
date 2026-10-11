@@ -14,6 +14,9 @@ const CHIP_LABEL: Record<SkillLayerChip, string> = { all: "Semua", global: "Glob
 const CHIP_ORDER: SkillLayerChip[] = ["all", "global", "project", "plugin"];
 export const layerChipOf = (s: SkillEntry): Exclude<SkillLayerChip, "all"> =>
   s.layer === "project" ? "project" : s.layer === "plugin" ? "plugin" : "global";
+// Nama project di banner galat: dipotong agar tak memenuhi baris; nama lengkapnya tetap di `title`.
+export const ringkasNama = (nama: string, maks = 40): string =>
+  nama.length > maks ? `${nama.slice(0, maks - 1).trimEnd()}…` : nama;
 
 function Row({ s, selected, onSelect, projectName }: { s: SkillEntry; selected: boolean; onSelect: (s: SkillEntry) => void; projectName?: string }) {
   // Maks dua lencana per baris: status yang perlu diperhatikan lebih dulu, lalu sumber bila ada.
@@ -80,7 +83,7 @@ export function SkillsList({ library, selected, onSelect, projectFirst = false }
       {/* Galat pemuatan project adalah banner di atas daftar, bukan item di dalamnya (role=alert dari Callout). */}
       {failedProjects.length > 0 && (
         <Callout tone="err" title="Sebagian skill belum bisa dimuat">
-          {failedProjects.map((p) => <div key={p.projectId}>{p.name}: {p.error}</div>)}
+          {failedProjects.map((p) => <div key={p.projectId} title={p.name}>{ringkasNama(p.name)}: {p.error}</div>)}
           <div>Periksa lokasi repo project itu di Projects.</div>
         </Callout>
       )}

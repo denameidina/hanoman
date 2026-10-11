@@ -7,6 +7,10 @@
    tempat, jadi urutan pemuatan stylesheet tak mengubah hasilnya. */
 .hn-choice-control { min-width: 24px; min-height: 24px; }
 
+/* Putaran spinner tombol loading dan StateBlock loading. Didefinisikan sekali di sini (berkas ini
+   selalu dimuat lewat forms.tsx), bukan sebagai <style> di dalam tombol: teks tombol tak lagi memuat CSS. */
+@keyframes hn-spin { to { transform: rotate(360deg); } }
+
 @media (pointer: coarse), (max-width: 767px) {
   .hn-choice-control { min-width: var(--touch-target); min-height: var(--touch-target); }
 }

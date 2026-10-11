@@ -74,7 +74,6 @@ export function StateBlock({
           </Button>
         </div>
       )}
-      <style>{`@keyframes hn-spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
