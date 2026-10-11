@@ -71,16 +71,33 @@ describe("SPEC-879 · baris kepala IDE punya pemilik sisa lebar", () => {
     expect(head).not.toMatch(/\.hn-ide-toolbar\s*\{[^}]*flex:\s*1 1 auto/s);
   });
 
-  it("menjadikan toolbar scroller yang HIDUP saat ruangnya kurang", () => {
-    const bar = css.slice(css.indexOf(".hn-ide-toolbar {"), css.indexOf(".hn-ide-toolbar > *"));
-    expect(bar).toMatch(/flex-wrap:\s*nowrap/s);
-    expect(bar).toMatch(/overflow-x:\s*auto/s);
-    // Scroller tanpa aturan ini adalah scroller MATI (akar SPEC-763): itemnya menyusut sampai
-    // labelnya tumpah, dan strip-nya tak pernah punya konten lebih lebar untuk digulir.
-    expect(css).toMatch(/\.hn-ide-toolbar > \*\s*\{\s*flex:\s*0 0 auto/s);
+  // Audit UI/UX 2026-10 (QA P1): toolbar MEMBUNGKUS, tidak lagi menggulir. Gulir mendatar di app.css
+  // (SPEC-879) membuat selector project 648px dan memotong selector cabang di luar layar. app.css
+  // masih memuat `nowrap` itu (berkas di luar lingkup Fase ini); aturan efektifnya ada di ide.css.
+  it("toolbar membungkus kontrolnya dan selector project/ref boleh menyusut (ide.css mengalahkan app.css)", () => {
+    expect(ideCss).toMatch(/\.hn-ide-head > \.hn-ide-toolbar\s*\{\s*flex-wrap:\s*wrap;\s*overflow:\s*visible;\s*\}/);
+    // `> * { flex: 0 0 auto }` di app.css memaksa lebar intrinsik `<select>` (opsi terpanjang).
+    // Tanpa min-width:0 flex item tak pernah lebih kecil dari itu.
+    expect(ideCss).toMatch(/\.hn-ide-head > \.hn-ide-toolbar > \.hn-ide-proyek,\s*\.hn-ide-head > \.hn-ide-toolbar > \.hn-ide-ref\s*\{\s*min-width:\s*0;\s*max-width:\s*100%/s);
+    expect(ideCss).toMatch(/\.hn-ide-head > \.hn-ide-toolbar > \.hn-ide-proyek \{ flex: 1 1 140px/);
+    expect(ideCss).toMatch(/\.hn-ide-head > \.hn-ide-toolbar > \.hn-ide-ref \{ flex: 1 1 140px/);
+    expect(ideCss).toMatch(/\.hn-ide-head > \.hn-ide-toolbar \.hn-select select\s*\{[^}]*text-overflow:\s*ellipsis/s);
+    // Di ponsel nama project mendapat baris penuh; ref dan tombol mengalir di bawahnya.
+    expect(ideCss).toMatch(/@media \(max-width: 767px\)\s*\{[\s\S]*?\.hn-ide-head > \.hn-ide-toolbar > \.hn-ide-proyek\s*\{\s*flex-basis:\s*100%/);
     // Rata kanan lewat margin auto: `justify-content: flex-end` membuat AWAL konten tak
     // terjangkau begitu kontainernya menggulir.
     expect(css).toMatch(/\.hn-ide-toolbar > :first-child\s*\{\s*margin-inline-start:\s*auto/s);
+  });
+
+  it("selector project dan ref memakai kelasnya di dalam toolbar, dan nama project utuh di title", () => {
+    const { container } = renderIde();
+    const proyek = screen.getByRole("combobox", { name: "Proyek" });
+    const ref = screen.getByRole("combobox", { name: "Ref yang dilihat" });
+    expect(proyek.closest(".hn-select")).toHaveClass("hn-ide-proyek");
+    expect(ref.closest(".hn-select")).toHaveClass("hn-ide-ref");
+    expect(container.querySelector(".hn-ide-toolbar")!.contains(proyek)).toBe(true);
+    // Nama yang dipotong ellipsis tetap terbaca lewat tooltip.
+    expect(proyek).toHaveAttribute("title", "P1");
   });
 
   it("memasang kedua kelas itu di layar IDE, dengan strip tab sebagai anak langsung", () => {
@@ -187,5 +204,31 @@ describe("SPEC-879 · kontrol IDE memakai primitive design system", () => {
   it("editor berkas tak memaksa tinggi tetap yang melewati viewport ponsel", () => {
     expect(ideCss).toMatch(/\.hn-ide-editor\s*\{[^}]*min-height:\s*clamp\(240px, 50dvh, 560px\)/s);
     expect(source("IdeScreen.tsx")).not.toContain("minHeight: 560");
+  });
+});
+
+// Audit UI/UX 2026-10 · Fase 4 QA (IDE): fokus dan target sentuh. jsdom tak memuat CSS, jadi yang
+// diikat di sini adalah kelas di DOM dan aturan yang dipegang ide.css.
+describe("QA · IDE: fokus bertoken dan target sentuh toggle diff/source", () => {
+  it("region panel tak memakai ring biru bawaan UA; ring bertoken hanya di mode selector", () => {
+    // Region ber-tabIndex=-1 difokus programatik di mode selector; UA menggambar kotak biru di
+    // sekeliling seluruh panel. Di mode split ia tak pernah jadi target fokus.
+    expect(ideCss).toMatch(/\.hn-ide-screen \.hn-responsive-panel:focus\s*\{\s*outline:\s*none/);
+    expect(ideCss).toMatch(
+      /\.hn-ide-screen \.hn-responsive-panels\[data-split="false"\] \.hn-responsive-panel:focus-visible\s*\{\s*outline:\s*2px solid var\(--border-focus\)/);
+    const { container } = renderIde();
+    const panel = container.querySelector('[data-panel="daftar"]')!;
+    expect(panel).toHaveAttribute("tabindex", "-1");
+    expect(panel.closest(".hn-responsive-panels")).toHaveAttribute("data-split");
+  });
+
+  it("toggle diff/source memakai kelas sentuh dan minimum 24px (desktop), 44px (pointer kasar)", async () => {
+    const { container } = renderIde();
+    await screen.findByRole("tablist", { name: "Bagian IDE" });
+    const buttons = [...container.querySelectorAll(".hn-ide-seg button")];
+    expect(buttons.map((b) => b.textContent)).toEqual(["diff", "source"]);
+    for (const b of buttons) expect(b).toHaveClass("hn-touch-target");
+    expect(ideCss).toMatch(/\.hn-ide-seg button\s*\{[^}]*min-height:\s*24px/s);
+    expect(ideCss).toMatch(/@media \(pointer: coarse\), \(max-width: 767px\)\s*\{\s*\.hn-ide-seg button\s*\{\s*min-height:\s*44px/s);
   });
 });

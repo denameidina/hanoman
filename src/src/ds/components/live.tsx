@@ -14,6 +14,9 @@ const OFFLINE_MS = 6_000;
  * dan tak pernah menampilkan apa pun: menyebutnya gangguan berarti tiap kembali dari tab lain
  * memunculkan peringatan palsu.
  *
+ * QA ui-ux-audit · `idle` (tak ada langganan sama sekali) juga bukan gangguan. Lencana hanya tampil
+ * bila ada consumer yang butuh data DAN socket benar-benar tak tersambung melewati grace.
+ *
  * Audit 2026-10 · wilayah `role="status"` (aria-live polite) SELALU terpasang; yang berubah hanya
  * isinya. Live region yang baru lahir bersama pesannya sering tak diumumkan pembaca layar. Saat
  * kosong, `.hn-live-status:empty` (app.css) membuatnya tak memakan ruang dan tak ikut gap flex induk.
@@ -21,7 +24,7 @@ const OFFLINE_MS = 6_000;
 export function LiveConnectionBadge({ className = "", style = {} }:
   { className?: string; style?: React.CSSProperties }) {
   const s = useEventsStatus();
-  const down = !s.connected && !s.paused;
+  const down = !s.idle && !s.connected && !s.paused;
   const [now, setNow] = React.useState(() => Date.now());
   React.useEffect(() => {
     if (!down) return;

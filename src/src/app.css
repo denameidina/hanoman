@@ -1,8 +1,13 @@
 /* Page-level styles ported from the prototype's Hanoman App.html <style>:
    layout reset, button accent, rendered-markdown (.hn-md), and the
    toast/modal keyframes the kit primitives animate with. */
-html, body { margin: 0; height: 100%; background: var(--surface-page); }
-#root { height: 100vh; height: 100dvh; overflow: hidden; max-width: 100%; }
+/* Satu scroller per layar: `.hn-shell-main` (atau scroller 100dvh milik permukaan mandiri). Dokumen itu
+   sendiri tak boleh ikut menggulir. `#root` ber-`position: relative` sebagai wadah bagi elemen absolut
+   yang tak punya induk ber-posisi: tanpanya, elemen seperti itu memakai ICB sebagai wadah, lolos dari
+   `overflow: hidden` #root, dan menambah tinggi dokumen (QA: 844px layar → dokumen 1071px, Backlog ponsel,
+   `window.scrollY` 227 setelah scroll ke bawah). Posisinya tak berubah: #root berada di (0,0) selebar layar. */
+html, body { margin: 0; height: 100%; background: var(--surface-page); overflow: hidden; }
+#root { position: relative; height: 100vh; height: 100dvh; overflow: hidden; max-width: 100%; }
 
 .hn-dynamic-viewport {
   height: 100vh;
@@ -97,7 +102,23 @@ textarea:focus-visible,
 .hn-shell-heading { min-width: 0; }
 .hn-shell-tools { margin-left: auto; display: flex; min-width: 0; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
 .hn-shell-search { width: 220px; }
-.hn-shell-main { flex: 1; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; }
+/* Lajur pet (HanomanPet) duduk di tepi bawah dan menutupi apa pun di bawahnya. `--pet-h` diterbitkan
+   HanomanPet (tinggi sel, atau 66px saat disembunyikan); ruang itu dipesan di bawah scroller, jadi
+   kontrol terbawah tetap bisa digulir di atasnya. `--safe-bottom` ikut karena lajur pet sendiri
+   menempel di atas safe-area. Pada layar tanpa pet nilainya 0. */
+:root { --pet-h: 0px; }
+.hn-shell-main {
+  flex: 1; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto;
+  padding-bottom: calc(var(--pet-h) + var(--safe-bottom));
+}
+/* Bar yang menempel di tepi bawah (keputusan Review dan Triase, sticky `bottom: 0` terhadap scrollport,
+   bukan terhadap padding) dan bar aksi QA di ponsel (fixed) ikut naik ke atas lajur pet. Spesifisitas
+   sengaja lebih tinggi dari aturan layarnya: berkas CSS layar dimuat setelah app.css. */
+.hn-shell-main .hn-review-decide,
+.hn-shell-main .hn-triage-decision { bottom: calc(var(--pet-h) + var(--safe-bottom)); }
+@media (max-width: 767px) {
+  .hn-shell .hn-qa-bar-actions { bottom: calc(var(--pet-h) + var(--safe-bottom)); }
+}
 .hn-shell-content {
   width: 100%;
   min-width: 0;
@@ -208,7 +229,13 @@ textarea:focus-visible,
   .hn-shell-topbar { align-items: flex-start; flex-wrap: wrap; gap: 8px 10px; padding: calc(6px + var(--safe-top)) var(--page-gutter-x) 8px; backdrop-filter: none; }
   .hn-shell-heading { flex: 1 1 calc(100% - 54px); align-self: center; }
   .hn-shell-tools { flex: 1 1 100%; margin-left: 0; justify-content: flex-start; gap: 6px; }
-  .hn-shell-search { flex: 1 1 100%; width: 100%; }
+  .hn-shell-search { flex: 1 1 100%; width: 100%; order: 1; }
+  /* Header dua baris: judul di baris pertama bersama tombol menu, barisan ikon (cari, notifikasi, batas,
+     akun, aksi halaman) di baris kedua. Pilihan project turun ke baris ketiga bersama kotak cari layar
+     (`order: 1`). Crumb dan judul dipotong satu baris dengan elipsis: header tak lagi membungkus. */
+  .hn-shell-crumb,
+  .hn-shell-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hn-shell-scope { flex: 1 1 100%; order: 1; }
   /* SPEC-763 · label topbar yang panjang (pil update) diringkas di mobile supaya barisan tools muat
      satu baris; kontrolnya tetap ada, namanya dipikul aria-label/title, dan versinya tetap terbaca. */
   .hn-topbar-label { display: none; }
@@ -307,7 +334,22 @@ textarea:focus-visible,
      pointer-kasar, atau border-bottom hair). Kunci sumbu-Y supaya hanya scroll mendatar. */
   overflow-y: hidden;
   overscroll-behavior-inline: contain;
+  /* Tab yang meluap digulir per tab, tak berhenti di tengah label. */
+  scroll-snap-type: x proximity;
 }
+.hn-tabs > [role="tab"] { scroll-snap-align: start; }
+/* Gradasi di tepi yang masih menyimpan tab tersembunyi. Tabs men-set `data-fade-start` / `data-fade-end`
+   hanya saat strip meluap dan tepinya belum sampai ujung. Lewat mask, bukan latar: warna di bawahnya
+   tak berubah, dan tab yang tak meluap tak punya gradasi sama sekali. `#000` di sini hanya alfa mask. */
+.hn-tabs[data-fade-start="true"],
+.hn-tabs[data-fade-end="true"] {
+  --hn-fade-l: 0px;
+  --hn-fade-r: 0px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--hn-fade-l), #000 calc(100% - var(--hn-fade-r)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--hn-fade-l), #000 calc(100% - var(--hn-fade-r)), transparent 100%);
+}
+.hn-tabs[data-fade-start="true"] { --hn-fade-l: 24px; }
+.hn-tabs[data-fade-end="true"] { --hn-fade-r: 24px; }
 
 /* SPEC-879 · baris kepala IDE = strip tab + toolbar. `flex-wrap` MEMUTUS BARIS SEBELUM MENYUSUT:
    keputusannya memakai hypothetical main size, yaitu `flex-basis`. Dengan basis `auto` itu berarti
@@ -349,15 +391,69 @@ textarea:focus-visible,
 .hn-ide-toolbar > * { flex: 0 0 auto; }
 .hn-ide-toolbar > :first-child { margin-inline-start: auto; }
 
+/* Checkbox/radio mentah (Triase, PRD, VPS, Agent access, setup). Kontrol native ber-appearance auto tak
+   bisa dibesarkan (Chrome dan Safari mengabaikan width/height-nya), dan kotak 13 px-nya juga area klik.
+   Di sini kotak digambar sendiri 16 px; padding transparan di sekelilingnya menjadi area klik: 24×24 di
+   desktop (WCAG 2.5.8), 44×44 di pointer kasar dan ponsel (blok coarse di bawah). `background-clip` dan
+   `background-origin: content-box` menjaga padding tetap transparan, jadi tak ada blok warna 44 px yang
+   melebar baris (SPEC-879). Kontrol DS (`.hn-choice-control`) punya jalur sendiri di forms.tsx. */
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  box-sizing: content-box;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-origin: content-box;
+  background-clip: content-box;
+  /* Dua lapis dari bawah ke atas: ring (border-strong) penuh, lalu isi (surface-card) 1,5 px lebih kecil. */
+  background-image:
+    linear-gradient(var(--surface-card), var(--surface-card)),
+    linear-gradient(var(--border-strong), var(--border-strong));
+  background-size: calc(100% - 3px) calc(100% - 3px), 100% 100%;
+  cursor: pointer;
+}
+input[type="radio"] { border-radius: 50%; }
+/* Terpilih: isi brass (token --accent), ring --accent-hover, dan tanda centang/titik di atasnya.
+   Warna tanda (ink-900 = --accent-on) ditulis langsung karena SVG di data-URI tak membaca variabel CSS. */
+input[type="checkbox"]:checked {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.6 2.6L12 5.6' fill='none' stroke='%2317130c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
+    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--accent-hover), var(--accent-hover));
+  background-size: 100% 100%, calc(100% - 3px) calc(100% - 3px), 100% 100%;
+}
+input[type="radio"]:checked {
+  background-image:
+    radial-gradient(circle, #17130c 0 2.5px, transparent 3px),
+    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--accent-hover), var(--accent-hover));
+  background-size: 100% 100%, calc(100% - 3px) calc(100% - 3px), 100% 100%;
+}
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled { opacity: 0.55; cursor: not-allowed; }
+/* Input file: kontrol bawaan browser ~21 px tinggi di pointer halus (tablet, desktop). 24 px = batas WCAG
+   2.5.8; di pointer kasar/ponsel naik ke 44 (blok coarse). */
+input[type="file"] { min-height: 24px; }
+
 @media (pointer: coarse), (max-width: 767px) {
   button:not(.hn-shell-backdrop) { min-width: var(--touch-target); min-height: var(--touch-target); }
   input:not([type="checkbox"]):not([type="radio"]), select, textarea {
     min-width: var(--touch-target); min-height: var(--touch-target);
   }
-  /* Checkbox/radio mentah mendapat 24×24 (batas minimum WCAG 2.5.8), bukan 44: 44 pada kotak 13–18px
-     membuat kotak biru 44×44 dan melebarkan baris (SPEC-879). Kontrol DS membawa 44 lewat
-     `.hn-choice-target` di bawah. */
-  input[type="checkbox"], input[type="radio"] { min-width: 24px; min-height: 24px; }
+  /* Checkbox/radio mentah: area klik 44×44 lewat padding (kotak 16 px + 14 px tiap sisi). Padding itu
+     transparan (aturan dasar di atas), jadi yang melebar hanya area klik, tak ada blok warna. */
+  input[type="checkbox"], input[type="radio"] { padding: 14px; }
+  /* Input file (Help Center, Keluhan, QA): tinggi tap 44, sebab kontrol bawaan browser hanya ~21 px. */
+  input[type="file"] { min-height: var(--touch-target); }
   .hn-touch-target,
   .hn-terminal-unplaced-action,
   [role="button"][tabindex="0"] {

@@ -180,6 +180,15 @@
 /* Lebar satu kolom di layar sempit: daftar tetap satu kolom; papan ditumpuk vertikal. */
 @media (max-width: 767px) {
   .hn-bl-toolbar { gap: var(--space-2); }
+  /* Di mobile daftar TAK menjadi scroller bersarang. Gulir dipegang satu scroller (.hn-shell-main), jadi
+     daftar dan pager mengalir sebagai satu tumpukan: tak ada kotak 633px yang digulir di dalam halaman
+     dengan area kosong di bawahnya (Audit 2026-10 QA P1/P2). Posisi gulir tetap dipulihkan Shell. */
+  .hn-bl-screen { min-height: auto; }
+  .hn-bl-body { flex: 0 0 auto; min-height: auto; }
+  .hn-bl-list-scroll { flex: 0 0 auto; min-height: auto; overflow: visible; }
+  /* Tab tahap membungkus ke baris berikutnya, tidak digulir mendatar: tiap segmen tampil utuh
+     ("Dikerjakan" tak lagi terpotong "Dikerja…"). Labelnya tetap istilah glosarium, sama dengan pil tahap. */
+  .hn-bl-screen .hn-bl-stage-tabs { overflow: visible; flex-wrap: wrap; }
   .hn-bl-board { flex-direction: column; overflow-x: hidden; }
   .hn-bl-col { flex: 0 0 auto; width: 100%; }
   .hn-bl-col-body { overflow-y: visible; }

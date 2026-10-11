@@ -184,3 +184,38 @@
 }
 .hn-ide-remote-add { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
 .hn-ide-changes-bar .hn-ide-changes-legend { min-width: 0; }
+
+/* ---------------------------------------------------------------- Kepala IDE: toolbar, fokus, sentuh (QA Fase 4) */
+
+/* Toolbar MEMBUNGKUS kontrolnya. app.css memberi `nowrap`, gulir mendatar, dan `> * { flex: 0 0 auto }`:
+   selector project memakai lebar intrinsik `<select>` (= opsi terpanjang), jadi satu nama project panjang
+   melebarkan toolbar sampai 648px dan meluber dari tepi (390, 820, dan 1280px terukur). Override di sini,
+   bukan di app.css: selektor dua kelas menang atas aturan tunggal di sana tanpa bergantung urutan pemuatan. */
+.hn-ide-head > .hn-ide-toolbar { flex-wrap: wrap; overflow: visible; }
+.hn-ide-head > .hn-ide-toolbar > .hn-ide-proyek,
+.hn-ide-head > .hn-ide-toolbar > .hn-ide-ref { min-width: 0; max-width: 100%; }
+.hn-ide-head > .hn-ide-toolbar > .hn-ide-proyek { flex: 1 1 140px; max-width: min(100%, 320px); }
+.hn-ide-head > .hn-ide-toolbar > .hn-ide-ref { flex: 1 1 140px; max-width: min(100%, 220px); }
+.hn-ide-head > .hn-ide-toolbar .hn-select select { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 767px) {
+  /* Di ponsel nama project mendapat satu baris penuh; ref dan tombol mengalir di bawahnya. */
+  .hn-ide-head > .hn-ide-toolbar > .hn-ide-proyek { flex-basis: 100%; max-width: 100%; }
+}
+
+/* Panel Perubahan/Berkas adalah region ber-tabIndex=-1 (ResponsivePanels). Ia difokus programatik hanya
+   di mode selector; UA menggambar ring biru di sekeliling seluruh panel. Di mode split region tak pernah
+   jadi target fokus, jadi ring-nya tak digambar. Ring bertoken hanya untuk fokus yang datang dari keyboard. */
+.hn-ide-screen .hn-responsive-panel:focus { outline: none; }
+.hn-ide-screen .hn-responsive-panels[data-split="false"] .hn-responsive-panel:focus-visible {
+  outline: 2px solid var(--border-focus); outline-offset: -2px;
+}
+
+/* Toggle diff/source dan Preview/Source sebelumnya 22px, di bawah 24px (WCAG 2.5.8). Kini ≥24px di
+   pointer halus, dan 44px di pointer kasar atau ponsel (kelas hn-touch-target juga ada di JSX). */
+.hn-ide-seg button {
+  min-height: 24px; min-width: 24px; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-ide-seg button { min-height: 44px; min-width: 44px; }
+}

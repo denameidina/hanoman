@@ -37,6 +37,11 @@ Primitive bersama:
   menggulir saat ruangnya kurang. Basis `auto` membuat pecah-baris ditentukan lebar isi, dan dengan
   itu bentuk kepala berubah hanya karena label tab aktif ditebalkan atau nama project bertambah
   panjang (SPEC-879).
+- **Lajur pet memesan ruangnya sendiri.** `HanomanPet` menerbitkan `--pet-h` di `<html>` (tinggi sel sprite,
+  atau 66 px saat disembunyikan). `.hn-shell-main` memakai `calc(var(--pet-h) + var(--safe-bottom))` sebagai
+  padding-bawah, sehingga kontrol terbawah bisa digulir di atas pet. Bar keputusan yang menempel di bawah
+  (Review, Triase) dan bar aksi QA ponsel ikut naik lewat aturan di `app.css`. Dokumen (`html`/`body`) tak
+  pernah menggulir: satu-satunya scroller adalah `.hn-shell-main` atau scroller 100dvh milik permukaan mandiri.
 - `--page-gutter-x/y`, `--sidebar-w`, `--touch-target`, dan `--safe-*` adalah token lintas-screen.
   Semua kontrol utama memiliki area sentuh minimum 44×44px pada pointer kasar/mobile, meskipun
   kepadatan visual desktop boleh tetap lebih kecil.
@@ -97,8 +102,11 @@ Aturan:
 5. **Keluar fokus terminal.** Pane terminal meneruskan semua tombol ke pty. `Ctrl+Shift+Esc` melepas
    fokus dari terminal (handler di `TerminalPane.tsx`, teks hint di sebelahnya).
 6. **Target sentuh pilihan.** Checkbox dan radio DS (`.hn-choice-target` / `.hn-choice-control`,
-   `ds/components/forms.tsx`) mendapat area 44×44 pada `(pointer: coarse), (max-width: 767px)`
-   (`app.css`). Checkbox/radio native tetap 24×24 di desktop; itu disengaja.
+   `ds/components/forms.tsx`) mendapat area 24×24 di desktop dan 44×44 pada `(pointer: coarse), (max-width: 767px)`
+   (`app.css`). Checkbox/radio `input` mentah (Triase, PRD, VPS, Agent access, setup) digambar sendiri 16 px
+   dengan padding transparan sebagai area klik: 24×24 di desktop, 44×44 di pointer kasar. Input file minimal
+   24 px, 44 px di pointer kasar. Kotak native tak bisa dibesarkan dengan width/height (Chrome dan Safari
+   mengabaikannya), jadi area kliknya lewat padding, bukan ukuran kotak.
 
 ## Primitif layout (Audit UI/UX 2026-10 · Fase 2A)
 
@@ -116,7 +124,7 @@ Sumber: `ds/components/layout.tsx`, `skeleton.tsx`, dan bagian yang diubah di `f
 | `Stack` / `Inline` | `gap` (0–12, skala spacing), `align?`, `wrap?` (Inline) | Gap = `var(--space-N)`. `Inline` membungkus secara default. |
 | `Text` | `size` 11 \| 12 \| 13 \| 14 \| 16, `tone` body \| muted \| subtle \| strong | Ukuran di luar skala token tak bisa diketik. |
 | `Skeleton` / `SkeletonList` | `height?`, `radius?` / `rows?`, `label?` | `SkeletonList` = `role="status"` + `aria-busy`; blok skeleton `aria-hidden`. Shimmer mati di `prefers-reduced-motion`. |
-| `Tabs` + `TabPanel` | `children` = `TabPanel` anak langsung | Tab punya `id` dan `aria-controls` (hanya bila ada panelnya). Panel tak aktif tetap di DOM dengan `hidden`. Keyboard tak berubah. |
+| `Tabs` + `TabPanel` | `children` = `TabPanel` anak langsung | Tab punya `id` dan `aria-controls` (hanya bila ada panelnya). Panel tak aktif tetap di DOM dengan `hidden`. Keyboard tak berubah. Strip yang meluap menandai tepi yang masih menyimpan tab (`data-fade-start` / `data-fade-end`, gradasi lewat mask di `app.css`) dan memakai scroll-snap per tab. |
 
 **Feedback yang diubah.** `Badge` dan `StatusPill` mendapat `variant="dot"` (titik status + teks, tanpa latar;
 titik `aria-hidden`, maknanya selalu ikut sebagai teks). `ProgressBar`: `aria-*` berjalan ke elemen

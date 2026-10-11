@@ -27,6 +27,10 @@ import { PetAnswer } from "./PetAnswer";
 const PET_HEIGHT: Record<"mobile" | "tablet" | "desktop", number> = { mobile: 96, tablet: 112, desktop: 112 };
 // SPEC-763 · hanya 44×44 px di kaki yang menangkap tap; sisa panggung cuma seni.
 const HIT = 44;
+// Tombol bangkitkan saat pet disembunyikan: 44 px, berjarak 22 px dari tepi bawah. Jarak itu juga
+// dipakai untuk memesan ruang di layout (`--pet-h`), jadi keduanya tak boleh berbeda.
+const REVEAL_EDGE = 22;
+const REVEAL_RESERVE = REVEAL_EDGE + HIT;
 const PANEL_W = 268;
 const PANEL_GAP = 10;
 const PANEL_EDGE = 12;
@@ -416,13 +420,25 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
     zIndex: 80, pointerEvents: "none",
   };
 
+  // Lajur pet menempati tepi bawah layar. Tingginya dipublikasikan sebagai `--pet-h` di <html>, dan
+  // `.hn-shell-main` memesan ruang sebanyak itu di bawah kontrolnya (app.css), sehingga kontrol
+  // terbawah bisa digulir DI ATAS pet dan tak tertutup maupun tertekan olehnya. Disembunyikan =
+  // hanya tombol bangkitkan. Layout-effect: nilainya sudah terpasang sebelum paint pertama, walau pet
+  // sendiri baru tampil sesudah idle. Hook ini wajib sebelum `return null` di bawah.
+  const petReserve = hidden ? REVEAL_RESERVE : cellH;
+  React.useLayoutEffect(() => {
+    const el = document.documentElement;
+    el.style.setProperty("--pet-h", `${petReserve}px`);
+    return () => { el.style.removeProperty("--pet-h"); };
+  }, [petReserve]);
+
   if (!mountReady) return null;
   if (hidden) {
     return (
       <div data-testid="pet-root" ref={rootRef} style={root}>
         <button aria-label="Tampilkan pet Hanoman" onClick={() => setVisibility(false)} style={{
-          pointerEvents: "auto", position: "absolute", width: 44, height: 44, padding: 0,
-          right: "max(22px, var(--safe-right))", bottom: 22,
+          pointerEvents: "auto", position: "absolute", width: HIT, height: HIT, padding: 0,
+          right: "max(22px, var(--safe-right))", bottom: REVEAL_EDGE,
           display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
           border: "1px solid var(--text-muted)", borderRadius: "var(--radius-pill)",
           background: "var(--surface-card)", color: "var(--text-strong)", boxShadow: "var(--shadow-sm)",

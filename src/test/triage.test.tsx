@@ -55,6 +55,14 @@ describe("SPEC-253 · TriageScreen", () => {
     expect(segment.getByRole("button", { name: /Belum ditinjau/ })).toHaveTextContent("1");
   });
 
+  it("checkbox pilih dibungkus <label> (kotak sentuh ikut memilih) dan judul memakai kelas baris", async () => {
+    renderTriage();
+    await screen.findByText("Tak bisa login");
+    const box = screen.getByRole("checkbox", { name: "Pilih tiket 1" });
+    expect(box.closest("label")?.classList.contains("hn-triage-check")).toBe(true);
+    expect(screen.getByText("Tak bisa login").classList.contains("hn-triage-title")).toBe(true);
+  });
+
   it("buka detail lalu Terima → memanggil acceptTicket + onAccepted (perilaku detail: ke backlog)", async () => {
     const onAccepted = vi.fn();
     render(<TriageScreen projects={projects} onAccepted={onAccepted} onToast={() => {}} />);

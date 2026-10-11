@@ -31,6 +31,36 @@ export function TabPanel({ value, children, className = "", style }: TabPanelPro
   }, children);
 }
 
+// Tepi strip tab yang masih menyimpan tab di luar kotaknya. `start` = ada tab di kiri yang belum terlihat,
+// `end` = ada di kanan. Hanya saat strip benar-benar meluap; di ujungnya gradasi berhenti.
+type TabEdges = { start: boolean; end: boolean };
+const readEdges = (el: HTMLElement): TabEdges => {
+  const max = el.scrollWidth - el.clientWidth;
+  return { start: el.scrollLeft > 1, end: max > 1 && el.scrollLeft < max - 1 };
+};
+function useTabEdges(ref: React.RefObject<HTMLElement>): TabEdges {
+  const [edges, setEdges] = React.useState<TabEdges>({ start: false, end: false });
+  // `setEdges` dengan nilai yang sama tak me-render ulang, jadi mengukur di tiap render itu murah.
+  const measure = React.useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const next = readEdges(el);
+    setEdges((cur) => (cur.start === next.start && cur.end === next.end ? cur : next));
+  }, [ref]);
+  // Tanpa deps: label dan angka tab bisa berubah tanpa mengubah ukuran kotaknya.
+  React.useEffect(() => { measure(); });
+  // Scroll, dan perubahan ukuran kotak (lebar layar, rotasi, sidebar). jsdom tak punya ResizeObserver.
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.addEventListener("scroll", measure, { passive: true });
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    ro?.observe(el);
+    return () => { el.removeEventListener("scroll", measure); ro?.disconnect(); };
+  }, [ref, measure]);
+  return edges;
+}
+
 type TabsProps = { tabs?: Tab[]; value?: string; defaultValue?: string; onChange?: (v: string) => void;
   variant?: "underline" | "pill"; style?: React.CSSProperties; children?: React.ReactNode } & Record<string, any>;
 export function Tabs({ tabs = [], value, defaultValue, onChange, variant = "underline", className = "", style = {}, children, ...rest }: TabsProps) {
@@ -39,6 +69,8 @@ export function Tabs({ tabs = [], value, defaultValue, onChange, variant = "unde
   const [inner, setInner] = React.useState(defaultValue ?? (norm[0] && norm[0].value));
   const active = isControlled ? value : inner;
   const baseId = React.useId();
+  const listRef = React.useRef<HTMLDivElement>(null);
+  const edges = useTabEdges(listRef);
   // Hanya tab yang punya TabPanel sungguhan yang diberi `aria-controls`; selebihnya akan menunjuk ke id yang tak ada.
   const panelValues = new Set(React.Children.toArray(children).flatMap((child) =>
     React.isValidElement<{ value?: string }>(child) && child.type === TabPanel && child.props.value !== undefined
@@ -59,7 +91,9 @@ export function Tabs({ tabs = [], value, defaultValue, onChange, variant = "unde
   };
   const pill = variant === "pill";
   const tablist = React.createElement("div", _extends({
-    className: `hn-tabs ${className}`.trim(), role: "tablist",
+    ref: listRef, className: `hn-tabs ${className}`.trim(), role: "tablist",
+    // Gradasi tepi (app.css `.hn-tabs[data-fade-*]`) hanya saat ada tab yang belum terlihat di sisi itu.
+    "data-fade-start": edges.start ? "true" : undefined, "data-fade-end": edges.end ? "true" : undefined,
     style: { display: "inline-flex", gap: pill ? 4 : 0, padding: pill ? 4 : 0,
       background: pill ? "var(--bone-200)" : "transparent", borderRadius: pill ? "var(--radius-md)" : 0,
       borderBottom: pill ? "none" : "1px solid var(--border-hair)", ...style },

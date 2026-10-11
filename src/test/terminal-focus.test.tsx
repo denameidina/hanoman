@@ -5,9 +5,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TerminalScreen } from "../src/screens/TerminalScreen";
 import { mockViewport, resetViewport } from "./viewport";
 
+// Stub menampilkan prop yang kini dikendalikan layar (papan tombol, dock ringkas) supaya tes bisa
+// membaca keputusan layar tanpa xterm. "Tombol khusus" meniru pemicu nyata lewat onToggleKeys.
 vi.mock("../src/screens/TerminalPane", () => ({
-  TerminalPane: ({ sessionId }: { sessionId: string }) => (
-    <div data-testid="pane">{sessionId}</div>
+  TerminalPane: ({ sessionId, showKeys, compact, onToggleKeys }: {
+    sessionId: string; showKeys?: boolean; compact?: boolean; onToggleKeys?: () => void;
+  }) => (
+    <div data-testid="pane" data-keys={String(!!showKeys)} data-compact={String(!!compact)}>
+      {sessionId}
+      {onToggleKeys && <button type="button" onClick={onToggleKeys}>Tombol khusus</button>}
+    </div>
   ),
 }));
 const listTerminals = vi.fn();
@@ -207,5 +214,90 @@ describe("TerminalScreen · mode Fokus (Fase 3E)", () => {
     expect(screen.getByTestId("pane")).toHaveTextContent("done44");
     // Sesi yang sudah berakhir tetap menampilkan banner Berakhir (perilaku Fase 1).
     expect(screen.getByTestId("terminal-ended")).toBeInTheDocument();
+  });
+});
+
+// Fase 3E+ · ponsel: toolbar satu baris (Sesi baru · Sesi · N · ⋯), kepala pane satu baris, dan papan
+// tombol khusus yang tertutup dulu. Tinggi dan tata letak nyata tak bisa diukur jsdom; yang diikat di
+// sini adalah struktur dan keputusan layar, sedangkan CSS-nya dijaga `terminal-css-contract.test.ts`.
+describe("TerminalScreen · ponsel: toolbar satu baris dan papan tombol khusus (Fase 3E+)", () => {
+  it("toolbar ponsel satu baris: Sesi baru, Buka… (ikon), Sesi · N, dan ⋯; Fokus|Grid dan layar penuh pindah ke ⋯", async () => {
+    mockViewport(390);
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByRole("button", { name: /^Sesi · 4$/ });
+    const toolbar = screen.getByRole("group", { name: "Terminal" });
+    expect(within(toolbar).getAllByRole("button")).toHaveLength(4);
+    expect(within(toolbar).getByRole("button", { name: "Sesi baru" })).toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "Buka…" })).toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "Sesi · 4" })).toBeInTheDocument();
+    expect(within(toolbar).getByRole("button", { name: "Menu terminal" })).toBeInTheDocument();
+    expect(within(toolbar).queryByRole("button", { name: "Fokus" })).toBeNull();
+    expect(within(toolbar).queryByRole("button", { name: "Layar penuh" })).toBeNull();
+  });
+
+  it("⋯ ponsel memuat mode, layar penuh, dan tampilan; mode Grid berpindah dari sana", async () => {
+    mockViewport(390);
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByRole("button", { name: /^Sesi · 4$/ });
+    fireEvent.click(screen.getByRole("button", { name: "Menu terminal" }));
+    const menu = await screen.findByRole("dialog", { name: "Terminal" });
+    for (const name of ["Pakai mode Grid", "Layar penuh", "Tampilan terminal"]) {
+      expect(within(menu).getByRole("button", { name })).toBeInTheDocument();
+    }
+    fireEvent.click(within(menu).getByRole("button", { name: "Pakai mode Grid" }));
+    expect(localStorage.getItem(VIEW_KEY)).toBe(JSON.stringify("grid"));
+    await screen.findByTestId("terminal-grid");
+    expect(screen.queryByTestId("terminal-focus")).toBeNull();
+  });
+
+  it("⋯ ponsel: Tampilan terminal membuka sheet kontrol tampilannya, bukan baris toolbar", async () => {
+    mockViewport(390);
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByRole("button", { name: /^Sesi · 4$/ });
+    fireEvent.click(screen.getByRole("button", { name: "Menu terminal" }));
+    const menu = await screen.findByRole("dialog", { name: "Terminal" });
+    fireEvent.click(within(menu).getByRole("button", { name: "Tampilan terminal" }));
+    const sheet = await screen.findByRole("dialog", { name: "Tampilan terminal" });
+    expect(within(sheet).getByText("Ukuran teks terminal")).toBeInTheDocument();
+    expect(within(sheet).getByText("Papan tombol layar (Esc · panah · Enter)")).toBeInTheDocument();
+  });
+
+  it("pane fokus ponsel: kepala satu baris tanpa tombol Sesi, dan pane memakai dock ringkas", async () => {
+    mockViewport(390);
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByRole("button", { name: /^Sesi · 4$/ });
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveAttribute("data-compact", "true"));
+    const head = document.querySelector<HTMLElement>(".hn-terminal-focus-head")!;
+    expect(within(head).queryByRole("button", { name: /^Sesi · / })).toBeNull();
+    expect(within(head).getByRole("button", { name: /^Aksi sesi / })).toBeInTheDocument();
+  });
+
+  it("ponsel: papan tombol khusus tertutup dulu, lalu dibuka dan pilihannya diingat", async () => {
+    mockViewport(390);
+    const first = render(<TerminalScreen projects={projects} />);
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveAttribute("data-compact", "true"));
+    expect(screen.getByTestId("pane")).toHaveAttribute("data-keys", "false");
+    fireEvent.click(screen.getByRole("button", { name: "Tombol khusus" }));
+    expect(screen.getByTestId("pane")).toHaveAttribute("data-keys", "true");
+    expect(localStorage.getItem("hn.ui.v1.terminal.keys")).toBe("true");
+    first.unmount();
+
+    render(<TerminalScreen projects={projects} />);
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveAttribute("data-keys", "true"));
+  });
+
+  it("tablet sentuh tetap membuka papan tombol, dan desktop tetap tertutup", async () => {
+    mockViewport(900);
+    const tablet = render(<TerminalScreen projects={projects} />);
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveAttribute("data-compact", "false"));
+    expect(screen.getByTestId("pane")).toHaveAttribute("data-keys", "true");
+    tablet.unmount();
+
+    // Pilihan papan tombol dari tablet tadi tersimpan; desktop diuji dari default-nya sendiri.
+    localStorage.removeItem("hn.ui.v1.terminal.keys");
+    mockViewport(1280);
+    render(<TerminalScreen projects={projects} />);
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveAttribute("data-compact", "false"));
+    expect(screen.getByTestId("pane")).toHaveAttribute("data-keys", "false");
   });
 });

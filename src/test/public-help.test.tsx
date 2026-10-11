@@ -91,6 +91,21 @@ describe("SPEC-253 · PublicHelpApp routing", () => {
 
   // SPEC-352 · akar masalah: honeypot bernama `hp` (= "handphone") di form berbahasa Indonesia
   // diisi autofill browser. Nama netral + autocomplete yang benar-benar dihormati browser.
+  it("label Kategori menunjuk select-nya dan label lampiran menunjuk input berkas (kelas kontrol portal)", async () => {
+    setPath("/help/demo");
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ projectName: "Demo", categories: ["bug", "fitur"] }), { status: 200 }),
+    );
+    render(<PublicHelpApp />);
+    await waitFor(() => screen.getByLabelText(/judul/i));
+    const kategori = screen.getByLabelText("Kategori");
+    expect(kategori.tagName).toBe("SELECT");
+    expect(kategori.closest(".hn-public-field")).toBeTruthy();
+    const berkas = screen.getByLabelText(/Lampiran gambar/);
+    expect(berkas.tagName).toBe("INPUT");
+    expect(berkas.classList.contains("hn-portal-file")).toBe(true);
+  });
+
   it("field honeypot tak bernama `hp` dan memakai autocomplete yang dihormati browser", async () => {
     setPath("/help/demo");
     vi.spyOn(global, "fetch").mockResolvedValue(

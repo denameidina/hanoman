@@ -31,6 +31,12 @@ kbd.hn-kbd,
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-card);
 }
 .hn-palette-search:focus-within { border-color: var(--border-focus); box-shadow: var(--ring); }
+/* Fokus kotak cari: SATU indikator, yaitu pembungkusnya (batas --border-focus, brass-600 4,83:1 di kartu,
+   ditambah ring). Outline `input:focus-visible` global (2 px, offset 2 px) menggambar kotak kedua di dalam
+   field. Spesifisitas di sini (dua kelas + elemen) mengalahkannya; `.hn-palette-input` saja (satu kelas)
+   kalah dan outline-nya tetap tampil. */
+.hn-palette-search input:focus-visible,
+.hn-palette-input:focus-visible { outline: none; }
 .hn-palette-input {
   flex: 1 1 auto; min-width: 0; border: none; outline: none; background: transparent;
   color: var(--text-strong); font-family: var(--font-ui); font-size: var(--text-md);

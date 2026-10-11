@@ -509,9 +509,11 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
   const changedCount = (status?.staged.length ?? 0) + (status?.unstaged.length ?? 0);
   const toolbar = (
     <div className="hn-ide-toolbar">
-      <Select size="sm" aria-label="Proyek" value={projectId} onChange={(e) => onProject(e.target.value)}
+      {/* Lebar selector ditentukan CSS (ide.css): nama project panjang dipotong, bukan melebarkan toolbar. */}
+      <Select size="sm" className="hn-ide-proyek" aria-label="Proyek" title={projects.find((p) => p.id === projectId)?.name}
+        value={projectId} onChange={(e) => onProject(e.target.value)}
         options={projects.map((p) => ({ value: p.id, label: p.name }))} />
-      <Select size="sm" aria-label="Ref yang dilihat" value={viewRef}
+      <Select size="sm" className="hn-ide-ref" aria-label="Ref yang dilihat" value={viewRef}
         onChange={(e) => { const next = e.target.value; whenClean(() => setViewRef(next)); }} options={refOptions} />
       {/* SPEC-233 · fetch --all --prune; ref-only → tak digerbang sesi */}
       <Button size="sm" variant="ghost" leftIcon="download-cloud" onClick={() => {
@@ -579,7 +581,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
               )}
               <div className="hn-ide-seg">
                 {(["diff", "source"] as const).map((t) => (
-                  <button key={t} type="button" aria-pressed={diffTab === t} onClick={() => setDiffTab(t)}>{t}</button>
+                  <button key={t} type="button" className="hn-touch-target" aria-pressed={diffTab === t} onClick={() => setDiffTab(t)}>{t}</button>
                 ))}
               </div>
             </div>
@@ -680,7 +682,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
                     {file && !file.binary && isMarkdownPath(fileSel) && (
                       <div className="hn-ide-seg">
                         {(["preview", "source"] as const).map((t) => (
-                          <button key={t} type="button" aria-pressed={mdView === t} onClick={() => setMdView(t)}>
+                          <button key={t} type="button" className="hn-touch-target" aria-pressed={mdView === t} onClick={() => setMdView(t)}>
                             {t === "preview" ? "Preview" : "Source"}
                           </button>
                         ))}

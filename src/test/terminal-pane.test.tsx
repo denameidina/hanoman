@@ -1342,3 +1342,82 @@ describe("TerminalPane · dikte suara", () => {
     stop.mockRestore();
   });
 });
+
+// Fase 3E+ · dock ringkas (pane fokus di ponsel): composer dengan mic dan Kirim, "Tombol khusus" yang
+// mengalihkan papan tombol, dan bahasa dikte di ⋯. Dock tablet/desktop (non-compact) tak berubah.
+describe("TerminalPane · dock ringkas ponsel (Fase 3E+)", () => {
+  class FakeRecognition {
+    static last: FakeRecognition | undefined;
+    lang = ""; continuous = false; interimResults = false;
+    onresult: ((e: any) => void) | null = null;
+    onerror: ((e: { error: string }) => void) | null = null;
+    onend: (() => void) | null = null;
+    constructor() { FakeRecognition.last = this; }
+    start() { }
+    stop() { }
+    abort() { }
+  }
+  const w = window as unknown as Record<string, unknown>;
+  const composer = () => screen.getByTestId("terminal-composer") as HTMLInputElement;
+
+  const openCompact = async (props: Record<string, unknown> = {}) => {
+    const r = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} composer compact {...props} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    return r;
+  };
+
+  afterEach(() => { delete w.SpeechRecognition; FakeRecognition.last = undefined; });
+
+  it("ringkas: kolom ketik dan Kirim tampil; papan tombol tertutup; Tombol khusus memanggil pemilik", async () => {
+    const onToggleKeys = vi.fn();
+    await openCompact({ onToggleKeys });
+    expect(screen.getByTestId("terminal-composer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Kirim perintah ke sesi" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Tombol terminal" })).toBeNull();
+    const toggle = screen.getByRole("button", { name: "Tombol khusus" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(onToggleKeys).toHaveBeenCalledTimes(1);
+  });
+
+  it("ringkas: papan tombol tampil mengikuti showKeys, dan Tombol khusus mencerminkannya", async () => {
+    await openCompact({ showKeys: true, onToggleKeys: () => { } });
+    expect(screen.getByRole("group", { name: "Tombol terminal" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tombol khusus" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("ringkas: Kirim mengirim teks yang diketik persis seperti Enter, dan kolom dikosongkan", async () => {
+    await openCompact({ onToggleKeys: () => { } });
+    const before = inputsOf(sockets[0]).length;
+    act(() => { fireEvent.change(composer(), { target: { value: "ls -l" } }); });
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Kirim perintah ke sesi" })); });
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["ls -l\r"]);
+    expect(composer().value).toBe("");
+  });
+
+  it("ringkas tanpa dukungan dikte: tak ada mic dan tak ada ⋯ Opsi dikte", async () => {
+    await openCompact({ onToggleKeys: () => { } });
+    expect(screen.queryByTestId("voice-toggle")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Opsi dikte suara" })).toBeNull();
+  });
+
+  it("ringkas dengan dukungan dikte: mic ada di baris composer; bahasa dan keterangan pindah ke ⋯", async () => {
+    w.SpeechRecognition = FakeRecognition;
+    await openCompact({ onToggleKeys: () => { } });
+    const row = document.querySelector<HTMLElement>(".hn-terminal-composer")!;
+    expect(row.contains(screen.getByTestId("voice-toggle"))).toBe(true);
+    expect(screen.queryByTestId("voice-lang")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Opsi dikte suara" }));
+    const sheet = await screen.findByRole("dialog", { name: "Opsi dikte suara" });
+    expect(within(sheet).getByRole("combobox", { name: "Bahasa dikte" })).toHaveValue("id-ID");
+    expect(within(sheet).getByText(/layanan suara browser Anda/)).toBeInTheDocument();
+  });
+
+  it("ringkas pane baca-saja (remote tanpa sessions:write): tak ada kolom, Kirim, atau Tombol khusus", async () => {
+    await openCompact({ mode: "remote", onToggleKeys: () => { } });
+    expect(screen.queryByTestId("terminal-composer")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Kirim perintah ke sesi" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Tombol khusus" })).toBeNull();
+  });
+});

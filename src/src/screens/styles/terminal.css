@@ -16,6 +16,13 @@
   flex-wrap: wrap;
 }
 
+/* Setiap kontrol toolbar memakai lebar isinya dan tak pernah menyusut sampai labelnya terpotong
+   (Audit UI/UX Fase 3E+: "Buka…" terpotong jadi "Buka..." di ponsel). */
+.hn-terminal-toolbar > * {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 /* Toggle Fokus | Grid: dua tombol bersegmen, status lewat aria-pressed. */
 .hn-terminal-seg {
   display: inline-flex;
@@ -256,9 +263,9 @@
   display: none;
 }
 
-/* Pemicu rail di kepala pane: hanya tampil di mobile (rail jadi laci). */
+/* Pemicu rail "Sesi · N" di toolbar: hanya dirender di mobile (rail jadi laci). */
 .hn-terminal-rail-toggle {
-  display: none;
+  display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   min-height: 32px;
@@ -285,8 +292,95 @@
   gap: var(--space-1);
 }
 
-/* Mobile (<768px): rail jadi laci (Modal) dan pane memakai seluruh lebar. */
+/* Dock ringkas (pane fokus di ponsel): composer di atas, lalu satu baris "Tombol khusus" + dikte,
+   lalu papan tombol bila dibuka. Tablet/desktop tak memakai kelas-kelas ini. */
+.hn-terminal-dock-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.hn-terminal-dock-bar .hn-terminal-voice-interim {
+  flex: 1 1 0;
+}
+
+.hn-terminal-keys-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hn-terminal-keys-toggle[aria-expanded="true"] {
+  background: var(--bone-200);
+  color: var(--text-strong);
+}
+
+.hn-terminal-keys-toggle:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Kirim di kanan kolom ketik ponsel. Warnanya token aksen (`--accent-on` di atas `--accent`). */
+.hn-terminal-send {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--accent-on);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hn-terminal-send:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Isi sheet "Opsi dikte suara" (⋯ di dock bar): bahasa dan keterangan privasi, satu kolom. */
+.hn-terminal-voice-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hn-terminal-voice-options-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.hn-terminal-voice-options p {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* Mobile (<768px): rail jadi laci (Modal), pane memakai seluruh lebar, dan toolbar tetap satu baris.
+   Tinggi pane dijaga berbasis viewport: kepala + strip + dock (composer + bar) dihitung di atas
+   55% tinggi layar, sehingga xterm tak terdesak oleh chrome. `vh` dulu sebagai cadangan. */
 @media (max-width: 767px) {
+  .hn-terminal-toolbar {
+    flex-wrap: nowrap;
+  }
+
   .hn-terminal-focus {
     min-height: 0;
     gap: 0;
@@ -296,20 +390,37 @@
     display: none;
   }
 
-  .hn-terminal-rail-toggle {
-    display: inline-flex;
-  }
-
   .hn-terminal-focus-main {
     border: 0;
     border-radius: 0;
     background: transparent;
+    min-height: calc(55vh + 168px);
+    min-height: calc(55dvh + 168px);
   }
 
   .hn-terminal-focus-head {
     background: transparent;
     padding-left: 0;
     padding-right: 0;
+  }
+
+  .hn-terminal-dock {
+    gap: var(--space-1);
+  }
+
+  .hn-terminal-dock .hn-terminal-composer {
+    flex-wrap: nowrap;
+  }
+
+  .hn-terminal-dock .hn-terminal-composer-status {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hn-terminal-keys-toggle,
+  .hn-terminal-send {
+    min-height: var(--touch-target);
   }
 }
 

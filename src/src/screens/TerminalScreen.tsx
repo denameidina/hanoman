@@ -73,9 +73,14 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // SPEC-800 · ukuran font & papan tombol adalah state TAMPILAN (SPEC-740 · ADR-0115): lokal per
   // browser, bukan bagian payload workspace kanonik per-user (SPEC-786 · ADR-0118).
   const coarse = useCoarsePointer();
+  const tier = useResponsiveTier();
+  const mobile = tier === "mobile";
   const [fontSize, setFontSize] = usePersistedState(
     "terminal", "fontSize", coarse ? FONT_DEFAULT_MOBILE : FONT_DEFAULT, isNum);
-  const [keysOpen, setKeysOpen] = usePersistedState("terminal", "keys", coarse, isBool);
+  // Audit UI/UX 2026-10 · Fase 3E+ · ponsel memulai dengan papan tombol TERTUTUP: composer adalah
+  // jalan utama, dan 7 tombol itu memakan sepertiga layar. Tablet sentuh tetap terbuka seperti dulu.
+  // Pilihan operator yang sudah tersimpan tetap menang atas default ini.
+  const [keysOpen, setKeysOpen] = usePersistedState("terminal", "keys", coarse && !mobile, isBool);
   // SPEC-856 · echo prediktif lokal. State TAMPILAN per browser seperti ukuran font & papan
   // tombol (SPEC-740 · ADR-0115), bukan payload workspace kanonik per-user (ADR-0118) — dan
   // sekaligus alat ukur sebelum/sesudah: satu build, satu variabel.
@@ -109,12 +114,13 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // Fase milik sesi di pane fokus; sessionId dicocokkan saat dibaca supaya fase sesi lama tak bocor.
   const [focusPhases, setFocusPhases] = React.useState<{ sessionId: string; phases: Phase[] } | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
+  // Tampilan (font, papan tombol, ketik responsif, diagnostik) di ponsel: sheet dari menu ⋯, bukan
+  // baris toolbar. Di tablet/desktop ia tetap menjadi panel dari tombol "Tampilan terminal".
+  const [displayOpen, setDisplayOpen] = React.useState(false);
   const [sessionDialog, setSessionDialog] = React.useState<{ kind: SessionDialogKind; sessionId: string } | null>(null);
   const launchAdmission = useLaunchAdmission();
   // Tutup sesi hidup menghentikan agen: selalu lewat dialog aplikasi, bukan confirm native.
   const { confirm: confirmKill, dialog } = useConfirm();
-  const tier = useResponsiveTier();
-  const mobile = tier === "mobile";
   const layout = W.activeGroup(ws).layout;
   const showEmpty = layout.rows === 1 && layout.cols === 1 && !layout.cells[0] && sessions.length === 0;
   // Audit UI/UX tablet · grid CSS `minmax(0,1fr)` menyusut pane ke lebar berapa pun tanpa batas
@@ -628,6 +634,15 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
       onSelect: () => void mutateWorkspace((current) =>
         W.mapActiveLayout(current, (l) => L.removeRow(l, Math.floor(activeCell / l.cols)))) },
   ];
+  // Mobile (<768px) · toolbar satu baris: Sesi baru, Buka… (ikon ber-label), "Sesi · N" (rail di
+  // mode Fokus), dan ⋯. Mode Fokus|Grid, layar penuh, dan tampilan masuk menu ⋯ ini.
+  const mobileMenuItems: OverflowItem[] = [
+    { key: "mode", label: focusMode ? "Pakai mode Grid" : "Pakai mode Fokus",
+      icon: focusMode ? "columns-2" : "terminal", onSelect: () => setView(focusMode ? "grid" : "focus") },
+    { key: "full", label: maxed ? "Keluar layar penuh" : "Layar penuh",
+      icon: maxed ? "minimize-2" : "maximize-2", onSelect: () => setMaxed((m) => !m) },
+    { key: "display", label: "Tampilan terminal", icon: "sliders", onSelect: () => setDisplayOpen(true) },
+  ];
 
   // Overlay menimpa Shell, bukan melepas screen darinya. zIndex 100: di atas konten halaman,
   // di bawah modal (150) dan toast (200) di ds/kit.tsx — kalau dibalik, dialog konfirmasi
@@ -654,22 +669,39 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
             "Buka sesi" ditekan, dengan pilihan itu sebagai argv pane tmux. */}
         <Button size="sm" leftIcon="plus" title="Pilih runtime lalu buka sesi agen di direktori project. Agen berjalan dengan izin penuh (claude --dangerously-skip-permissions)."
           onClick={() => setNewOpen(true)}>Sesi baru</Button>
-        <OpenMenu items={openItems} />
-        <div className="hn-terminal-seg" role="group" aria-label="Mode tampilan terminal">
-          <button type="button" className="hn-terminal-seg-btn" aria-pressed={focusMode}
-            title="Satu terminal fokus dengan daftar sesi di samping" onClick={() => setView("focus")}>
-            Fokus
-          </button>
-          <button type="button" className="hn-terminal-seg-btn" aria-pressed={!focusMode}
-            title="Beberapa terminal sekaligus dalam grid" onClick={() => setView("grid")}>
-            Grid
-          </button>
-        </div>
-        {/* SPEC-800 · kontrol tampilan (font, papan tombol, ketik responsif, diagnostik) ada di panel ini. */}
-        <OverflowActions label="Tampilan terminal" icon="sliders" items={[]}>{displayControls}</OverflowActions>
-        <IconButton size="sm" icon={maxed ? "minimize-2" : "maximize-2"}
-          label={maxed ? "Keluar layar penuh" : "Layar penuh"}
-          aria-pressed={maxed} onClick={() => setMaxed((m) => !m)} />
+        {mobile ? (
+          <>
+            {/* Sempit: "Buka…" jadi ikon ber-label (tak ada teks yang bisa terpotong). */}
+            <OpenMenu compact items={openItems} />
+            {/* Rail sesi di ponsel jadi laci; tombolnya ikut toolbar supaya kepala pane tetap satu baris. */}
+            {focusMode && sessions.length > 0 && (
+              <button type="button" className="hn-terminal-rail-toggle" aria-haspopup="dialog"
+                aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}>
+                Sesi · {sessions.length}
+              </button>
+            )}
+            <OverflowActions label="Menu terminal" title="Terminal" items={mobileMenuItems} />
+          </>
+        ) : (
+          <>
+            <OpenMenu items={openItems} />
+            <div className="hn-terminal-seg" role="group" aria-label="Mode tampilan terminal">
+              <button type="button" className="hn-terminal-seg-btn" aria-pressed={focusMode}
+                title="Satu terminal fokus dengan daftar sesi di samping" onClick={() => setView("focus")}>
+                Fokus
+              </button>
+              <button type="button" className="hn-terminal-seg-btn" aria-pressed={!focusMode}
+                title="Beberapa terminal sekaligus dalam grid" onClick={() => setView("grid")}>
+                Grid
+              </button>
+            </div>
+            {/* SPEC-800 · kontrol tampilan (font, papan tombol, ketik responsif, diagnostik) ada di panel ini. */}
+            <OverflowActions label="Tampilan terminal" icon="sliders" items={[]}>{displayControls}</OverflowActions>
+            <IconButton size="sm" icon={maxed ? "minimize-2" : "maximize-2"}
+              label={maxed ? "Keluar layar penuh" : "Layar penuh"}
+              aria-pressed={maxed} onClick={() => setMaxed((m) => !m)} />
+          </>
+        )}
       </div>
 
       {(workspaceStatus !== "ready" || cleanups.length > 0) && (
@@ -857,7 +889,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           paneHandlers={(id) => ({
             onExit: handlersFor(id).onExit, onPhases: phasesFor(id), onForget: handlersFor(id).onForget,
           })}
-          fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
+          fontSize={fontSize} showKeys={keysOpen} onToggleKeys={() => setKeysOpen((on) => !on)}
+          predict={predict} diag={diag}
         />
       )}
 
@@ -889,6 +922,11 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           label={cellLabel(byId(fullId)!, nameOf, titleOf)}
           fontSize={fontSize} showKeys={keysOpen} predict={predict} diag={diag}
           onClose={() => setFullId(null)} />
+      )}
+      {mobile && displayOpen && (
+        <Modal open title="Tampilan terminal" icon="sliders" width={420} onClose={() => setDisplayOpen(false)}>
+          {displayControls}
+        </Modal>
       )}
       {dialog}
       <Toast toast={toast} />
@@ -1507,14 +1545,20 @@ function SessionDialogs({ kind, session, specOf, onIntegrate, onIntegrateSession
   );
 }
 
-// "Buka…": pemicu bertulisan untuk cara membuka sesi selain "Sesi baru". Panelnya Modal DS, sama
-// dengan menu ⋯ lain (fokus, Escape, sheet di mobile).
-function OpenMenu({ items }: { items: readonly OverflowItem[] }) {
+// "Buka…": pemicu untuk cara membuka sesi selain "Sesi baru". Di ruang sempit ia ikon ber-label
+// "Buka…" (nama aksesibelnya sama, tak ada teks yang terpotong). Panelnya Modal DS, sama dengan menu
+// ⋯ lain (fokus, Escape, sheet di mobile).
+function OpenMenu({ items, compact = false }: { items: readonly OverflowItem[]; compact?: boolean }) {
   const [open, setOpen] = React.useState(false);
   return (
     <>
-      <Button size="sm" variant="ghost" aria-haspopup="dialog" aria-expanded={open}
-        onClick={() => setOpen(true)}>Buka…</Button>
+      {compact ? (
+        <IconButton size="sm" icon="folder-open" label="Buka…" aria-haspopup="dialog" aria-expanded={open}
+          onClick={() => setOpen(true)} />
+      ) : (
+        <Button size="sm" variant="ghost" aria-haspopup="dialog" aria-expanded={open}
+          onClick={() => setOpen(true)}>Buka…</Button>
+      )}
       {open && (
         <Modal open title="Buka sesi" icon="terminal" width={420} onClose={() => setOpen(false)}>
           <div className="hn-terminal-menu-list">
@@ -1549,11 +1593,11 @@ type FocusViewProps = {
   fullId: string | null;
   focusPhases: { sessionId: string; phases: Phase[] } | null;
   paneHandlers: (id: string) => { onExit: (code: number) => void; onPhases: (p: Phase[], done: boolean) => void; onForget: () => void };
-  fontSize: number; showKeys: boolean; predict: boolean; diag: boolean;
+  fontSize: number; showKeys: boolean; onToggleKeys: () => void; predict: boolean; diag: boolean;
 };
 
 function FocusView({ sessionCount, focused, railItems, mobile, listError, menuFor, onFocus, drawerOpen, onDrawer,
-  fullId, focusPhases, paneHandlers, fontSize, showKeys, predict, diag }: FocusViewProps) {
+  fullId, focusPhases, paneHandlers, fontSize, showKeys, onToggleKeys, predict, diag }: FocusViewProps) {
   const current = focused ? railItems.find((item) => item.session.id === focused.id) : undefined;
   return (
     <div className="hn-terminal-focus" data-testid="terminal-focus">
@@ -1571,13 +1615,8 @@ function FocusView({ sessionCount, focused, railItems, mobile, listError, menuFo
       <section className="hn-terminal-focus-main" aria-label="Terminal fokus">
         {focused && current ? (
           <>
+            {/* Kepala satu baris: nama, satu status, ⋯. Di ponsel tombol "Sesi · N" ada di toolbar. */}
             <header className="hn-terminal-focus-head">
-              {mobile && (
-                <button type="button" className="hn-terminal-rail-toggle" aria-haspopup="dialog"
-                  aria-expanded={drawerOpen} onClick={() => onDrawer(true)}>
-                  Sesi · {sessionCount}
-                </button>
-              )}
               <span className="hn-terminal-focus-title" title={current.label}>
                 {current.label} · {focused.id.slice(0, 6)}
               </span>
@@ -1585,14 +1624,14 @@ function FocusView({ sessionCount, focused, railItems, mobile, listError, menuFo
               <OverflowActions label={`Aksi sesi ${focused.id}`} items={menuFor(focused)} />
             </header>
             {focused.exited && <SessionEndedBanner />}
-            <PhaseStrip phases={focusPhases?.sessionId === focused.id ? focusPhases.phases : null} />
+            <PhaseStrip compact={mobile} phases={focusPhases?.sessionId === focused.id ? focusPhases.phases : null} />
             <div className="hn-terminal-focus-body">
               {fullId === focused.id ? (
                 <div className="hn-terminal-focus-placeholder">Terbuka di layar penuh</div>
               ) : (
                 <TerminalPane key={focused.id} sessionId={focused.id} {...paneHandlers(focused.id)}
                   fontSize={fontSize} showKeys={showKeys} predict={predict} diag={diag}
-                  composer label={current.label} />
+                  composer compact={mobile} onToggleKeys={onToggleKeys} label={current.label} />
               )}
             </div>
           </>

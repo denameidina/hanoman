@@ -1273,21 +1273,29 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
     }
   });
 
+  // Ponsel: Tampilan terminal ada di menu ⋯ (Fase 3E+), jadi dua ketukan: ⋯, lalu item-nya.
+  const openDisplayOnPhone = async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Menu terminal" }));
+    const menu = await screen.findByRole("dialog", { name: "Terminal" });
+    fireEvent.click(within(menu).getByRole("button", { name: "Tampilan terminal" }));
+    return screen.findByRole("dialog", { name: "Tampilan terminal" });
+  };
+
   it("SPEC-856 · sakelar echo prediktif hidup secara default dan tersimpan", async () => {
     mockViewport(390);
     listTerminals.mockResolvedValue([]);
     const view = render(<TerminalScreen projects={projects} />);
     await screen.findByRole("button", { name: /Sesi baru/ });
-    fireEvent.click(screen.getByRole("button", { name: "Tampilan terminal" }));
-    const toggle = screen.getByRole("button", { name: "Matikan ketik responsif" });
+    const sheet = await openDisplayOnPhone();
+    const toggle = within(sheet).getByRole("button", { name: "Matikan ketik responsif" });
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(toggle);
     expect(localStorage.getItem("hn.ui.v1.terminal.predict")).toBe("false");
     view.unmount();
     render(<TerminalScreen projects={projects} />);
     await screen.findByRole("button", { name: /Sesi baru/ });
-    fireEvent.click(screen.getByRole("button", { name: "Tampilan terminal" }));
-    expect(screen.getByRole("button", { name: "Nyalakan ketik responsif" }))
+    const again = await openDisplayOnPhone();
+    expect(within(again).getByRole("button", { name: "Nyalakan ketik responsif" }))
       .toHaveAttribute("aria-pressed", "false");
   });
 
@@ -1296,14 +1304,14 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
     listTerminals.mockResolvedValue([]);
     const view = render(<TerminalScreen projects={projects} />);
     await screen.findByRole("button", { name: /Sesi baru/ });
-    fireEvent.click(screen.getByRole("button", { name: "Tampilan terminal" }));
-    fireEvent.click(screen.getByRole("button", { name: "Perbesar teks terminal" }));
+    const sheet = await openDisplayOnPhone();
+    fireEvent.click(within(sheet).getByRole("button", { name: "Perbesar teks terminal" }));
     expect(localStorage.getItem("hn.ui.v1.terminal.fontSize")).toBe("16");
     view.unmount();
     render(<TerminalScreen projects={projects} />);
     await screen.findByRole("button", { name: /Sesi baru/ });
-    fireEvent.click(screen.getByRole("button", { name: "Tampilan terminal" }));
-    expect(screen.getByText("16px")).toBeInTheDocument();
+    const again = await openDisplayOnPhone();
+    expect(within(again).getByText("16px")).toBeInTheDocument();
   });
 
   it("ADR-0164 · sesi diorkestrasi menampilkan model & effort orchestrator di header sel", async () => {

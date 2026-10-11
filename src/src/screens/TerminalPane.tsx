@@ -7,14 +7,15 @@ import { isTerminalResponse, paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { useInstance, useWsTarget } from "../api/instance";
-import { useCoarsePointer, useConfirm } from "../ds";
+import { IconButton, OverflowActions, useCoarsePointer, useConfirm } from "../ds";
 import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
 import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, isFocusEscape, TERMINAL_KEYS } from "./terminal-chrome";
 import * as P from "./terminal-predict";
 import * as D from "./terminal-diag";
 import { TerminalComposer } from "./TerminalComposer";
 import { VoiceControls } from "./VoiceControls";
-import { useVoiceInput } from "./use-voice-input";
+import { ERROR_MESSAGES, LANGS } from "./speech-engine";
+import { useVoiceInput, type VoiceInput } from "./use-voice-input";
 import { createHiddenRing } from "../lib/hidden-ring";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
@@ -52,7 +53,8 @@ type LinkState =
 export const TerminalPane = React.memo(TerminalPaneImpl);
 
 function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
-  predict = true, diag = false, mode = "local", hidden = false, onForget, label, composer = false }: {
+  predict = true, diag = false, mode = "local", hidden = false, onForget, label, composer = false,
+  compact = false, onToggleKeys }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
@@ -81,6 +83,11 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   // Audit UI/UX 2026-10 · Fase 3E: pane fokus selalu menampilkan composer sebagai aksi utama di
   // bawah pane. Grid tetap memakai perilaku lama (composer hanya saat papan tombol/dikte aktif).
   composer?: boolean;
+  // Audit UI/UX 2026-10 · Fase 3E+ · ponsel (pane fokus): dock ringkas. Composer satu baris dengan
+  // mic dan Kirim; papan tombol dibuka lewat "Tombol khusus" (dikendalikan pemilik lewat
+  // `showKeys`/`onToggleKeys`); bahasa dikte pindah ke ⋯. Tablet/desktop memakai dock lama.
+  compact?: boolean;
+  onToggleKeys?: () => void;
 }) {
   const wsTarget = useWsTarget(`terminal:${sessionId}`);
   const instance = useInstance();
@@ -852,6 +859,15 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     if (ok) onForget();
   };
 
+  // Mic untuk composer ringkas (ponsel). Bahasa & keterangannya ada di ⋯ dock bar, bukan di sini.
+  const listening = voice.status === "listening";
+  const micButton = voice.supported ? (
+    <IconButton icon="mic" size="sm" variant={listening ? "solid" : "outline"}
+      label={listening ? "Hentikan dikte suara" : "Mulai dikte suara"}
+      aria-pressed={listening} data-testid="voice-toggle"
+      className={listening ? "hn-voice-rec" : ""} onClick={voice.toggle} />
+  ) : undefined;
+
   return (
     <div ref={rootRef} tabIndex={-1} style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, outline: "none" }}>
       {/* Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya.
@@ -924,14 +940,62 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
         )}
       </div>
       {/* Dock bawah: dikte, composer, dan papan tombol satu blok. Kosong = tak tampil (CSS :empty). */}
-      <div className="hn-terminal-dock">
-        <VoiceControls voice={voice} />
-        {showComposer && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
-          external={composerDrain} linkState={link.state} queue={queue}
-          voiceAppend={voiceAppend} onDraft={setDraft} />}
-        {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
-      </div>
+      {compact ? (
+        <div className="hn-terminal-dock">
+          {showComposer && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
+            external={composerDrain} linkState={link.state} queue={queue}
+            voiceAppend={voiceAppend} onDraft={setDraft} sendButton
+            leading={micButton} />}
+          {canWrite && (
+            <div className="hn-terminal-dock-bar">
+              {onToggleKeys && (
+                <button type="button" className="hn-terminal-keys-toggle" aria-expanded={showKeys}
+                  onClick={onToggleKeys}>Tombol khusus</button>
+              )}
+              {voice.supported && voice.status === "listening" && voice.interim && (
+                <span className="hn-terminal-voice-interim" data-testid="voice-interim">{voice.interim}</span>
+              )}
+              {voice.error && (
+                <span className="hn-terminal-voice-error" role="status" data-testid="voice-error">
+                  {ERROR_MESSAGES[voice.error]}
+                </span>
+              )}
+              {voice.supported && (
+                <OverflowActions label="Opsi dikte suara" items={[]}>
+                  <VoiceOptions voice={voice} />
+                </OverflowActions>
+              )}
+            </div>
+          )}
+          {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
+        </div>
+      ) : (
+        <div className="hn-terminal-dock">
+          <VoiceControls voice={voice} />
+          {showComposer && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
+            external={composerDrain} linkState={link.state} queue={queue}
+            voiceAppend={voiceAppend} onDraft={setDraft} />}
+          {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
+        </div>
+      )}
       {dialog}
+    </div>
+  );
+}
+
+// Isi ⋯ "Opsi dikte suara" di dock ringkas: bahasa dikte dan keterangan bahwa audionya diproses
+// layanan suara browser. Keduanya tetap terlihat; hanya tempatnya yang pindah dari baris dikte.
+function VoiceOptions({ voice }: { voice: VoiceInput }) {
+  return (
+    <div className="hn-terminal-voice-options">
+      <label className="hn-terminal-voice-options-field">
+        <span>Bahasa dikte</span>
+        <select className="hn-terminal-voice-lang" data-testid="voice-lang" value={voice.lang}
+          onChange={(e) => voice.setLang(e.target.value)}>
+          {LANGS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+        </select>
+      </label>
+      <p>Audio diproses oleh layanan suara browser Anda (di Chrome: Google).</p>
     </div>
   );
 }

@@ -123,9 +123,9 @@ function InboxRow({ row, selected, picked, busy, onOpen, onPick, onAccept, onRej
   return (
     <DenseRow selected={selected} onClick={onOpen} actions={<>
       {isNew && (
-        <span className="hn-triage-check hn-touch-target">
+        <label className="hn-triage-check hn-touch-target">
           <input type="checkbox" aria-label={`Pilih ${noun} ${row.number}`} checked={picked} onChange={onPick} />
-        </span>
+        </label>
       )}
       <Badge tone="neutral" size="sm">{row.kind === "tiket" ? "Help Center" : "GitHub"}</Badge>
       {isNew && <>

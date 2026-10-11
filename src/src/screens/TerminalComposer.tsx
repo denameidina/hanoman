@@ -12,7 +12,8 @@ const SENT_FLASH_MS = 1500;
 // Keadaan otoritatifnya dipegang di REF, bukan di state React: `external` dipanggil pane secara
 // sinkron dari dalam `term.onData`, dan closure yang tertinggal satu render akan menguras teks yang
 // sudah basi. `text` yang jadi state hanya melayani nilai `<input>` yang terkendali.
-export function TerminalComposer({ sessionId, send, external, linkState, queue, voiceAppend, onDraft }: {
+export function TerminalComposer({ sessionId, send, external, linkState, queue, voiceAppend, onDraft,
+  leading, sendButton = false }: {
   sessionId: string;
   /** Pintu keluar byte SPEC-878 milik pane (`sendKey.current`). */
   send: (d: string) => void;
@@ -26,6 +27,11 @@ export function TerminalComposer({ sessionId, send, external, linkState, queue, 
   /** Dipanggil tiap isi kolom berubah: `true` bila berisi. Pane memakainya untuk menyembunyikan
    *  kolom (di desktop) begitu mic berhenti dan kolom kosong. */
   onDraft?: (nonEmpty: boolean) => void;
+  /** Slot di kiri kolom (mis. tombol mic di ponsel). Absen = kolom saja, seperti dulu. */
+  leading?: React.ReactNode;
+  /** Tombol Kirim di kanan kolom: dipakai dock ringkas ponsel, yang tak punya Enter yang jelas di
+   *  keyboard virtual. Sama persis dengan Enter (`submit`), termasuk tanpa teks = kirim Enter saja. */
+  sendButton?: boolean;
 }) {
   const [text, setText] = React.useState("");
   const state = React.useRef<C.ComposerState>(C.initialState());
@@ -83,6 +89,7 @@ export function TerminalComposer({ sessionId, send, external, linkState, queue, 
   const status = C.statusFor(linkState, queue, sentRecently);
   return (
     <div className="hn-terminal-composer">
+      {leading}
       <Input size="lg" mono value={text} data-testid="terminal-composer"
         aria-label={`Ketik untuk sesi ${sessionId}`}
         placeholder="mis. pnpm vitest --run"
@@ -98,6 +105,10 @@ export function TerminalComposer({ sessionId, send, external, linkState, queue, 
           e.preventDefault();
           submit();
         }} />
+      {sendButton && (
+        <button type="button" className="hn-terminal-send" aria-label="Kirim perintah ke sesi"
+          onClick={() => submit()}>Kirim</button>
+      )}
       {/* Live region dipasang permanen (kosong saat diam): pembaca layar hanya mengumumkan
           perubahan pada region yang sudah ada di DOM. */}
       <span role="status" data-testid="terminal-composer-status"

@@ -482,6 +482,18 @@ toggle **Fokus | Grid** · **Tampilan** (font, papan tombol, ketik responsif; Di
 hanya di mode grid) · **Layar penuh**. Baris grid (mode grid saja): tab grup, `+ Kolom`, dan `+ Baris`. Di sempit,
 ketiga aksi susunan itu masuk menu **Atur grid**.
 
+**Ponsel (<768px, QA Fase 3E+).** Toolbar tetap satu baris: **Sesi baru** · **Buka…** (ikon ber-label `Buka…`,
+nama aksesibelnya sama, tak ada teks yang terpotong) · **Sesi · N** (laci rail, hanya mode Fokus) ·
+**⋯ Menu terminal** (Pakai mode Grid/Fokus, Layar penuh, Tampilan terminal yang dibuka sebagai sheet). Kepala pane
+satu baris: nama, status, ⋯; tanpa tombol Sesi. Strip fase memakai `PhaseStrip compact`. Dock pane fokus
+ringkas: composer satu baris (mic · kolom · **Kirim**), lalu baris **Tombol khusus** (mengalihkan papan tombol) ·
+galat dikte · **⋯ Opsi dikte suara** (bahasa dan keterangan audio). Papan tombol **tertutup** secara default di
+ponsel; pilihan tersimpan di `hn.ui.v1.terminal.keys` dan tetap menang. Tablet sentuh tetap terbuka seperti dulu.
+Tinggi pane dijaga `min-height: calc(55dvh + 168px)` (`terminal.css`, `@media (max-width: 767px)`): xterm
+≥ ~55% viewport dalam keadaan default; papan tombol terbuka mengurangi sekitar 52 px lagi. Tablet dan desktop
+tetap memakai toolbar dan dock lama. Jsdom tak mengukur tinggi, jadi kontrak CSS-nya diikat di
+`test/terminal-css-contract.test.ts`; angka nyatanya milik verifikasi visual 390×844.
+
 Perilaku:
 
 - Mode dipersist per browser. Pengguna yang memakai grid bisa kembali dengan satu klik, dan nilai rusak di
@@ -504,7 +516,10 @@ Tes:
   validasi mode.
 - `src/test/terminal-focus.test.tsx` — default Fokus (satu pane), urutan rail, panah/Home/End, klik baris, kill
   lewat menu (Batal tak mematikan; Tutup dikonfirmasi), deep link fokus, toggle Grid bertahan lintas mount, nilai
-  rusak, toolbar ≤ 6 kontrol, dan laci mobile.
+  rusak, toolbar ≤ 6 kontrol, dan laci mobile. Ponsel: toolbar satu baris, isi ⋯, kepala pane tanpa tombol Sesi,
+default papan tombol tertutup dan tablet tetap terbuka (`terminal-focus`). `terminal-pane` menguji dock ringkas
+(Kirim, Tombol khusus, mic di baris composer, bahasa di ⋯). `terminal-css-contract` mengikat aturan CSS yang tak
+terukur jsdom.
 - Suite terminal yang menguji komposisi grid (`terminal-screen`, `terminal-screen-memo`, `terminal-cleanups`) memasang
   `hn.ui.v1.terminal.view = "grid"`. Pembukaan Ambil backlog, Riwayat, dan Terminal biasa kini lewat "Buka…".
 
@@ -658,6 +673,25 @@ tes di luar folder IDE (`doc-download-screens`, `preview-fill-height`, `scroll-c
 
 Belum diverifikasi: tampilan di 390/820/1100 px (jsdom tanpa layout; pemisah bertumpu pada celah grid
 `ResponsivePanels`) dan commit dari UI. Commit tulis butuh endpoint dan keputusan MCP sendiri (ADR-0202).
+
+**QA Fase 4 · kepala IDE (toolbar, fokus, sentuh).** Tiga temuan dari audit visual 390/820/1280 px:
+
+- **Toolbar membungkus, tidak lagi menggulir.** `<select>` project memakai lebar intrinsik opsi terpanjang
+  (`flex: 0 0 auto` dari app.css), sehingga satu nama project panjang melebarkan toolbar ke 648 px dan
+  mendorong selector cabang keluar layar. Override di `screens/styles/ide.css` (selektor `.hn-ide-head >
+  .hn-ide-toolbar`, dua kelas, mengalahkan `nowrap` + `overflow-x: auto` di app.css): `.hn-ide-proyek`
+  `flex: 1 1 140px` (ponsel: baris penuh), `.hn-ide-ref` `flex: 1 1 140px`, keduanya `min-width: 0` dengan
+  `max-width` dan ellipsis; nama project utuh di `title`. Tombol tetap `flex: 0 0 auto`, jadi toolbar tetap
+  ≤ 6 kontrol. **Ini membalik keputusan SPEC-879** (toolbar menggulir di barisnya sendiri); aturan `nowrap`
+  dan `overflow-x` di app.css belum dihapus (berkas itu di luar lingkup Fase 4).
+- **Ring fokus region panel.** `ResponsivePanels` memberi `tabIndex=-1` pada setiap panel. Di mode split
+  ring UA biru menggambar kotak di sekeliling panel Perubahan. Kini `:focus` tanpa outline, dan
+  `:focus-visible` di mode selector memakai `--border-focus` (brass-600).
+- **Target sentuh toggle diff/source (dan Preview/Source).** Tinggi 22 px → `min-height: 24px` (WCAG 2.5.8),
+  44 px di `(pointer: coarse), (max-width: 767px)`, dan kelas `hn-touch-target` di JSX.
+
+Belum diverifikasi visual ulang di Chrome: wrap toolbar di 390/820/1280 (jumlah baris kontrol di ponsel
+diperkirakan tiga) dan ellipsis `<select>` di Chrome, Safari, dan Firefox.
 
 ## Audit UI/UX 2026-10 · Fase 3I · Scheduler (tab hub Otonom)
 

@@ -127,7 +127,11 @@ describe("kontrak CSS dan HTML hasil audit", () => {
   it("aturan 44px pointer kasar tidak mengenai checkbox/radio mentah", () => {
     expect(css).toMatch(/input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\), select, textarea \{/);
     expect(css).not.toMatch(/(^|\n)\s*input, select, textarea \{/);
-    expect(css).toMatch(/input\[type="checkbox"\], input\[type="radio"\] \{ min-width: 24px; min-height: 24px; \}/);
+    // Checkbox/radio mentah tak lagi di-min-width (tak membesarkan kontrol native): kotaknya digambar
+    // sendiri 16 px, dan area klik 44 px di pointer kasar datang dari padding transparan.
+    expect(css).toMatch(/input\[type="checkbox"\],\ninput\[type="radio"\] \{\n  -webkit-appearance: none;/);
+    expect(css).toMatch(/input\[type="checkbox"\], input\[type="radio"\] \{ padding: 14px; \}/);
+    expect(css).not.toMatch(/input\[type="checkbox"\], input\[type="radio"\] \{ min-width: 24px; min-height: 24px; \}/);
   });
 
   it("tombol primer tak lagi di-override putih (danger memberi #fff sendiri di inline style)", () => {

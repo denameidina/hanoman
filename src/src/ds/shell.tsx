@@ -195,6 +195,7 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
   const mainRef = useScrollRestore(`page@${active ?? "-"}`, "scroll");
   const tier = useResponsiveTier();
   const mobile = tier === "mobile";
+  const crumbHub = mobile ? undefined : hubCrumb;
   const [navOpen, setNavOpen] = React.useState(false);
   const navRef = React.useRef<HTMLElement>(null);
   const toggleRef = React.useRef<HTMLButtonElement>(null);
@@ -303,18 +304,20 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             <Icon name="menu" size={20} />
           </button>
           <div className="hn-shell-heading">
-            {(hubCrumb || breadcrumb || scopeName) && (
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", marginBottom: 1 }}>
-                {hubCrumb && <span data-testid="hub-crumb">{hubCrumb}</span>}
-                {hubCrumb && (breadcrumb || scopeName) ? " · " : ""}
+            {/* Di ponsel crumb hub dilepas: judulnya sudah nama tab (h1) dan barisnya dijajar tab di atas
+                konten. Crumb yang tersisa dipotong satu baris (app.css `.hn-shell-crumb`). */}
+            {(crumbHub || breadcrumb || scopeName) && (
+              <div className="hn-shell-crumb" style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", marginBottom: 1 }}>
+                {crumbHub && <span data-testid="hub-crumb">{crumbHub}</span>}
+                {crumbHub && (breadcrumb || scopeName) ? " · " : ""}
                 {/* Deskripsi layar dibungkus sendiri: teksnya tetap bisa dicari utuh (getByText) walau
                     kini berdampingan dengan crumb hub. */}
                 {breadcrumb && <span>{breadcrumb}</span>}
-                {scopeName && <span data-testid="scope-crumb">{breadcrumb || hubCrumb ? " · " : ""}project: {scopeName}</span>}
+                {scopeName && <span data-testid="scope-crumb">{breadcrumb || crumbHub ? " · " : ""}project: {scopeName}</span>}
               </div>
             )}
             {/* h1: judul layar adalah heading utama halaman. `margin: 0` menimpa base.css. */}
-            <h1 style={{
+            <h1 className="hn-shell-title" style={{
               margin: 0, fontFamily: "var(--font-display)", fontSize: 19, fontWeight: 600,
               letterSpacing: "-0.02em", color: "var(--text-strong)", lineHeight: 1.1,
             }}>

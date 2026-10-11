@@ -22,7 +22,7 @@ Dokumen ini adalah kontrak untuk teks yang tampil ke operator. Kode penegaknya: 
 | Nilai enum | label dari `lib/labels.ts` | nilai mentah | Lihat "Enum" di bawah. |
 | Waktu relatif | "baru saja", "5 menit lalu", "2 jam lalu", "kemarin", "3 hari lalu", lalu tanggal ("4 Okt") | "5m lalu", "5 mnt", "2j lalu", "baru saja lalu" | Lihat "Waktu relatif" di bawah. |
 | Mode tampilan terminal | **Fokus** (satu pane + daftar sesi), **Grid** (beberapa pane) | Split, Tabs, Panel | Default Fokus sejak Fase 3E. Pilihan tersimpan per browser. |
-| Buka sesi lain | **Buka…** (menu: Ambil backlog, Riwayat sesi, Terminal biasa) | Impor, Attach | Pemicu bertulisan di toolbar Terminal. |
+| Buka sesi lain | **Buka…** (menu: Ambil backlog, Riwayat sesi, Terminal biasa) | Impor, Attach | Pemicu bertulisan di toolbar Terminal; di ponsel ikon ber-label "Buka…" (nama aksesibel sama). |
 | Laporan dari klien (tiket) | **Keluhan** (tab "Keluhan saya", tombol "Lapor masalah") | Laporan & keluhan, Help desk, Tiket, Bug | Di layar Klien dan Help Center. Kategori "Ada masalah" untuk `bug`. |
 | Obrolan klien | **Tanya & ide** (tab di Klien) | Obrolan, Chat | Sesi chat milik project, bukan milik satu keluhan. |
 | Pemilik konflik sinkron | **server pusat** | hub, Instance, Pusat | Diputuskan di Fase 3L. Dipakai di copy konflik dan sinkronisasi. |
