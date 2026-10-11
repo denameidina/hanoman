@@ -492,10 +492,13 @@ Pakai skill lebih sempit saat task cocok:
   *(default)* (129) → `--danger` (165); yang lebih sempit **menghilangkan** tool, bukan menolaknya
   saat dipanggil, dan yang lebih sempit selalu menang. Tingkat itu **BUKAN kontrol keamanan** —
   ia mencegah salah pilih; yang menahan sungguhan adalah capability pada token.
-  **Yang tetap di luar katalog, dan alasannya:** empat route kredensial Telegram (ADR-0097), tiga
-  route dialog sesi (SPEC-899 — agen yang bisa menjawab `AskUserQuestion` bisa menjawab
-  pertanyaannya sendiri), enam route `scheduler/crons` (ADR-0112 — cron adalah
-  `POST /terminal/sessions` yang ditunda), multipart/biner, dan `password` VPS.
+  **Yang tetap di luar katalog, dan alasannya:** empat route kredensial Telegram (ADR-0097),
+  multipart/biner, dan `password` VPS. **Tiga route dialog sesi (SPEC-899) dan enam route
+  `scheduler/crons` (ADR-0112) dulu juga di luar, dan DIBUNGKUS atas permintaan pemilik** lewat
+  gerbang di server: ADR-0190/0192 — capability **`sessions:decide`** (danger, domain tampilan
+  `decisions`; token yang meluncurkan sesinya atau memanggil dari dalam sesi ditolak 403; `steer`
+  ke dialog ikut digerbangi) dan ADR-0191 — **`scheduler:read|write`** (create/patch-eksekusi/run
+  juga menuntut `sessions:spawn`, ditegakkan di handler).
   **ADR-0157 menutup dua lubang terakhir.** (a) Papan Tim (`/api/tasks*`, `/api/members*`) yang
   jatuh ke `null` di `capabilityForRoute` — kini domain **`team:read`/`team:write`** (capability
   **28 → 30**, **13 domain**), satu domain untuk dua permukaan karena kartu tanpa nama penanggung

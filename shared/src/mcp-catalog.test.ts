@@ -203,7 +203,7 @@ describe("tingkat mode", () => {
 // dijaga adalah INVARIANNYA. Dua arah dikunci, dan arah kedua yang paling mudah lolos: sebuah tool
 // bisa bermode `danger` sambil menuntut capability yang lemah, dan tak ada yang menyadarinya sampai
 // seseorang memakainya.
-const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete"]);
+const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete", "sessions:decide"]);
 
 // Tool DESTRUKTIF yang capability-nya tetap `:write` — bukan karena ringan, melainkan karena tak
 // ada capability `danger` di domainnya. Mode `danger`-nya murni ergonomi (mencegah salah pilih),
@@ -239,6 +239,11 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   // Tak satu pun MEMULAI pekerjaan di luar proses hanoman, jadi bukan `danger` berakses — mode
   // `danger`-nya ergonomi (tak terlihat di tingkat default), bukan gerbang.
   "hanoman_activity_purge", "hanoman_portal_chat_prd_write", "hanoman_portal_chat_export",
+  // ADR-0191 · cron: `scheduler:write` + (create/update/run) `sessions:spawn` yang ditegakkan di
+  // HANDLER server, bukan di katalog — katalog hanya menyebut satu capability per tool. Mode
+  // `danger`-nya bukan ergonomi belaka: tiga di antaranya membuka sesi berizin penuh secara tertunda.
+  "hanoman_scheduler_cron_create", "hanoman_scheduler_cron_update",
+  "hanoman_scheduler_cron_delete", "hanoman_scheduler_cron_run",
 ]);
 
 describe("mode ⇔ capability", () => {

@@ -74,7 +74,11 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     // `settings:write` bisa menjadwalkan sesi tanpa batas — persis kelas eskalasi yang ditutup
     // SPEC-405 untuk `/update/apply` dan ADR-0097/0100 untuk permukaan kredensial. ADR-0099 sudah
     // menetapkan bahwa MCP tak mengekspos tool yang mengeksekusi; cron adalah eksekusi.
-    if (seg[1] === "crons") return "COOKIE_ONLY";
+    // ADR-0191 · membalik ADR-0112 DENGAN pagar: `crons` kini domain `scheduler` (menurut method),
+    // opt-in, tak diwarisi `settings:*`. Capability itu SAJA tak pernah cukup untuk eksekusi — handler
+    // di routes/scheduler.ts menuntut `sessions:spawn` juga untuk create/patch-eksekusi/run. Fungsi
+    // ini sengaja tak melihat body (kemurnian (method, path)), jadi gerbang kedua itu hidup di handler.
+    if (seg[1] === "crons") return rw("scheduler");
     return rw("settings");   // SPEC-294 · sisanya = setelan instance
   }
   // SPEC-409 · ADR-0091 · domain TERSENDIRI. `POST /lead/decisions` adalah endpoint TULIS: ia
@@ -140,6 +144,11 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     // SPEC-786 · workspace memuat preferensi per akun dan diturunkan dari req.user.id;
     // capability sesi tak membawa identitas admin yang diperlukan untuk isolasi row ini.
     if (seg[1] === "workspace") return "COOKIE_ONLY";
+    // ADR-0190 · ADR-0192 · SELURUH sub-pohon `/dialog` (baca, jawab, rebut) = `sessions:decide`,
+    // APA PUN method-nya. Dulu `rw("sessions")`: token ber-`sessions:write` — yang cukup untuk
+    // steer/interrupt — otomatis bisa menjawab dialog. Membaca ikut digerbangi karena `screenHash`
+    // dari GET adalah satu-satunya jalan menuju jawaban, dan pertanyaan sesi bisa memuat rahasia.
+    if (seg[1] === "sessions" && seg[3] === "dialog") return "sessions:decide";
     if (seg[seg.length - 1] === "ws") return "sessions:write"; // WS = kontrol interaktif
     // ADR-0155 · membuka sesi BARU ≠ mengendalikan sesi yang sudah ada. Dicocokkan ke panjang
     // segmen PERSIS (`/terminal/sessions`), bukan prefix: `/terminal/sessions/:id/steer`

@@ -29,14 +29,9 @@ const UNWRAPPED = new Map<string, string>([
   // ADR-0157 · GLOBAL_READ tapi tetap di luar: kanal siar, bukan request-response. Tool MCP tak
   // punya bentuk untuk aliran yang tak pernah selesai.
   ["GET /events/ws", "WebSocket siar, bukan request-response"],
-  // SPEC-899 · ADR-0142 · BUKAN kelalaian: agen yang bisa menjawab `AskUserQuestion` bisa menjawab
-  // pertanyaannya SENDIRI, dan gerbang "manusia yang terakhir memutuskan" runtuh lewat pintu itu.
-  // Assert terpisah di mcp-capability.test.ts menjaga agar tak ada samplePath yang memuat /dialog.
-  ["GET /terminal/sessions/:id/dialog", "gerbang keputusan manusia (SPEC-899)"],
-  ["POST /terminal/sessions/:id/dialog/answer", "gerbang keputusan manusia (SPEC-899)"],
-  ["POST /terminal/sessions/:id/dialog/takeover", "gerbang keputusan manusia (SPEC-899)"],
   // ADR-0183 · route multipart/biner (lampiran, ekspor, impor, unggah IDE, arsip) dan hapus QA sudah
   // TIDAK di daftar ini: tool-nya ada di shared/src/mcp-catalog/transfer.ts.
+  // ADR-0190 · route dialog sesi dibungkus gates.ts (sessions:decide); ADR-0191 · /scheduler/crons* dibungkus gates.ts (scheduler:*).
 ]);
 
 // Route yang TERCAKUP tool bercabang. Tool semacam itu memilih endpoint menurut argumen (isi `q` →

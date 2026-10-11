@@ -1,6 +1,6 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { zScheduler, zCreateCron, zPatchCron } from "@hanoman/shared";
+import { zScheduler, zCreateCron, zPatchCron, grantsCapability } from "@hanoman/shared";
 import { prisma } from "../db";
 import { getScheduler, setScheduler } from "../services/scheduler/config";
 import { buildQueuePage, markCanceled, markRequeued } from "../services/scheduler/queue";
@@ -23,6 +23,26 @@ async function refuse(reply: FastifyReply, id: string, verb: string) {
     ? "sesinya sudah berjalan — tutup dari Terminal bila memang tak diperlukan"
     : `statusnya sudah ${row.status}`;
   return reply.code(409).send({ error: `tak bisa ${verb}: ${why}`, status: row.status });
+}
+
+// ADR-0191 · cron adalah `POST /terminal/sessions` yang ditunda (ADR-0112): sebuah baris cron
+// membuat hanoman membuka sesi agen berizin penuh di worktree project, berulang, tanpa manusia di
+// pane. `scheduler:write` sendirian karena itu TIDAK PERNAH cukup untuk membuat, menyetel ulang
+// (prompt/agen/model/effort/jadwal), mengaktifkan, atau menjalankan cron — token pemanggil wajib
+// juga memegang `sessions:spawn`, capability yang sama yang dituntut membuka sesi secara langsung.
+// Tanpa ini `scheduler:write` jadi jalan memutar menuju sesi yang `sessions:spawn`-nya tak pernah
+// dicentang manusia. Gerbangnya di HANDLER karena `capabilityForRoute` sengaja tak melihat body.
+// Cookie (manusia) tak dinilai. Menghapus & MENONAKTIFKAN/mengganti nama cron tidak memulai
+// apa pun, jadi tetap `scheduler:write` saja.
+const EXEC_PATCH_KEYS = ["prompt", "agent", "model", "effort", "expr"] as const;
+function refuseWithoutSpawn(req: FastifyRequest, reply: FastifyReply): boolean {
+  if (!req.agent || grantsCapability(req.agent.capabilities, "sessions:spawn")) return false;
+  reply.code(403).send({
+    error: "capability required", need: "sessions:spawn",
+    reason: "cron-executes",
+    detail: "cron membuka sesi agen; selain scheduler:write, token wajib juga memegang sessions:spawn",
+  });
+  return true;
 }
 
 export default async function (app: FastifyInstance) {
@@ -66,7 +86,8 @@ export default async function (app: FastifyInstance) {
   });
 
   // SPEC-646 · ADR-0112 · CRUD cronjob per project. Semua di bawah prefix `/scheduler` seperti
-  // tetangganya, TAPI `capabilityForRoute` memberi `crons` cabang COOKIE_ONLY sendiri.
+  // tetangganya, TAPI `capabilityForRoute` memberi `crons` cabang sendiri: COOKIE_ONLY sampai
+  // ADR-0191, kini `scheduler:read|write` + `sessions:spawn` untuk aksi eksekusi (lihat atas).
   const cronView = (c: {
     id: string; projectId: string; name: string; expr: string; prompt: string;
     agent: string | null; model: string | null; effort: string | null; enabled: boolean;
@@ -101,6 +122,7 @@ export default async function (app: FastifyInstance) {
   });
 
   app.post("/scheduler/crons", async (req, reply) => {
+    if (refuseWithoutSpawn(req, reply)) return;
     const parsed = zCreateCron.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const d = parsed.data;
@@ -124,6 +146,9 @@ export default async function (app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const parsed = zPatchCron.safeParse(req.body ?? {});
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    // ADR-0191 · yang menggeser APA/KAPAN/OLEH SIAPA sesi diluncurkan, atau menyalakannya, = eksekusi.
+    const d0 = parsed.data;
+    if ((EXEC_PATCH_KEYS.some((k) => d0[k] !== undefined) || d0.enabled === true) && refuseWithoutSpawn(req, reply)) return;
     const cur = await prisma.schedulerCron.findUnique({ where: { id } });
     if (!cur) return reply.code(404).send({ error: "cron tak ada" });
     const d = parsed.data;
@@ -162,6 +187,7 @@ export default async function (app: FastifyInstance) {
   // coba tetap tunduk cap, Pause, dan master switch tanpa menyalin gerbangnya ke sini — kelas bug
   // SPEC-431/448/475/481. Karena itu penolakannya EKSPLISIT (409), bukan tombol yang diam.
   app.post("/scheduler/crons/:id/run", async (req, reply) => {
+    if (refuseWithoutSpawn(req, reply)) return;
     const { id } = req.params as { id: string };
     const cron = await prisma.schedulerCron.findUnique({ where: { id } });
     if (!cron) return reply.code(404).send({ error: "cron tak ada" });

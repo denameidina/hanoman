@@ -117,15 +117,17 @@ describe("riwayat run", () => {
 });
 
 // SPEC-646 · gerbang capability: sebuah cron adalah `POST /terminal/sessions` yang DITUNDA, jadi
-// `settings:write` tak boleh cukup untuknya.
+// `settings:write` tak boleh cukup untuknya. ADR-0191 membalik "COOKIE_ONLY" menjadi domain
+// `scheduler` yang opt-in; `settings:*` tetap TIDAK menjangkaunya, dan eksekusi menuntut
+// `sessions:spawn` juga (server/test/scheduler-cron-gate.test.ts).
 describe("capabilityForRoute", () => {
-  it("seluruh /scheduler/crons* COOKIE_ONLY di semua method", () => {
-    for (const [m, p] of [
-      ["GET", "/api/scheduler/crons"], ["POST", "/api/scheduler/crons"],
-      ["PATCH", "/api/scheduler/crons/c1"], ["DELETE", "/api/scheduler/crons/c1"],
-      ["POST", "/api/scheduler/crons/c1/run"], ["GET", "/api/scheduler/crons/c1/runs"],
+  it("/scheduler/crons* = scheduler:read|write MENURUT METHOD, bukan settings dan bukan cookie-only", () => {
+    for (const [m, p, want] of [
+      ["GET", "/api/scheduler/crons", "scheduler:read"], ["POST", "/api/scheduler/crons", "scheduler:write"],
+      ["PATCH", "/api/scheduler/crons/c1", "scheduler:write"], ["DELETE", "/api/scheduler/crons/c1", "scheduler:write"],
+      ["POST", "/api/scheduler/crons/c1/run", "scheduler:write"], ["GET", "/api/scheduler/crons/c1/runs", "scheduler:read"],
     ] as const) {
-      expect(capabilityForRoute(m, p), `${m} ${p}`).toBe("COOKIE_ONLY");
+      expect(capabilityForRoute(m, p), `${m} ${p}`).toBe(want);
     }
   });
   it("endpoint scheduler lain tak berubah", () => {

@@ -186,6 +186,13 @@ export function relayBodyAllowed(method: string, path: string, body: unknown): b
     bukan `sessions:write` — dispatcher (SPEC-1218) membuang `in`/`diag` sebelum route. */
 export function remoteCapabilityFor(method: string, path: string, mode: "read" | "write"): Capability | null {
   const p = path.split("?")[0] ?? "";
+  // ADR-0190 · dialog sesi kini `sessions:decide` bagi AGENT TOKEN (capabilityForRoute), tetapi
+  // principal relay adalah OPERATOR MANUSIA di hub — bukan agen — dan `sessions:decide` memang tak
+  // ada di REMOTE_CAPABILITIES. Tanpa pengecualian ini, memperketat agent token diam-diam mencabut
+  // hak operator hub menjawab pertanyaan sesi di mesin yang sudah ia pegang `sessions:write`-nya.
+  // Kembali ke persis capability sebelum ADR-0190: baca = sessions:read, jawab/rebut = sessions:write.
+  if (/^\/api\/terminal\/sessions\/[^/]+\/dialog(?:\/(?:answer|takeover))?$/.test(p))
+    return method.toUpperCase() === "GET" ? "sessions:read" : "sessions:write";
   return method.toUpperCase() === "GET" && mode === "read" && /^\/api\/terminal\/sessions\/[^/]+\/ws$/.test(p)
     ? "sessions:read" : null;
 }

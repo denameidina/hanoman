@@ -20,7 +20,7 @@ describe("/agent-tokens routes (cookie-only)", () => {
     expect((await app.inject({ method: "GET", url: "/api/agent-tokens" })).statusCode).toBe(401);
   });
 
-  it("capabilities catalog lists 32 entries", async () => {
+  it("capabilities catalog lists 37 entries", async () => {
     const cookie = await login();
     const r = await app.inject({ method: "GET", url: "/api/agent-tokens/capabilities", headers: { cookie } });
     expect(r.statusCode).toBe(200);

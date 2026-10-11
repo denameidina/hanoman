@@ -64,6 +64,12 @@ export function explainHttpError(status: number, body: unknown, ctx: ErrorCtx): 
     const need = (body as { need?: string })?.need;
     if (need)
       return `Token yang dipakai kurang capability \`${need}\`. Ini tak bisa diakali dari sisi agen: MANUSIA harus menambahkan \`${need}\` ke token itu di Settings → Akses AI Agent. Sebutkan capability persis itu saat memintanya.`;
+    // ADR-0192 · gerbang agen-tak-memutuskan-sesinya-sendiri menjawab 403 TANPA `need` tetapi dengan
+    // `reason`. Tanpa cabang ini ia jatuh ke kalimat cookie-only di bawah — salah alamat: yang ditolak
+    // bukan capability dan bukan route, melainkan PEMANGGILNYA.
+    const reason = (body as { reason?: string })?.reason;
+    if (reason === "self" || reason === "in-session" || reason === "launcher")
+      return `Ditolak gerbang keputusan manusia (${reason}): ${said ?? "agen tak boleh memutuskan dialog sesinya sendiri"}. Ini BUKAN soal capability dan tak bisa diakali dari sisi agen: dialog sebuah sesi hanya boleh diputuskan manusia di dashboard, atau token yang tidak dipakai di dalam sesi itu dan tidak meluncurkannya. Sampaikan pertanyaannya ke manusia.`;
     return "Route ini sengaja hanya untuk sesi manusia yang login — agent token tak akan pernah bisa mengaksesnya, apa pun capability-nya (kelola user, agent token, device token, dan sync). Jangan cari jalan lain; sampaikan ke manusia bila memang perlu.";
   }
 

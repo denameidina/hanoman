@@ -49,6 +49,14 @@ export const CAPABILITY_IDS = [
   "portal-chat:read", "portal-chat:write",
   // ADR-0183 · hapus laporan/test case/temuan/lampiran QA. Dipecah dari `qa:write` seperti keempat di atas.
   "qa:delete",
+  // ADR-0190 · ADR-0192 · MENJAWAB/merebut dialog `AskUserQuestion` sebuah sesi. Akses `danger`
+  // dengan domain tampilan SENDIRI (`decisions`): ia gerbang "manusia yang memutuskan" (ADR-0142),
+  // bukan bagian dari mengendalikan sesi, jadi `sessions:write` tak pernah mengimplikasikannya.
+  "sessions:decide",
+  // ADR-0191 · cronjob per project (`/api/scheduler/crons*`). Sebuah baris cron = `POST
+  // /terminal/sessions` yang ditunda (ADR-0112); karena itu server MENUNTUT `sessions:spawn` juga
+  // untuk membuat/mengubah/menjalankannya — capability ini saja tidak pernah cukup untuk eksekusi.
+  "scheduler:read", "scheduler:write",
 ] as const;
 export const zCapability = z.enum(CAPABILITY_IDS);
 export type Capability = z.infer<typeof zCapability>;
@@ -103,6 +111,12 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "portal-chat:read", domain: "portal-chat", access: "read", label: "Chat portal — baca", desc: "Baca percakapan klien di chat portal berikut email klien, kuota, dan PRD draft; termasuk ekspor transkrip." },
   { id: "portal-chat:write", domain: "portal-chat", access: "write", label: "Chat portal — tulis", desc: "Materialisasi PRD draft chat portal menjadi berkas docs/prd/<slug>.md di checkout repo (menimpa berkas bernama sama). Isi draftnya berasal dari percakapan klien.", risk: "exec" },
   { id: "qa:delete", domain: "qa", access: "danger", label: "QA — hapus", desc: "Hapus laporan QA, test case, temuan, dan lampiran (permanen, ikut tersinkron ke mesin lain). Dipisah dari QA — tulis: menyunting laporan tak lagi cukup untuk menghapusnya.", risk: "exec" },
+  // ADR-0190 · ADR-0192 · domain tampilan `decisions` (bukan `sessions`): grid Settings hanya punya
+  // SATU sel `berbahaya` per domain, dan `sessions` sudah dipakai `sessions:spawn`.
+  { id: "sessions:decide", domain: "decisions", access: "danger", label: "Keputusan — jawab dialog sesi", desc: "Membaca, menjawab, dan merebut dialog AskUserQuestion sebuah sesi dari lead. Ini gerbang \"manusia yang memutuskan\": beri HANYA ke token yang tidak dipakai agen di dalam sesi hanoman. Server menolak token yang meluncurkan sesi itu dan panggilan dari dalam sesi.", risk: "exec" },
+  // ADR-0191
+  { id: "scheduler:read", domain: "scheduler", access: "read", label: "Cronjob — baca", desc: "Lihat cronjob per project (jadwal, prompt, agen) dan riwayat run-nya." },
+  { id: "scheduler:write", domain: "scheduler", access: "write", label: "Cronjob — tulis", desc: "Buat/ubah/hapus/jalankan cronjob. Membuat, mengubah prompt/agen/jadwal, mengaktifkan, dan menjalankan cron juga menuntut Sesi — buka sesi baru (cron = sesi agen tertunda).", risk: "exec" },
 ];
 
 // SPEC-264 · Metadata per-domain untuk grid capability di Settings (label ramah + cakupan).
@@ -127,6 +141,8 @@ export const CAPABILITY_DOMAINS: { domain: string; label: string; desc: string }
   { domain: "qa", label: "QA", desc: "Laporan QA per project: test case, temuan, lampiran, ekspor/impor." },
   { domain: "activity", label: "Aktivitas", desc: "Log aktivitas lintas device (stage, commit, PR) dan purge-nya." },
   { domain: "portal-chat", label: "Chat portal", desc: "Percakapan klien di chat portal (berisi email klien), PRD draft, dan ekspor transkrip." },
+  { domain: "decisions", label: "Keputusan sesi", desc: "Jawab/rebut dialog AskUserQuestion sesi — gerbang manusia yang memutuskan." },
+  { domain: "scheduler", label: "Cronjob", desc: "Cronjob per project: sesi agen terjadwal. Eksekusinya juga menuntut Sesi — buka sesi baru." },
 ];
 
 // write meng-implikasikan read pada domain yang sama.

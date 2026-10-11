@@ -75,8 +75,19 @@ describe("agent capabilities", () => {
     expect(risky).toContain("vps:write");
     // ADR-0155 · keempat capability `danger` wajib bertanda risk; tanpa itu grid Settings
     // merendernya tanpa ⚠ dan pemecahannya kehilangan separuh gunanya.
-    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"])
+    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "sessions:decide", "scheduler:write"])
       expect(risky, id).toContain(id);
+  });
+
+  // ADR-0190/0191 · pecahan baru juga tak diimplikasikan `:write`. Dan grid Settings hanya punya SATU
+  // sel `berbahaya` per domain, jadi dua capability danger tak boleh berbagi domain tampilan —
+  // yang kedua tak akan punya kotak centang, dan manusia tak bisa memberikannya sama sekali.
+  it("sessions:decide tak diimplikasikan sessions:write; satu danger per domain tampilan", () => {
+    expect(grantsCapability(["sessions:write", "sessions:spawn"], "sessions:decide")).toBe(false);
+    expect(grantsCapability(["scheduler:write"], "scheduler:read")).toBe(true);
+    expect(grantsCapability(["settings:write", "sessions:write"], "scheduler:read")).toBe(false);
+    const dangerDomains = CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.domain);
+    expect(new Set(dangerDomains).size).toBe(dangerDomains.length);
   });
 
   it("zAgentTokenCreate rejects unknown capability and empty name", () => {

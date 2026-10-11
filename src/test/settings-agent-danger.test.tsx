@@ -38,7 +38,7 @@ describe("grid capability — kolom berbahaya", () => {
   it("kolomnya ada, dengan checkbox terpisah per capability danger", async () => {
     render(<AgentAccessPanel />);
     expect(await screen.findByText((t, el) => el?.tagName === "DIV" && t === "berbahaya")).toBeInTheDocument();
-    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"])
+    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "sessions:decide"])
       expect(screen.getByLabelText(id), id).toBeInTheDocument();
   });
 
@@ -46,7 +46,7 @@ describe("grid capability — kolom berbahaya", () => {
     render(<AgentAccessPanel />);
     await screen.findByText((t, el) => el?.tagName === "DIV" && t === "berbahaya");
     const danger = CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id);
-    expect(danger).toEqual(expect.arrayContaining(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete"]));
+    expect(danger).toEqual(expect.arrayContaining(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete", "sessions:decide"]));
     expect(screen.queryByLabelText("docs:danger")).toBeNull();
     expect(screen.queryByLabelText("support:danger")).toBeNull();
   });
