@@ -36,8 +36,10 @@ describe("GET /api/presence", () => {
     expect(body.devices.find((x) => x.deviceId === d.id)!.online).toBe(true);
   });
 
-  // Peta pekerjaan lintas mesin bukan sesuatu yang boleh didelegasikan ke agent token.
-  it("tak boleh didelegasikan ke agent token", () => {
-    expect(capabilityForRoute("GET", "/api/presence")).toBe("COOKIE_ONLY");
+  // ADR-0197 · dulu cookie-only. Kini hanya `presence:read` yang membukanya, dan tak ada capability
+  // lain (apalagi `:write` domain mana pun) yang diimplikasikan.
+  it("hanya dibuka capability `presence:read` (opt-in), tak ada tulis", () => {
+    expect(capabilityForRoute("GET", "/api/presence")).toBe("presence:read");
+    expect(capabilityForRoute("POST", "/api/presence")).toBe("COOKIE_ONLY");
   });
 });

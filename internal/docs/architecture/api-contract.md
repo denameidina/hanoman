@@ -823,8 +823,10 @@ GET /agent-integration.md   -> 200 text/markdown; charset=utf-8   # isi docs/age
 > Panduan berhadapan-agen (cara AI agent eksternal terhubung, langkah demi langkah + contoh `curl`): [`docs/agent-integration.md`](../../../docs/agent-integration.md) — **naskah yang sama** disajikan runtime di `GET /api/agent-integration.md` (publik, markdown mentah) dan dirender di panel "Akses AI Agent" di UI (SPEC-265/489).
 
 ```
-# Kelola kredensial AI agent — COOKIE-ONLY (agent token sendiri → 403; anti privilege-escalation).
-GET    /agent-tokens/capabilities   -> { capabilities: CapabilityInfo[] }   # katalog 30 (13 domain; 4 punya akses ke-3 `danger`) untuk UI
+# Kelola kredensial AI agent — sesi cookie (manusia, tak dibatasi) ATAU agent token ber-`tokens:read|write`
+# (ADR-0196: pagar tak-eskalasi-diri di handler — token hasil cetak/ubahan ⊆ capability pemanggil, target
+# tak boleh lebih berkuasa dari pemanggil, token sendiri tak bisa diubah/dicabut → 403 `{ exceeds | self }`).
+GET    /agent-tokens/capabilities   -> { capabilities: CapabilityInfo[] }   # katalog 48 (23 domain; 7 punya akses ke-3 `danger`) untuk UI
 GET    /agent-tokens                 -> { items: AgentTokenView[] }          # tanpa hash/plaintext
 POST   /agent-tokens { name, capabilities[] }  -> 201 { ...AgentTokenView, token }   # plaintext hnm_agt_… SEKALI
 #   400 nama kosong / capability asing (divalidasi vs CAPABILITY_IDS). createdBy = user pemanggil.
@@ -834,7 +836,7 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 ```
 
 > **Capability** = `"<domain>:<access>"`, `access ∈ {read,write,danger}`, **write⊇read** dan `danger`
-> tak diimplikasikan apa pun (ADR-0155). 13 domain: `projects`,
+> tak diimplikasikan apa pun (ADR-0155). 23 domain (15 inti + 8 admin ADR-0196..0198 di bawah): `projects`,
 > `backlog`, `sessions` (spawn agen = RCE), `docs`, `ide`, `vps` (remote exec), `settings` (+`/scheduler`),
 > `support` (tickets + issue GitHub), `notifications`, `lead` (ADR-0091), `agents` (ADR-0094),
 > `telegram` (ADR-0096), `team` (papan Tim: `/tasks*` + `/members*`, ADR-0157). Peta route→capability di `server/src/services/agent-capabilities.ts`:
@@ -850,6 +852,16 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > route tak dikenal peta → cookie-only. **Dibuka oleh capability BARU opt-in** (membalik ADR-0097/0100/0110, lewat
 > ADR-0193/0194/0195): `/telegram/{settings,test,credentials}` → `telegram:admin` (danger), `/webhooks` → `webhooks:read|write`,
 > `/client-accounts` → `clients:read|write`, baca `/portal` → `portal:read`. Master switch
+> (SPEC-405 · ADR-0088). Keempat yang bukan WS/health punya tool MCP ber-`capability: null` (ADR-0157).
+> **Permukaan admin yang DIBUKA opt-in (ADR-0196..0198, mengamandemen ADR-0065/0165/0166/0147)** — domain
+> `tokens` (`/agent-tokens*`), `devices` (`/device-tokens*`), `access` (`/auth/users*`,
+> `/auth/change-password`; `access:admin` = danger), `remote` (`/remote-control`; `remote:control` = danger),
+> `relay` (`/devices/:deviceId/relay/*`; `relay:exec` = danger, semua method), `logs` (`/logs*`),
+> `presence` (`GET /presence`), `metrics` (`/custom-agents/{metrics,invocations/:id}`). **Tak-boleh-didelegasikan**
+> (agent → 403): `/auth/{status,setup,login,logout}`, `/sync`, `/webhooks` (ADR-0100), `/portal` &
+> `/client-accounts` (ADR-0110), `/session-events` (ADR-0146; agent token → 401 HMAC), `/terminal/workspace`
+> (tata letak browser per akun), dan `/telegram/{settings,test,credentials}` (ADR-0097); route tak dikenal
+> peta → cookie-only. Master switch
 > `Setting.agentAccessEnabled` (PUT /settings) mematikan semua. **Kecuali** endpoint `PUBLIC`
 > (`/health`, `/auth/status`, `/auth/login`, `/auth/setup`, `/agent-integration.md`) yang tak pernah
 > menyentuh gate ini sama sekali.

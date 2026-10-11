@@ -70,7 +70,13 @@ export function explainHttpError(status: number, body: unknown, ctx: ErrorCtx): 
     const reason = (body as { reason?: string })?.reason;
     if (reason === "self" || reason === "in-session" || reason === "launcher")
       return `Ditolak gerbang keputusan manusia (${reason}): ${said ?? "agen tak boleh memutuskan dialog sesinya sendiri"}. Ini BUKAN soal capability dan tak bisa diakali dari sisi agen: dialog sebuah sesi hanya boleh diputuskan manusia di dashboard, atau token yang tidak dipakai di dalam sesi itu dan tidak meluncurkannya. Sampaikan pertanyaannya ke manusia.`;
-    return "Route ini sengaja hanya untuk sesi manusia yang login — agent token tak akan pernah bisa mengaksesnya, apa pun capability-nya (kelola user, agent token, device token, dan sync). Jangan cari jalan lain; sampaikan ke manusia bila memang perlu.";
+    // ADR-0196 · pagar tak-eskalasi-diri: capability SUDAH cukup, tapi server menolak isi permintaannya.
+    const b = body as { exceeds?: unknown; self?: unknown; error?: unknown } | null;
+    if (Array.isArray(b?.exceeds))
+      return `Ditolak oleh pagar tak-eskalasi-diri: ${typeof b?.error === "string" ? b.error : "permintaan melebihi hak pemanggil"} (melebihi: ${(b!.exceeds as unknown[]).map(String).join(", ")}). Token ini hanya boleh memberi/mengubah sebatas capability yang ia miliki sendiri — itu bukan galat, dan tak bisa diakali. Minta MANUSIA di Settings → Akses AI Agent bila memang perlu hak lebih.`;
+    if (b?.self === true)
+      return `${typeof b.error === "string" ? b.error : "Token tak boleh mengubah atau mencabut dirinya sendiri."} Itu pagar yang disengaja; sampaikan ke manusia.`;
+    return "Route ini sengaja hanya untuk sesi manusia yang login — agent token tak akan pernah bisa mengaksesnya, apa pun capability-nya (login/logout/setup akun, sync mesin-ke-mesin, event hook sesi, tata letak terminal, portal klien, webhook, kredensial Telegram). Jangan cari jalan lain; sampaikan ke manusia bila memang perlu.";
   }
 
   if (status === 400)

@@ -1,5 +1,7 @@
 # ADR-0166 — Log terpusat: ingest satu arah di `/api/sync/logs`, tiga lajur, high-water mark per device
 
+> **Amandemen 2026-10-11 ([ADR-0197](0197-mcp-kendali-jarak-jauh-relay-log-presence.md)):** `GET /api/logs*` dan `PUT /api/logs/retention` tak lagi cookie-only — `logs:read` / `logs:write` (opt-in). Perubahan retensi oleh agen dicatat di log event SEBELUM nilainya berubah. Ingest `POST /api/sync/logs` tetap device-token.
+
 **Status:** diterima (SPEC-1215, fase Spec) · 2026-09-15 · **mendarat penuh (turunan A + D,
 SPEC-1215/SPEC-1217)**: model `LogEntry`/`LogCursor` (migration `20260915120000_log_terpusat`),
 `appendEvent` ber-seq HLC, hook sesi aditif, tap lokal

@@ -12,7 +12,7 @@ export function redactToken(text: string, token: string): string {
   // ADR-0193 · bot token Telegram (`<angka>:<35+ karakter>`). Bentuknya tetap, jadi disensor lewat
   // pola juga — nilai yang kebetulan lewat di galat/stderr tak boleh bocor hanya karena bukan
   // argumen panggilan ini.
-  return out.replace(/\b\d{6,12}:[A-Za-z0-9_-]{30,}/g, MASK);
+  return redactCredentialFields(out.replace(/\b\d{6,12}:[A-Za-z0-9_-]{30,}/g, MASK));
 }
 
 /**
@@ -38,4 +38,23 @@ export function secretValues(
     if (typeof v === "string" && v !== "") out.push(v);
   }
   return out;
+}
+
+/**
+ * ADR-0196 · hasil sukses tool yang `revealsSecret` (cetak agent/device token): kredensial BARU yang
+ * dikembalikan REST sekali-tampil harus sampai ke pemanggil, jadi topeng pola `hnm_agt_…` tidak
+ * dipasang. Yang TETAP disembunyikan: token konfigurasi proses MCP ini dan field password.
+ */
+export function redactKeepingFresh(text: string, token: string): string {
+  const out = token.length > 0 ? text.split(token).join(MASK) : text;
+  return redactCredentialFields(out);
+}
+
+/**
+ * Field kredensial berbentuk JSON (`"password":"…"`, `newPassword`, `passwordHash`) disensor di
+ * semua keluaran. Tool admin menerima password di ARGUMEN, dan galat server kadang memantulkan
+ * bentuk request; satu regex di titik keluar lebih murah daripada mengingat tiap call site.
+ */
+function redactCredentialFields(text: string): string {
+  return text.replace(/("(?:password|newPassword|currentPassword|passwordHash)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi, `$1"${MASK}"`);
 }

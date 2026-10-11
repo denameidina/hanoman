@@ -77,14 +77,41 @@ describe("capabilityForRoute", () => {
     ["GET", "/api/agent-tokens", "COOKIE_ONLY"],
     ["POST", "/api/agent-tokens", "COOKIE_ONLY"],
     ["GET", "/api/device-tokens", "COOKIE_ONLY"],
+    // ADR-0196 · dulu COOKIE_ONLY; kini capability baru yang opt-in, menurut METHOD.
+    ["GET", "/api/auth/users", "access:read"],
+    ["POST", "/api/auth/users", "access:admin"],
+    ["DELETE", "/api/auth/users/u1", "access:admin"],
+    ["POST", "/api/auth/change-password", "access:admin"],
+    ["GET", "/api/agent-tokens", "tokens:read"],
+    ["GET", "/api/agent-tokens/capabilities", "tokens:read"],
+    ["POST", "/api/agent-tokens", "tokens:write"],
+    ["PATCH", "/api/agent-tokens/t1", "tokens:write"],
+    ["DELETE", "/api/agent-tokens/t1", "tokens:write"],
+    ["GET", "/api/device-tokens", "devices:read"],
+    ["POST", "/api/device-tokens", "devices:write"],
+    ["DELETE", "/api/device-tokens/d1", "devices:write"],
+    // Yang TETAP cookie-only karena tak bisa dibungkus secara teknis.
+    ["GET", "/api/auth/status", "COOKIE_ONLY"],
+    ["POST", "/api/auth/setup", "COOKIE_ONLY"],
+    ["POST", "/api/auth/login", "COOKIE_ONLY"],
+    ["POST", "/api/auth/logout", "COOKIE_ONLY"],
     ["GET", "/api/sync/pull", "COOKIE_ONLY"],
     // SPEC-909 · ADR-0146 · memalsukan "sesi X bertanya Y" bukan capability, itu peniruan identitas.
     ["POST", "/api/session-events", "COOKIE_ONLY"],
-    // SPEC-919 · ADR-0147 · peta pekerjaan lintas mesin — tak ada capability yang berarti untuknya.
-    ["GET", "/api/presence", "COOKIE_ONLY"],
-    // SPEC-1215 · ADR-0165 §4 · grant kendali jarak jauh.
-    ["GET", "/api/remote-control", "COOKIE_ONLY"],
-    ["PUT", "/api/remote-control", "COOKIE_ONLY"],
+    // ADR-0197 · SPEC-919 · peta pekerjaan lintas mesin kini `presence:read` (hanya GET).
+    ["GET", "/api/presence", "presence:read"],
+    ["POST", "/api/presence", "COOKIE_ONLY"],
+    // SPEC-1215 · ADR-0165 §4 · ADR-0197 · baca grant ≠ mengubahnya (RCE → `remote:control`).
+    ["GET", "/api/remote-control", "remote:read"],
+    ["PUT", "/api/remote-control", "remote:control"],
+    ["GET", "/api/logs", "logs:read"],
+    ["GET", "/api/logs/12/transcript", "logs:read"],
+    ["GET", "/api/logs/retention", "logs:read"],
+    ["PUT", "/api/logs/retention", "logs:write"],
+    // ADR-0198 · metrik & disposisi custom agent: domain `metrics`, bukan `agents`.
+    ["GET", "/api/custom-agents/metrics", "metrics:read"],
+    ["PATCH", "/api/custom-agents/invocations/i1", "metrics:write"],
+    ["GET", "/api/custom-agents", "agents:read"],
     ["GET", "/api/nonsense", null],
   ];
   it.each(cases)("%s %s → %s", (m, p, want) => {
@@ -92,10 +119,40 @@ describe("capabilityForRoute", () => {
   });
 
   // SPEC-1216 · ADR-0165 §4 · `/devices/:id/relay/*` menjalankan aksi sesi di mesin lain atas nama
-  // operator — capability apa pun yang bisa mendelegasikannya adalah eskalasi RCE lintas mesin.
-  it("top devices → COOKIE_ONLY (SPEC-1216 · ADR-0165 §4)", () => {
-    expect(capabilityForRoute("GET", "/api/devices/dev1/relay/terminal/sessions")).toBe("COOKIE_ONLY");
-    expect(capabilityForRoute("POST", "/api/devices/dev1/relay/specs/x/done")).toBe("COOKIE_ONLY");
+  // operator — eskalasi RCE lintas mesin. ADR-0197 membukanya HANYA lewat capability tersendiri
+  // `relay:exec` (danger, tak diimplikasikan apa pun) untuk SEMUA method — membaca isi sesi mesin
+  // lain pun sensitif — dan memisahkannya dari `remote:control` (grant mesin INI).
+  it("top devices → relay:exec untuk semua method (ADR-0197)", () => {
+    expect(capabilityForRoute("GET", "/api/devices/dev1/relay/terminal/sessions")).toBe("relay:exec");
+    expect(capabilityForRoute("POST", "/api/devices/dev1/relay/specs/x/done")).toBe("relay:exec");
+    expect(capabilityForRoute("DELETE", "/api/devices/dev1/relay/x")).toBe("relay:exec");
+    expect(checkAgentCapability(["sessions:spawn", "remote:control", "sessions:write"], "POST", "/api/devices/dev1/relay/terminal/sessions"))
+      .toMatchObject({ ok: false, need: "relay:exec" });
+    expect(checkAgentCapability(["relay:exec"], "POST", "/api/devices/dev1/relay/terminal/sessions")).toEqual({ ok: true });
+  });
+
+  // ADR-0196..0198 · capability admin opt-in: TAK ADA capability lama yang membukanya, dan
+  // `:write`-nya tak mengimplikasikan danger di domain lain.
+  it("capability lama tak membuka permukaan admin (opt-in sungguhan)", () => {
+    const old = ["settings:write", "agents:write", "sessions:write", "sessions:spawn", "vps:exec", "projects:write",
+      "backlog:lifecycle", "lead:write", "telegram:write", "ide:git"];
+    for (const [m, p] of [
+      ["GET", "/api/agent-tokens"], ["POST", "/api/agent-tokens"], ["GET", "/api/device-tokens"],
+      ["GET", "/api/auth/users"], ["POST", "/api/auth/users"], ["POST", "/api/auth/change-password"],
+      ["GET", "/api/remote-control"], ["PUT", "/api/remote-control"], ["GET", "/api/logs"],
+      ["PUT", "/api/logs/retention"], ["GET", "/api/presence"], ["GET", "/api/custom-agents/metrics"],
+      ["PATCH", "/api/custom-agents/invocations/i"], ["POST", "/api/devices/d/relay/terminal/sessions"],
+    ] as const) expect(checkAgentCapability(old, m, p), `${m} ${p}`).toMatchObject({ ok: false, reason: "capability" });
+    // sebaliknya: tokens:write TIDAK membuka akun, relay, atau kendali jarak jauh
+    for (const [m, p] of [
+      ["POST", "/api/auth/users"], ["PUT", "/api/remote-control"], ["POST", "/api/devices/d/relay/x"],
+    ] as const) expect(checkAgentCapability(["tokens:write", "devices:write", "logs:write"], m, p).ok, `${m} ${p}`).toBe(false);
+  });
+
+  it("agents:write (definisi agen) tak membuka disposisi metrik, dan metrics:write tak membuka definisi agen", () => {
+    expect(checkAgentCapability(["agents:write"], "PATCH", "/api/custom-agents/invocations/i")).toMatchObject({ ok: false, need: "metrics:write" });
+    expect(checkAgentCapability(["metrics:write"], "POST", "/api/custom-agents")).toMatchObject({ ok: false, need: "agents:write" });
+    expect(checkAgentCapability(["metrics:write"], "GET", "/api/custom-agents/metrics")).toEqual({ ok: true });
   });
 
   // SPEC-471 · ADR-0095 · triase issue satu domain dengan tiket; dipetakan MENURUT METHOD
@@ -115,7 +172,7 @@ describe("checkAgentCapability", () => {
     expect(checkAgentCapability(["projects:write"], "GET", "/api/projects")).toEqual({ ok: true });
     expect(checkAgentCapability(["projects:read"], "POST", "/api/projects"))
       .toMatchObject({ ok: false, status: 403, need: "projects:write", reason: "capability" });
-    expect(checkAgentCapability(["projects:read"], "GET", "/api/auth/users"))
+    expect(checkAgentCapability(["projects:read"], "POST", "/api/auth/login"))
       .toMatchObject({ ok: false, status: 403, reason: "cookie-only" });
     expect(checkAgentCapability(["projects:read"], "GET", "/api/nonsense"))
       .toMatchObject({ ok: false, status: 403, reason: "cookie-only" });

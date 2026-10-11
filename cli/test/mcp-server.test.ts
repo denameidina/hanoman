@@ -120,7 +120,11 @@ describe("buildMcpServer", () => {
     // agen yang menemukan sebuah tool tak ada tak boleh menyimpulkan ia berhak memanggilnya.
     expect(String(about.modeNote)).toMatch(/bukan kontrol keamanan/i);
     expect(text).not.toContain("hnm_agt_secret");
-    expect(JSON.stringify(about)).not.toMatch(/token/i);
+    // ADR-0196 · daftar `tools` kini memuat NAMA tool & capability pengelola kredensial
+    // (`hanoman_agent_token_create`, `tokens:write`) — kata itu sah di sana. Yang dijaga tetap sama:
+    // bagian lain balasan (host/mode/catatan/keluhan) tak menyebut "token" sama sekali.
+    const { tools: _tools, ...rest } = about;
+    expect(JSON.stringify(rest)).not.toMatch(/token/i);
   });
 
   it("hanoman_about tetap menjawab meski konfigurasi bermasalah, dan menyebut keluhannya", async () => {
@@ -136,6 +140,51 @@ describe("buildMcpServer", () => {
     t.feed({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "hanoman_ticket_get", arguments: { ticket: "t1" } } });
     await tick();
     expect(reply(t, 9)?.result.content[0].text).not.toContain("hnm_agt_secret");
+  });
+
+  // ADR-0196 · SATU-SATUNYA pengecualian atas aturan di atas: tool pencetak kredensial. Plaintext
+  // token BARU yang dikembalikan REST sekali-tampil harus sampai ke pemanggil (tanpa itu tool-nya
+  // tak berguna), tapi token konfigurasi proses ini, field password, dan SEMUA galat tetap masked.
+  describe("revealsSecret", () => {
+    const run = async (name: string, args: Record<string, unknown>, call: ReturnType<typeof vi.fn>) => {
+      const { t } = await boot({ level: "danger" }, call as never);
+      t.feed({ jsonrpc: "2.0", id: 21, method: "tools/call", params: { name, arguments: args } });
+      await tick();
+      return reply(t, 21)?.result as { content: { text: string }[]; isError?: boolean };
+    };
+
+    it("hasil sukses agent_token_create membawa plaintext token BARU, tapi tidak token konfigurasi", async () => {
+      const call = vi.fn(async (): Promise<CallResult> => ({
+        ok: true, body: { id: "t9", token: "hnm_agt_NEWNEWNEW", bocor: "hnm_agt_secret" },
+      }));
+      const r = await run("hanoman_agent_token_create", { name: "anak", capabilities: ["projects:read"] }, call);
+      const text = r.content[0]!.text;
+      expect(text).toContain("hnm_agt_NEWNEWNEW");
+      expect(text).not.toContain("hnm_agt_secret");
+      expect(text).toContain("«token disembunyikan»");
+    });
+
+    it("device_token_create juga; tool LAIN yang kebetulan memuat pola token tetap masked", async () => {
+      const okDevice = vi.fn(async (): Promise<CallResult> => ({ ok: true, body: { id: "d1", token: "abcDEF_ghi-123" } }));
+      expect((await run("hanoman_device_token_create", { name: "laptop" }, okDevice)).content[0]!.text).toContain("abcDEF_ghi-123");
+      const other = vi.fn(async (): Promise<CallResult> => ({ ok: true, body: { x: "hnm_agt_NEWNEWNEW" } }));
+      expect((await run("hanoman_agent_tokens_list", {}, other)).content[0]!.text).not.toContain("hnm_agt_NEWNEWNEW");
+    });
+
+    it("GALAT dari tool pencetak tetap masked penuh", async () => {
+      const call = vi.fn(async (): Promise<CallResult> => ({ ok: false, message: "ditolak: hnm_agt_NEWNEWNEW hnm_agt_secret" }));
+      const r = await run("hanoman_agent_token_create", { name: "x", capabilities: [] }, call);
+      expect(r.isError).toBe(true);
+      expect(r.content[0]!.text).not.toContain("hnm_agt_NEWNEWNEW");
+      expect(r.content[0]!.text).not.toContain("hnm_agt_secret");
+    });
+
+    it("password disensor dari keluaran walau server memantulkannya", async () => {
+      const call = vi.fn(async (): Promise<CallResult> => ({ ok: true, body: { id: "u1", password: "hunter2hunter2", user: { newPassword: "x y" } } }));
+      const r = await run("hanoman_user_create", { email: "a@b.co", password: "hunter2hunter2" }, call);
+      expect(r.content[0]!.text).not.toContain("hunter2hunter2");
+      expect(r.content[0]!.text).not.toContain("x y");
+    });
   });
 });
 

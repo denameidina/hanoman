@@ -4,6 +4,7 @@ import { searchLogs, readRemoteTranscript } from "../services/logs/search";
 import { getSetting } from "../services/settings";
 import { prisma } from "../db";
 import { Prisma } from "@prisma/client";
+import { auditAgentAdmin } from "../services/admin-audit";
 
 export default async function (app: FastifyInstance) {
   app.get("/logs", async (req, reply) => {
@@ -28,6 +29,12 @@ export default async function (app: FastifyInstance) {
     const parsed = zLogRetention.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const before = await getSetting();
+    // ADR-0197 · memendekkan retensi menghapus jejak audit. Bila pelakunya agent token, catatannya
+    // ditulis SEBELUM nilainya berubah (dan retensi event baru memangkas sesudahnya), supaya
+    // perubahan itu sendiri tak ikut terhapus oleh perubahan yang dicatatnya.
+    await auditAgentAdmin(req, "log-retention.updated", "retensi log diubah", {
+      from: before.logRetention, to: parsed.data,
+    });
     const data = { ...before, logRetention: parsed.data } as unknown as Prisma.InputJsonValue;
     await prisma.setting.upsert({ where: { id: 1 }, update: { data }, create: { id: 1, data } });
     return parsed.data;

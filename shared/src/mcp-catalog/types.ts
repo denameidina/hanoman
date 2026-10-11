@@ -82,6 +82,13 @@ export type McpToolDef = {
    * hasil yang memang harus sampai ke pemanggil.
    */
   secretArgs?: readonly string[];
+  /**
+   * ADR-0196 · HASIL SUKSES tool ini memuat kredensial sekali-tampil (plaintext agent/device token)
+   * yang memang HARUS sampai ke pemanggil. Runtime CLI karenanya tak menerapkan topeng pola
+   * `hnm_agt_…` pada hasil sukses tool ini — token konfigurasi MCP sendiri tetap disembunyikan, dan
+   * galat/stderr tetap dimasker penuh. Tak ada tool lain yang boleh menyalakan ini.
+   */
+  revealsSecret?: boolean;
   build(args: Args): McpRequest | null;
   shape(raw: unknown, args: Args): unknown;
 };

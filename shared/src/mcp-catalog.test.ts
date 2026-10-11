@@ -38,9 +38,14 @@ describe("katalog tool MCP", () => {
     for (const t of executing) expect(visible.has(t.name), t.name).toBe(false);
   });
 
+  // ADR-0196..0198 · `auth/users`, `agent-tokens`, `device-tokens` kini punya tool (capability
+  // opt-in). Yang TETAP cookie-only dan tak boleh pernah dibungkus: login/logout/setup/status
+  // (cookie sesi & bootstrap) dan `sync` (Bearer device-token mesin-ke-mesin).
   it("tak ada tool yang menyentuh route cookie-only", () => {
-    for (const t of MCP_TOOLS)
-      expect(t.samplePath, t.name).not.toMatch(/^\/(auth|agent-tokens|device-tokens|sync)\b/);
+    for (const t of MCP_TOOLS) {
+      expect(t.samplePath, t.name).not.toMatch(/^\/(auth\/(status|setup|login|logout)|sync|session-events|portal|client-accounts|webhooks)\b/);
+      expect(t.samplePath, t.name).not.toMatch(/^\/terminal\/workspace/);
+    }
   });
 
   it("setiap tool punya deskripsi yang menyebut apa yang dikembalikan", () => {
@@ -203,7 +208,10 @@ describe("tingkat mode", () => {
 // dijaga adalah INVARIANNYA. Dua arah dikunci, dan arah kedua yang paling mudah lolos: sebuah tool
 // bisa bermode `danger` sambil menuntut capability yang lemah, dan tak ada yang menyadarinya sampai
 // seseorang memakainya.
-const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete", "sessions:decide"]);
+const DANGER_CAPS = new Set([
+  "sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete", "sessions:decide", "telegram:admin",
+  "access:admin", "remote:control", "relay:exec",
+]);
 
 // Tool DESTRUKTIF yang capability-nya tetap `:write` — bukan karena ringan, melainkan karena tak
 // ada capability `danger` di domainnya. Mode `danger`-nya murni ergonomi (mencegah salah pilih),
@@ -251,6 +259,13 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   "hanoman_webhook_test", "hanoman_webhook_delivery_retry",
   "hanoman_client_account_create", "hanoman_client_account_update",
   "hanoman_client_account_password_reset", "hanoman_client_account_delete",
+  // ADR-0196..0198 · permukaan admin: tulisnya (`tokens:write`, `devices:write`, `logs:write`,
+  // `metrics:write`) mencetak/mencabut kredensial atau menghapus jejak audit/vonis manusia, tapi
+  // aksesnya `write` biasa di domainnya. Mode `danger` di sini ergonomi; gerbang sungguhannya
+  // adalah capability opt-in + pagar tak-eskalasi-diri di handler server.
+  "hanoman_agent_token_create", "hanoman_agent_token_update", "hanoman_agent_token_revoke",
+  "hanoman_device_token_create", "hanoman_device_token_revoke",
+  "hanoman_logs_retention_set", "hanoman_agent_invocation_disposition",
 ]);
 
 describe("mode ⇔ capability", () => {

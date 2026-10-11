@@ -65,6 +65,18 @@ export const CAPABILITY_IDS = [
   // ADR-0193 · kredensial kanal Telegram (bot token + AgentToken gateway + allowlist). Akses `danger`:
   // siapa yang memegang ini ikut menentukan SIAPA yang bisa memerintah gateway ber-capability penuh.
   "telegram:admin",
+  // ADR-0196..0198 · permukaan ADMIN yang dulu cookie-only (ADR-0065/0097/0110/0146/0147/0165).
+  // Semuanya OPT-IN: tak satu pun diimplikasikan capability lama, dan `:write` di sini tak pernah
+  // memberi apa pun di domain lain. Kredensial & kendali mesin dipecah dari baca: manusia mencentang
+  // tiap kotak di Settings → Akses AI Agent.
+  "tokens:read", "tokens:write",
+  "devices:read", "devices:write",
+  "access:read", "access:admin",
+  "remote:read", "remote:control",
+  "relay:exec",
+  "logs:read", "logs:write",
+  "presence:read",
+  "metrics:read", "metrics:write",
 ] as const;
 export const zCapability = z.enum(CAPABILITY_IDS);
 export type Capability = z.infer<typeof zCapability>;
@@ -131,6 +143,22 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "scheduler:read", domain: "scheduler", access: "read", label: "Cronjob — baca", desc: "Lihat cronjob per project (jadwal, prompt, agen) dan riwayat run-nya." },
   { id: "scheduler:write", domain: "scheduler", access: "write", label: "Cronjob — tulis", desc: "Buat/ubah/hapus/jalankan cronjob. Membuat, mengubah prompt/agen/jadwal, mengaktifkan, dan menjalankan cron juga menuntut Sesi — buka sesi baru (cron = sesi agen tertunda).", risk: "exec" },
   { id: "telegram:admin", domain: "telegram", access: "danger", label: "Telegram — kredensial", desc: "Baca/ubah/hapus bot token, AgentToken gateway & allowlist user Telegram, dan uji koneksi. Siapa pun yang boleh memerintah gateway mewarisi capability token gateway; server menolak bila token gateway melebihi capability pemanggil.", risk: "exec" },
+  // ADR-0196..0198 · permukaan admin. Dibalik dari cookie-only dengan SADAR oleh pemilik; pagar
+  // tak-eskalasi-diri ditegakkan di handler server (lihat routes/agent-tokens.ts), bukan di label ini.
+  { id: "tokens:read", domain: "tokens", access: "read", label: "Agent token — baca", desc: "Lihat daftar agent token (nama, prefix, capability) dan katalog capability. Plaintext token tak pernah ikut." },
+  { id: "tokens:write", domain: "tokens", access: "write", label: "Agent token — tulis", desc: "Cetak, ubah, dan cabut agent token. Token baru/ubahan HANYA boleh memuat capability yang dimiliki pemanggil, dan token sendiri tak bisa diubah/dicabut. Plaintext token tampil sekali saat dicetak.", risk: "exec" },
+  { id: "devices:read", domain: "devices", access: "read", label: "Device token — baca", desc: "Lihat daftar device token (identitas mesin sync/relay) milik pemilik token ini." },
+  { id: "devices:write", domain: "devices", access: "write", label: "Device token — tulis", desc: "Cetak & cabut device token — kredensial mesin untuk sync workspace dan relay. Plaintext tampil sekali; token dicetak atas nama akun manusia yang menerbitkan agent token ini.", risk: "exec" },
+  { id: "access:read", domain: "access", access: "read", label: "Akun — baca", desc: "Lihat daftar akun operator/klien (email, role)." },
+  { id: "access:admin", domain: "access", access: "danger", label: "Akun — admin", desc: "Buat akun admin, hapus akun, dan setel ulang password akun lain. Akun admin = akses penuh dashboard (termasuk yang cookie-only): capability ini setara menyerahkan seluruh instance.", risk: "rce" },
+  { id: "remote:read", domain: "remote", access: "read", label: "Kendali jarak jauh — baca", desc: "Lihat grant kendali jarak jauh, lajur pengiriman log, status tautan relay, dan audit terakhir." },
+  { id: "remote:control", domain: "remote", access: "danger", label: "Kendali jarak jauh — ubah grant", desc: "Menyalakan/mengubah grant kendali jarak jauh mesin ini dan lajur pengiriman log ke hub. Grant yang menyala membuat hub bisa menjalankan agen di mesin ini; token hanya boleh memberi capability yang ia miliki sendiri.", risk: "rce" },
+  { id: "relay:exec", domain: "relay", access: "danger", label: "Relay perangkat — jalankan", desc: "Meneruskan aksi sesi (buka/steer/interrupt/selesai) ke mesin LAIN lewat relay hub atas nama operator. Eksekusi lintas mesin: dipisah dari kendali jarak jauh mesin ini.", risk: "rce" },
+  { id: "logs:read", domain: "logs", access: "read", label: "Log terpusat — baca", desc: "Cari log lintas device, baca transkrip, dan lihat retensi. Jejak audit seluruh mesin operator." },
+  { id: "logs:write", domain: "logs", access: "write", label: "Log terpusat — tulis", desc: "Ubah retensi log (memendekkan retensi menghapus jejak audit) dan lajur pengiriman log ke hub. Setiap perubahan oleh agen dicatat di log event.", risk: "exec" },
+  { id: "presence:read", domain: "presence", access: "read", label: "Presence — baca", desc: "Peta sesi yang sedang hidup di seluruh device operator." },
+  { id: "metrics:read", domain: "metrics", access: "read", label: "Metrik custom agent — baca", desc: "Metrik pemakaian & disposisi (diterima/ditolak) custom agent." },
+  { id: "metrics:write", domain: "metrics", access: "write", label: "Metrik custom agent — tulis", desc: "Menyetel disposisi satu invokasi (accepted/partial/rejected/false-positive). Disposisi adalah vonis MANUSIA atas mutu agen; agen yang menilai dirinya sendiri merusak sinyal itu.", risk: "exec" },
 ];
 
 // SPEC-264 · Metadata per-domain untuk grid capability di Settings (label ramah + cakupan).
@@ -160,6 +188,15 @@ export const CAPABILITY_DOMAINS: { domain: string; label: string; desc: string }
   { domain: "webhooks", label: "Webhook", desc: "Endpoint webhook keluar, secret penandatanganan, riwayat pengiriman." },
   { domain: "clients", label: "Akun klien", desc: "Akun login portal klien dan project yang boleh dilihatnya." },
   { domain: "portal", label: "Portal klien", desc: "Lihat portal atas nama satu akun klien (baca-saja)." },
+  // ADR-0196..0198 · permukaan admin (opt-in; lihat komentar di CAPABILITY_IDS).
+  { domain: "tokens", label: "Agent token", desc: "Cetak/ubah/cabut agent token — hanya sebatas capability milik pemanggil." },
+  { domain: "devices", label: "Device token", desc: "Kredensial mesin untuk sync & relay: daftar, cetak, cabut." },
+  { domain: "access", label: "Akun & password", desc: "Daftar akun, buat/hapus akun admin, setel ulang password — setara akses penuh." },
+  { domain: "remote", label: "Kendali jarak jauh", desc: "Grant kendali jarak jauh mesin ini dan lajur log ke hub." },
+  { domain: "relay", label: "Relay perangkat", desc: "Aksi sesi di mesin lain lewat relay hub." },
+  { domain: "logs", label: "Log terpusat", desc: "Pencarian log lintas device, transkrip, retensi." },
+  { domain: "presence", label: "Presence", desc: "Sesi yang sedang hidup di seluruh device operator." },
+  { domain: "metrics", label: "Metrik custom agent", desc: "Metrik pemakaian custom agent & disposisi per invokasi." },
 ];
 
 // write meng-implikasikan read pada domain yang sama.
@@ -167,6 +204,14 @@ export function grantsCapability(granted: string[], need: Capability): boolean {
   if (granted.includes(need)) return true;
   if (need.endsWith(":read")) return granted.includes(need.replace(/:read$/, ":write"));
   return false;
+}
+
+// ADR-0196 · pagar tak-eskalasi-diri: capability di `requested` yang TIDAK dimiliki `granted`
+// (write tetap mengimplikasikan read; danger tak pernah diimplikasikan). Kosong = `requested`
+// adalah himpunan-bagian dari hak pemanggil. Id tak dikenal dianggap melebihi (fail closed).
+export function exceedingCapabilities(granted: readonly string[], requested: readonly string[]): string[] {
+  const g = [...granted];
+  return [...new Set(requested)].filter((c) => !zCapability.safeParse(c).success || !grantsCapability(g, c as Capability));
 }
 
 export const zAgentTokenView = z.object({

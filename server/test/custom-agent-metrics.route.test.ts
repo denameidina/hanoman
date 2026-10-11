@@ -119,9 +119,9 @@ describe("GET /api/custom-agents/metrics", () => {
     expect(all.json().recent).toHaveLength(100);
   });
 
-  it("cookie-only dan menolak tanggal tidak sah", async () => {
+  it("butuh sesi, gerbang `metrics:read` (ADR-0198), dan menolak tanggal tidak sah", async () => {
     expect((await app.inject({ method: "GET", url: "/api/custom-agents/metrics" })).statusCode).toBe(401);
-    expect(capabilityForRoute("GET", "/api/custom-agents/metrics")).toBe("COOKIE_ONLY");
+    expect(capabilityForRoute("GET", "/api/custom-agents/metrics")).toBe("metrics:read");
     const cookie = await login();
     expect((await app.inject({
       method: "GET", url: "/api/custom-agents/metrics?from=kemarin", headers: { cookie },
@@ -174,6 +174,7 @@ describe("PATCH /api/custom-agents/invocations/:id", () => {
       method: "PATCH", url: "/api/custom-agents/invocations/missing", headers: { cookie },
       payload: { disposition: "rejected" },
     })).statusCode).toBe(404);
-    expect(capabilityForRoute("PATCH", "/api/custom-agents/invocations/judge")).toBe("COOKIE_ONLY");
+    // ADR-0198 · dulu COOKIE_ONLY; kini `metrics:write` — capability TERSENDIRI, bukan `agents:write`.
+    expect(capabilityForRoute("PATCH", "/api/custom-agents/invocations/judge")).toBe("metrics:write");
   });
 });

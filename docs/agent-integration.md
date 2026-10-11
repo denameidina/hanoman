@@ -99,6 +99,12 @@ read** pada domain yang sama. Ada **18 domain**; lima di antaranya punya akses K
 deskripsi) tampil di panel **Settings → Akses AI Agent** saat manusia membuat token; endpoint
 katalognya (`GET /api/agent-tokens/capabilities`) bersifat **cookie-only** (lihat §5) — kamu tak
 perlu mengambilnya, cukup rujuk tabel di bawah:
+read** pada domain yang sama. Ada **23 domain** dan **48 capability**; domain yang punya akses KETIGA
+`danger` (`sessions:spawn`, `ide:git`, `backlog:lifecycle`, `vps:exec` — ADR-0155 — dan, sejak
+ADR-0196..0198, `access:admin`, `remote:control`, `relay:exec`) **tak diimplikasikan `:write`**.
+Katalog resmi (dengan label & deskripsi) tampil di panel **Settings → Akses AI Agent** saat manusia
+membuat token; endpoint katalognya (`GET /api/agent-tokens/capabilities`) kini terbaca dengan
+`tokens:read` — selain itu cukup rujuk tabel di bawah:
 
 | Domain | Cakupan endpoint | Catatan |
 |---|---|---|
@@ -126,6 +132,14 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 | `qa` | `/api/projects/:id/qa/**`, `/api/qa/**` | laporan QA, test case, temuan, lampiran, ekspor/impor. Method `DELETE` menuntut `qa:delete` (akses `danger`, ADR-0185), bukan `qa:write` |
 | `decisions` | `/api/terminal/sessions/:id/dialog*` (capability `sessions:decide`, akses `danger`) | **gerbang manusia-yang-memutuskan** (ADR-0190, ADR-0192): baca, jawab, dan rebut dialog `AskUserQuestion` sebuah sesi. **Tak diimplikasikan `sessions:write`.** Beri HANYA ke token yang tidak dipakai agen di dalam sesi hanoman — lihat §13 |
 | `scheduler` | `/api/scheduler/crons*` | cronjob per project — **cron = sesi agen berizin penuh yang ditunda** (ADR-0191). Membuat, mengubah prompt/agen/model/effort/jadwal, mengaktifkan, dan menjalankan cron menuntut **`scheduler:write` DAN `sessions:spawn`**; server menjawab 403 `need: sessions:spawn` bila yang kedua tak dicentang |
+| `tokens` | `/api/agent-tokens*` | cetak/ubah/cabut **agent token**. Dulu cookie-only (ADR-0065); ADR-0196 membukanya dengan **pagar tak-eskalasi-diri** (§5b). `tokens:write` **bukan** izin menaikkan hak sendiri |
+| `devices` | `/api/device-tokens*` | **device token** (identitas mesin untuk sync & relay) atas nama akun admin yang menerbitkan agent token ini (ADR-0197). Plaintext sekali-tampil |
+| `access` | `/api/auth/users*`, `POST /api/auth/change-password` | daftar akun (`access:read`); **`access:admin`** (danger) membuat akun admin, menghapus akun, dan menyetel ulang password akun lain — **setara akses penuh instance** |
+| `remote` | `/api/remote-control` | grant kendali jarak jauh mesin ini. `remote:read` membaca; **`remote:control`** (danger) mengubahnya — grant yang menyala membuat hub menjalankan agen di mesin ini (ADR-0165, ADR-0197) |
+| `relay` | `/api/devices/:id/relay/*` | **`relay:exec`** (danger): meneruskan aksi sesi ke mesin LAIN lewat relay hub, atas nama operator — eksekusi lintas mesin (ADR-0165 §4, ADR-0197) |
+| `logs` | `/api/logs*` | log terpusat lintas device: cari, transkrip, retensi (`logs:read`); `logs:write` mengubah retensi & lajur pengiriman log (memendekkan retensi menghapus jejak audit) |
+| `presence` | `/api/presence` | peta sesi hidup di seluruh device operator (`presence:read`, ADR-0147/0197) |
+| `metrics` | `/api/custom-agents/{metrics,invocations}*` | metrik custom agent (`metrics:read`) dan disposisi per invokasi (`metrics:write` — vonis MANUSIA atas mutu agen; ADR-0198) |
 
 ## 4. Aturan gate & kode status
 
@@ -159,25 +173,29 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
 > Agent): `/api/webhooks*` → `webhooks:*` (ADR-0194), `/api/client-accounts*` → `clients:*`
 > (ADR-0194), `/api/telegram/{settings,test,credentials}` → `telegram:admin` (ADR-0193), dan
 > **baca** `/api/portal*` → `portal:read` (ADR-0195). Lihat tabel §3.
+- `/api/auth/{status,setup,login,logout}` — cookie sesi & bootstrap akun pertama (setup token di
+  `HANOMAN_HOME`). Agen tak punya sesi cookie, jadi tak ada yang bisa dibungkus bermakna. (Pengelolaan
+  akun — `/api/auth/users*` dan `change-password` — **dibuka** lewat `access:*`; lihat §5b.)
+- `/api/sync*` — sync mesin-ke-mesin; kredensialnya Bearer **device token**, bukan agent token
+- `/api/webhooks*` — memegang secret penandatanganan **dan** menentukan ke mana data workspace
+  mengalir keluar (ADR-0100)
+- `/api/telegram/settings`, `/api/telegram/test`, `/api/telegram/credentials` — permukaan
+  **kredensial** (bot token & agent token), beda dari sisa `/api/telegram*` (ADR-0097)
+- `/api/portal*` — portal klien: isinya ditentukan **akun yang login** (`ClientProjectAccess`), jadi
+  tak ada capability yang bisa berarti apa pun di sana. Backlog & tiket yang sama tersedia lewat
+  `/api/specs` dan `/api/tickets` dengan capability `backlog`/`support` (ADR-0110)
+- `/api/client-accounts*` — membuat & mencabut akun klien beserta password awalnya (ADR-0110)
 - `/api/session-events` — event pertanyaan sesi untuk hanoman-lead (SPEC-909/ADR-0146). Pemanggilnya
   **hook sesi**, bukan manusia dan bukan agen: kredensialnya token turunan per sesi, dan agen yang
   bisa memalsukan "sesi X bertanya Y" bisa menggerakkan lead atas nama sesi mana pun — itu peniruan
   identitas, bukan capability. Agent token di sini menerima **401** (token sesi tak cocok), bukan
   403: gate cookie mem-bypass path-nya dan route menegakkan tokennya sendiri
-- `/api/presence` — peta pekerjaan yang sedang berjalan di **seluruh mesin** operator: sesi apa
-  hidup di device mana (SPEC-919/ADR-0147). Tak ada capability yang bisa berarti sesuatu untuk
-  agregat lintas-mesin, jadi ia cookie-only apa pun method-nya. Frame siar `presence` di
-  `/api/events/ws` mengikuti gerbang yang sama — grup itu **tidak** dikirim ke principal non-cookie,
-  walau kanalnya sendiri `GLOBAL_READ` bagi agent token
-- `/api/remote-control` — grant kendali jarak jauh mesin ini dari hub (SPEC-1215/ADR-0165): siapa
-  pun yang bisa menulisnya bisa membuka eksekusi agen di mesin ini atas perintah hub. Cookie-only apa
-  pun method-nya, dan `PUT /api/settings` pun tak bisa mengubah kunci `remoteControl`/`logShipping`/
-  `logRetention`
-- `/api/logs*` (`GET /api/logs`, `GET /api/logs/:id/transcript`, `GET|PUT /api/logs/retention`) —
-  log terpusat & audit lintas klien (SPEC-1217/ADR-0166): ini jejak audit "siapa melakukan apa di
-  mesin mana", dan agen yang bisa membacanya atau memendekkan retensinya bisa menyembunyikan atau
-  memalsukan seluruh jejak sesi. Cookie-only apa pun method-nya — beda dari `POST /api/sync/logs`
-  (pengiriman batch **dari** klien), yang tetap device-token seperti jalur sync lain
+- `/api/terminal/workspace` — tata letak tab/pane **browser** satu akun manusia (revisi optimistik per
+  `req.user.id`); agent token tak punya akun, dan menulisnya hanya merusak layout operator
+- Frame siar `presence` di `/api/events/ws` — grup itu **tidak** dikirim ke principal non-cookie,
+  walau kanalnya sendiri `GLOBAL_READ`. Agen membaca peta yang sama lewat `GET /api/presence`
+  (`presence:read`, §5b). `PUT /api/settings` tetap tak bisa mengubah kunci `remoteControl`/
+  `logShipping`/`logRetention`; jalurnya hanya `PUT /api/remote-control` dan `PUT /api/logs/retention`
 - `POST /api/update/apply` dan tulis lain di bawah prefix status (`/api/limits`, `/api/update`,
   `/api/events`, `/api/fs`, `/api/health`, serta — sejak ADR-0187 — `/api/models`, `/api/methods`,
   `/api/codex`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya cookie-only
@@ -185,6 +203,46 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
 Route yang tak dikenal peta juga **default cookie-only** (aman): endpoint baru tak pernah terbuka
 karena kelalaian. Endpoint `/api/help*` (Help Center publik) punya otorisasi sendiri (kunci tiket)
 dan tak memakai agent token.
+
+## 5b. Permukaan admin yang dibuka opt-in (ADR-0196..0198)
+
+Sampai ADR-0196..0198, `/api/agent-tokens*`, `/api/device-tokens*`, `/api/auth/users*`,
+`/api/auth/change-password`, `/api/remote-control`, `/api/devices/:id/relay/*`, `/api/logs*`,
+`/api/presence`, dan metrik custom agent cookie-only. Pemilik repo meminta mereka dibungkus, jadi
+keputusan lama itu dibalik **dengan capability baru yang opt-in** (tak ada capability lama yang
+membukanya) dan **pagar yang ditegakkan di server**, bukan hanya di katalog tool:
+
+| Hal | Aturan |
+|---|---|
+| Cetak agent token (`POST /api/agent-tokens`) | `capabilities` token baru HARUS himpunan-bagian milik pemanggil (`write ⊇ read`; danger hanya bila dimiliki persis). Selebihnya **403** `{ error, exceeds: [...] }` |
+| Ubah agent token (`PATCH`) | `capabilities` baru ⊆ milik pemanggil, **dan** token target tak boleh lebih berkuasa dari pemanggil (agen lemah tak bisa menonaktifkan/menurunkan token yang manusia beri hak lebih) |
+| Cabut agent token (`DELETE`) | aturan target yang sama |
+| Token sendiri | **tak bisa** diubah atau dicabut oleh dirinya sendiri (403 `{ self: true }`) — minta manusia |
+| Plaintext token | hanya di balasan `POST` (agent maupun device token); tak pernah di daftar atau di log audit; runtime MCP melepas topeng token HANYA untuk hasil sukses dua tool pencetak |
+| Device token | dicetak atas nama akun admin yang menerbitkan agent token pemanggil (rantai `agent:<id>` ditelusuri); tanpa penerbit manusia → **409**. Agen hanya melihat/mencabut device token milik akun itu |
+| Akun | membuat akun admin, menghapus akun, menyetel ulang password akun lain = `access:admin` (danger). Reset password agen: `{ userId, newPassword }` tanpa password lama, mencabut semua sesi akun itu, dan **tidak** menerbitkan cookie. Admin terakhir tetap tak bisa dihapus. `access:admin` setara menyerahkan seluruh instance |
+| Grant jarak jauh (`PUT /api/remote-control`) | `control.capabilities` ⊆ milik pemanggil; mengubah lajur log (data keluar ke hub) menuntut juga `logs:write` |
+| Relay perangkat | `relay:exec` (danger) untuk semua method; aktor ditandai `agent:<id>`; allowlist route ditegakkan mesin tujuan; WebSocket relay tidak tersedia untuk agen |
+| Jejak | setiap aksi admin oleh agent token tercatat di log event (`kind` `admin.*`) tanpa rahasia; perubahan retensi log dicatat **sebelum** nilainya berubah |
+
+Tool MCP-nya (semua tulis bermode `danger`, hanya tampil dengan `--danger`):
+
+| Tool | Mode | Capability |
+|---|---|---|
+| `hanoman_agent_tokens_list`, `hanoman_agent_token_capabilities` | baca | `tokens:read` |
+| `hanoman_agent_token_create`, `hanoman_agent_token_update`, `hanoman_agent_token_revoke` | danger | `tokens:write` |
+| `hanoman_device_tokens_list` | baca | `devices:read` |
+| `hanoman_device_token_create`, `hanoman_device_token_revoke` | danger | `devices:write` |
+| `hanoman_users_list` | baca | `access:read` |
+| `hanoman_user_create`, `hanoman_user_delete`, `hanoman_user_password_reset` | danger | `access:admin` |
+| `hanoman_remote_control_get` | baca | `remote:read` |
+| `hanoman_remote_control_set` | danger | `remote:control` |
+| `hanoman_device_relay` | danger | `relay:exec` |
+| `hanoman_logs_search`, `hanoman_log_transcript`, `hanoman_logs_retention_get` | baca | `logs:read` |
+| `hanoman_logs_retention_set` | danger | `logs:write` |
+| `hanoman_presence_get` | baca | `presence:read` |
+| `hanoman_agent_metrics` | baca | `metrics:read` |
+| `hanoman_agent_invocation_disposition` | danger | `metrics:write` |
 
 ## 6. Endpoint yang paling sering dipakai
 
