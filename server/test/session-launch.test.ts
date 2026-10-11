@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -9,6 +9,8 @@ import { killAll, killSession, agentsFilePath, promptFilePath, getSession } from
 import { DEFAULT_SETTING } from "../src/services/settings";
 import { resolveGoalCondition } from "@hanoman/runner";
 import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
+import { makeRepoWithBranches } from "./factory";
+import { resolveRepoDir } from "../src/services/local-binding";
 
 const clean = async () => {
   killAll();
@@ -26,6 +28,43 @@ describe("session-launch", () => {
     const spec = await prisma.spec.create({ data: { id: "SPEC-1", projectId: "p1", title: "t", source: "brief", stage: "planned", author: "a", priority: "sedang", objective: "", launchApprovedAt: new Date(), launchApprovedBy: "test" } });
     await expect(startSpecSession(spec, { flow: "feature" })).rejects.toMatchObject({ kind: "needs-bind" });
     expect((await prisma.spec.findUnique({ where: { id: "SPEC-1" } }))!.baseSha).toBeNull(); // tak menyentuh baseSha
+  });
+
+  // ADR-0203 · binding kosong + gitRemote → hanoman meng-clone sendiri lalu lanjut ke worktree.
+  describe("auto-clone checkout (ADR-0203)", () => {
+    const oldHome = process.env.HANOMAN_HOME;
+    const oldBin = process.env.HANOMAN_CLAUDE_BIN;
+    afterEach(() => {
+      if (oldHome === undefined) delete process.env.HANOMAN_HOME; else process.env.HANOMAN_HOME = oldHome;
+      if (oldBin === undefined) delete process.env.HANOMAN_CLAUDE_BIN; else process.env.HANOMAN_CLAUDE_BIN = oldBin;
+    });
+    const approvedSpec = (id: string, projectId: string) => prisma.spec.create({ data: {
+      id, projectId, title: "t", source: "brief", stage: "planned", author: "a", priority: "sedang",
+      objective: "o", launchApprovedAt: new Date(), launchApprovedBy: "test",
+    } });
+
+    it("meng-clone otomatis saat binding kosong dan project punya gitRemote", async () => {
+      process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+      const home = mkdtempSync(join(tmpdir(), "hn-home-"));
+      process.env.HANOMAN_HOME = home;
+      await prisma.project.create({ data: { id: "pc", name: "PC", desc: "", kind: "existing", gitRemote: makeRepoWithBranches("main") } });
+      const spec = await approvedSpec("SPEC-CL", "pc");
+      const r = await startSpecSession(spec, { flow: "feature" });
+      const dir = await resolveRepoDir("pc");
+      expect(dir).toBe(join(home, "projects", "pc"));
+      expect(existsSync(join(dir!, ".git"))).toBe(true);
+      expect(existsSync(join(dir!, ".worktrees", r.id))).toBe(true);
+      expect((await prisma.spec.findUnique({ where: { id: "SPEC-CL" } }))!.baseSha).toMatch(/^[0-9a-f]{40}$/);
+      killSession(r.id);
+    }, 30_000);
+
+    it("clone gagal → LaunchError kind checkout dan baseSha tidak tersentuh", async () => {
+      process.env.HANOMAN_HOME = mkdtempSync(join(tmpdir(), "hn-home-"));
+      await prisma.project.create({ data: { id: "pf", name: "PF", desc: "", kind: "existing", gitRemote: join(tmpdir(), "tidak-ada-repo-ini") } });
+      const spec = await approvedSpec("SPEC-CF", "pf");
+      await expect(startSpecSession(spec, { flow: "feature" })).rejects.toMatchObject({ kind: "checkout" });
+      expect((await prisma.spec.findUnique({ where: { id: "SPEC-CF" } }))!.baseSha).toBeNull();
+    });
   });
 
   // SPEC-332 · ADR-0073 · resolusi mode goal: override per sesi → template global → default bawaan.

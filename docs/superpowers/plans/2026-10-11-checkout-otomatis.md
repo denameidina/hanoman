@@ -618,7 +618,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `cloneProjectCheckout`, `CheckoutError`, `fetchRefIfMissing` (Task 3).
 - Produces: `LaunchError.kind` bertambah `"checkout"` (route `POST /terminal/sessions` memetakannya ke 422 lewat cabang default yang sudah ada — tidak perlu mengubah `terminal.ts`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan di `server/test/session-launch.test.ts` (impor `mkdtempSync`, `tmpdir`, `join`, `existsSync` sudah ada; tambahkan `makeRepoWithBranches` dari `./factory` dan `resolveRepoDir` dari `../src/services/local-binding`):
 
@@ -657,12 +657,12 @@ Tambahkan di `server/test/session-launch.test.ts` (impor `mkdtempSync`, `tmpdir`
 
 Test lama "throws LaunchError needs-bind when the project has no local checkout" (project tanpa `gitRemote`) harus tetap lulus tanpa diubah.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/session-launch.test.ts --no-file-parallelism -t "meng-clone otomatis|clone gagal"`
 Expected: FAIL — launch melempar `needs-bind` karena belum ada auto-clone.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `server/src/services/session-launch.ts`:
 
@@ -705,12 +705,12 @@ async function autoCheckout(projectId: string): Promise<string> {
     if (!resume?.worktreeKept) await fetchRefIfMissing(repoDir, spec.branchFrom);
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/session-launch.test.ts test/session-launch-admission.test.ts test/structured-launch-admission.test.ts --no-file-parallelism`
 Expected: PASS, termasuk test lama `needs-bind`. Bila ada `switch` pada `LaunchError.kind` yang tidak lengkap, `grep -rn "LaunchError" server/src` dan tangani kind `checkout` seperti `worktree` (gagal → `markFailed`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/session-launch.ts server/test/session-launch.test.ts docs/superpowers/plans/2026-10-11-checkout-otomatis.md
