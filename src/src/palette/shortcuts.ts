@@ -75,6 +75,9 @@ export function paletteShortcutLabel(mac: boolean): string {
   return mac ? "⌘K" : "Ctrl K";
 }
 
+/** Nama baris bantuan untuk layar yang berbeda dari label nav-nya (ADR-0205: Dalang di luar sidebar). */
+const NAV_ROW_LABEL: Readonly<Record<string, string>> = { dalang: "Buka panggung" };
+
 export type ShortcutRow = { keys: string[]; label: string };
 export type ShortcutSection = { title: string; rows: ShortcutRow[] };
 
@@ -96,7 +99,8 @@ export function shortcutSections(mac: boolean, nav: readonly { key: string; labe
       title: "Pindah layar: tekan g, lalu huruf",
       rows: nav.flatMap((n) => {
         const letter = letterOf.get(n.key);
-        return letter ? [{ keys: ["g", letter], label: n.label }] : [];
+        // ADR-0205 · Dalang di luar sidebar; baris bantuannya memakai nama aksinya, sama dengan palet.
+        return letter ? [{ keys: ["g", letter], label: NAV_ROW_LABEL[n.key] ?? n.label }] : [];
       }),
     },
   ];

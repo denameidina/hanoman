@@ -8,11 +8,11 @@ import type { TerminalSession } from "../api/client";
 import type { ProjectVM, SpecSlim } from "./types";
 import { LimitWindows } from "./LimitIndicator";
 import { DalangStage, FLOW_LABEL, STAGE_LABEL } from "./DalangStage";
+import { DOC_STATUS_LABEL, labelOf } from "../lib/labels";
 import { useLimits } from "../api/limits";
 import { useCodexLimits } from "../api/codex-limits";
 
-// Satu sumber untuk kata status dokumen — dipakai pill, badge, dan judul baris.
-const DOC_LABEL: Record<string, string> = { ok: "Sesuai standar", drift: "Tidak sinkron", broken: "Belum sesuai" };
+// Kata status dokumen dipusatkan di lib/labels.ts — dipakai pill, badge, dan judul baris.
 function oCovTone(s: string) { return s === "broken" ? "err" : s === "drift" ? "warn" : "ok"; }
 // Sesi tak punya status "failed" yang terbaca dari luar — yang gagal terlihat di terminalnya.
 function oAttention(p: ProjectVM): "high" | "low" | "none" {
@@ -65,7 +65,7 @@ function LiveSessionRow({ s, name, stage, onOpenSession }: {
 }) {
   return (
     <button type="button" className="hn-dense-row" onClick={() => onOpenSession(s.id)} style={rowBtn}>
-      <StatusPill status="running" size="sm">{stage ?? FLOW_LABEL[s.flow ?? ""] ?? "Sesi"}</StatusPill>
+      <StatusPill status="running" size="sm">{stage ?? (s.flow ? labelOf(FLOW_LABEL, s.flow) : "Sesi")}</StatusPill>
       <span className="hn-grow" title={name} style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-strong)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>{s.specId ?? ""}</span>
     </button>
@@ -86,7 +86,7 @@ function CoverageRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => vo
       <ProgressBar value={p.coverage} tone={oCovTone(p.docStatus)} size="sm" />
       {/* kolom 136px memuat "Sesuai standar" (~121px dengan dot & padding); justifySelf:end bikin
           pill seukuran konten & rata kanan — bukan stretch yang bikin teks tumpah dari pill. */}
-      <StatusPill status={p.docStatus} size="sm" style={{ justifySelf: "end" }}>{DOC_LABEL[p.docStatus] ?? p.docStatus}</StatusPill>
+      <StatusPill status={p.docStatus} size="sm" style={{ justifySelf: "end" }}>{labelOf(DOC_STATUS_LABEL, p.docStatus)}</StatusPill>
     </button>
   );
 }
@@ -148,7 +148,7 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
   const activity = projects.map((p) => ({ project: p, text: p.activity, commit: p.commit, live: liveProjects.has(p.id) }));
   const stageOf = (s: TerminalSession) => {
     const spec = s.specId ? backlog.find((x) => x.id === s.specId) : undefined;
-    return spec ? (STAGE_LABEL[spec.stage] ?? spec.stage) : null;
+    return spec ? labelOf(STAGE_LABEL, spec.stage) : null;
   };
 
   return (

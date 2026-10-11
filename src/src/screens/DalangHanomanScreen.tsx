@@ -11,6 +11,7 @@ import { Icon } from "../ds";
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, SpecSlim } from "./types";
 import { isToday, STAGE_LABEL, FLOW_LABEL } from "./DalangStage";
+import { labelOf } from "../lib/labels";
 import { useEventsStatus } from "../api/live";
 // Hero dirakit dari 5 bagian ber-sendi (rig sheet Codex): badan + 4 lengan berputar
 // di cakram pivot bahunya masing-masing — animasi jauh lebih hidup dari satu gambar statis.
@@ -342,7 +343,7 @@ export function DalangHanomanScreen({ projects, backlog, sessions, onOpenSession
                   const spec = s.specId ? backlog.find((x) => x.id === s.specId) : undefined;
                   const waiting = !!s.decision && !s.deciding;
                   const sub = waiting ? "menunggu jawabanmu"
-                    : spec ? `${spec.id} · ${STAGE_LABEL[spec.stage] ?? spec.stage}` : (FLOW_LABEL[s.flow ?? ""] ?? "sesi terminal");
+                    : spec ? `${spec.id} · ${labelOf(STAGE_LABEL, spec.stage)}` : (s.flow ? labelOf(FLOW_LABEL, s.flow) : "sesi terminal");
                   return (
                     <li key={s.id} style={{ listStyle: "none" }}>
                       <button type="button" className="hn-dlg-prj" data-puppet

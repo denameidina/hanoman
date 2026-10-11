@@ -4,6 +4,7 @@ import React from "react";
 import { Card, Switch, Select, Button, Input, Field, HnTextarea, Icon, StateBlock, Badge, Callout, useConfirm, useResponsiveTier, Modal } from "../ds";
 import { api, ApiError } from "../api/client";
 import { failureMessage } from "../lib/report-error";
+import { RUNTIME_LABEL } from "../lib/labels";
 import { CAPABILITY_DOMAINS, SCHEDULER_DEFAULTS, GOAL_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, LEAD_DEFAULTS, TELEGRAM_DEFAULTS, PORTAL_CHAT_DEFAULTS, ORCHESTRATION_DEFAULTS, BUILTIN_RUNTIME_DEFAULTS, REMOTE_CONTROL_DEFAULTS, LOG_SHIPPING_DEFAULTS, LOG_RETENTION_DEFAULTS, CODEX_MODELS, MODELS, EFFORTS, METHODS, METHOD_IDS, DEFAULT_METHOD, resolveMethod, codexEfforts, coerceCodexEffort, codexModel, codexClientTooOld, configEntry, modelSelectOptions } from "@hanoman/shared";
 import type { Setting, UserView, DeviceTokenView, SessionResultView, ConfigResponse, ConfigEntryView, AgentTokenView, CapabilityInfo, TelegramGatewayStatus, TelegramCredentialsView, TelegramTestResult, MethodStatusResponse, MethodSkillStatus, SetupStatus } from "@hanoman/shared";
 import type { ShowToast } from "../ds";
@@ -75,7 +76,7 @@ const S_DEFAULTS: Setting = {
 
 // SPEC-383 · label agen dipakai di judul grup model DAN di baris warisan kartu konflik — satu
 // sumber supaya "Codex CLI" di dua tempat tak bisa berbeda.
-const AGENT_LABEL: Record<"claude" | "codex", string> = { claude: "Claude Code", codex: "Codex CLI" };
+const AGENT_LABEL = RUNTIME_LABEL;
 
 // SPEC-383 · penanda blok mana yang benar-benar dipakai sesi baru. Tanpa ini judul kartu
 // ("default global") terbaca sebagai klaim atas KEDUA blok, padahal `sessionAgentDefaults()`

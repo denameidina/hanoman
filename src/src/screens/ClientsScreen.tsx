@@ -6,6 +6,7 @@ import { Icon } from "../ds/icon";
 import { LogsPanel } from "./LogsPanel";
 import { RemoteInstanceView } from "./RemoteInstanceView";
 import type { PresenceDeviceView, PresenceSessionView, PresenceView } from "@hanoman/shared";
+import { relativeTime } from "../lib/time-format";
 
 /* SPEC-919 · ADR-0147 · halaman "Klien": perangkat yang sinkron ke server ini, dan pekerjaan yang
    sedang berjalan di masing-masing.
@@ -20,18 +21,6 @@ const STATUS: Record<PresenceSessionView["status"], { label: string; tone: "ok" 
   waiting: { label: "menunggu keputusan", tone: "warn" },
   exited: { label: "selesai", tone: "neutral" },
 };
-
-/** Diekspor karena ia fungsi MURNI dan satu-satunya penerjemah angka waktu di layar ini —
-    menguji lewat render hanya menyentuh satu cabangnya. */
-export function sinceLabel(iso: string, now: number): string {
-  const ms = now - Date.parse(iso);
-  if (!Number.isFinite(ms) || ms < 0) return "—";
-  const m = Math.floor(ms / 60_000);
-  if (m < 1) return "baru saja";
-  if (m < 60) return `${m} mnt`;
-  const h = Math.floor(m / 60);
-  return h < 24 ? `${h} jam ${m % 60} mnt` : `${Math.floor(h / 24)} hari`;
-}
 
 /** Alasan tombol "Buka" mati, dalam bahasa biasa. `null` = tombol boleh dipakai. Murni, supaya
     tiap cabangnya bisa diuji tanpa merender kartu. */
@@ -72,7 +61,7 @@ function SessionRow({ s, title, onOpenSpec, now }:
       {s.phase && <Badge tone="brass" size="sm">{s.phase}</Badge>}
       <Badge tone={st.tone} size="sm">{st.label}</Badge>
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, color: "var(--text-subtle)" }}>
-        {sinceLabel(s.startedAt, now)}
+        {relativeTime(s.startedAt, now) || "—"}
       </span>
     </div>
   );
@@ -96,7 +85,7 @@ function DeviceCard({ d, specTitles, onOpenSpec, now, onOpenRemote }:
         </Badge>
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 11.5, color: "var(--text-subtle)" }}>
-          terakhir terlihat {d.lastSeenAt ? sinceLabel(d.lastSeenAt, now) + " lalu" : "—"}
+          terakhir terlihat {relativeTime(d.lastSeenAt, now) || "—"}
         </span>
         {!d.local && (
           <Button size="sm" disabled={!!reason} onClick={() => onOpenRemote(d)}

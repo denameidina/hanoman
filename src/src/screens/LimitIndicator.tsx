@@ -5,6 +5,8 @@ import type { LimitsDTO } from "@hanoman/shared";
 import { useLimits, worstWindow, severityToken } from "../api/limits";
 import { useCodexLimits } from "../api/codex-limits";
 import { usePopoverFocus } from "../ds/popover";
+import { relativeTime } from "../lib/time-format";
+import { LIMIT_SEVERITY_LABEL } from "../lib/labels";
 import { useCoarsePointer } from "../ds/responsive";
 
 // Tanggal+jam absolut reset (waktu lokal browser, id-ID). Weekly reset berhari-hari ke depan —
@@ -19,16 +21,10 @@ function resetLabel(iso: string | null, absolute = false): string {
   const cd = ms <= 0 ? "reset segera" : h >= 1 ? `reset dalam ${h} jam ${m} menit` : `reset dalam ${m} menit`;
   return absolute ? `${cd} · ${resetFmt.format(new Date(iso))}` : cd;
 }
-function agoLabel(iso: string | null): string {
-  if (!iso) return "";
-  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (m <= 0) return "baru saja";
-  return m < 60 ? `${m} menit lalu` : `${Math.round(m / 60)} jam lalu`;
-}
 
 // Severity selalu ditulis sebagai kata, bukan hanya warna (aturan a11y: warna bukan satu-satunya pembeda).
 type Severity = Parameters<typeof severityToken>[0];
-const SEVERITY_WORD: Record<string, string> = { normal: "aman", warning: "peringatan", critical: "kritis" };
+const SEVERITY_WORD: Readonly<Record<string, string>> = LIMIT_SEVERITY_LABEL;
 const severityWord = (s: string) => SEVERITY_WORD[s] ?? "tidak diketahui";
 
 // Meter satu window. Memakai token severity DS; `role="progressbar"` memegang nama dan teks nilainya
@@ -82,8 +78,8 @@ export function LimitWindows({ dto, emptyHint }: { dto: LimitsDTO; emptyHint?: s
       })}
       <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)", marginTop: 2 }}>
         {dto.status === "stale"
-          ? `Data lama · terakhir diperbarui ${agoLabel(dto.fetchedAt)}`
-          : `Diperbarui ${agoLabel(dto.fetchedAt)}`}
+          ? `Data lama · terakhir diperbarui ${relativeTime(dto.fetchedAt)}`
+          : `Diperbarui ${relativeTime(dto.fetchedAt)}`}
       </div>
     </div>
   );

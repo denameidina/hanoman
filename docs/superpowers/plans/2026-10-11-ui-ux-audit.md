@@ -27,10 +27,10 @@ yang tersentuh diperbarui dalam commit yang sama. Baseline gagal sebelum perubah
 - [x] 2A komponen DS: PageHeader, FilterBar, RowList, Stack/Inline, Text, hover CSS, StatusPill dot
 - [x] 2B a11y DS: Field/Input/Select, Radio, Modal inert+h2, shell h1+skip link, Toast antrean + undo, Icon aria-hidden
 - [x] 2C command palette + shortcut + notifikasi "Jawab"
-- [ ] 2D map label terpusat + glosarium copy + skeleton/loading
+- [x] 2D map label terpusat + glosarium copy + skeleton/loading
 - [ ] 2E layout inline → kelas `hn-*`, hapus `!important`/`[style*=`
 
 ## Fase 3 — redesign
-- [ ] 3A ADR IA baru (17 → 8 menu) + routes/redirect + nav
+- [x] 3A ADR IA baru (17 → 8 menu) + nav hub — ADR-0205; tanpa redirect (path section tak berubah, URL lama tetap hidup)
 - [ ] 3B Overview, 3C Settings, 3D Backlog/Tim, 3E Terminal, 3F Triase/Lead, 3G Klien, 3H IDE,
       3I Scheduler, 3J VPS, 3K Skills, 3L Review, 3M Portal, 3N Onboarding

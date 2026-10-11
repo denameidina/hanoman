@@ -268,7 +268,7 @@ desktop. Tidak ada route atau screen mobile kedua. Breakpoint tunggal ada di `ds
 mobile `<768px`, tablet `768–1199px`, desktop `≥1200px`; `Shell` menulis tier hidup ke
 `data-layout` untuk kontrak dan diagnosis.
 
-**Chrome.** `Shell` merender satu navigation tree berisi seluruh `HN_NAV`. Pada mobile tree itu
+**Chrome.** `Shell` merender satu navigation tree berisi delapan hub bergrup (`HN_HUBS`, ADR-0205; `HN_NAV` tetap daftar rute yang valid). Pada mobile tree itu
 menjadi drawer ber-backdrop dengan tombol `aria-controls`/`aria-expanded`, focus trap, Escape,
 focus restore, konten belakang `inert`, dan menutup sesudah navigasi. Tablet merender rail 72px (ikon + `title`), desktop
 sidebar 248px. Topbar/search/limit/notifikasi/update/action/account membungkus pada ruang sempit;
@@ -398,6 +398,55 @@ dengan memotong atau menjepit, bukan dengan reflow. Ketiganya kini punya aturan:
   **111px (13%)** pada layar tanpa search/aksi. Yang diringkas hanya kata-nya — kontrol, versi, dan
   `aria-label`/`title`-nya tetap ada, sesuai aturan "tak satu pun dihilangkan"; ikon telanjang
   ditolak karena lingkaran kosong tak mengatakan apa pun.
+
+## Audit UI/UX 2026-10 · Fase 3A · Navigasi 8 hub bergrup (ADR-0205)
+
+Fase 3A dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md): 17 entri sidebar
+menjadi 8 hub di tiga grup. Keputusan dan alasannya ada di [ADR-0205](../adr/0205-navigasi-8-hub-bergrup.md);
+pola interaksinya di [design-system](../design-system/design-system.md#navigasi-hub-audit-uiux-2026-10--fase-3a).
+URL tidak berubah dan tidak ada redirect, karena path setiap section sama seperti sebelumnya.
+
+Berkas:
+
+- `src/src/nav-hubs.ts` — murni: `HN_HUBS` (delapan hub, tab, `default`, turunan `derived`), `HN_GROUPS`,
+  `PALETTE_ONLY_SECTIONS` (dalang), `hubOf`, `tabOf` (tab yang mewakili sebuah section), `sectionsOf`,
+  `tabsOf` (menyaring gerbang), `hubTarget` (tab terakhir, lalu default), dan `hubBadge` (jumlah antrean tab).
+- `src/src/ds/shell.tsx` — sidebar merender hub per grup berlabel (`role="group"`). Item aktif = hub dari
+  `active`. Klik hub → `hubTarget`. Tab terakhir per hub disimpan di ui-state `nav.lastTab` dan **hanya
+  ditulis `Shell`** lewat efek pada `active`. Crumb `hub-crumb` `Hub › Tab` untuk hub bertab banyak;
+  deskripsi layar dibungkus span sendiri agar teksnya tetap utuh. `HN_NAV` tetap diekspor.
+- `src/src/ds/section-tabs.tsx` — `SectionTabs`: `Tabs` DS (`role="tablist"`). Tab terpilih diturunkan dari
+  `section` (URL). Klik tab → `onNavigate` (kecuali tab yang sama dengan `section`). Gerbang tab disaring,
+  badge per tab dari `NavPending`. Tak merender apa pun bila hub hanya punya satu tab yang tampil.
+- `src/src/App.tsx` — `hubTabs` (`SectionTabs`) dipasang di layar anak hub: Projects (`projects`, `project`,
+  `prd`, `docs`, `qa`, `ide`), Backlog (`backlog`, `team`, `review`), Sesi (`terminal`, `clients`), Otonom
+  (`scheduler`, `lead`), dan Pengaturan (`settings`, `vps`). Layar hub satu-tab (Overview, Triase, Skills)
+  tak memasangnya. Dalang tetap `section`, tanpa Shell.
+- `src/src/palette/commands.ts` — aksi **"Buka panggung"** (`action:panggung` → `dalang`), karena Dalang tak
+  lagi di sidebar. Entri "Pindah ke Dalang Hanoman" tetap ada.
+- `src/src/palette/shortcuts.ts` — baris bantuan Dalang bernama "Buka panggung" (`g d`).
+- `src/src/app.css` — `.hn-nav-group`, `.hn-nav-group-label` (disembunyikan di rail tablet, diganti garis
+  pemisah), dan `.hn-section-tabs`. Kelas `.hn-shell-workspace` dihapus bersama eyebrow "Workspace".
+
+Tes:
+
+- `src/src/nav-hubs.test.ts` — delapan hub dan tiga grup; setiap section `HN_NAV` dimiliki sebuah hub atau
+  tercatat palet-saja (**tak ada section yatim**); satu section hanya punya satu hub; gerbang tab sama dengan
+  gerbang `HN_NAV`; `default` tak bergerbang; `hubTarget` (riwayat, gerbang, fallback); `hubBadge`.
+- `src/test/nav-hub.test.tsx` — `SectionTabs` (tab terpilih, turunan, klik, tab induk dari detail project,
+  gerbang, badge, tanpa bar); `Shell` (crumb, riwayat tab bertahan lewat pemasangan ulang, fallback gerbang).
+- `src/test/hub-nav-app.test.tsx` — App utuh: delapan hub di sidebar; `/prd` membuka tab PRD tanpa mengubah
+  URL; klik tab memindahkan URL ke `/team`; klik hub kembali ke tab terakhir; palet "Buka panggung" → `/dalang`.
+- `src/test/responsive-shell-modal.test.tsx` — drawer memuat delapan hub dan tiga grup; tab bergerbang tak
+  pernah jadi tombol sidebar (hub Sesi tetap ada).
+- `src/test/nav-pending-badge.test.tsx` — badge hub = antrean tab-tabnya (PRD di Projects, Lead di Otonom).
+- `src/src/palette/commands.test.ts` dan `shortcuts.test.ts` — "Buka panggung" membuka Dalang dan terbaca di
+  bantuan shortcut.
+
+Belum (lihat [§Status pelaksanaan](ui-ux-audit-2026-10.md#status-pelaksanaan)):
+
+- Overview belum punya tombol "Buka panggung" (`screens/OverviewScreen.tsx`, milik fase 2F). Aksi itu baru
+  ada di palet dan bantuan shortcut.
 
 ## State tampilan persisten (SPEC-740 · ADR-0115)
 

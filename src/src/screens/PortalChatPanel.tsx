@@ -4,6 +4,7 @@ import {
   type PortalChatMessageRow, type PortalChatQuotaRow, type PortalChatSessionRow,
 } from "../api/client";
 import { Button, Card, Input, Pager, serverPage, StateBlock, StatusPill } from "../ds";
+import { PORTAL_CHAT_TYPE_LABEL } from "../lib/labels";
 import { MarkdownView } from "../ds/markdown";
 
 // SPEC-854 · ADR-0129 · panel operator untuk obrolan portal klien. Ia menjawab tiga pertanyaan:
@@ -12,7 +13,7 @@ import { MarkdownView } from "../ds/markdown";
 
 const PAGE = 20;
 
-const TYPE_LABEL: Record<string, string> = { brainstorm: "Brainstorming", tanya: "Bertanya" };
+const TYPE_LABEL: Readonly<Record<string, string>> = PORTAL_CHAT_TYPE_LABEL;
 
 const tanggal = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("id-ID",

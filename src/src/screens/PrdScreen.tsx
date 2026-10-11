@@ -8,6 +8,7 @@
    aksi utama dan "Breakdown" sekunder; status tampil dalam bahasa Indonesia. */
 import React from "react";
 import { PortalChatPanel } from "./PortalChatPanel";
+import { PRD_STATUS_LABEL } from "../lib/labels";
 import {
   Badge, Button, Select, Modal, Field, Input, HnTextarea, StateBlock, MarkdownView, Icon,
   DocDownload, LIST_SCREEN_STYLE, FIXED_ROW_STYLE, ResponsivePanels, useCoarsePointer,
@@ -28,10 +29,8 @@ export type PrdPrefill = {
   kind?: "brief" | "goal"; goal?: string;
 };
 
-// SPEC-520 · status turunan PRD dalam bahasa Indonesia (bukan enum mentah).
-export const PRD_STATUS_LABEL: Record<PrdStatus, string> = {
-  draft: "Draf", dieskalasi: "Dieskalasi", terwujud: "Terwujud",
-};
+// SPEC-520 · status turunan PRD dalam bahasa Indonesia (bukan enum mentah). Petanya di lib/labels.ts.
+export { PRD_STATUS_LABEL };
 
 // SPEC-340 · ADR-0076 · di-export karena App memakainya ulang untuk eskalasi audit → PRD (brief
 // ter-prefill dari rekomendasi audit). `lockProject` mengunci project ke asal auditnya.

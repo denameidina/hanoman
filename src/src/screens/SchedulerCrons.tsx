@@ -8,6 +8,7 @@
 import React from "react";
 import { Card, Button, Badge, Select, Input, Switch, Modal, Field, HnTextarea, Pager, serverPage, Icon, useConfirm } from "../ds";
 import { api } from "../api/client";
+import { QUEUE_STATUS_LABEL, labelOf } from "../lib/labels";
 import {
   describeCron, nextRunFor, exprToPreset, presetToExpr, parseCron, WEEKDAY_LABELS,
   type CronPreset, type SchedulerCronView, type SchedulerCronRunView, type Agent,
@@ -65,7 +66,6 @@ const exprOf = (d: Draft): string => {
 };
 
 const STATUS_TONE: Record<string, string> = { launched: "ok", queued: "neutral", skipped: "warn", failed: "err" };
-const STATUS_LABEL: Record<string, string> = { launched: "berjalan", queued: "menunggu", skipped: "dilewati", failed: "gagal" };
 
 function RunHistory({ cronId }: { cronId: string }) {
   const [items, setItems] = React.useState<SchedulerCronRunView[]>([]);
@@ -91,7 +91,7 @@ function RunHistory({ cronId }: { cronId: string }) {
       {items.map((r) => (
         <div key={r.id} className="hn-dense-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
           border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", marginBottom: 6, flexWrap: "wrap" }}>
-          <Badge tone={(STATUS_TONE[r.status] ?? "neutral") as never} size="sm">{STATUS_LABEL[r.status] ?? r.status}</Badge>
+          <Badge tone={(STATUS_TONE[r.status] ?? "neutral") as never} size="sm">{labelOf(QUEUE_STATUS_LABEL, r.status)}</Badge>
           <span className="hn-grow" style={{ flex: 1, minWidth: 0, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
             jatuh tempo {fmtLocal(r.dueAt)}
             {r.startedAt ? ` · mulai ${fmtLocal(r.startedAt)}` : ""}

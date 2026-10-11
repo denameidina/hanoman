@@ -77,6 +77,13 @@ describe("buildPaletteCommands", () => {
     expect(on.some((c) => c.id === "nav:clients")).toBe(true);
   });
 
+  // ADR-0205 · Dalang tak lagi di sidebar; aksi ini satu-satunya pintu yang diberi nama.
+  it("'Buka panggung' membuka Dalang dan tak bergantung pada gerbang apa pun", () => {
+    const { src, fns } = source({ gates: {} });
+    byId(buildPaletteCommands(src), "action:panggung").run();
+    expect(fns.go).toHaveBeenLastCalledWith("dalang");
+  });
+
   it("'Jawab sesi yang menunggu' nonaktif tanpa sesi menunggu dan membuka sesi pertama bila ada", () => {
     const empty = buildPaletteCommands(source().src);
     expect(byId(empty, "action:answer").disabled).toBe(true);

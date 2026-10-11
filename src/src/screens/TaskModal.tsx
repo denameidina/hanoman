@@ -3,6 +3,7 @@ import type { CreateTaskInput, MemberView, TaskStatus, TaskView } from "@hanoman
 import { Button, Field, HnTextarea, Input, Modal, Select, useConfirm } from "../ds";
 import { api } from "../api/client";
 import { failureMessage } from "../lib/report-error";
+import { PRIORITY_LABEL } from "../lib/labels";
 import { TEAM_COLUMNS, dateInputToIso, dateInputValue } from "./team-rules";
 import type { ProjectVM } from "./types";
 
@@ -13,7 +14,6 @@ import type { ProjectVM } from "./types";
 // literal baru — `Record<Priority, …>` membuat nilai yang bertambah jadi galat kompilasi di sini,
 // bukan opsi yang diam-diam hilang dari form.
 type Priority = NonNullable<CreateTaskInput["priority"]>;
-const PRIORITY_LABEL: Record<Priority, string> = { tinggi: "Tinggi", sedang: "Sedang", rendah: "Rendah" };
 const PRIORITIES = (Object.keys(PRIORITY_LABEL) as Priority[])
   .map((value) => ({ value, label: PRIORITY_LABEL[value] }));
 

@@ -16,13 +16,11 @@ import { PresenceChip } from "./PresenceChip";
 import type { DeviceTokenView } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 import { errorMessage } from "../lib/report-error";
+import { PROJECT_KIND_LABEL, labelOf } from "../lib/labels";
 
-/** Enum `ProjectKind` → label Indonesia. Nilai yang tak dikenal jatuh ke nilai mentahnya. */
-export const KIND_LABEL: Record<string, string> = {
-  "from-scratch": "Dari nol",
-  existing: "Repo sudah ada",
-};
-export const kindLabel = (kind: string): string => KIND_LABEL[kind] ?? kind;
+/** Enum `ProjectKind` → label Indonesia (lib/labels.ts). Nilai yang tak dikenal dirapikan, bukan mentah. */
+export const KIND_LABEL = PROJECT_KIND_LABEL;
+export const kindLabel = (kind: string): string => labelOf(PROJECT_KIND_LABEL, kind);
 
 function hnCovTone(s: string) { return s === "broken" ? "err" : s === "drift" ? "warn" : "ok"; }
 function hnAttention(p: ProjectVM): "high" | "low" | "none" {

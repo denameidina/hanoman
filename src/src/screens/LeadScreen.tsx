@@ -15,6 +15,11 @@ import type { ProjectVM } from "./types";
 import { usePersistedState, useResetOnChange, ResetViewButton, isStr, isNum } from "../ui-state";
 import { failureMessage } from "../lib/report-error";
 import { agoLabel, clampNumber, InlineError, useServerDraft } from "./sched-lead-shared";
+import {
+  LEAD_CONFIDENCE_LABEL as CONF_LABEL, LEAD_STATUS_LABEL as DECISION_STATUS_LABEL, LEAD_KIND_LABEL as KIND_LABEL,
+  LEAD_GATE_LABEL as GATE_LABEL, LEAD_ACTION_LABEL as ACTION_LABEL, LEAD_FLOW_STATUS_LABEL as FLOW_LABEL,
+  LEAD_FLOW_CLOSE_LABEL as FLOW_CLOSE_LABEL, labelOf,
+} from "../lib/labels";
 
 // SPEC-908 · tinggal kadens FALLBACK; jalur normalnya langganan `/events/ws`.
 const POLL_MS = 5000;
@@ -34,35 +39,14 @@ function LeadPager({ total, page, onPage, unit }:
 // Tone DS (feedback.tsx) — disempitkan supaya salah tulis nada tertangkap tsc, bukan tampil pucat.
 type Tone = "neutral" | "brass" | "info" | "ok" | "warn" | "err";
 // Istilah baku per enum. Layar tak pernah menampilkan nilai mentah (`ragu`, `pulse`, `integrate-main`).
-const CONF_LABEL: Record<string, string> = { tinggi: "yakin tinggi", sedang: "yakin sedang", ragu: "ragu-ragu" };
 const CONF_TONE: Record<string, Tone> = { tinggi: "ok", sedang: "neutral", ragu: "warn" };
-const DECISION_STATUS_LABEL: Record<string, string> = { berlaku: "Berlaku", ditimpa: "Ditimpa", dibatalkan: "Dibatalkan", gagal: "Gagal" };
 const STATUS_TONE: Record<string, Tone> = { berlaku: "ok", ditimpa: "warn", dibatalkan: "neutral", gagal: "err" };
-const KIND_LABEL: Record<string, string> = {
-  answer: "jawaban", order: "urutan kerja", collision: "tabrakan area",
-  quality: "mutu hasil", refusal: "tindakan ditolak",
-};
-const GATE_LABEL: Record<string, string> = {
-  contract: "kontrak", detected: "deteksi otomatis", pulse: "pemeriksaan berkala",
-};
-const ACTION_LABEL: Record<string, string> = {
-  "answer-session": "jawab di sesi", "start-session": "mulai sesi", "stop-session": "hentikan sesi",
-  "resume-session": "lanjutkan sesi", "restart-session": "ulangi dari awal", "order-queue": "atur urutan antrean",
-  "hold-work": "tunda pekerjaan", "push-branch": "dorong branch", "integrate-main": "integrasi ke main",
-  "run-migration": "jalankan migrasi lokal",
-};
 // SPEC-485 · ADR-0102 · status satu RANTAI keputusan. `menunggu` diberi nada peringatan: alur yang
 // terbuka tanpa satu pun jawaban berlaku memang keadaan yang menuntut mata operator.
 const FLOW_TONE: Record<string, Tone> = {
   menunggu: "warn", sebagian: "info", selesai: "ok", dibatalkan: "neutral",
 };
-const FLOW_LABEL: Record<string, string> = {
-  menunggu: "Menunggu kamu", sebagian: "Sebagian terjawab", selesai: "Selesai", dibatalkan: "Dibatalkan",
-};
 const FLOW_OPEN = new Set(["menunggu", "sebagian"]);
-const FLOW_CLOSE_LABEL: Record<string, string> = {
-  tunggal: "sekali jalan", submit: "dikirim", operator: "ditutup oleh kamu", kedaluwarsa: "kedaluwarsa",
-};
 
 function RowShell({ children }: { children: React.ReactNode }) {
   return (
@@ -590,7 +574,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
               <span className="hn-grow" style={{ flex: 1, minWidth: 0, color: "var(--text-strong)" }}>{f.title}</span>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
                 {f.steps} langkah · {agoLabel(f.openedAt)}
-                {f.closeReason ? ` · ${FLOW_CLOSE_LABEL[f.closeReason] ?? f.closeReason}` : ""}
+                {f.closeReason ? ` · ${labelOf(FLOW_CLOSE_LABEL, f.closeReason)}` : ""}
               </span>
               {FLOW_OPEN.has(f.status) && <>
                 <Button size="sm" leftIcon="check" disabled={busyId === f.id}

@@ -1,5 +1,6 @@
 import { CLAUDE_SUBAGENT_INHERIT, CODEX_MODELS, claudeModel } from "@hanoman/shared";
 import type { Phase } from "../api/client";
+import { PHASE_STATUS_LABEL } from "../lib/labels";
 
 // ADR-0164 · format chip fase. Murni supaya PhaseStrip dan chip header memakai label yang sama.
 export const modelLabel = (id?: string): string =>
@@ -24,10 +25,7 @@ export function chipTone(p: Phase): ChipTone {
 }
 
 // Audit R2 · status chip terbaca pembaca layar (ikon CHIP_ICON `aria-hidden`).
-export const CHIP_STATUS_LABEL: Record<ChipTone, string> = {
-  done: "selesai", running: "berjalan", pending: "menunggu", skipped: "dilewati",
-  failed: "terputus", abandoned: "ditinggalkan",
-};
+export const CHIP_STATUS_LABEL = PHASE_STATUS_LABEL;
 
 /** Audit R2 · nama aksesibel chip fase: SELALU lengkap (juga saat mode ringkas menyembunyikan
  *  model/effort/durasi secara visual) — `Fase X: status · model · effort · durasi · percobaan n · ⚠`. */

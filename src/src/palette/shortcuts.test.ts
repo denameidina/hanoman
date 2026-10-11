@@ -71,6 +71,13 @@ describe("shortcutSections", () => {
     ]);
   });
 
+  // ADR-0205 · Dalang di luar sidebar; bantuannya menamainya sebagai aksi, sama dengan palet.
+  it("Dalang dinamai 'Buka panggung' di bantuan, tetap dengan huruf g d", () => {
+    const sections = shortcutSections(false, [{ key: "dalang", label: "Dalang Hanoman" }]);
+    const nav = sections.find((s) => s.title.startsWith("Pindah"))!;
+    expect(nav.rows).toEqual([{ keys: ["g", "d"], label: "Buka panggung" }]);
+  });
+
   it("label Mac memakai ⌘, lainnya Ctrl", () => {
     expect(shortcutSections(true, []).find((s) => s.title === "Global")!.rows[0]!.keys).toEqual(["⌘", "K"]);
     expect(shortcutSections(false, []).find((s) => s.title === "Global")!.rows[0]!.keys).toEqual(["Ctrl", "K"]);

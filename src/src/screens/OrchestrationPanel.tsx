@@ -5,18 +5,16 @@ import {
   type Agent, type FlowOrchestration, type Orchestration, type OrchestrationFlow, type PhaseCell,
 } from "@hanoman/shared";
 import { runtimeEfforts, runtimeSubagentModels } from "./session-runtime";
+import { FLOW_LABEL, RUNTIME_LABEL } from "../lib/labels";
 
 // ADR-0164 · matriks model/effort per fase. Satu-satunya penulis `Setting.orchestration` adalah tab
 // ini, jadi menulis dari snapshot mount aman (berbeda dari baca-ulang lead/telegram).
 // Katalog dibaca lewat `session-runtime.ts` — sumber yang sama dengan picker Start.
 
-// Diekspor: layar Scheduler memakai nama flow yang sama dengan matriks ini (satu istilah baku).
-export const FLOW_LABEL: Record<OrchestrationFlow, string> = {
-  feature: "Brief (feature)", qa: "QA", scaffold: "Scaffold", reverse: "Reverse docs", prd: "PRD",
-  audit: "Audit", breakdown: "Breakdown PRD", goal: "Goal", no_effort: "No effort",
-};
+// Diekspor: layar Scheduler memakai nama flow yang sama dengan matriks ini (satu istilah baku dari lib/labels.ts).
+export { FLOW_LABEL };
 const RUNTIMES: { id: Agent; label: string }[] = [
-  { id: "claude", label: "Claude Code" }, { id: "codex", label: "Codex CLI" },
+  { id: "claude", label: RUNTIME_LABEL.claude }, { id: "codex", label: RUNTIME_LABEL.codex },
 ];
 // Amandemen ADR-0170 P2 · cara fase Execute/Goal (sesi Claude) mengerjakan plan.
 const EXECUTE_MODE_OPTIONS = [

@@ -72,6 +72,9 @@ export function buildPaletteCommands(src: PaletteSource): PaletteCommand[] {
       run: () => { const first = src.waiting[0]; if (first) src.openSession(first.id); } },
     { id: "action:settings", group: "Aksi", label: "Buka pengaturan",
       keywords: "settings akun preferensi konfigurasi", run: () => src.go("settings") },
+    // ADR-0205 · Dalang tak lagi punya tempat di sidebar; panggungnya dibuka dari sini dan dari `g d`.
+    { id: "action:panggung", group: "Aksi", label: "Buka panggung", hint: "Dalang Hanoman",
+      keywords: "dalang panggung orkestrasi sinematik wayang", run: () => src.go("dalang") },
     { id: "action:scope", group: "Aksi", label: "Ganti project aktif", hint: scopeName,
       keywords: "project scope filter", prefill: "project ", run: () => undefined },
   );

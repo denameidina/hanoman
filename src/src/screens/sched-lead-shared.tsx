@@ -6,15 +6,10 @@
 //  - `agoLabel` / `untilLabel`: waktu relatif dalam bahasa biasa ("5 menit lalu").
 import React from "react";
 import { Button } from "../ds";
+import { relativeTime } from "../lib/time-format";
 
 export function agoLabel(iso: string | null, now = Date.now()): string {
-  if (!iso) return "—";
-  const m = Math.floor(Math.max(0, now - new Date(iso).getTime()) / 60_000);
-  if (m < 1) return "baru saja";
-  if (m < 60) return `${m} menit lalu`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h} jam lalu`;
-  return `${Math.floor(h / 24)} hari lalu`;
+  return relativeTime(iso, now) || "—";
 }
 
 export function untilLabel(iso: string | null, now = Date.now()): string {

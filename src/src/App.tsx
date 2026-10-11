@@ -10,6 +10,7 @@ import { LazyBoundary } from "./ds/LazyBoundary";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
 import { Shell, HN_NAV, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, useToast, ToastHost, StateBlock, useConfirm } from "./ds";
+import { SectionTabs } from "./ds/section-tabs";
 
 import { CommandPalette, ShortcutHelp, ProjectScopeContext, buildPaletteCommands, useGlobalShortcuts } from "./palette";
 import { waitingSessions } from "./screens/pet-state";
@@ -1535,6 +1536,9 @@ function AppInner() {
           title="Gagal memuat data dari server"
           hint="Pastikan server hanoman berjalan, lalu coba lagi." action={load} />
       : suspend(body);
+  // ADR-0205 · bar tab hub di atas layar anak hub. Diturunkan dari `section` (URL), jadi klik tab
+  // hanya menavigasi. Layar yang hubnya tak punya tab (Overview, Triase, Skills) tak merender apa pun.
+  const hubTabs = <SectionTabs section={section} onNavigate={setSection} />;
 
   // SPEC-169 · gerbang auth: splash → Setup/Login → app.
   if (!auth) return <StateBlock kind="loading" title="Memuat hanoman…" />;
@@ -1575,6 +1579,7 @@ function AppInner() {
       <Shell active="projects" title="Projects" breadcrumb="nafanesia.id · workspace"
         showSearch searchValue={search} onSearchChange={setSearch} onNavigate={setSection}
         actions={<Button size="sm" leftIcon="plus" onClick={() => setModal("project")}>Project baru</Button>}>
+        {hubTabs}
         {gate(
           projectsView.length === 0
             ? <StateBlock kind="empty" icon="box" title="Belum ada project"
@@ -1589,6 +1594,7 @@ function AppInner() {
     screen = (
       <Shell active="projects" title={proj ? proj.name : "Project"}
         breadcrumb={proj ? "projects · " + proj.id : "projects"} onNavigate={setSection}>
+        {hubTabs}
         {/* SPEC-848 · gerbang pintu Reverse/Scaffold memakai path EFEKTIF, cermin `resolveRepoDir`
             di server: project hasil clone disimpan sebagai LocalBinding (SPEC-213/217/218) dan
             `repoDir`-nya tetap null — digerbangi `repoDir` saja, pintunya tak pernah muncul justru
@@ -1612,6 +1618,7 @@ function AppInner() {
     screen = (
       <Shell active="backlog" title="Backlog" breadcrumb="specs · brainstorm → execute" onNavigate={setSection}
         actions={<Button size="sm" leftIcon="plus" onClick={() => setModal("brief")}>Tambah</Button>}>
+        {hubTabs}
         {gate(<BacklogScreen backlog={backlog} projects={projectsView} pageSize={20}
           onStart={startSession} activeSpecs={activeSpecs} presenceBySpec={presenceMap.bySpec}
           onNew={() => setModal("brief")}
@@ -1631,6 +1638,7 @@ function AppInner() {
     // sampai muatan backlog/sessions App selesai, dan layar ini tak memakai satu pun dari keduanya.
     screen = (
       <Shell active="team" title="Tim" breadcrumb="tugas manusia · backlog → selesai" onNavigate={setSection}>
+        {hubTabs}
         <TeamScreen projects={projectsView} projectFilter={projectFilter}
           onProjectFilter={setProjectFilter} onToast={showToast}
           onOpenSpec={(specId) => navigate(routePath({ section: "backlog", specId }))} />
@@ -1653,6 +1661,7 @@ function AppInner() {
     // SPEC-210 · PRD: PM/PO menulis brief + brainstorm → dokumen PRD (docs/prd/), preview, take ke backlog.
     screen = (
       <Shell active="prd" title="PRD" breadcrumb="brief → brainstorm → dokumen" onNavigate={setSection}>
+        {hubTabs}
         {gate(projectsView.length === 0
           ? <StateBlock kind="empty" icon="box" title="Belum ada project"
               hint="PRD butuh project dengan repoDir untuk menulis docs/prd/."
@@ -1666,6 +1675,7 @@ function AppInner() {
   } else if (section === "terminal") {
     screen = (
       <Shell active="terminal" title="Terminal" breadcrumb="Claude Code · sesi interaktif" onNavigate={setSection} wide>
+        {hubTabs}
         {gate(projectsView.length === 0
           ? <StateBlock kind="empty" icon="box" title="Belum ada project"
               hint="Terminal butuh project dengan repoDir untuk dijalankan."
@@ -1684,6 +1694,7 @@ function AppInner() {
     // SPEC-182 · IDE Visual: explorer + branch switch + git graph, difilter per project.
     screen = (
       <Shell active="ide" title="IDE" breadcrumb={proj ? proj.name : "workspace"} onNavigate={setSection} wide>
+        {hubTabs}
         {gate(projectsView.length === 0
           ? <StateBlock kind="empty" icon="box" title="Belum ada project"
               hint="IDE butuh project dengan repoDir." action={() => setModal("project")} actionLabel="Project baru" />
@@ -1696,6 +1707,7 @@ function AppInner() {
     // VpsScreen memuat datanya sendiri — tak lewat `gate`, yang menunggu project/backlog.
     screen = (
       <Shell active="vps" title="VPS" breadcrumb="infra · audit → harden" onNavigate={setSection}>
+        {hubTabs}
         <VpsScreen onToast={showToast} onGotoTerminal={openTerminal} />
       </Shell>
     );
@@ -1705,6 +1717,7 @@ function AppInner() {
     screen = (
       <Shell active="clients" title="Klien" breadcrumb="device · sesi yang sedang berjalan"
         onNavigate={setSection}>
+        {hubTabs}
         <ClientsScreen view={presence} specTitles={specTitles} onOpenSpec={openReviewSpecId} />
       </Shell>
     );
@@ -1713,6 +1726,7 @@ function AppInner() {
     // Screen mandiri (pola VPS) — memuat state fondasi sendiri (HTTP polling), tak lewat `gate`.
     screen = (
       <Shell active="scheduler" title="Scheduler" breadcrumb="otonom · jadwal → antrean → sesi" onNavigate={setSection}>
+        {hubTabs}
         <SchedulerScreen projects={projectsView} backlog={backlog}
           onProjectChanged={refreshProject} onToast={showToast}
           onGotoTerminal={openTerminal} />
@@ -1723,6 +1737,7 @@ function AppInner() {
     // Screen mandiri (pola Scheduler/VPS) — memuat statusnya sendiri lewat HTTP polling, tak lewat `gate`.
     screen = (
       <Shell active="lead" title="Lead" breadcrumb="otonom · keputusan → jejak → kendali" onNavigate={setSection}>
+        {hubTabs}
         <LeadScreen projects={projectsView} onProjectChanged={refreshProject} onToast={showToast}
           onGotoTerminal={openTerminal} />
       </Shell>
@@ -1736,6 +1751,7 @@ function AppInner() {
             options={projectsView.map((p) => ({ value: p.id, label: p.name }))} />
           <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={() => deleteProject(proj)}>Hapus project</Button>
         </>}>
+        {hubTabs}
         {gate(proj
           ? <DocsWorkspace projectId={proj.id} projectName={proj.name} docStatus={proj.docStatus} />
           : <StateBlock kind="empty" icon="book-open" title="Belum ada project"
@@ -1750,6 +1766,7 @@ function AppInner() {
       <Shell active="backlog" title="Review" wide onNavigate={setSection}
         breadcrumb={reviewTarget ? (reviewTarget.kind === "session" ? "terminal · " : "backlog · ") + reviewTarget.id : "review"}
         actions={<Button size="sm" variant="ghost" leftIcon="arrow-left" onClick={() => setSection(back)}>Kembali</Button>}>
+        {hubTabs}
         {gate(reviewTarget
           ? <ReviewScreen specId={reviewTarget.id} kind={reviewTarget.kind} title={reviewTarget.title} onBack={() => setSection(back)} />
           : <StateBlock kind="empty" icon="git-compare" title="Pilih item untuk di-review"
@@ -1761,6 +1778,7 @@ function AppInner() {
     const qaProjectId = route?.projectId ?? projects[0]?.id;
     screen = (
       <Shell active="qa" title="QA" wide onNavigate={setSection} breadcrumb="qa · laporan per project">
+        {hubTabs}
         {gate(<QaWorkspace key={qaProjectId ?? "none"} projects={projects} projectId={qaProjectId}
           onSelectProject={(id) => navigate(routePath({ section: "qa", projectId: id }))} onToast={showToast}
           onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }} />)}
@@ -1781,6 +1799,7 @@ function AppInner() {
   } else if (section === "settings") {
     screen = (
       <Shell active="settings" title="Settings" breadcrumb="nafanesia.id · workspace" onNavigate={setSection}>
+        {hubTabs}
         {suspend(<SettingsScreen onToast={showToast} me={me} onLoggedOut={onLoggedOut} />)}
       </Shell>
     );

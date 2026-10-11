@@ -23,6 +23,7 @@ import { SchedulerCrons } from "./SchedulerCrons";
 import { FLOW_LABEL } from "./OrchestrationPanel";
 import { usePersistedState, isNum } from "../ui-state";
 import { failureMessage } from "../lib/report-error";
+import { PRIORITY_LABEL, QUEUE_SOURCE_LABEL, labelOf } from "../lib/labels";
 import { agoLabel, untilLabel, clampNumber, InlineError, useServerDraft } from "./sched-lead-shared";
 
 // SPEC-908 · tinggal kadens FALLBACK; jalur normalnya langganan `/events/ws`.
@@ -32,10 +33,8 @@ const QUEUE_PAGE = 10;
 // dengan skema parameter topik `schedulerQueue`.
 type QueueStatus = TopicParams["schedulerQueue"]["status"];
 
-// Istilah baku per enum: layar tak pernah menampilkan nilai mentah (`backlog`, `tinggi`, …).
-const PRIO_LABEL: Record<string, string> = { tinggi: "Prioritas tinggi", sedang: "Prioritas sedang", rendah: "Prioritas rendah" };
+// Istilah baku per enum ada di lib/labels.ts: layar tak pernah menampilkan nilai mentah (`backlog`, `tinggi`, …).
 const PRIO_TONE: Record<string, string> = { tinggi: "err", sedang: "warn", rendah: "neutral" };
-const SOURCE_LABEL: Record<string, string> = { backlog: "Backlog", triase: "Triase" };
 const AUTONOMY_OPTIONS = [
   { value: "butuh-keputusan", label: "Berhenti dan minta keputusan dulu" },
   { value: "full-control", label: "Jalan sampai selesai tanpa berhenti" },
@@ -62,7 +61,7 @@ function SourceCard({ s }: { s: SchedulerSourceView }) {
     <div style={{ padding: "12px 14px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-md)",
       background: "var(--surface-card)", display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 180 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontWeight: 600, color: "var(--text-strong)" }}>{SOURCE_LABEL[s.id] ?? s.id}</span>
+        <span style={{ fontWeight: 600, color: "var(--text-strong)" }}>{labelOf(QUEUE_SOURCE_LABEL, s.id)}</span>
         <Badge tone={s.enabled ? "ok" : "neutral"} size="sm">{s.enabled ? "aktif" : "nonaktif"}</Badge>
       </div>
       <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
@@ -93,10 +92,10 @@ function QueueRow({ q, ctx, onCancel, busy }:
       <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
         <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, ctx.backlog)}</span>
         <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
-          {ctx.projectName(q.projectId)} · {SOURCE_LABEL[q.source] ?? q.source}{q.note ? ` · ${q.note}` : ""}
+          {ctx.projectName(q.projectId)} · {labelOf(QUEUE_SOURCE_LABEL, q.source)}{q.note ? ` · ${q.note}` : ""}
         </span>
       </span>
-      <Badge tone={(PRIO_TONE[q.priority] ?? "neutral") as never} size="sm">{PRIO_LABEL[q.priority] ?? q.priority}</Badge>
+      <Badge tone={(PRIO_TONE[q.priority] ?? "neutral") as never} size="sm">{labelOf(PRIORITY_LABEL, q.priority)}</Badge>
       {/* SPEC-522 · tanpa dialog konfirmasi: tindakannya reversibel lewat "Antre lagi", dan
           konfirmasi untuk tindakan reversibel adalah gesekan tanpa hasil. */}
       <Button size="sm" variant="ghost" leftIcon="ban" disabled={busy} onClick={() => onCancel(q.id)}>Batalkan</Button>
@@ -115,7 +114,7 @@ function CanceledRow({ q, ctx, onRequeue, busy }:
       <span className="hn-grow" style={{ flex: 1, minWidth: 0 }}>
         <span style={{ color: "var(--text-strong)", fontWeight: 500 }}>{titleFor(q.specId, ctx.backlog)}</span>
         <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
-          {ctx.projectName(q.projectId)} · {SOURCE_LABEL[q.source] ?? q.source} · {q.note ?? "dibatalkan"}
+          {ctx.projectName(q.projectId)} · {labelOf(QUEUE_SOURCE_LABEL, q.source)} · {q.note ?? "dibatalkan"}
         </span>
       </span>
       <Button size="sm" variant="ghost" leftIcon="rotate-ccw" disabled={busy} onClick={() => onRequeue(q.id)}>Antre lagi</Button>
@@ -148,7 +147,7 @@ function DoneRow({ q, ctx, onToast }: { q: SchedulerQueueItemView; ctx: Ctx; onT
         <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
           {/* SPEC-431 · baris yang ditutup gerbang "spec sudah selesai" tak pernah punya sesi;
               "selesai —" akan terbaca seolah scheduler yang menyelesaikannya. */}
-          {ctx.projectName(q.projectId)} · {SOURCE_LABEL[q.source] ?? q.source} · {q.launchedAt ? `selesai ${agoLabel(q.launchedAt)}` : (q.note ?? "tidak diluncurkan")}
+          {ctx.projectName(q.projectId)} · {labelOf(QUEUE_SOURCE_LABEL, q.source)} · {q.launchedAt ? `selesai ${agoLabel(q.launchedAt)}` : (q.note ?? "tidak diluncurkan")}
         </span>
       </span>
       <Button size="sm" variant="ghost" leftIcon="external-link" onClick={() => window.open(link, "_blank", "noreferrer")}>Buka review</Button>
@@ -378,11 +377,11 @@ function SettingsPanel({ cfg, onWrite, busy }: { cfg: Scheduler; onWrite: (next:
         {(["backlog", "triase"] as const).map((k) => (
           <div key={k} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
             padding: "10px 12px", border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)" }}>
-            <Switch label={SOURCE_LABEL[k]} checked={draft.sources[k].enabled} onChange={(next: boolean) => setSrc(k, { enabled: next })} />
+            <Switch label={QUEUE_SOURCE_LABEL[k]} checked={draft.sources[k].enabled} onChange={(next: boolean) => setSrc(k, { enabled: next })} />
             <span style={{ flex: 1 }} />
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--text-xs)" }}>
               cek tiap
-              <Input type="number" min={1} style={{ width: 84 }} aria-label={`Interval cek ${SOURCE_LABEL[k]}`}
+              <Input type="number" min={1} style={{ width: 84 }} aria-label={`Interval cek ${QUEUE_SOURCE_LABEL[k]}`}
                 placeholder="30" value={draft.sources[k].everyMin}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSrc(k, { everyMin: e.target.value })}
                 onBlur={blur} onKeyDown={enterCommits} />

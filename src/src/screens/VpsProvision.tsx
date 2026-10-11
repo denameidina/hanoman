@@ -10,9 +10,9 @@ import type {
   ComponentId, ComponentProbe, ProvisionComponent, ProvisionProfile, ProvisionStep,
   VpsComponents, VpsView,
 } from "@hanoman/shared";
+import { COMPONENT_STATUS_LABEL, labelOf } from "../lib/labels";
 
-const STATUS_LABEL: Record<string, string> = {
-  ok: "terpasang", partial: "belum siap", absent: "belum ada" };
+const STATUS_LABEL = COMPONENT_STATUS_LABEL;
 const STATUS_COLOR: Record<string, string> = {
   ok: "var(--leaf-600)", partial: "var(--amber-600)", absent: "var(--text-subtle)" };
 
@@ -22,7 +22,7 @@ export function badgeText(id: string, entry: { status: string; detail: string })
   if (entry.status === "partial" && entry.detail.startsWith("not-logged-in")) return `${id} · belum login`;
   if (entry.status === "partial") return `${id} · ${entry.detail || STATUS_LABEL.partial}`;
   const suffix = entry.status === "ok" && entry.detail ? ` ${entry.detail}` : "";
-  return `${id} · ${STATUS_LABEL[entry.status] ?? entry.status}${suffix}`;
+  return `${id} · ${labelOf(STATUS_LABEL, entry.status)}${suffix}`;
 }
 
 // Arti kedua profil bagi operator (sumber: `ProvisionComponent.requires` — lab memasang langsung

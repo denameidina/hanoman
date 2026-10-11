@@ -48,7 +48,7 @@ describe("DalangStage — panggung dalang di Overview", () => {
   it("sesi hidup dari siaran WS: satu wayang per sesi, klik → fokus sesi itu di terminal", () => {
     const onOpenSession = vi.fn();
     render(<DalangStage projects={projects}
-      backlog={[spec({ id: "SPEC-1", stage: "execute", startedAt: new Date() })]}
+      backlog={[spec({ id: "SPEC-1", stage: "executing", startedAt: new Date() })]}
       sessions={[
         session({ id: "s-alpha", projectId: "a", specId: "SPEC-1" }),
         session({ id: "s-beta", projectId: "b", flow: "qa" }),
@@ -66,7 +66,7 @@ describe("DalangStage — panggung dalang di Overview", () => {
     expect(liveList.querySelectorAll(".hn-dalang-live")).toHaveLength(2);
     expect(liveList.querySelectorAll('img[src*="wayang-project"]')).toHaveLength(2);
     // sub-label memakai Spec.stage yang hidup, bukan ProjectView.session yang basi
-    fireEvent.click(screen.getByRole("button", { name: "Buka terminal — alpha, SPEC-1 · execute" }));
+    fireEvent.click(screen.getByRole("button", { name: "Buka terminal — alpha, SPEC-1 · Dikerjakan" }));
     expect(onOpenSession).toHaveBeenCalledWith("s-alpha");
     // gamma: sesinya sudah exited → wayang parkir di debog, bukan di kelir
     expect(screen.getByRole("button", { name: "Buka project gamma" })).toBeTruthy();

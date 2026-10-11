@@ -9,13 +9,15 @@ vi.mock("../src/auth/AccountMenu", () => ({ AccountMenu: () => null }));
 
 import { Shell } from "../src/ds/shell";
 
-describe("Shell nav · Scheduler (SPEC-299)", () => {
-  it("merender item nav Scheduler dan memanggil onNavigate('scheduler')", () => {
+// ADR-0205 · Scheduler tak lagi entri sidebar sendiri: ia tab di dalam hub Otonom. Klik hub
+// mendarat di Scheduler (tab pertama dan default), jadi perilaku yang dijaga test ini tetap sama.
+describe("Shell nav · Scheduler (SPEC-299, ADR-0205)", () => {
+  it("hub Otonom memuat Scheduler dan klik hub memanggil onNavigate('scheduler')", () => {
     const onNavigate = vi.fn();
     render(<Shell active="overview" title="x" onNavigate={onNavigate}><div /></Shell>);
-    const item = screen.getByText("Scheduler");
-    expect(item).toBeInTheDocument();
-    fireEvent.click(item);
+    const hub = screen.getByRole("button", { name: "Otonom" });
+    expect(hub).toBeInTheDocument();
+    fireEvent.click(hub);
     expect(onNavigate).toHaveBeenCalledWith("scheduler");
   });
 });

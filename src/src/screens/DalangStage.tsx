@@ -9,6 +9,7 @@
 import React from "react";
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, SpecSlim } from "./types";
+import { FLOW_LABEL, STAGE_LABEL, labelOf } from "../lib/labels";
 // Aset dalang digenerate Codex/GPT Image (chroma key hijau → transparan), master + rekaman
 // produksi di internal/assets/dalang/. Ukuran display (512/384/256) supaya bundle tak bengkak —
 // pelajaran registry illustration (master 1,5 MB per berkas dilarang masuk glob bundel).
@@ -16,20 +17,9 @@ import dalangUrl from "../../../internal/assets/dalang/hnm-dalang-six-arms-v01.w
 import wayangUrl from "../../../internal/assets/dalang/hnm-wayang-project-v01.webp?url";
 import blencongUrl from "../../../internal/assets/dalang/hnm-blencong-v01.webp?url";
 
-// Label stage yang terbaca operator (audit 2026-10: enum mentah dilarang tampil). Satu tempat
-// untuk Overview dan panggung dalang; nilai tak dikenal jatuh ke teks aslinya.
-export const STAGE_LABEL: Record<string, string> = {
-  brainstorming: "Brainstorm",
-  objective: "Tujuan",
-  "spec-ready": "Spek siap",
-  planned: "Rencana siap",
-  executing: "Dikerjakan",
-  done: "Selesai",
-};
-export const FLOW_LABEL: Record<string, string> = {
-  feature: "Fitur", qa: "QA", scaffold: "Scaffold", reverse: "Reverse", prd: "PRD", audit: "Audit",
-  breakdown: "Pecah tugas", goal: "Goal", no_effort: "Tanpa usaha",
-};
+// Label stage & flow dipusatkan di lib/labels.ts (Audit 2026-10 · Fase 2D). Overview dan panggung
+// Dalang tetap mengimpor nama lama dari sini.
+export { FLOW_LABEL, STAGE_LABEL };
 
 // Batas hari LOKAL, komponen-per-komponen — `new Date("YYYY-MM-DD")` adalah tengah malam UTC
 // dan menggeser hari di WIB (gotcha ADR-0090/0105). Dipakai juga DalangHanomanScreen.
@@ -92,7 +82,7 @@ function LivePuppet({ s, projects, backlog, index, onOpenSession }: {
   // manusia — wayang-nya "menoleh" (goyangan berhenti) supaya yang minta tolong terbaca beda.
   const waiting = !!s.decision && !s.deciding;
   const sub = waiting ? "menunggu jawabanmu"
-    : spec ? `${spec.id} · ${STAGE_LABEL[spec.stage] ?? spec.stage}` : (FLOW_LABEL[s.flow ?? ""] ?? "sesi terminal");
+    : spec ? `${spec.id} · ${labelOf(STAGE_LABEL, spec.stage)}` : (s.flow ? labelOf(FLOW_LABEL, s.flow) : "sesi terminal");
   return (
     <button
       type="button"

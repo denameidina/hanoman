@@ -289,10 +289,12 @@ di Terminal; persist Settings yang jujur; label ramah Portal.
   berjumlah 49; `[style*=` tersisa satu selektor di `app.css:297`.
 - [ ] Varian `danger` pada `ProgressBar`, `Radio`, `Field`, `Callout`, dan `OverflowActions`; hanya `Button` yang punya.
 
-### Fase 3 — redesign per layar (belum)
+### Fase 3 — redesign per layar (sebagian)
 
-- [ ] IA 17 → 8 menu dengan ADR baru (menimpa sebagian ADR-0160), redirect path lama, dan
-  `NAV_KEYS`/`routes.test.ts` diperbarui.
+- [x] IA 17 → 8 hub bergrup dengan [ADR-0205](../adr/0205-navigasi-8-hub-bergrup.md) (menimpa sebagian
+  ADR-0160). Tanpa redirect: path setiap section tak berubah, jadi tautan lama tetap membuka layar yang sama.
+  `HN_NAV` dan `routes.test.ts` tetap valid; yang berubah hanya isi sidebar. Rincian:
+  [frontend-implementation § Fase 3A](frontend-implementation.md#audit-uiux-2026-10--fase-3a--navigasi-8-hub-bergrup-adr-0205).
 - [ ] Redesign per layar sesuai urutan usulan: Overview → Settings → Backlog/Tim → Terminal → Triase/Lead →
   Klien → IDE → Scheduler → VPS → Skills → Review → Portal → Onboarding.
 

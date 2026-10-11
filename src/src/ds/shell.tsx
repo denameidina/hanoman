@@ -9,14 +9,20 @@ import { LimitBadge, CodexLimitBadge } from "../screens/LimitIndicator";
 import { UpdateBadge, ReloadBadge } from "../screens/UpdateIndicator";
 import { AccountMenu } from "../auth/AccountMenu";
 import { useResponsiveTier } from "./responsive";
-import { pendingFor, pendingLabel, type PendingCounts } from "@hanoman/shared";
+import { pendingLabel, type PendingCounts } from "@hanoman/shared";
 // Dari `../ui-state/hooks`, BUKAN barrel `../ui-state`: barrel itu memuat ResetViewButton
 // yang mengimpor komponen DS, dan lewat sana `ds → shell → ui-state → ds` jadi lingkaran impor.
-import { useScrollRestore } from "../ui-state/hooks";
+import { useScrollRestore, usePersistedState } from "../ui-state/hooks";
 import { openPalette } from "../palette/ui-store";
 import { ProjectScopeContext, ProjectSwitcher, PROJECT_SCOPED_KEYS, scopeProjectName } from "../palette/ProjectSwitcher";
 import { isMacPlatform, paletteShortcutLabel } from "../palette/shortcuts";
+import { HN_GROUPS, HN_HUBS, hubBadge, hubOf, hubTarget, tabOf, tabsOf, type NavHub } from "../nav-hubs";
 
+// `HN_NAV` = SEMUA rute yang valid (parseRoute, palet, shortcut `g`). Sidebar TIDAK lagi merender
+// daftar ini mentah: ia merender `HN_HUBS` (ADR-0205), dan tiap section yang tak punya hub hanya
+// bisa dicapai lewat palet (`PALETTE_ONLY_SECTIONS`). Kontrak "tak ada section yatim" dijaga
+// `src/src/nav-hubs.test.ts`.
+//
 // Setiap key WAJIB punya cabang `section === …` di App.tsx. Bila tidak, `screen` tetap
 // null dan App merender kosong — sidebar ikut hilang, pengguna terjebak sampai reload.
 // `runs` dan `triggers` pernah begitu: screen-nya lenyap bersama subsistem run (SPEC-162),
@@ -95,19 +101,20 @@ function HnNavBadge({ count }: { count: number }) {
   );
 }
 
-function HnSidebarItem({ item, active, onNavigate }: { item: NavItem; active?: string; onNavigate?: (key: string) => void }) {
-  const on = active === item.key;
+/* ADR-0205 · satu entri sidebar = satu hub. `target` sudah diselesaikan pemanggil (tab terakhir di hub
+   itu, atau default), jadi klik cukup meneruskannya ke App seperti sebelumnya. */
+function HnHubItem({ hub, on, target, badge, onNavigate }:
+  { hub: NavHub; on: boolean; target: string; badge?: number; onNavigate?: (key: string) => void }) {
   const [hover, setHover] = React.useState(false);
   const interactive = !!onNavigate;
-  const pending = pendingFor(React.useContext(NavPending), item.key);
   // Angka ikut ke dalam nama yang dibacakan & tooltip: di lebar tablet label-nya disembunyikan CSS,
   // sehingga tanpa ini pembaca layar hanya mendengar "Triase" untuk tombol yang justru sedang
   // memberi tahu ada tiga yang menunggu.
-  const name = pending ? `${item.label}, ${pending} butuh pengajuan` : item.label;
+  const name = badge ? `${hub.label}, ${badge} butuh pengajuan` : hub.label;
   return (
     <button
       type="button"
-      onClick={interactive ? () => onNavigate!(item.key) : undefined}
+      onClick={interactive ? () => onNavigate!(target) : undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       aria-current={on ? "page" : undefined}
@@ -125,12 +132,17 @@ function HnSidebarItem({ item, active, onNavigate }: { item: NavItem; active?: s
         transition: "background var(--dur-fast, 120ms) ease",
       }}
     >
-      <Icon name={item.icon} size={17} color={on ? "var(--accent-hover)" : "var(--text-muted)"} />
-      <span className="hn-nav-label">{item.label}</span>
-      {pending !== undefined && <HnNavBadge count={pending} />}
+      <Icon name={hub.icon} size={17} color={on ? "var(--accent-hover)" : "var(--text-muted)"} />
+      <span className="hn-nav-label">{hub.label}</span>
+      {badge !== undefined && <HnNavBadge count={badge} />}
     </button>
   );
 }
+
+/* ADR-0205 · ingatan tab terakhir per hub (hub key → section). Dibaca dan ditulis hanya oleh Shell:
+   klik hub kembali ke tab yang terakhir dibuka di hub itu, dan itu cukup — tak perlu state di App. */
+const isLastTab = (v: unknown): v is Record<string, string> =>
+  typeof v === "object" && v !== null && !Array.isArray(v) && Object.values(v).every((x) => typeof x === "string");
 
 /* SPEC-919 · gerbang nav berbasis kemampuan instance. Context, bukan prop: `Shell` dirender di
    belasan cabang `App`, dan menambah prop ke semuanya adalah undangan bagi cabang yang terlewat.
@@ -164,6 +176,20 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
   const scope = React.useContext(ProjectScopeContext);
   const scoped = !!scope && PROJECT_SCOPED_KEYS.has(active ?? "");
   const scopeName = scoped && scope ? scopeProjectName(scope) : undefined;
+  // ADR-0205 · hub yang memuat layar ini dan tab-nya. Crumb "Hub › Tab" hanya bagi hub yang punya
+  // lebih dari satu tab yang tampil: hub berisi satu layar (Overview, Triase, Skills) tak butuh crumb.
+  const pendingCounts = React.useContext(NavPending);
+  const activeHub = hubOf(active);
+  const activeTab = tabOf(active);
+  const [lastTab, setLastTab] = usePersistedState<Record<string, string>>("nav", "lastTab", {}, isLastTab);
+  React.useEffect(() => {
+    if (!activeHub || !activeTab || lastTab[activeHub.key] === activeTab) return;
+    setLastTab((cur) => ({ ...cur, [activeHub.key]: activeTab }));
+  }, [active]);
+  const visibleTabs = activeHub ? tabsOf(activeHub, gates) : [];
+  const hubCrumb = activeHub && visibleTabs.length > 1
+    ? [activeHub.label, visibleTabs.find((t) => t.section === activeTab)?.label].filter(Boolean).join(" › ")
+    : undefined;
   const isMac = isMacPlatform();
   const shortcutHint = paletteShortcutLabel(isMac);
   const mainRef = useScrollRestore(`page@${active ?? "-"}`, "scroll");
@@ -238,18 +264,27 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
       <aside ref={navRef} id="hn-primary-navigation" className="hn-shell-sidebar" aria-hidden={mobile && !navOpen ? "true" : undefined}>
         <div className="hn-shell-wordmark"><HnWordmark /></div>
 
-        <div className="hn-eyebrow hn-shell-workspace">Workspace</div>
+        {/* ADR-0205 · delapan hub dalam tiga grup berlabel. Grup berlabel supaya pembaca layar
+            mendengar konteks tiap hub; di rail tablet labelnya disembunyikan CSS dan grup tinggal
+            dipisah garis tipis, sehingga kedelapan ikon muat tanpa gulir. */}
         <nav className="hn-shell-nav" aria-label="Navigasi utama">
-          {HN_NAV.filter((n) => !n.gate || gates[n.gate]).map((n) => (
-            <HnSidebarItem
-              key={n.key}
-              item={n}
-              active={active}
-              onNavigate={onNavigate ? (key) => {
-                onNavigate(key);
-                if (mobile) closeNavigation();
-              } : undefined}
-            />
+          {HN_GROUPS.map((g) => (
+            <div key={g.key} className="hn-nav-group" role="group" aria-labelledby={`hn-nav-group-${g.key}`}>
+              <div id={`hn-nav-group-${g.key}`} className="hn-eyebrow hn-nav-group-label">{g.label}</div>
+              {HN_HUBS.filter((h) => h.group === g.key).map((h) => (
+                <HnHubItem
+                  key={h.key}
+                  hub={h}
+                  on={activeHub?.key === h.key}
+                  target={hubTarget(h, lastTab, gates)}
+                  badge={hubBadge(h, pendingCounts, gates)}
+                  onNavigate={onNavigate ? (key) => {
+                    onNavigate(key);
+                    if (mobile) closeNavigation();
+                  } : undefined}
+                />
+              ))}
+            </div>
           ))}
         </nav>
       </aside>
@@ -268,10 +303,14 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             <Icon name="menu" size={20} />
           </button>
           <div className="hn-shell-heading">
-            {(breadcrumb || scopeName) && (
+            {(hubCrumb || breadcrumb || scopeName) && (
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", marginBottom: 1 }}>
-                {breadcrumb}
-                {scopeName && <span data-testid="scope-crumb">{breadcrumb ? " · " : ""}project: {scopeName}</span>}
+                {hubCrumb && <span data-testid="hub-crumb">{hubCrumb}</span>}
+                {hubCrumb && (breadcrumb || scopeName) ? " · " : ""}
+                {/* Deskripsi layar dibungkus sendiri: teksnya tetap bisa dicari utuh (getByText) walau
+                    kini berdampingan dengan crumb hub. */}
+                {breadcrumb && <span>{breadcrumb}</span>}
+                {scopeName && <span data-testid="scope-crumb">{breadcrumb || hubCrumb ? " · " : ""}project: {scopeName}</span>}
               </div>
             )}
             {/* h1: judul layar adalah heading utama halaman. `margin: 0` menimpa base.css. */}

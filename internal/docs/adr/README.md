@@ -181,6 +181,7 @@ setiap sesi agen, riwayat ADR hanya saat seseorang butuh alasannya.
 - [0200 — `instance:admin`: pasang pembaruan & restart lewat agent token](0200-instance-admin-update-restart.md) — mengamandemen SPEC-405/0088; balasan dikirim sebelum proses mati.
 - [0201 — Help Center publik anonim tidak dibungkus tool MCP](0201-help-center-publik-tanpa-tool-mcp.md)
 - [0204 — Requeue baris gagal, tandai notifikasi terbaca per item, zona waktu scheduler](0204-requeue-gagal-tandai-per-item-zona-scheduler.md) — memperluas 0106
+- [0205 — Navigasi 8 hub bergrup](0205-navigasi-8-hub-bergrup.md) — **menimpa sebagian 0160** (daftar menu sidebar: 17 datar → 8 hub di tiga grup; bentuk URL tetap). Tab hub = section URL (`SectionTabs`), klik hub mengingat tab terakhir, Dalang keluar dari sidebar (palet "Buka panggung"). Tanpa redirect, tanpa API baru
 - [0202 — Setiap API baru wajib punya keputusan MCP](0202-keputusan-mcp-wajib-untuk-setiap-api-baru.md)
 - [0182 — Hapus memori project dan changelog](0182-hapus-memori-project-dan-changelog.md) — penghapusan fitur dan data atas permintaan pengguna; menggantikan 0105 (changelog), 0178/0179/0181, dan bagian memori 0180.
 - [0183 — Transfer berkas lewat tool MCP: unggah dari `filePath`, unduh ke `savePath`](0183-transfer-berkas-lewat-tool-mcp.md) — **mengamandemen 0124 §6, 0099 & pengecualian lampiran/ekspor/impor QA**. 18 tool untuk route multipart/biner; `McpRequest` mendapat `multipart`/`download`, klien membaca/menulis disk LOKAL, model tak pernah menerima byte.

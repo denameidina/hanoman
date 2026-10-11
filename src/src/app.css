@@ -60,8 +60,14 @@ textarea:focus-visible,
 }
 
 .hn-shell-wordmark { padding: 2px 4px 20px; }
-.hn-shell-workspace { padding: 0 10px 8px; }
 .hn-shell-nav { display: flex; min-height: 0; flex-direction: column; gap: 2px; overflow-y: auto; }
+/* ADR-0205 · tiga grup berlabel (Kerja · Otomasi · Sistem). Label grup sekecil eyebrow; pemisah antar
+   grup memakai jarak, bukan garis, supaya di sidebar penuh terbaca sebagai daftar biasa. */
+.hn-nav-group { display: flex; flex-direction: column; gap: 2px; }
+.hn-nav-group + .hn-nav-group { margin-top: 14px; }
+.hn-nav-group-label { padding: 0 10px 6px; }
+/* ADR-0205 · bar tab hub di atas konten layar anak hub (SectionTabs). */
+.hn-section-tabs { margin-bottom: var(--space-4); }
 .hn-shell-column { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .hn-shell-topbar {
   min-height: var(--topbar-h);
@@ -186,8 +192,10 @@ textarea:focus-visible,
   .hn-shell-sidebar .hn-nav-badge { margin-left: 0; }
 
   .hn-shell-sidebar .hn-nav-label,
-  .hn-shell-sidebar .hn-shell-workspace,
+  .hn-shell-sidebar .hn-nav-group-label,
   .hn-shell-sidebar .hn-shell-wordmark > div > div > span:last-child { display: none; }
+  /* Rail: label grup disembunyikan, jadi grup dipisah garis tipis agar tetap terbaca sebagai kelompok. */
+  .hn-shell-sidebar .hn-nav-group + .hn-nav-group { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-hair); }
   .hn-shell-sidebar nav button { justify-content: center; padding-inline: 0; }
   .hn-shell-wordmark { display: flex; justify-content: center; padding-inline: 0; }
 }

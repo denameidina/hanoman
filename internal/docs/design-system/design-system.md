@@ -173,13 +173,36 @@ Aturan:
 
 1. Shortcut huruf tunggal (`g`, `/`, `?`) tak pernah aktif saat fokus di input, textarea, select,
    contenteditable, atau terminal, saat dialog modal terbuka, atau bersama Ctrl/⌘/Alt.
-2. `g` hanya menuju layar yang tampil di sidebar. Layar bergerbang yang mati tak pernah dituju.
+2. `g` menuju layar mana pun di `HN_NAV` (termasuk Dalang yang kini di luar sidebar). Layar bergerbang yang mati tak pernah dituju.
 3. Tombol topbar "Cari" membuka palet dan menunjukkan `⌘K` (Mac) atau `Ctrl K` (lainnya). Di mobile dan
    pointer kasar ia menjadi ikon ≥44px dan petunjuknya disembunyikan.
 4. Project switcher topbar hanya tampil di layar yang membaca filter project (Backlog, Tim, PRD). Scope
    aktif ditampilkan di breadcrumb sebagai `project: <nama>`.
 5. Hasil palet dikelompokkan: Riwayat dan Menunggu kamu, Aksi, Pindah ke saat kueri kosong; Backlog dan
    Project hanya saat diketik, dipangkas delapan per grup.
+
+## Navigasi hub (Audit UI/UX 2026-10 · Fase 3A)
+
+Rincian berkas di [frontend-implementation](../frontend/frontend-implementation.md#audit-uiux-2026-10--fase-3a--navigasi-8-hub-bergrup-adr-0205).
+Keputusan di [ADR-0205](../adr/0205-navigasi-8-hub-bergrup.md).
+
+| Elemen | Aturan |
+|---|---|
+| Sidebar (desktop) | Delapan hub dalam tiga grup berlabel: **Kerja** (Overview, Projects, Backlog, Triase, Sesi) · **Otomasi** (Otonom) · **Sistem** (Skills, Pengaturan). Item aktif = hub yang memuat layar |
+| Rail (tablet) | Ikon saja. Label grup disembunyikan, dan grup dipisah garis tipis. Tak ada gulir |
+| Drawer (mobile) | Tiga grup berlabel. Menutup sesudah navigasi |
+| Klik hub | Membuka tab terakhir yang dibuka di hub itu. Tanpa riwayat, tab pertama yang tampil |
+| Bar tab | Di atas konten layar anak hub. `role="tablist"` dengan URL sebagai sumber kebenaran. Tampil bila ada dua tab atau lebih yang tampil |
+| Angka antrean | Hub menjumlahkan antrean tab-tabnya. Tiap tab menampilkan angkanya sendiri. Nol tak dirender |
+| Crumb | `Hub › Tab` di atas judul, hanya untuk hub bertab banyak. Deskripsi layar tetap di belakangnya |
+| Layar turunan | Detail project tampil di bawah Projects, dan review di bawah Backlog. Keduanya tak pernah jadi tab |
+| Di luar sidebar | Dalang: palet "Buka panggung", `g d`, dan bantuan `?` |
+
+Aturan:
+
+1. Tab adalah **section URL**, bukan state lokal. Pindah tab = navigasi, sehingga Kembali browser dan tautan bersama tetap bekerja.
+2. Hub baru masuk `HN_HUBS` dan lolos `nav-hubs.test.ts`. Section tanpa hub harus dicatat sebagai palet-saja secara sadar, atau test gagal.
+3. Hub satu layar (Overview, Triase, Skills) tak punya bar tab maupun crumb. Jangan memaksakan tab untuk hub yang belum punya dua layar.
 
 ## Form, Modal, Toast — Fase 2B (Audit UI/UX 2026-10)
 

@@ -10,6 +10,8 @@
    Audit UI/UX 2026-10 (Fase 1H): tolak lewat konfirmasi, galat tak ditelan, pencarian tak memicu
    "Memuat…" penuh, aksi detail dipangkas ke primer + menu ⋯. */
 import React from "react";
+import { relativeTime } from "../lib/time-format";
+import { TICKET_STATUS_LABEL } from "../lib/labels";
 import { Button, Badge, Select, StateBlock, Icon, Input, Field, HnTextarea, ConfirmDialog, useConfirm, Pager, ResponsivePanels, serverPage, LiveConnectionBadge, OverflowActions, useResponsiveTier } from "../ds";
 import type { OverflowItem } from "../ds";
 import { paths, publicStatus, type TicketView, type TicketDetail, type Spec, type GithubIssueView } from "@hanoman/shared";
@@ -48,19 +50,11 @@ const reasonOf = (e: unknown): string => {
 };
 const failed = (action: string, e: unknown): string => failureMessage(action, new Error(reasonOf(e)));
 
-// Bentuk relatif lengkap ("5 menit lalu"), supaya pemanggil tak menambah "lalu" sendiri.
-function ago(iso: string, now = Date.now()): string {
-  const d = Math.max(0, now - new Date(iso).getTime());
-  const m = Math.floor(d / 60_000);
-  if (m < 1) return "baru saja";
-  if (m < 60) return `${m} menit lalu`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h} jam lalu`;
-  return `${Math.floor(h / 24)} hari lalu`;
-}
+// Waktu relatif satu bentuk untuk seluruh dashboard (lib/time-format.ts).
+const ago = (iso: string, now = Date.now()): string => relativeTime(iso, now) || "—";
 
 const STATUS_TONE = { new: "warn", accepted: "ok", rejected: "neutral" } as const;
-const STATUS_LABEL = { new: "belum ditinjau", accepted: "diterima", rejected: "ditutup" } as const;
+const STATUS_LABEL = TICKET_STATUS_LABEL;
 type TStatus = keyof typeof STATUS_TONE;
 
 function TicketRow({ t, selected, onOpen }: { t: TicketView; selected: boolean; onOpen: (id: string) => void }) {

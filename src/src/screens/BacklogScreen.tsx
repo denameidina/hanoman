@@ -8,6 +8,7 @@ import {
 } from "../ds";
 import { api, ApiError, type SourceResetPending } from "../api/client";
 import { failureMessage } from "../lib/report-error";
+import { PRIORITY_LABEL } from "../lib/labels";
 import { mergeSlim } from "../lib/specs-digest";
 import { SpecDocsModal } from "./SpecDocsModal";
 import { SpecAttachmentsPanel, type AttachmentToast } from "./SpecAttachments";
@@ -51,9 +52,9 @@ const startLabel = (stage: string) => (stage === "brainstorming" ? "Mulai" : "La
 // Satu sumber label prioritas untuk board, grid, list, dan detail. Warnanya aksen (brass), BUKAN
 // `err`: `err` dipesan untuk gagal/terblokir, dan sumber QA sudah memakainya.
 const B_PRIO: Record<string, { tone: "brass" | "neutral"; label: string }> = {
-  tinggi: { tone: "brass", label: "Tinggi" },
-  sedang: { tone: "neutral", label: "Sedang" },
-  rendah: { tone: "neutral", label: "Rendah" },
+  tinggi: { tone: "brass", label: PRIORITY_LABEL.tinggi },
+  sedang: { tone: "neutral", label: PRIORITY_LABEL.sedang },
+  rendah: { tone: "neutral", label: PRIORITY_LABEL.rendah },
 };
 const prioMeta = (priority: string) => B_PRIO[priority] ?? B_PRIO.sedang!;
 // SPEC-546 · ADR-0109 · katalog source (lencana, opsi, daftar field per bentuk) pindah ke
