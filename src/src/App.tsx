@@ -1547,6 +1547,7 @@ function AppInner() {
   if (!auth.user) return <AuthScreen needsSetup={auth.needsSetup}
     setupTokenRequired={auth.setupTokenRequired ?? false}
     setupTokenPath={auth.setupTokenPath}
+    setupStep={auth.needsSetup && setupStatus?.needed === false ? 2 : undefined}
     onDone={(u) => setAuth({ needsSetup: false, user: u })} />;
   // SPEC-617 · ADR-0110 · akun klien mendarat di permukaannya sendiri, bukan dashboard operator.
   // Percabangan di SINI (bukan di dalam Shell) supaya tak satu pun state/efek dashboard operator
@@ -1718,7 +1719,7 @@ function AppInner() {
       <Shell active="clients" title="Klien" breadcrumb="device · sesi yang sedang berjalan"
         onNavigate={setSection}>
         {hubTabs}
-        <ClientsScreen view={presence} specTitles={specTitles} onOpenSpec={openReviewSpecId} />
+        <ClientsScreen view={presence} specTitles={specTitles} onOpenSpec={openReviewSpecId} onToast={showToast} />
       </Shell>
     );
   } else if (section === "scheduler") {
@@ -1768,7 +1769,8 @@ function AppInner() {
         actions={<Button size="sm" variant="ghost" leftIcon="arrow-left" onClick={() => setSection(back)}>Kembali</Button>}>
         {hubTabs}
         {gate(reviewTarget
-          ? <ReviewScreen specId={reviewTarget.id} kind={reviewTarget.kind} title={reviewTarget.title} onBack={() => setSection(back)} />
+          ? <ReviewScreen specId={reviewTarget.id} kind={reviewTarget.kind} title={reviewTarget.title} onBack={() => setSection(back)}
+              onGoto={(to) => navigate(routePath(to))} />
           : <StateBlock kind="empty" icon="git-compare" title="Pilih item untuk di-review"
               hint="Buka Review dari Backlog atau dari sel sesi di Terminal." action={() => setSection("backlog")} actionLabel="Ke Backlog" />)}
       </Shell>

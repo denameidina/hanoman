@@ -8,7 +8,7 @@ import React from "react";
 import { Icon } from "../ds";
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, SpecSlim } from "./types";
-import { WayangSilhouette } from "./DalangStage";
+import { WayangSilhouette } from "./WayangSilhouette";
 import { FLOW_LABEL, STAGE_LABEL, labelOf } from "../lib/labels";
 import { useEventsStatus } from "../api/live";
 import "./styles/dalang.css";

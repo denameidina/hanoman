@@ -4,9 +4,12 @@
     <meta charset="UTF-8" />
     <!-- viewport-fit=cover: tanpa ini env(safe-area-inset-*) bernilai 0 dan token --safe-* tak aktif. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- fonts.css memuat IBM Plex dari Google Fonts lewat @import; preconnect memangkas RTT sebelum CSS itu terunduh. -->
+    <!-- IBM Plex dari Google Fonts. Bukan @import di CSS (itu memblokir render). Preload lalu pindah ke
+         stylesheet begitu tiba; tanpa JS atau offline, fallback generik di ds/tokens/typography.css yang berlaku. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap" as="style" onload="this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap" /></noscript>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>hanoman</title>
   </head>

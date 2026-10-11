@@ -1,0 +1,169 @@
+/* Workspace QA · redesign 3L (Audit UI/UX 2026-10 · Fase 3). Susunan lewat kelas `hn-qa-*`; warna,
+   font, dan jarak hanya memakai token DS. Keputusan layar: frontend-implementation.md § Fase 3 · QA. */
+
+.hn-qa-stack { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.hn-qa-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.hn-qa-toolbar-project { flex: 0 1 240px; min-width: 0; }
+.hn-qa-intro { margin: 0; max-width: 70ch; font-size: var(--text-sm); color: var(--text-subtle); }
+.hn-qa-note { margin: 0; font-size: var(--text-xs); color: var(--text-subtle); }
+.hn-qa-note-list { margin: 0; padding-left: 18px; }
+.hn-qa-error { margin: 0; font-size: var(--text-sm); color: var(--status-err); overflow-wrap: anywhere; }
+.hn-qa-code { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-subtle); white-space: nowrap; }
+.hn-qa-label { font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--text-strong); margin-bottom: var(--space-1); }
+.hn-qa-pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-sm); color: var(--text-body); }
+
+/* ---------------------------------------------------------------- Daftar laporan & baris temuan (RowList) */
+
+/* Isi baris DenseRow berupa <span> (main-nya <button>, jadi tak boleh <div>). */
+.hn-qa-row-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1 1 200px; }
+.hn-qa-row-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.hn-qa-row-title {
+  display: block; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-strong);
+  overflow-wrap: anywhere; min-width: 0;
+}
+.hn-qa-row-line {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--space-3); min-width: 0;
+  font-size: var(--text-xs); color: var(--text-subtle);
+}
+.hn-qa-row-line > span { min-width: 0; overflow-wrap: anywhere; }
+.hn-qa-row-stat { color: var(--text-muted); }
+
+/* ---------------------------------------------------------------- Editor · header sticky */
+
+.hn-qa-editor { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.hn-qa-bar {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  padding: var(--space-2) 0; background: var(--surface-page); border-bottom: 1px solid var(--border-hair); min-width: 0;
+}
+.hn-qa-bar-title { flex: 1 1 200px; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.hn-qa-bar-name {
+  margin: 0; min-width: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-strong);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-qa-bar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); flex: 0 0 auto; min-width: 0; }
+.hn-qa-bar-save {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 360px;
+  font-size: var(--text-xs); color: var(--text-subtle);
+}
+.hn-qa-bar-save.is-error { color: var(--status-err); }
+
+/* Mobile: aksi utama menempel di bawah layar (bar sticky), bukan di kepala. Satu elemen, dua posisi. */
+@media (max-width: 767px) {
+  .hn-qa-editor { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .hn-qa-bar-actions {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; justify-content: flex-end;
+    padding: var(--space-2) var(--page-gutter-x) calc(var(--space-2) + env(safe-area-inset-bottom));
+    background: var(--surface-card); border-top: 1px solid var(--border-hair);
+  }
+  .hn-qa-bar-save { flex: 1 1 100%; max-width: none; order: -1; }
+}
+
+/* ---------------------------------------------------------------- Kartu info laporan (ringkas) */
+
+.hn-qa-info {
+  display: flex; flex-direction: column; gap: var(--space-2); min-width: 0;
+  padding: var(--space-3) var(--space-4); background: var(--surface-card);
+  border: 1px solid var(--border-hair); border-radius: var(--radius-lg);
+}
+.hn-qa-info-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.hn-qa-info-title { margin: 0; flex: 1 1 160px; min-width: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-strong); }
+.hn-qa-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: var(--space-2) var(--space-4); margin: 0; min-width: 0; }
+.hn-qa-facts > div { min-width: 0; }
+.hn-qa-facts dt { font-size: var(--text-2xs); color: var(--text-subtle); }
+.hn-qa-facts dd { margin: 0; font-size: var(--text-sm); color: var(--text-strong); overflow-wrap: anywhere; }
+
+/* ---------------------------------------------------------------- Form di dalam drawer "Info laporan" */
+
+.hn-qa-form { display: flex; flex-direction: column; min-width: 0; }
+.hn-qa-grid { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); min-width: 0; }
+.hn-qa-fieldset { border: 0; margin: 0 0 var(--space-3); padding: 0; min-width: 0; }
+.hn-qa-legend { padding: 0; margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-strong); }
+.hn-qa-more { margin-top: var(--space-1); }
+.hn-qa-more > summary { cursor: pointer; color: var(--text-subtle); font-size: var(--text-sm); padding: var(--space-1) 0; }
+.hn-qa-file { display: block; width: 100%; max-width: 100%; font: var(--text-sm)/1.4 var(--font-ui); color: var(--text-body); }
+.hn-qa-file::file-selector-button {
+  margin-right: 10px; height: 34px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface-card); color: var(--text-strong); font: var(--weight-medium) var(--text-sm)/1 var(--font-ui);
+  cursor: pointer; box-shadow: var(--shadow-xs);
+}
+.hn-qa-file::file-selector-button:hover { background: var(--bone-100); }
+.hn-qa-file:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; border-radius: var(--radius-sm); }
+.hn-qa-file:disabled { opacity: .5; }
+.hn-qa-modal-stack { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+/* ---------------------------------------------------------------- Tinjau dan ajukan (checklist) */
+
+.hn-qa-check { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.hn-qa-check > li {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: var(--space-2); align-items: start;
+  padding-bottom: var(--space-3); border-bottom: 1px solid var(--border-hair);
+}
+.hn-qa-check > li:last-child { border-bottom: 0; padding-bottom: 0; }
+.hn-qa-check-icon { display: inline-flex; padding-top: 1px; }
+.hn-qa-check-icon.is-ok { color: var(--leaf-600); }
+.hn-qa-check-icon.is-warn { color: var(--amber-600); }
+.hn-qa-check-icon.is-miss { color: var(--clay-600); }
+.hn-qa-check-name { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-strong); }
+.hn-qa-check-note { font-size: var(--text-xs); color: var(--text-subtle); overflow-wrap: anywhere; }
+.hn-qa-check-body { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+
+/* ---------------------------------------------------------------- Menu ⋯ berisi tautan ekspor */
+
+.hn-qa-export { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.hn-qa-export > a { justify-content: flex-start; }
+
+/* ---------------------------------------------------------------- Test case */
+
+.hn-qa-case-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2); min-width: 0; }
+.hn-qa-case-code { flex: 0 1 120px; min-width: 0; }
+.hn-qa-case-name { flex: 1 1 200px; min-width: 0; }
+.hn-qa-case-status { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-1); min-width: 0; }
+.hn-qa-case-grid { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin-top: var(--space-2); min-width: 0; }
+.hn-qa-add { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: flex-start; min-width: 0; }
+.hn-qa-add-field { flex: 1 1 240px; min-width: 0; }
+
+/* Indikator simpan per kartu: Menyimpan / Tersimpan / gagal (+ alasan). */
+.hn-qa-save { display: inline-flex; align-items: center; gap: 6px; min-height: 20px; font-size: var(--text-xs); color: var(--text-subtle); overflow-wrap: anywhere; }
+.hn-qa-save.is-saved { color: var(--leaf-600); }
+.hn-qa-save.is-error { color: var(--status-err); }
+
+/* Status test case: pilihan satu ketukan. RadioGroup DS dipakai apa adanya; bentuk chip-nya dari sini
+   (lingkaran dan indikator fokus dimatikan visualnya, fokus tetap digambar lewat :focus-within). */
+.hn-qa-seg { min-width: 0; }
+.hn-qa-seg .hn-choice-target { position: relative; min-height: 36px; border-radius: var(--radius-sm); background: var(--surface-card); border: 1px solid var(--border-strong); }
+.hn-qa-seg .hn-choice-target > span:last-child { display: flex; align-items: center; min-height: 36px; padding: 0 12px; }
+.hn-qa-seg .hn-choice-control { position: absolute; left: 0; top: 0; opacity: 0; }
+.hn-qa-seg .hn-choice-target:focus-within { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.hn-qa-seg .hn-choice-target.is-on { background: var(--brass-100); border-color: var(--brass-600); }
+.hn-qa-seg .hn-choice-target.is-on > span:last-child { font-weight: var(--weight-semibold); }
+
+/* ---------------------------------------------------------------- Temuan · detail dan hasil kirim massal */
+
+.hn-qa-detail-grid { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); min-width: 0; }
+.hn-qa-detail-stack { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.hn-qa-steps { margin: 0; padding-left: 20px; font-size: var(--text-sm); color: var(--text-body); }
+.hn-qa-steps li { overflow-wrap: anywhere; }
+.hn-qa-result-line { font-size: var(--text-xs); color: var(--text-subtle); overflow-wrap: anywhere; }
+.hn-qa-result-line.is-err { color: var(--status-err); }
+
+/* ---------------------------------------------------------------- Lampiran */
+
+.hn-qa-attach { min-width: 0; margin-top: var(--space-2); border-radius: var(--radius-sm); }
+.hn-qa-attach:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+.hn-qa-attach-list { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-3); min-width: 0; }
+.hn-qa-attach-item { display: grid; gap: 4px; max-width: 160px; min-width: 0; }
+.hn-qa-attach-img {
+  height: 96px; max-width: 160px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+}
+.hn-qa-attach-img.is-compact { height: 64px; }
+.hn-qa-attach-file { font-size: var(--text-xs); overflow-wrap: anywhere; }
+.hn-qa-attach-meta { font-size: var(--text-2xs); color: var(--text-subtle); overflow-wrap: anywhere; }
+.hn-qa-attach-hint { margin: var(--space-2) 0 0; font-size: var(--text-xs); color: var(--text-subtle); }
+
+/* ---------------------------------------------------------------- Pratinjau (Markdown ekspor) */
+
+.hn-qa-preview { display: grid; gap: var(--space-3); grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.hn-qa-preview .hn-md table { display: block; overflow-x: auto; max-width: 100%; }
+/* Sel punya lebar minimum: tabel di layar sempit digulir mendatar, header tak pecah per huruf. */
+.hn-qa-preview .hn-md th { white-space: nowrap; }
+.hn-qa-preview .hn-md td { min-width: 112px; overflow-wrap: break-word; word-break: normal; }

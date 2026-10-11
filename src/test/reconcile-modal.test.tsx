@@ -29,7 +29,7 @@ describe("ReconcileModal (SPEC-270)", () => {
     expect(screen.getByTestId("default-side").textContent).toContain("Lokal");
   });
 
-  // Cacat C · route membalas HTTP 200 ber-`{ ok: false, reason }` saat hub menolak, dan modal
+  // Cacat C · route membalas HTTP 200 ber-`{ ok: false, reason }` saat server pusat menolak, dan modal
   // membuang hasilnya. Operator mengklik, tak ada yang berubah, tak ada pesan apa pun.
   it("menampilkan alasan saat resolusi ditolak, bukan diam", async () => {
     resolveConflict.mockResolvedValue({ ok: false, reason: "still-conflict" });
@@ -37,7 +37,7 @@ describe("ReconcileModal (SPEC-270)", () => {
     await waitFor(() => screen.getByText(/judul lokal/));
     fireEvent.click(screen.getByRole("button", { name: /Pakai Lokal/i }));
     fireEvent.click(await screen.findByRole("button", { name: "Pakai data Lokal" }));
-    await waitFor(() => expect(screen.getByTestId("resolve-error").textContent).toMatch(/hub/i));
+    await waitFor(() => expect(screen.getByTestId("resolve-error").textContent).toMatch(/server pusat/i));
   });
 
   it("klik Pakai Server memanggil resolveConflict(server)", async () => {

@@ -1,6 +1,7 @@
-# Aset dalang — figur orkestrator untuk DalangStage
+# Aset dalang — figur orkestrator (dulu untuk DalangStage)
 
-Tiga aset transparan yang dipakai panel `DalangStage` di Overview (`src/src/screens/DalangStage.tsx`):
+Tiga aset transparan yang dulu dipakai panel `DalangStage` di Overview. Panel itu sudah dihapus di Fase 2E
+(`src/src/screens/DalangStage.tsx`); tak ada kode yang mengimpor aset ini lagi, dan berkasnya dibiarkan:
 
 | berkas (display, dibundel) | master (tidak dibundel) | dipakai sebagai |
 |---|---|---|

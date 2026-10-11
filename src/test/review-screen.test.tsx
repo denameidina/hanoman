@@ -159,3 +159,48 @@ describe("ReviewScreen · berkas gagal, legenda, CTA lanjut", () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
+
+// Audit UI/UX 2026-10 · Fase 3 (3L) · bar keputusan: tiga tujuan, lewat onGoto atau tautan.
+describe("ReviewScreen · bar keputusan (Fase 3L)", () => {
+  it("tiga tujuan keputusan memanggil onGoto dengan rute yang benar", async () => {
+    const onGoto = vi.fn();
+    render(<ReviewScreen specId="SPEC-9" title="Judul item" onBack={() => {}} onGoto={onGoto} />);
+    await screen.findByRole("region", { name: "Keputusan" });
+    fireEvent.click(screen.getByRole("button", { name: "Buka di Backlog" }));
+    expect(onGoto).toHaveBeenLastCalledWith({ section: "backlog", specId: "SPEC-9" });
+    fireEvent.click(screen.getByRole("button", { name: "Buka di Terminal" }));
+    expect(onGoto).toHaveBeenLastCalledWith({ section: "terminal" });
+    fireEvent.click(screen.getByRole("button", { name: "Buka di IDE" }));
+    expect(onGoto).toHaveBeenLastCalledWith({ section: "ide" });
+  });
+
+  it("tanpa onGoto, setiap tujuan berupa tautan ke rute hanoman", async () => {
+    render(<ReviewScreen specId="SPEC-9" title="Judul" onBack={() => {}} />);
+    await screen.findByRole("region", { name: "Keputusan" });
+    expect(screen.getByRole("link", { name: "Buka di Backlog" })).toHaveAttribute("href", "/backlog/SPEC-9");
+    expect(screen.getByRole("link", { name: "Buka di Terminal" })).toHaveAttribute("href", "/terminal");
+    expect(screen.getByRole("link", { name: "Buka di IDE" })).toHaveAttribute("href", "/ide");
+  });
+
+  it("sesi PRD tak punya tujuan Backlog: merge dan konflik hanya di Terminal", async () => {
+    (api.sessionReview as any).mockResolvedValue({ base: "abc", files: [], changed: [] });
+    render(<ReviewScreen specId="S1" title="PRD" kind="session" onBack={() => {}} />);
+    await screen.findByRole("region", { name: "Keputusan" });
+    expect(screen.queryByRole("link", { name: "Buka di Backlog" })).toBeNull();
+    expect(screen.getByText("Merge dan konflik dikerjakan di Terminal.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Buka di Terminal" })).toBeInTheDocument();
+  });
+
+  it("header menyebut jumlah berkas dan total +/− dari daftar changed", async () => {
+    (api.specReview as any).mockResolvedValue({
+      base: "abc", files: ["a.ts", "b.ts"],
+      changed: [
+        { path: "a.ts", add: 3, del: 1, status: "M", binary: false },
+        { path: "b.ts", add: 2, del: 0, status: "A", binary: false },
+      ],
+    });
+    render(<ReviewScreen specId="SPEC-9" title="Judul" onBack={() => {}} />);
+    expect(await screen.findByText("+5 −1")).toBeInTheDocument();
+    expect(screen.getByText(/2 berkas berubah/)).toBeInTheDocument();
+  });
+});

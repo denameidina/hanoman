@@ -7,12 +7,11 @@ import { SYNC_STATE_BADGE, errText, fmtSize } from "./qa-ui";
 
 const MAX = 10 * 1024 * 1024;   // sama dengan QA_ATTACHMENT_LIMITS.fileBytes di server
 const ACCEPT = ".png,.jpg,.jpeg,.webp,.pdf,.md,.txt,.log,.json,.csv";
-// Wadah yang bisa difokus (untuk Ctrl/Cmd+V) harus memperlihatkan fokusnya. Cincin memakai token DS.
-const FOCUS_CSS = ".qa-attach:focus-visible{outline:2px solid var(--border-focus);outline-offset:3px;border-radius:var(--radius-sm)}";
 const OWNER_LABEL: Record<QaOwnerType, string> = { report: "laporan ini", case: "test case ini", finding: "temuan ini" };
 
 type Props = PanelProps & { ownerType: QaOwnerType; ownerId: string; compact?: boolean };
 
+// Wadah yang bisa difokus (Ctrl/Cmd+V menempel screenshot ke pemilik ini). Fokusnya digambar di qa.css.
 export function QaAttachments({ detail, projectId, locked, onChange, onToast, ownerType, ownerId, compact }: Props) {
   const api = useApi();
   const { confirm, dialog } = useConfirm();
@@ -51,31 +50,27 @@ export function QaAttachments({ detail, projectId, locked, onChange, onToast, ow
 
   return (
     <>
-      {/* Wadah dapat difokus supaya Ctrl/Cmd+V menempel screenshot langsung ke pemilik ini. */}
-      <div className="qa-attach" tabIndex={locked ? -1 : 0} style={{ marginTop: compact ? 10 : 0 }}
+      <div className="hn-qa-attach" tabIndex={locked ? -1 : 0}
         onPaste={(e) => { const fs = [...(e.clipboardData?.files ?? [])]; if (fs.length) { e.preventDefault(); void upload(fs); } }}
         onDragOver={(e) => { if (!locked) e.preventDefault(); }}
         onDrop={(e) => { if (locked) return; e.preventDefault(); void upload([...e.dataTransfer.files]); }}>
-        <style>{FOCUS_CSS}</style>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div className="hn-qa-attach-list">
           {items.map((a) => {
             const url = api.qaAttachmentUrl(projectId, detail.id, a.id);
+            const sync = SYNC_STATE_BADGE[a.syncState];
             return (
-              <div key={a.id} style={{ display: "grid", gap: 4, maxWidth: 160 }}>
+              <div key={a.id} className="hn-qa-attach-item">
                 {a.mimeType.startsWith("image/") ? (
                   <a href={url} target="_blank" rel="noreferrer">
-                    <img src={url} alt={a.filename} loading="lazy"
-                      style={{ height: compact ? 64 : 96, maxWidth: 160, objectFit: "cover", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-strong)" }} />
+                    <img src={url} alt={a.filename} loading="lazy" className={`hn-qa-attach-img${compact ? " is-compact" : ""}`} />
                   </a>
                 ) : (
-                  <a href={api.qaAttachmentUrl(projectId, detail.id, a.id, true)} style={{ fontSize: "var(--text-xs)", overflowWrap: "anywhere" }}>{a.filename}</a>
+                  <a href={api.qaAttachmentUrl(projectId, detail.id, a.id, true)} className="hn-qa-attach-file">{a.filename}</a>
                 )}
-                <span style={{ fontSize: "var(--text-2xs)", color: "var(--text-subtle)" }}>
+                <span className="hn-qa-attach-meta">
                   {a.mimeType.startsWith("image/") ? a.filename + " · " : ""}{fmtSize(a.size)}
                 </span>
-                {SYNC_STATE_BADGE[a.syncState] && (
-                  <Badge tone={SYNC_STATE_BADGE[a.syncState]!.tone} size="sm" title={SYNC_STATE_BADGE[a.syncState]!.hint}>{SYNC_STATE_BADGE[a.syncState]!.label}</Badge>
-                )}
+                {sync && <Badge tone={sync.tone} size="sm" title={sync.hint}>{sync.label}</Badge>}
                 {!locked && (
                   <Button size="sm" variant="ghost" leftIcon="trash-2" aria-label={`Hapus lampiran ${a.filename}`} onClick={() => void remove(a)} />
                 )}
@@ -91,7 +86,7 @@ export function QaAttachments({ detail, projectId, locked, onChange, onToast, ow
           )}
         </div>
         {!locked && !compact && (
-          <p style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)", margin: "8px 0 0" }}>
+          <p className="hn-qa-attach-hint">
             {/* Seret dan tempel hanya ada di perangkat berkursor; di layar sentuh pakai tombol Lampirkan. */}
             {coarse ? "Pilih berkas lewat tombol Lampirkan." : "Seret berkas ke sini atau tempel screenshot (Ctrl/Cmd+V)."}{" "}
             Maks 10 MB per berkas: png, jpg, webp, pdf, md, txt, log, json, csv.

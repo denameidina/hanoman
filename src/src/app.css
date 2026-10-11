@@ -135,28 +135,10 @@ textarea:focus-visible,
 .hn-topbar-label-short { display: none; }
 .hn-grid-mobile,
 .hn-stack-mobile,
-.hn-wrap-mobile,
-.hn-dense-row,
-.hn-vps-row { min-width: 0; }
+.hn-dense-row { min-width: 0; }
 /* Header Card. Susunan dasar di sini (sebelum blok mobile), bukan inline, supaya `align-items: stretch`
    di mobile menang lewat urutan kaskade biasa. */
 .hn-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-
-/* Baris VPS · baris atas (identitas · pil status · aksi) dan baris bawah (status instalasi).
-   Aksi dikunci ke kanan lewat margin-left auto supaya kolom tombol tetap sejajar antar-baris
-   meski panjang nama & host berbeda-beda. */
-.hn-vps-row:hover { background: var(--surface-sunken); }
-.hn-vps-main { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
-.hn-vps-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; flex-shrink: 0; }
-.hn-vps-sep {
-  width: 1px; height: 18px; margin: 0 4px;
-  background: var(--border-hair);
-}
-
-@media (max-width: 1199px) {
-  /* Sempit: label tombol jadi mahal, tapi jangan sampai baris atas ikut membungkus. */
-  .hn-vps-actions { flex-wrap: wrap; justify-content: flex-end; }
-}
 
 /* SPEC-961 · badge "butuh pengajuan" di entri sidebar. `margin-left: auto` mengunci angkanya ke
    tepi kanan supaya kolomnya sejajar antar-baris; `flex-shrink: 0` menjaga ia tak pernah menyusut
@@ -254,62 +236,9 @@ textarea:focus-visible,
   .hn-modal-body { padding-inline: var(--page-gutter-x) !important; }
   .hn-modal-footer { padding-inline: var(--page-gutter-x) !important; }
   .hn-modal-footer > * { min-height: var(--touch-target); }
-  .hn-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-  .hn-project-header { display: none !important; }
-  .hn-project-row {
-    grid-template-columns: minmax(0, 1fr) !important;
-    align-items: stretch !important;
-    gap: 10px !important;
-    margin-bottom: 10px;
-    padding: 14px !important;
-    border: 1px solid var(--border-hair);
-    border-left-width: 3px;
-    border-radius: var(--radius-md);
-  }
-  .hn-project-row > [data-label] { min-width: 0; }
-  .hn-project-row > [data-label]::before {
-    content: attr(data-label);
-    display: block;
-    margin-bottom: 4px;
-    color: var(--text-subtle);
-    font: var(--weight-semibold) var(--text-2xs)/1.2 var(--font-mono);
-    letter-spacing: .08em;
-    text-transform: uppercase;
-  }
-  .hn-project-row > [data-label="Aktivitas"] { white-space: normal !important; }
-  /* SPEC-946 · toolbar papan Tim memakai aturan yang SAMA. Kelasnya dinamai sendiri, bukan
-     meminjam `.hn-backlog-*`: layar yang meminjam nama layar lain adalah cara aturan mulai
-     berubah untuk satu layar dan diam-diam ikut mengubah yang lain. */
-  .hn-backlog-topline,
-  .hn-team-topline,
-  .hn-backlog-view-actions,
-  .hn-team-view-actions,
-  .hn-backlog-filters,
-  .hn-team-filters { align-items: stretch !important; }
-  .hn-backlog-topline > *,
-  .hn-team-topline > *,
-  .hn-backlog-view-actions > *,
-  .hn-team-view-actions > *,
-  .hn-backlog-filters > *,
-  .hn-team-filters > * { max-width: 100%; }
-  .hn-backlog-view-actions,
-  .hn-team-view-actions { flex-wrap: wrap; }
-  .hn-backlog-filters .hn-touch-target,
-  .hn-team-filters .hn-touch-target { flex: 1 1 145px !important; width: auto !important; }
-  .hn-backlog-grid { grid-template-columns: minmax(0, 1fr) !important; }
-  .hn-backlog-row { align-items: flex-start !important; flex-wrap: wrap; }
-  .hn-backlog-row > div { flex-basis: 100% !important; }
-  .hn-card-footer { align-items: flex-start !important; flex-direction: column; }
   .hn-grid-mobile { grid-template-columns: minmax(0, 1fr) !important; }
   .hn-stack-mobile { align-items: stretch !important; flex-direction: column; }
-  .hn-wrap-mobile,
   .hn-dense-row { align-items: flex-start !important; flex-wrap: wrap; }
-  .hn-vps-main { align-items: flex-start; gap: 8px; }
-  .hn-vps-main > button { flex: 1 1 100%; }
-  .hn-vps-pills { flex-wrap: wrap; }
-  .hn-vps-actions { margin-left: 0; width: 100%; justify-content: flex-start; }
-  .hn-vps-actions > button { flex: 1 1 auto; }
-  .hn-vps-sep { display: none; }
   .hn-dense-row > .hn-grow { min-width: min(220px, 100%); }
   /* SPEC-763 · baris pemilih (Ambil backlog, Riwayat sesi): judul adalah satu-satunya pembeda
      antar-baris, tapi `flex-basis: 0` membuatnya kalah dari tetangga yang basis-nya selebar isi —
@@ -339,7 +268,6 @@ textarea:focus-visible,
     box-sizing: border-box;
     padding: 16px max(var(--page-gutter-x), var(--safe-right)) calc(24px + var(--safe-bottom)) max(var(--page-gutter-x), var(--safe-left)) !important;
   }
-  .hn-portal-toolbar { align-items: stretch !important; flex-direction: column; }
   .hn-portal-row { align-items: flex-start !important; flex-wrap: wrap; min-height: var(--touch-target); }
   .hn-portal-row > span:nth-child(2) { flex-basis: calc(100% - 110px); }
 }
@@ -431,7 +359,6 @@ textarea:focus-visible,
      `.hn-choice-target` di bawah. */
   input[type="checkbox"], input[type="radio"] { min-width: 24px; min-height: 24px; }
   .hn-touch-target,
-  .hn-project-open,
   .hn-terminal-unplaced-action,
   [role="button"][tabindex="0"] {
     min-width: var(--touch-target) !important;
@@ -844,7 +771,6 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 
 @keyframes hn-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes hn-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
-@keyframes hn-toast-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* SPEC-648 · tiap transform punya layer sendiri agar hover, click, reveal, dan frame sprite dapat
    berjalan bersamaan. Seluruh keyframe hanya transform/opacity → compositor. */
@@ -901,108 +827,10 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   100% { opacity: 0; transform: translateY(-26px) scale(0.9); }
 }
 
-/* ---- DalangStage (Overview hero) — Anoman dalang mengendalikan wayang project. ----
-   Kelir = gradasi bone; sesi running = wayang di panel gelap terminal ber-rim brass;
-   project idle = wayang parkir di debog. Sway hanya transform → compositor; padam
-   otomatis oleh blok prefers-reduced-motion global. */
-.hn-dalang {
-  border: 1px solid var(--border-hair); border-radius: var(--radius-lg);
-  background: var(--surface-card); overflow: hidden; margin-bottom: 20px;
-}
-.hn-dalang-head {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
-  padding: 16px 20px 10px;
-}
-.hn-dalang-stats { display: flex; gap: 22px; flex-wrap: wrap; }
-.hn-dalang-stat { text-align: right; }
-.hn-dalang-stat > div:first-child { justify-content: flex-end; }
-.hn-dalang-stage {
-  position: relative; display: flex; align-items: flex-end; gap: 16px; min-height: 148px;
-  padding: 6px 20px 0; background: linear-gradient(180deg, var(--bone-000), var(--bone-200));
-}
-/* Saat ada wayang dimainkan, kelir berubah jadi panggung gelap (permukaan gelap yang memang
-   disediakan sistem untuk kerja aktif) dengan pendar blencong dari atas — bahasa visual
-   concept art #4. Idle tetap bone: tenang. */
-.hn-dalang-stage[data-live] {
-  min-height: 196px; padding-top: 30px;
-  background: radial-gradient(ellipse 85% 130% at 50% -25%,
-    color-mix(in srgb, var(--brass-400) 24%, var(--term-bg)), var(--term-bg) 64%);
-}
-.hn-dalang-stage[data-live] .hn-dalang-mascot img {
-  filter: drop-shadow(0 0 20px color-mix(in srgb, var(--bone-000) 32%, transparent));
-}
-.hn-dalang-stage[data-live] .hn-dalang-live {
-  border-color: color-mix(in srgb, var(--brass-500) 45%, var(--term-line));
-}
-.hn-dalang-stage[data-live] .hn-dalang-live[data-waiting] { border-color: var(--amber-600); }
-.hn-dalang-stage[data-live] .hn-dalang-puppet img {
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--brass-300) 55%, transparent));
-}
-/* Benang gapit: energi mengalir dari tangan dalang ke tiap wayang (stroke-dashoffset —
-   dekoratif; padam total oleh blok prefers-reduced-motion global). */
-.hn-dalang-threads { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.hn-dalang-threads path {
-  fill: none; stroke: var(--brass-400); stroke-width: 1.5; stroke-linecap: round;
-  stroke-dasharray: 5 9; opacity: 0.75; animation: hn-dalang-flow 1.4s linear infinite;
-}
-@keyframes hn-dalang-flow { to { stroke-dashoffset: -28; } }
-.hn-dalang-mascot { width: 172px; flex: 0 0 auto; }
-/* Blencong di header panel; "menyala" (drop-shadow hangat) hanya saat ada wayang dimainkan.
-   Digambar Codex tanpa glow — cahayanya urusan UI (prompt aset). */
-.hn-dalang-blencong { height: 44px; width: auto; flex: 0 0 auto; pointer-events: none; }
-.hn-dalang-blencong[data-lit] {
-  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--brass-400) 65%, transparent));
-}
-.hn-dalang-troupe {
-  flex: 1; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
-  padding: 4px 0 14px;
-}
-.hn-dalang-live {
-  appearance: none; font: inherit; text-align: left; cursor: pointer; width: 168px;
-  background: var(--term-bg); border: 1px solid var(--term-line);
-  border-radius: var(--radius-md); padding: 8px 12px 10px;
-  box-shadow: var(--shadow-sm), 0 0 16px 0 color-mix(in srgb, var(--brass-500) 28%, transparent);
-  transition: box-shadow var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
-}
-.hn-dalang-live:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md), 0 0 22px 0 color-mix(in srgb, var(--brass-500) 42%, transparent);
-}
-.hn-dalang-live:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-.hn-dalang-puppet {
-  display: block; width: fit-content; margin: 0 auto 6px;
-  transform-origin: 50% 100%;
-  animation: hn-dalang-sway 3.8s var(--ease-inout) infinite alternate;
-}
-@keyframes hn-dalang-sway {
-  from { transform: rotate(-2.4deg); }
-  to { transform: rotate(2.4deg); }
-}
-/* Sesi yang menunggu manusia: wayang diam menoleh — beda dari yang sedang dimainkan. */
-.hn-dalang-puppet--still { animation: none; transform: rotate(-3deg); }
-.hn-dalang-live[data-waiting] {
-  border-color: var(--amber-600);
-  box-shadow: var(--shadow-sm), 0 0 16px 0 color-mix(in srgb, var(--amber-500) 30%, transparent);
-}
-.hn-dalang-empty { flex: 1; padding: 22px 0 26px; }
-.hn-dalang-debog {
-  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-  padding: 10px 20px 12px; border-top: 1px solid var(--border-hair); background: var(--bone-100);
-}
-.hn-dalang-parked {
-  appearance: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center;
-  gap: 7px; padding: 4px 12px 4px 8px; background: var(--surface-card);
-  border: 1px solid var(--border-hair); border-radius: var(--radius-pill);
-  transition: border-color var(--dur-fast) var(--ease-out);
-}
-.hn-dalang-parked:hover { border-color: var(--bone-400); }
-.hn-dalang-parked:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-/* ---- Dalang Hanoman (layar penuh) — panggung orkestrasi sinematik dari konsep Claude
-   Design "Dashboard Futuristik". Satu-satunya layar gelap penuh: peran warna DS menyediakan
-   permukaan gelap untuk KERJA AKTIF, dan seluruh layar ini adalah panggung kerja aktif.
-   Aksen tetap brass; glow = rgba brass, tak ada neon. ---- */
+/* ---- Dalang Hanoman (layar penuh). Gaya isinya ada di screens/styles/dalang.css (papan senyap, Fase 3B);
+   di sini hanya kerangka takeover dan tombol keluar yang dipakai bersama. ---- */
 /* Takeover layar penuh (cermin fullscreen Terminal, z 100 > header 90 > pet 80):
-   masuk menu = panggung memenuhi viewport; keluar lewat tombol ✕ atau Esc. */
+   masuk menu = layar memenuhi viewport; keluar lewat tombol ✕ atau Esc. */
 .hn-dlg {
   position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain;
   background: linear-gradient(180deg, var(--term-bg), #0d0b07 60%);
@@ -1010,22 +838,7 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   padding-bottom: max(12px, var(--safe-bottom, 0px));
 }
 .hn-dlg-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.hn-dlg-blencong { height: 44px; width: auto; flex: 0 0 auto; }
-.hn-dlg-blencong[data-lit] { filter: drop-shadow(0 0 12px rgba(207,157,85,0.65)); }
 .hn-dlg-title { font-family: var(--font-display); font-size: 21px; font-weight: 600; color: var(--term-fg); margin: 0; }
-.hn-dlg-boot {
-  margin: 4px 0 0; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
-  color: var(--brass-300); min-height: 15px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-}
-.hn-dlg-boot::after { content: "▍"; color: var(--brass-500); margin-left: 2px; animation: hn-dlg-blink 1s steps(1) infinite; }
-@keyframes hn-dlg-blink { 50% { opacity: 0; } }
-.hn-dlg-chips { display: flex; gap: 8px; flex: 0 0 auto; }
-.hn-dlg-chip {
-  display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px;
-  border: 1px solid var(--term-line); border-radius: var(--radius-md); background: rgba(255,253,248,0.03);
-  font-family: var(--font-mono); font-size: 12px; color: var(--brass-300); white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
 .hn-dlg-exit {
   appearance: none; font: inherit; cursor: pointer; width: 34px; height: 34px; flex: none;
   display: inline-flex; align-items: center; justify-content: center;
@@ -1039,173 +852,9 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 @media (pointer: coarse), (max-width: 767px) {
   .hn-dlg-exit { width: var(--touch-target); height: var(--touch-target); }
 }
-.hn-dlg-kpis { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-top: 16px; }
-.hn-dlg-kpi {
-  display: flex; gap: 11px; align-items: flex-start; min-width: 0; padding: 12px 14px;
-  border: 1px solid var(--term-line); border-radius: var(--radius-md); background: rgba(255,253,248,0.03);
-}
-.hn-dlg-kpi-ic { width: 34px; height: 34px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; justify-content: center; flex: none; }
-.hn-dlg-tone-wind { background: rgba(81,127,140,0.18); color: var(--wind-500); }
-.hn-dlg-tone-leaf { background: rgba(95,131,64,0.18); color: var(--leaf-500); }
-.hn-dlg-tone-brass { background: rgba(184,134,59,0.18); color: var(--brass-400); }
-.hn-dlg-tone-amber { background: rgba(207,143,40,0.18); color: var(--amber-500); }
-.hn-dlg-kpi-l { display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; color: var(--term-dim); }
-.hn-dlg-kpi-v { display: block; font-family: var(--font-display); font-size: 25px; font-weight: 700; line-height: 1.15; color: var(--term-fg); font-variant-numeric: tabular-nums; }
-.hn-dlg-kpi-s { display: block; font-size: 11px; color: var(--term-dim); margin-top: 1px; }
-.hn-dlg-grid { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 14px; align-items: start; margin-top: 14px; }
-.hn-dlg-hero {
-  position: relative; overflow: hidden; border: 1px solid var(--term-line); border-radius: var(--radius-lg);
-  background: radial-gradient(ellipse 75% 95% at 50% 0%, rgba(207,157,85,0.20), rgba(0,0,0,0) 62%);
-  padding: 16px 16px 0;
-}
-.hn-dlg-hud { position: absolute; left: 50%; top: 128px; transform: translate(-50%, -50%); width: 300px; height: 300px; pointer-events: none; opacity: 0.5; }
-.hn-dlg-hud circle { fill: none; stroke: var(--brass-700); stroke-width: 1; }
-.hn-dlg-hud-a, .hn-dlg-hud-b { transform-origin: 50% 50%; }
-.hn-dlg-hud-a { animation: hn-dlg-rot 26s linear infinite; }
-.hn-dlg-hud-b { animation: hn-dlg-rotr 40s linear infinite; }
-@keyframes hn-dlg-rot { to { transform: rotate(360deg); } }
-@keyframes hn-dlg-rotr { to { transform: rotate(-360deg); } }
-.hn-dlg-threads { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.hn-dlg-threads path {
-  fill: none; stroke: var(--brass-500); stroke-width: 1.4; stroke-linecap: round;
-  stroke-dasharray: 4 8; opacity: 0.8; animation: hn-dalang-flow 1.5s linear infinite;
-}
-/* Benang kendur ke wayang diam: utuh (tanpa dash), redup, tak beranimasi. */
-.hn-dlg-threads path.hn-dlg-thread--slack {
-  stroke: var(--brass-700); stroke-dasharray: none; opacity: 0.3; animation: none;
-}
-.hn-dlg-scan {
-  position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(207,157,85,0.05) 48%, rgba(227,201,136,0.09) 50%, rgba(207,157,85,0.05) 52%, rgba(0,0,0,0) 100%);
-  background-size: 100% 240px; background-repeat: no-repeat; background-position: 0 -240px;
-  animation: hn-dlg-scan 7s linear infinite;
-}
-@keyframes hn-dlg-scan { 0% { background-position: 0 -240px; } 60% { background-position: 0 460px; } 100% { background-position: 0 460px; } }
-/* Rig hero ber-sendi: kanvas komposisi 1003x757 unit sheet; badan + 4 lengan absolut,
-   tiap lengan berputar pada cakram pivot bahunya (transform-origin = pusat cakram,
-   koordinat diukur dari aset — lihat internal/assets/dalang/README.md). */
-/* Geometri dari internal/scripts/dalang/rigbuild.py (ARM_SCALE=0.78 — lengan generasi
-   terlalu tebal relatif badan; skala murni CSS, aset tak disentuh). */
-.hn-dlg-hero-art {
-  position: relative; width: min(540px, 94%); aspect-ratio: 835 / 582;
-  margin: 0 auto; animation: hn-dlg-float 6s ease-in-out infinite;
-}
-.hn-dlg-hero-art img {
-  position: absolute; display: block; height: auto;
-  filter: drop-shadow(0 0 18px rgba(212,164,60,0.35));
-}
-.hn-dlg-rig-body { left: 25.88%; top: 16.32%; width: 48.73%; z-index: 2; }
-.hn-dlg-rig-arm { z-index: 1; will-change: transform; }
-.hn-dlg-rig-arm--ul { left: 5.48%;  top: 0.39%;  width: 32.03%; transform-origin: 85.5% 86.8%; animation: hn-dlg-arm-a 5s   ease-in-out infinite; }
-.hn-dlg-rig-arm--ur { left: 61.65%; top: 0%;     width: 30.82%; transform-origin: 15.1% 87.1%; animation: hn-dlg-arm-b 5.6s ease-in-out infinite; }
-.hn-dlg-rig-arm--ml { left: 0%;     top: 58.84%; width: 37.36%; transform-origin: 89.2% 24.2%; animation: hn-dlg-arm-b 6.4s ease-in-out infinite; }
-.hn-dlg-rig-arm--mr { left: 61.80%; top: 58.32%; width: 38.20%; transform-origin: 11.1% 24.3%; animation: hn-dlg-arm-a 7s   ease-in-out infinite; }
-@keyframes hn-dlg-arm-a { 0%, 100% { transform: rotate(-2.5deg); } 50% { transform: rotate(3deg); } }
-@keyframes hn-dlg-arm-b { 0%, 100% { transform: rotate(2.5deg); } 50% { transform: rotate(-3deg); } }
-/* Jangkar benang: titik gapit di tiap tangan (centroid emas terukur → %). */
-.hn-dlg-hand { position: absolute; width: 2px; height: 2px; pointer-events: none; }
-.hn-dlg-hand[data-hand="ul"] { left: 15.5%; top: 9.9%; }
-.hn-dlg-hand[data-hand="ur"] { left: 82.7%; top: 9.6%; }
-.hn-dlg-hand[data-hand="ml"] { left: 10.2%; top: 76.1%; }
-.hn-dlg-hand[data-hand="mr"] { left: 89.5%; top: 75.5%; }
-@keyframes hn-dlg-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-.hn-dlg-cards { position: relative; display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; justify-content: center; padding: 18px 0 16px; }
-.hn-dlg-prj {
-  appearance: none; font: inherit; text-align: left; cursor: pointer; width: 168px;
-  background: rgba(10,8,5,0.85); border: 1px solid rgba(184,134,59,0.45); border-radius: var(--radius-md);
-  padding: 8px 12px 10px; color: var(--term-fg);
-  box-shadow: 0 0 16px 0 rgba(184,134,59,0.22);
-  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
-}
-.hn-dlg-prj:hover { transform: translateY(-3px); box-shadow: 0 0 24px 0 rgba(184,134,59,0.4); }
-.hn-dlg-prj:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-.hn-dlg-prj[data-waiting] { border-color: var(--amber-600); box-shadow: 0 0 16px 0 rgba(207,143,40,0.3); }
-/* Wayang tidak aktif: tetap tampil, tersandar redup — tanpa glow, tanpa goyang. */
-.hn-dlg-prj--off { border-color: var(--term-line); box-shadow: none; }
-.hn-dlg-prj--off:hover { box-shadow: 0 0 14px 0 rgba(184,134,59,0.14); }
-.hn-dlg-prj--off .hn-dlg-puppet img { filter: grayscale(0.85) brightness(0.55); }
-.hn-dlg-prj--off .hn-dlg-prj-name { color: var(--term-dim); }
-.hn-dlg-prj-sub--off { color: var(--term-dim); }
-.hn-dlg-puppet { display: block; width: fit-content; margin: 0 auto 6px; transform-origin: 50% 0%; animation: hn-dalang-sway 3.6s var(--ease-inout) infinite alternate; }
-.hn-dlg-puppet--still { animation: none; transform: rotate(-3deg); }
-.hn-dlg-puppet img { display: block; height: 108px; width: auto; filter: drop-shadow(0 0 10px rgba(227,201,136,0.5)); }
-.hn-dlg-prj--off .hn-dlg-puppet img { height: 88px; }
-.hn-dlg-prj-name { display: block; font-family: var(--font-mono); font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hn-dlg-prj-sub { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--brass-400); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hn-dlg-prj-sub--amber { color: var(--amber-500); }
 .hn-dlg-empty { position: relative; text-align: center; padding: 26px 0 30px; color: var(--term-dim); font-size: 12.5px; line-height: 1.7; }
-.hn-dlg-cmd {
-  appearance: none; font: inherit; cursor: pointer; width: 100%; margin-top: 12px;
-  display: flex; align-items: center; gap: 12px; padding: 11px 15px; text-align: left;
-  border: 1px solid var(--brass-700); border-radius: var(--radius-lg);
-  background: linear-gradient(90deg, rgba(212,164,60,0.12), rgba(212,164,60,0.03)); color: var(--term-fg);
-  transition: border-color var(--dur-base) var(--ease-out);
-}
-.hn-dlg-cmd:hover { border-color: var(--brass-500); }
-.hn-dlg-cmd:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-.hn-dlg-mic { position: relative; width: 11px; height: 11px; border-radius: 50%; background: var(--brass-500); flex: none; }
-.hn-dlg-mic::before { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 1px solid var(--brass-500); opacity: 0; animation: hn-dlg-ping 1.8s ease-out infinite; }
-@keyframes hn-dlg-ping { 0% { transform: scale(0.85); opacity: 0.8; } 70% { transform: scale(1.4); opacity: 0; } 100% { opacity: 0; } }
-.hn-dlg-cmd-t { font-family: var(--font-mono); font-size: 12px; color: var(--term-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hn-dlg-cmd-t b { color: var(--brass-300); font-weight: 500; }
-.hn-dlg-cmd-k { margin-left: auto; flex: none; font-family: var(--font-mono); font-size: 11px; color: var(--term-dim); border: 1px solid var(--term-line); border-radius: var(--radius-sm); padding: 2px 8px; }
-.hn-dlg-rail { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.hn-dlg-card { border: 1px solid var(--term-line); border-radius: var(--radius-md); background: rgba(255,253,248,0.03); padding: 12px 14px; }
 .hn-dlg-rt { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; color: var(--brass-300); margin-bottom: 9px; }
-.hn-dlg-mut { font-size: 12px; color: var(--term-dim); }
-.hn-dlg-act { display: flex; gap: 9px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--term-line); font-size: 11.5px; }
-.hn-dlg-act:last-of-type { border-bottom: 0; }
 .hn-dlg-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--term-line); flex: none; margin-top: 4px; }
-.hn-dlg-dot--on { background: var(--brass-500); }
-.hn-dlg-act-x { color: var(--term-dim); line-height: 1.5; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.hn-dlg-act-x b { color: var(--term-fg); font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
-.hn-dlg-donut-wrap { display: flex; align-items: center; gap: 12px; }
-.hn-dlg-donut { position: relative; width: 112px; height: 112px; flex: none; }
-.hn-dlg-ring { fill: none; stroke: var(--term-line); }
-.hn-dlg-seg { fill: none; transition: stroke-dasharray var(--dur-slow) var(--ease-out); }
-.hn-dlg-seg--wind { stroke: var(--wind-500); }
-.hn-dlg-seg--leaf { stroke: var(--leaf-500); }
-.hn-dlg-seg--amber { stroke: var(--amber-500); }
-.hn-dlg-seg--brass { stroke: var(--brass-400); }
-.hn-dlg-leg { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--term-dim); }
-.hn-dlg-leg b { color: var(--term-fg); }
-.hn-dlg-leg i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 7px; }
-.hn-dlg-leg i.hn-dlg-seg--wind { background: var(--wind-500); }
-.hn-dlg-leg i.hn-dlg-seg--leaf { background: var(--leaf-500); }
-.hn-dlg-leg i.hn-dlg-seg--amber { background: var(--amber-500); }
-.hn-dlg-leg i.hn-dlg-seg--brass { background: var(--brass-400); }
-.hn-dlg-donut-c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.hn-dlg-donut-c b { font-family: var(--font-display); font-size: 23px; color: var(--term-fg); line-height: 1; }
-.hn-dlg-donut-c span { font-size: 11px; color: var(--term-dim); margin-top: 2px; }
-/* Teks grafik dalam satuan viewBox (260 unit). 11 unit membuat label hari terakhir menjorok sedikit
-   melewati tepi viewBox, jadi overflow dibiarkan terlihat: lebih baik menjorok ke padding kartu
-   daripada terpotong. */
-.hn-dlg-chart { display: block; width: 100%; height: auto; overflow: visible; }
-.hn-dlg-chart line { stroke: var(--term-line); stroke-width: 0.6; }
-.hn-dlg-chart text { font-family: var(--font-mono); font-size: 11px; fill: var(--term-dim); }
-.hn-dlg-chart circle { fill: var(--wind-500); }
-.hn-dlg-trend { fill: none; stroke: var(--wind-500); stroke-width: 1.6; }
-/* brass-500 = 6,10:1 di #0d0b07 (brass-700 hanya 2,91:1). */
-.hn-dlg-foot { text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.28em; color: var(--brass-500); padding: 12px 0 4px; }
-@media (max-width: 1199px) {
-  .hn-dlg-grid { grid-template-columns: 1fr; }
-}
-@media (max-width: 767px) {
-  .hn-dlg-kpis { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  /* Sembunyikan hanya chip tanggal/jam. Wadah `.hn-dlg-chips` tetap tampil karena memuat tombol keluar. */
-  .hn-dlg-chip { display: none; }
-  .hn-dlg-hero-art { width: min(360px, 100%); }
-}
-
-@media (max-width: 767px) {
-  .hn-dalang-head { flex-direction: column; }
-  .hn-dalang-stats { gap: 16px; }
-  .hn-dalang-stat { text-align: left; }
-  .hn-dalang-stat > div:first-child { justify-content: flex-start; }
-  .hn-dalang-mascot { width: 116px; }
-  .hn-dalang-blencong { display: none; }
-  .hn-dalang-live { width: 100%; }
-}
 
 /* ============================================================
    Primitif layout & daftar (Audit UI/UX 2026-10 · Fase 2A)

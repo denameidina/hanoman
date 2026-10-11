@@ -12,7 +12,6 @@ describe("responsive touch targets", () => {
   it("overrides compact inline dimensions for semantic and reset-style controls", () => {
     for (const selector of [
       ".hn-touch-target",
-      ".hn-project-open",
       ".hn-terminal-unplaced-action",
       '[role="button"][tabindex="0"]',
     ]) expect(coarse).toContain(selector);

@@ -34,8 +34,13 @@ describe("SPEC-253 · PublicHelpApp routing", () => {
       new Response(JSON.stringify({ number: 3, category: "bug", title: "T", status: "Diterima", createdAt: new Date().toISOString() }), { status: 200 }),
     );
     render(<PublicHelpApp />);
-    await waitFor(() => expect(screen.getByText(/Diterima/)).toBeTruthy());
-    expect(screen.getByText(/Tiket #3/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(/Tiket #3/)).toBeTruthy());
+    // Status "Diterima" tampil sebagai pill dan sebagai langkah pertama linimasa (dua teks sama).
+    expect(screen.getAllByText("Diterima").length).toBeGreaterThanOrEqual(2);
+    // Linimasa: langkah pertama sudah lewat, langkah ketiga (Dikerjakan) yang sedang menunggu giliran.
+    const timeline = screen.getByRole("list", { name: /Perkembangan laporan: Diterima/ });
+    expect(timeline.querySelector('[data-state="done"]')?.textContent).toMatch(/Diterima/);
+    expect(timeline.querySelector('[aria-current="step"]')?.textContent).toMatch(/Dikerjakan/);
   });
 
   it("submit valid → tampilkan nomor tiket + link status", async () => {

@@ -1,30 +1,38 @@
-import React from "react";
+// Daftar laporan QA (RowList). Satu baris = satu laporan: kode, status, judul, versi/penguji, angka lulus,
+// ringkasan temuan, dan keputusan. Ekspor ZIP adalah satu-satunya pintu unduh di daftar; format lain ada
+// di menu ⋯ editor.
 import type { QaReportView } from "@hanoman/shared";
-import { Badge, Card, StateBlock } from "../../ds";
-import { REPORT_LABEL, REPORT_TONE, VERDICT_LABEL, VERDICT_TONE, pct } from "./qa-ui";
+import { Badge, Button, DenseRow, RowList, StateBlock } from "../../ds";
+import { useApi } from "../../api/instance";
+import { relativeTime } from "../../lib/time-format";
+import { REPORT_LABEL, REPORT_TONE, VERDICT_LABEL, pct } from "./qa-ui";
 
-export function QaReportList({ reports, onOpen }: { reports: QaReportView[]; onOpen: (id: string) => void }) {
+export function QaReportList({ projectId, reports, onOpen }: { projectId: string; reports: QaReportView[]; onOpen: (id: string) => void }) {
+  const api = useApi();
   if (reports.length === 0)
     return <StateBlock kind="empty" title="Belum ada laporan QA" hint="Buat laporan baru, atau impor dari template Excel." />;
+  const now = Date.now();
   return (
-    <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 320px), 1fr))" }}>
+    <RowList label="Daftar laporan QA">
       {reports.map((r) => (
-        <Card key={r.id} interactive padding={16} onClick={() => onOpen(r.id)} style={{ cursor: "pointer" }}
-          role="button" tabIndex={0} onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r.id); } }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
-            <Badge tone="brass" variant="outline" size="sm">{r.code}</Badge>
-            <Badge tone={REPORT_TONE[r.status]} size="sm">{REPORT_LABEL[r.status]}</Badge>
-            {r.verdict && <Badge tone={VERDICT_TONE[r.verdict]} size="sm">{VERDICT_LABEL[r.verdict]}</Badge>}
-          </div>
-          <div style={{ fontWeight: 600, color: "var(--text-strong)", marginBottom: 4, overflowWrap: "anywhere" }}>{r.title}</div>
-          <div style={{ fontSize: "var(--text-sm)", color: "var(--text-subtle)" }}>
-            {[r.buildVersion && `Versi ${r.buildVersion}`, r.tester].filter(Boolean).join(" · ") || "—"}
-          </div>
-          <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginTop: 8 }}>
-            {r.stats.cases.pass}/{r.stats.cases.total} lulus ({pct(r.stats.passRate)}) · {r.stats.findings.total} temuan ({r.stats.findings.open} belum ditangani)
-          </div>
-        </Card>
+        <DenseRow key={r.id} onClick={() => onOpen(r.id)}
+          actions={<Button as="a" size="sm" variant="ghost" leftIcon="download" href={api.qaExportUrl(projectId, r.id)}
+            aria-label={`Unduh ZIP ${r.code}`}>Unduh ZIP</Button>}>
+          <span className="hn-qa-row-body">
+            <span className="hn-qa-row-head">
+              <span className="hn-qa-code">{r.code}</span>
+              <Badge tone={REPORT_TONE[r.status]} variant="dot" size="sm">{REPORT_LABEL[r.status]}</Badge>
+            </span>
+            <span className="hn-qa-row-title">{r.title}</span>
+            <span className="hn-qa-row-line">
+              <span>{[r.buildVersion && `Versi ${r.buildVersion}`, r.tester].filter(Boolean).join(" · ") || "Belum ada versi atau penguji"}</span>
+              <span className="hn-qa-row-stat">{r.stats.cases.pass}/{r.stats.cases.total} lulus ({pct(r.stats.passRate)}) · {r.stats.findings.total} temuan ({r.stats.findings.open} belum ditangani)</span>
+              {r.verdict && <span>Keputusan: {VERDICT_LABEL[r.verdict]}</span>}
+              <span>Diubah {relativeTime(r.updatedAt, now) || "—"}</span>
+            </span>
+          </span>
+        </DenseRow>
       ))}
-    </div>
+    </RowList>
   );
 }

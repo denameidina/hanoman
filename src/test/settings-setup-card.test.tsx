@@ -48,7 +48,7 @@ describe("kartu Setup awal (SPEC-884)", () => {
     openTab();
     await waitFor(() => expect(screen.getByTestId("setup-card")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: /Jalankan ulang setup/ }));
-    expect(screen.getByLabelText("Perangkat ini")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /Perangkat ini/ })).toBeTruthy();
   });
 
   // Batal di wizard yang diulang harus kembali ke kartu, bukan membiarkan operator terkunci di wizard.

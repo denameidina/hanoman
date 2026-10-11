@@ -4,13 +4,16 @@ import type {
 } from "@hanoman/shared";
 import { Button, Card, StateBlock } from "../ds";
 import { portalApi } from "../api/portal";
+import "./portal.css";
 
-// SPEC-854 · ADR-0129 · permukaan obrolan klien. Ia hidup di samping Help desk, bukan
+// SPEC-854 · ADR-0129 · permukaan obrolan klien. Ia hidup di samping Keluhan saya, bukan
 // menggantikannya — bedanya dijelaskan di layar, karena "kenapa ada dua kotak masuk" adalah
 // pertanyaan pertama yang muncul di kepala klien.
 //
 // ATURAN BERKAS INI: tak satu pun teks di sini boleh teknis. Tanpa kode status, tanpa nama
 // alamat, tanpa pesan galat mentah. Gagal apa pun dijawab satu kalimat biasa (huruf E).
+// Audit UI/UX 2026-10 · Fase 3 (3M): tampilan dipindah ke kelas `hn-chat-*` (portal.css).
+// Logika, testid, dan urutan langkah tetap sama.
 
 const PAGE = { page: 1, limit: 20 };
 
@@ -28,11 +31,6 @@ type Gelembung = PortalChatMessageView & { gagal?: boolean };
 // Tanggal panjang, bukan ISO: yang dibaca klien adalah "1 September 2026", bukan stempel waktu.
 const tanggalPanjang = (iso: string) =>
   new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-
-const BUBBLE: React.CSSProperties = {
-  maxWidth: "min(560px, 88%)", padding: "10px 14px", borderRadius: "var(--radius-lg)",
-  border: "1px solid var(--border-hair)", whiteSpace: "pre-wrap", lineHeight: 1.6,
-};
 
 export function ChatPanel({ projectId }: { projectId: string }) {
   const [sesi, setSesi] = React.useState<PortalChatSessionView | null>(null);
@@ -105,13 +103,9 @@ export function ChatPanel({ projectId }: { projectId: string }) {
   };
 
   const beda = (
-    <p data-testid="chat-beda-help" style={{
-      margin: "0 0 18px", padding: "10px 14px", borderRadius: "var(--radius-lg)",
-      background: "var(--bone-100)", border: "1px solid var(--border-hair)",
-      color: "var(--text-subtle)", fontSize: 13, lineHeight: 1.6,
-    }}>
-      Obrolan ini dijawab hanoman saat itu juga. Kalau Anda ingin melaporkan sesuatu supaya
-      ditangani orang, kirimkan lewat <strong>Laporan &amp; keluhan</strong> — laporan di sana masuk antrean
+    <p data-testid="chat-beda-help" className="hn-portal-note">
+      Obrolan ini dijawab hanoman saat itu juga. Kalau Anda ingin melaporkan masalah supaya
+      ditangani orang, kirimkan lewat <strong>Keluhan saya</strong> — laporan di sana masuk antrean
       tim dan dijawab manusia.
     </p>
   );
@@ -119,9 +113,7 @@ export function ChatPanel({ projectId }: { projectId: string }) {
   const sisaOf = (t: PortalChatType) => kuota?.[t === "brainstorm" ? "brainstorm" : "tanya"];
 
   const jatahBlok = kuota && (
-    <p data-testid="chat-jatah" style={{
-      margin: "0 0 14px", color: "var(--text-subtle)", fontSize: 13, lineHeight: 1.6,
-    }}>
+    <p data-testid="chat-jatah" className="hn-chat-jatah">
       Brainstorming: sudah dipakai {kuota.brainstorm.terpakai} dari {kuota.brainstorm.jatah} bulan
       ini. Bertanya: {kuota.tanya.terpakai} dari {kuota.tanya.jatah}. Jatah kembali penuh pada{" "}
       {tanggalPanjang(kuota.resetPada)}.
@@ -129,36 +121,31 @@ export function ChatPanel({ projectId }: { projectId: string }) {
   );
 
   if (!sesi) return (
-    <div>
+    <div className="hn-chat">
       {beda}
       {jatahBlok}
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+      <div className="hn-chat-types">
         {TIPE.map((t) => (
           <Card key={t.value}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-start" }}>
+            <div className="hn-chat-type">
               <Button disabled={sisaOf(t.value)?.sisa === 0} onClick={() => void mulai(t.value)}>{t.label}</Button>
-              <p style={{ margin: 0, color: "var(--text-subtle)", fontSize: 13, lineHeight: 1.6 }}>
-                {t.jelas}
-              </p>
+              <p>{t.jelas}</p>
             </div>
           </Card>
         ))}
       </div>
-      {galat && <p data-testid="chat-galat" role="alert" style={GALAT}>{galat}</p>}
+      {galat && <p data-testid="chat-galat" role="alert" className="hn-portal-error">{galat}</p>}
       {riwayatGagal && <StateBlock kind="error" compact title="Riwayat obrolan belum bisa dimuat" hint={GAGAL_UMUM} action={muatRiwayat} actionLabel="Coba lagi" />}
       {riwayat.length > 0 && (
-        <div style={{ marginTop: 22 }}>
-          <h3 style={{ margin: "0 0 10px", fontSize: 14, color: "var(--text-strong)" }}>Obrolan sebelumnya</h3>
+        <div className="hn-chat-history">
+          <h3>Obrolan sebelumnya</h3>
           <Card padding={0}>
             {riwayat.map((s) => (
-              <button key={s.id} type="button" className="hn-portal-row" onClick={() => void buka(s)}
-                style={{ display: "flex", gap: 12, width: "100%", textAlign: "left",
-                  padding: "12px 16px", background: "none", border: "none", cursor: "pointer",
-                  borderBottom: "1px solid var(--border-hair)" }}>
-                <span style={{ fontSize: 13, color: "var(--text-subtle)", width: 110 }}>
+              <button key={s.id} type="button" className="hn-chat-row" onClick={() => void buka(s)}>
+                <span className="hn-chat-row-type">
                   {TIPE.find((t) => t.value === s.type)?.label ?? s.type}
                 </span>
-                <span style={{ flex: 1, minWidth: 0, color: "var(--text-strong)" }}>
+                <span className="hn-chat-row-sum">
                   {s.summary || "Belum ada ringkasan"}
                 </span>
               </button>
@@ -170,28 +157,21 @@ export function ChatPanel({ projectId }: { projectId: string }) {
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div className="hn-chat">
       {beda}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div className="hn-chat-bar">
         <Button size="sm" variant="ghost" onClick={() => { setSesi(null); setPesan([]); }}>
           ← Semua obrolan
         </Button>
-        <span style={{ fontSize: 13, color: "var(--text-subtle)" }}>
-          {TIPE.find((t) => t.value === sesi.type)?.label}
-        </span>
+        <span>{TIPE.find((t) => t.value === sesi.type)?.label}</span>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="hn-chat-thread">
         {pesan.map((m) => (
-          <div key={m.id} style={{
-            display: "flex", flexDirection: "column", alignItems: m.role === "klien" ? "flex-end" : "flex-start", gap: 4 }}>
-            <div style={{ ...BUBBLE,
-              background: m.role === "klien" ? "var(--bone-100)" : "var(--surface-card)",
-              opacity: m.gagal ? 0.85 : 1, borderColor: m.gagal ? "var(--clay-500)" : "var(--border-hair)" }}>
-              {m.text}
-            </div>
+          <div key={m.id} className="hn-chat-msg" data-role={m.role} data-gagal={m.gagal ? "true" : undefined}>
+            <div className="hn-chat-bubble">{m.text}</div>
             {m.gagal && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--clay-600)" }}>
+              <div className="hn-chat-failed">
                 <span role="alert">Gagal terkirim</span>
                 <Button size="sm" variant="ghost" disabled={menunggu}
                   onClick={() => void kirim({ id: m.id, teks: m.text })}>Kirim ulang</Button>
@@ -203,17 +183,14 @@ export function ChatPanel({ projectId }: { projectId: string }) {
           hint="Ini bisa memakan waktu sebentar." />}
       </div>
 
-      {galat && <p data-testid="chat-galat" role="alert" style={GALAT}>{galat}</p>}
+      {galat && <p data-testid="chat-galat" role="alert" className="hn-portal-error">{galat}</p>}
 
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* textarea native: font 16px agar iOS tak men-zoom saat kotak ini difokus. */}
-          <textarea data-testid="chat-input" value={draft} rows={3} aria-label="Pesan Anda"
+      <div className="hn-chat-compose">
+        <div>
+          {/* textarea native: font 16px (kelas hn-portal-textarea) agar iOS tak men-zoom saat difokus. */}
+          <textarea data-testid="chat-input" className="hn-portal-textarea" value={draft} rows={3} aria-label="Pesan Anda"
             placeholder="Tulis pesan Anda…" disabled={menunggu}
-            onChange={(e) => setDraft(e.target.value)}
-            style={{ display: "block", width: "100%", boxSizing: "border-box", padding: "9px 11px", resize: "vertical",
-              border: "1px solid var(--border-strong)", borderRadius: "var(--radius-sm)", background: "var(--surface-card)",
-              color: "var(--text-strong)", fontSize: 16, fontFamily: "var(--font-ui)" }} />
+            onChange={(e) => setDraft(e.target.value)} />
         </div>
         <Button data-testid="chat-kirim" disabled={menunggu || !draft.trim()} onClick={() => void kirim()}>
           Kirim
@@ -222,7 +199,3 @@ export function ChatPanel({ projectId }: { projectId: string }) {
     </div>
   );
 }
-
-const GALAT: React.CSSProperties = {
-  margin: "10px 0 0", color: "var(--clay-600)", fontSize: 13, lineHeight: 1.6,
-};

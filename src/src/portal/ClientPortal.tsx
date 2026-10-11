@@ -9,11 +9,20 @@ import { portalApi } from "../api/portal";
 import { stagePill, ticketPill } from "./status-pill";
 import { TicketForm } from "./TicketForm";
 import { ChatPanel } from "./ChatPanel";
+import { TicketNote, TicketTimeline } from "./TicketTimeline";
+import { ticketNote } from "./ticket-timeline";
 import { kategoriLabel, prioritasLabel, jaringanAtauPesan } from "./labels";
+import "./portal.css";
 
 // SPEC-617 · ADR-0110 · permukaan klien. SENGAJA tidak memakai <Shell>: sidebar HN_NAV adalah
 // navigasi OPERATOR, dan setiap entrinya adalah 403 yang menunggu diklik. Chrome-nya sendiri,
-// minimal, mengikuti design system (bone paper, brass accent). Tak ada satu pun aksi tulis.
+// minimal, mengikuti design system (bone paper, brass accent). Tak ada satu pun aksi tulis
+// selain "Lapor masalah".
+//
+// Audit UI/UX 2026-10 · Fase 3 (3M) · "Beranda Klien" per project. Pertanyaan yang dijawab layar
+// ini: "Bagaimana masalah saya?" — tiap keluhan tampil sebagai linimasa 4 langkah (Diterima →
+// Ditinjau → Dikerjakan → Selesai) dengan satu kalimat keadaan. Progres pekerjaan tim tinggal di
+// tab sendiri; obrolan tetap tab karena sesinya milik project, bukan milik satu keluhan.
 
 const tanggal = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -28,6 +37,8 @@ const STAGE_LABEL: Record<string, string> = {
 // SPEC-647 · ADR-0107 · ukuran halaman portal, cermin `TICKET_PAGE` TriageScreen (SPEC-523).
 const PORTAL_PAGE = 20;
 
+type Tab = "keluhan" | "progres" | "tanya";
+
 const EMPTY: Paginated<never> = { items: [], total: 0, page: 1, pageSize: PORTAL_PAGE };
 
 /* Pager DS, satu bentuk untuk kedua daftar. `total` datang dari amplop server — bukan
@@ -38,7 +49,7 @@ function PortalPager({ total, page, onPage, unit }:
   { total: number; page: number; onPage: (n: number) => void; unit: string }) {
   const sp = serverPage(total, page, PORTAL_PAGE);
   return (
-    <div style={{ marginTop: 14, border: "1px solid var(--border-hair)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+    <div className="hn-portal-pager">
       <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to} onPage={onPage} unit={unit} />
     </div>
   );
@@ -47,7 +58,7 @@ function PortalPager({ total, page, onPage, unit }:
 export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOut: () => void }) {
   const [projects, setProjects] = React.useState<PortalProject[] | null>(null);
   const [active, setActive] = React.useState<string | null>(null);
-  const [tab, setTab] = React.useState("backlog");
+  const [tab, setTab] = React.useState<Tab>("keluhan");
   const [backlog, setBacklog] = React.useState<Paginated<PortalSpec>>(EMPTY);
   const [tickets, setTickets] = React.useState<Paginated<PortalTicket>>(EMPTY);
   // Satu nomor halaman per daftar: satu nomor bersama akan meminta halaman yang tak dimiliki
@@ -119,36 +130,28 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
     finally { onLoggedOut(); }
   };
 
+  const activeName = projects?.find((p) => p.id === active)?.name ?? "";
+
   return (
     // SPEC-626 · `#root` (app.css) mengunci viewport — benar untuk Shell operator
     // yang menggulir di panel dalamnya. Portal tidak memakai Shell, jadi ia harus memasang rantai
     // gulirnya SENDIRI: header di luar scroller (tetap terbaca), <main> yang menggulir. Konstanta
     // DS yang sama dengan layar operator — bukan angka baru, dan app.css tak disentuh.
-    <div data-testid="portal-root" className="hn-dynamic-viewport" style={{
+    <div data-testid="portal-root" className="hn-dynamic-viewport hn-portal" style={{
       height: "100dvh", minHeight: 0, display: "flex", flexDirection: "column",
       background: "var(--surface-page)", color: "var(--text-body)",
     }}>
-      <header className="hn-portal-header" style={{
-        ...FIXED_ROW_STYLE,
-        display: "flex", alignItems: "center", gap: 14, padding: "0 22px",
-        height: "var(--topbar-h)", borderBottom: "1px solid var(--border-hair)",
-        background: "var(--bone-100)",
-      }}>
-        <span style={{
-          display: "inline-flex", alignItems: "center", justifyContent: "center",
-          width: 26, height: 26, borderRadius: "var(--radius-sm)", background: "var(--accent)",
-        }}><Mark id="buntut" size={17} color="var(--surface-card)" /></span>
-        <span style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--text-strong)" }}>
-          Portal klien
-        </span>
-        <div style={{ flex: 1 }} />
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--text-subtle)" }}>{user.email}</span>
+      <header className="hn-portal-header" style={FIXED_ROW_STYLE}>
+        <span className="hn-portal-mark"><Mark id="buntut" size={17} color="var(--surface-card)" /></span>
+        <span className="hn-portal-brand">Klien</span>
+        <div className="hn-portal-spacer" />
+        <span className="hn-portal-who">{user.email}</span>
         <Button size="sm" variant="ghost" leftIcon="log-out" onClick={logout}>Keluar</Button>
       </header>
 
       <main data-testid="portal-scroll" style={LIST_SCROLL_STYLE}>
-        <div className="hn-portal-content" style={{ maxWidth: "var(--content-max)", margin: "0 auto", padding: "24px 28px 32px" }}>
-        {bukaGagal && <p role="alert" style={{ margin: "0 0 14px", color: "var(--clay-600)", fontSize: 13 }}>{bukaGagal}</p>}
+        <div className="hn-portal-content">
+        {bukaGagal && <p role="alert" className="hn-portal-alert">{bukaGagal}</p>}
         {projects === null ? <StateBlock kind="loading" title="Memuat…" />
           : projects.length === 0 ? (
             <StateBlock kind={failed ? "error" : "empty"} icon="folder"
@@ -159,41 +162,50 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
               actionLabel={failed ? "Coba lagi" : undefined} />
           ) : (
             <>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
-                {projects.map((p) => (
-                  <Button key={p.id} size="sm" variant={p.id === active ? "primary" : "ghost"}
-                    aria-pressed={p.id === active} onClick={() => setActive(p.id)}>{p.name}</Button>
-                ))}
+              {projects.length > 1 && (
+                <div className="hn-portal-projects">
+                  {projects.map((p) => (
+                    <Button key={p.id} size="sm" variant={p.id === active ? "primary" : "ghost"}
+                      aria-pressed={p.id === active} onClick={() => setActive(p.id)}>{p.name}</Button>
+                  ))}
+                </div>
+              )}
+
+              <div className="hn-portal-head">
+                <div className="hn-portal-titlebox">
+                  <h1 className="hn-portal-title">{activeName}</h1>
+                  <p className="hn-portal-sub">Beranda Klien · lihat bagaimana masalah Anda berkembang di sini.</p>
+                </div>
+                <Button variant="primary" leftIcon="send" onClick={() => setComposing(true)}>Lapor masalah</Button>
               </div>
 
-              <div className="hn-portal-toolbar" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                <Tabs value={tab} onChange={setTab} style={{ flex: 1, minWidth: 0 }} tabs={[
-                  { value: "backlog", label: "Progres pekerjaan", count: backlog.total },
-                  { value: "tickets", label: "Laporan & keluhan", count: tickets.total },
+              <div className="hn-portal-tabs-row">
+                <Tabs className="hn-portal-tabs" value={tab} onChange={(v) => setTab(v as Tab)} tabs={[
+                  { value: "keluhan", label: "Keluhan saya", count: tickets.total },
+                  { value: "progres", label: "Progres pekerjaan", count: backlog.total },
                   // SPEC-854 · ADR-0129 · tab hanya lahir kalau chat menyala di Settings; selama
                   // mati, route-nya 404 dan `chatAda` tetap false (tak ada tab yang menipu).
-                  ...(chatAda ? [{ value: "chat", label: "Obrolan" }] : []),
+                  ...(chatAda ? [{ value: "tanya", label: "Tanya & ide" }] : []),
                 ]} />
-                <Button size="sm" leftIcon="send" onClick={() => setComposing(true)}>Kirim keluhan</Button>
               </div>
 
-              {tab === "chat" ? <ChatPanel projectId={active!} /> : listGagal ? (
+              {tab === "tanya" ? <ChatPanel projectId={active!} /> : listGagal ? (
                 <StateBlock kind="error" title="Daftar belum bisa dimuat" hint={listGagal}
                   action={() => setReload((n) => n + 1)} actionLabel="Coba lagi" />
-              ) : tab === "backlog" ? (
+              ) : tab === "progres" ? (
                 backlog.total === 0
                   ? <StateBlock kind="empty" icon="list-checks" title="Belum ada pekerjaan tercatat"
                       hint="Begitu tim mulai mengerjakan sesuatu di project ini, daftarnya muncul di sini." />
                   : <>
-                      <Card padding={0} data-testid="portal-list">
+                      <p className="hn-portal-note">Ini pekerjaan yang dikerjakan tim untuk project ini. Keluhan Anda ada di tab Keluhan saya.</p>
+                      <Card padding={0} data-testid="portal-list" className="hn-portal-list">
                         {backlog.items.map((s) => (
                           <button key={s.id} type="button" className="hn-portal-row"
-                            onClick={() => void openSpecDetail(s.id)}
-                            style={ROW}>
-                            <span title={s.title} style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title}</span>
+                            onClick={() => void openSpecDetail(s.id)}>
+                            <span className="hn-portal-row-title" title={s.title}>{s.title}</span>
                             <StatusPill status={stagePill(s.stage)} size="sm">{STAGE_LABEL[s.stage] ?? s.stage}</StatusPill>
-                            <span style={META}>{prioritasLabel(s.priority)}</span>
-                            <span style={META}>{tanggal(s.doneAt ?? s.startedAt ?? s.createdAt)}</span>
+                            <span className="hn-portal-meta">{prioritasLabel(s.priority)}</span>
+                            <span className="hn-portal-meta">{tanggal(s.doneAt ?? s.startedAt ?? s.createdAt)}</span>
                           </button>
                         ))}
                       </Card>
@@ -201,23 +213,26 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
                     </>
               ) : (
                 tickets.total === 0
-                  ? <StateBlock kind="empty" icon="inbox" title="Belum ada tiket"
-                      hint="Kirim keluhan lewat tombol Kirim keluhan di atas — atau lewat halaman Help Center project ini." />
+                  ? <StateBlock kind="empty" illustration="PST-002" illustrationDecorative
+                      title="Belum ada keluhan" hint="Ada yang tidak berfungsi? Lapor di sini. Perkembangannya akan tampil di halaman ini."
+                      action={() => setComposing(true)} actionLabel="Lapor masalah" />
                   : <>
-                      <Card padding={0} data-testid="portal-list">
+                      <ul className="hn-portal-cases" data-testid="portal-list">
                         {tickets.items.map((t) => (
-                          <button key={t.id} type="button" className="hn-portal-row"
-                            onClick={() => void openTicketDetail(t.id)}
-                            style={ROW}>
-                            <span style={{ ...META, fontFamily: "var(--font-mono)", width: 48 }}>#{t.number}</span>
-                            <span title={t.title} style={{ flex: 1, minWidth: 0, fontWeight: 500, color: "var(--text-strong)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.title}</span>
-                            <span style={META}>{kategoriLabel(t.category)}</span>
-                            <StatusPill status={ticketPill(t.status)} size="sm">{t.status}</StatusPill>
-                            <span style={META}>{tanggal(t.createdAt)}</span>
-                          </button>
+                          <li key={t.id} className="hn-portal-case">
+                            <div className="hn-portal-case-head">
+                              <span className="hn-portal-case-num">#{t.number}</span>
+                              <button type="button" className="hn-portal-case-title"
+                                onClick={() => void openTicketDetail(t.id)}>{t.title}</button>
+                              <StatusPill status={ticketPill(t.status)} size="sm">{t.status}</StatusPill>
+                            </div>
+                            <TicketTimeline status={t.status} compact />
+                            <p className="hn-portal-case-note">{ticketNote(t.status)}</p>
+                            <span className="hn-portal-case-meta">{kategoriLabel(t.category)} · dikirim {tanggal(t.createdAt)}</span>
+                          </li>
                         ))}
-                      </Card>
-                      <PortalPager total={tickets.total} page={tPage} onPage={setTPage} unit="tiket" />
+                      </ul>
+                      <PortalPager total={tickets.total} page={tPage} onPage={setTPage} unit="keluhan" />
                     </>
               )}
             </>
@@ -226,10 +241,10 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
       </main>
 
       {composing && projects && projects.length > 0 && (
-        <TicketForm projects={projects} activeId={active!} onCancel={() => setComposing(false)}
+        <TicketForm projects={projects} activeId={active!} email={user.email} onCancel={() => setComposing(false)}
           onSent={(id) => {
             setComposing(false);
-            setTab("tickets");
+            setTab("keluhan");
             // Tiket baru duduk paling atas (createdAt desc), jadi memuat ulang di halaman yang
             // sedang aktif akan menyembunyikan tiket yang baru saja dikirim.
             setTPage(1);
@@ -243,18 +258,18 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
       <Modal open={!!openSpec} title={openSpec?.title ?? ""} eyebrow="pekerjaan"
         onClose={() => setOpenSpec(null)}>
         {openSpec && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="hn-portal-detail">
+            <div className="hn-portal-pillrow">
               <StatusPill status={stagePill(openSpec.stage)} size="sm">
                 {STAGE_LABEL[openSpec.stage] ?? openSpec.stage}
               </StatusPill>
-              <span style={META}>{prioritasLabel(openSpec.priority)}</span>
+              <span className="hn-portal-meta">{prioritasLabel(openSpec.priority)}</span>
             </div>
-            <p style={{ margin: 0, lineHeight: 1.6 }}>{openSpec.objective}</p>
-            <dl style={DL}>
-              <dt style={META}>Dibuat</dt><dd style={DD}>{tanggal(openSpec.createdAt)}</dd>
-              <dt style={META}>Mulai</dt><dd style={DD}>{tanggal(openSpec.startedAt)}</dd>
-              <dt style={META}>Selesai</dt><dd style={DD}>{tanggal(openSpec.doneAt)}</dd>
+            <p className="hn-portal-body">{openSpec.objective}</p>
+            <dl className="hn-portal-dl">
+              <dt>Dibuat</dt><dd>{tanggal(openSpec.createdAt)}</dd>
+              <dt>Mulai</dt><dd>{tanggal(openSpec.startedAt)}</dd>
+              <dt>Selesai</dt><dd>{tanggal(openSpec.doneAt)}</dd>
             </dl>
           </div>
         )}
@@ -264,22 +279,17 @@ export function ClientPortal({ user, onLoggedOut }: { user: UserView; onLoggedOu
         eyebrow={openTicket ? `#${openTicket.number} · ${kategoriLabel(openTicket.category)}` : undefined}
         onClose={() => setOpenTicket(null)}>
         {openTicket && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="hn-portal-detail">
             <div><StatusPill status={ticketPill(openTicket.status)} size="sm">{openTicket.status}</StatusPill></div>
-            <p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{openTicket.detail}</p>
-            <span style={META}>Dikirim {tanggal(openTicket.createdAt)}</span>
+            <TicketTimeline status={openTicket.status} />
+            <TicketNote status={openTicket.status} />
+            <p className="hn-portal-body">{openTicket.detail}</p>
+            <dl className="hn-portal-dl">
+              <dt>Dikirim</dt><dd>{tanggal(openTicket.createdAt)}</dd>
+            </dl>
           </div>
         )}
       </Modal>
     </div>
   );
 }
-
-const ROW: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "12px 16px",
-  border: "none", borderBottom: "1px solid var(--border-hair)", cursor: "pointer",
-  background: "transparent", color: "inherit", font: "inherit", textAlign: "left",
-};
-const META: React.CSSProperties = { fontSize: "var(--text-sm)", color: "var(--text-subtle)" };
-const DL: React.CSSProperties = { display: "grid", gridTemplateColumns: "auto 1fr", gap: "6px 16px", margin: 0 };
-const DD: React.CSSProperties = { margin: 0, fontSize: "var(--text-sm)" };

@@ -80,18 +80,18 @@ describe("kontras batas kontrol: WCAG 1.4.11 (>= 3:1)", () => {
   });
 });
 
-describe("footer Dalang (.hn-dlg-foot) lolos 4,5:1 di kedua latar gelapnya", () => {
-  const css = stripComments(read("../src/app.css"));
-  const footColor = /\.hn-dlg-foot\s*\{[^}]*color:\s*var\((--[\w-]+)\)/.exec(css)?.[1];
+describe("teks Dalang (screens/styles/dalang.css) lolos 4,5:1 di atas --term-bg", () => {
+  // Pengganti kontrak footer `.hn-dlg-foot` (kelasnya dihapus di Fase 2E, tak dirender lagi). Semua warna
+  // TEKS di berkas Dalang yang kini dipakai diukur terhadap latar gelapnya; titik status (background) di luar.
+  const dalang = stripComments(read("../src/screens/styles/dalang.css"));
+  const textTokens = [...new Set([...dalang.matchAll(/(?<![-\w])color:\s*var\((--[\w-]+)\)/g)].map((m) => m[1]!))];
 
-  it("warna footer terbaca dari app.css", () => {
-    expect(footColor).toBe("--brass-500");
+  it("warna teks terbaca dari dalang.css", () => {
+    expect(textTokens.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("rasio >= 4,5:1 di term-bg dan di #0d0b07", () => {
-    for (const bg of [color("--term-bg"), "#0d0b07"]) {
-      expect(contrast(color(footColor!), bg)).toBeGreaterThanOrEqual(4.5);
-    }
+  it.each(textTokens)("%s >= 4,5:1 di term-bg", (token) => {
+    expect(contrast(color(token), color("--term-bg"))).toBeGreaterThanOrEqual(4.5);
   });
 });
 
@@ -108,6 +108,22 @@ describe("kontrak CSS dan HTML hasil audit", () => {
     expect(html).toContain('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />');
   });
 
+  it("font tak render-blocking: fonts.css tanpa @import; stylesheet Google Fonts lewat preload + swap, dengan noscript", () => {
+    expect(stripComments(read("../src/ds/tokens/fonts.css"))).not.toMatch(/@import/);
+    expect(html).toMatch(/<link rel="preload" href="https:\/\/fonts\.googleapis\.com\/css2\?[^"]*" as="style" onload="this\.rel='stylesheet'" \/>/);
+    expect(html).toMatch(/<noscript><link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com\/css2\?[^"]*" \/><\/noscript>/);
+    // Stylesheet Google Fonts hanya boleh ada di <noscript> (fallback tanpa JS), bukan sebagai pemblokir render.
+    expect(html.replace(/<noscript>[\s\S]*?<\/noscript>/g, "")).not.toMatch(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com/);
+  });
+
+  it("fallback offline: tiap keluarga font berakhir generik (serif / sans-serif / monospace)", () => {
+    const typo = stripComments(read("../src/ds/tokens/typography.css"));
+    for (const name of ["serif", "sans", "mono"]) {
+      const value = new RegExp(`--font-${name}:\\s*([^;]+);`).exec(typo)?.[1] ?? "";
+      expect(value, `--font-${name}`).toMatch(/,\s*(serif|sans-serif|monospace)\s*$/);
+    }
+  });
+
   it("aturan 44px pointer kasar tidak mengenai checkbox/radio mentah", () => {
     expect(css).toMatch(/input:not\(\[type="checkbox"\]\):not\(\[type="radio"\]\), select, textarea \{/);
     expect(css).not.toMatch(/(^|\n)\s*input, select, textarea \{/);
@@ -118,9 +134,10 @@ describe("kontrak CSS dan HTML hasil audit", () => {
     expect(css).not.toMatch(/--accent-on:\s*#fff/);
   });
 
-  it("Dalang: tombol keluar tetap tampil di ponsel; hanya chip tanggal/jam yang disembunyikan", () => {
-    expect(css).not.toMatch(/\.hn-dlg-chips\s*\{\s*display:\s*none/);
-    expect(css).toMatch(/\.hn-dlg-chip\s*\{\s*display:\s*none;?\s*\}/);
+  it("Dalang: tombol keluar tak pernah disembunyikan (dalang.css), termasuk di ponsel", () => {
+    const dalang = stripComments(read("../src/screens/styles/dalang.css"));
+    expect(dalang).toMatch(/\.hn-dlg-exit\s*\{[^}]*width:\s*var\(--touch-target\)/);
+    expect(dalang).not.toMatch(/\.hn-dlg-exit[^{]*\{[^}]*display:\s*none/);
   });
 
   it("Dalang: tombol keluar 44×44 di pointer kasar dan di ponsel", () => {

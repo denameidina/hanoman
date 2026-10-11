@@ -75,16 +75,17 @@ function brokenAbove(scroller: HTMLElement, root: HTMLElement): string[] {
 describe("portal klien bisa digulir (SPEC-626)", () => {
   it("daftar Pekerjaan punya leluhur yang benar-benar menggulir", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     const list = await screen.findByTestId("portal-list");
     const scroller = scrollerOf(list);
     expect(scroller, "tak ada satu pun leluhur ber-overflow auto/scroll").not.toBeNull();
     expect(brokenAbove(scroller!, screen.getByTestId("portal-root"))).toEqual([]);
   });
 
-  it("daftar Help desk memakai scroller yang sama", async () => {
+  it("daftar Keluhan saya memakai scroller yang sama", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     await screen.findByTestId("portal-list");
-    fireEvent.click(screen.getByRole("tab", { name: /laporan/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keluhan/i }));
     const scroller = screen.getByTestId("portal-scroll");
     expect(scrolls(scroller)).toBe(true);
     expect(scrollerOf(await screen.findByTestId("portal-list"))).toBe(scroller);
@@ -106,6 +107,7 @@ describe("portal klien bisa digulir (SPEC-626)", () => {
   // containing block). Test ini mengunci kontraknya supaya tak hilang diam-diam.
   it("badan modal detail bisa digulir", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     fireEvent.click(await screen.findByText("Pekerjaan 1"));
     await waitFor(() => expect(screen.getByTestId("modal-body")).toBeInTheDocument());
     expect(scrolls(screen.getByTestId("modal-body"))).toBe(true);

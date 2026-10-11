@@ -1,9 +1,8 @@
 import React from "react";
 import { QA_CASE_STATUSES, type QaCaseStatus, type QaCaseView } from "@hanoman/shared";
-import { Button, Card, HnTextarea, Input, Select, StateBlock, useConfirm } from "../../ds";
+import { Button, Card, Field, HnTextarea, Icon, Input, OverflowActions, Radio, RadioGroup, StateBlock, useConfirm } from "../../ds";
 import { useApi } from "../../api/instance";
 import { QaAttachments } from "./QaAttachments";
-import { QaField } from "./QaField";
 import type { PanelProps } from "./QaReportEditor";
 import { CASE_LABEL, errText, failText } from "./qa-ui";
 
@@ -47,9 +46,9 @@ export function QaCasesPanel(p: PanelProps) {
     finally { if (fileRef.current) fileRef.current.value = ""; }
   };
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <p style={{ margin: 0, color: "var(--text-subtle)" }}>Satu langkah uji (test case) = satu aktivitas yang diperiksa. Kolom tersimpan saat Anda keluar dari kolom.</p>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+    <div className="hn-qa-stack">
+      <p className="hn-qa-intro">Satu langkah uji (test case) = satu aktivitas yang diperiksa. Kolom tersimpan saat Anda keluar dari kolom.</p>
+      <div className="hn-qa-toolbar">
         <Button size="sm" variant="ghost" leftIcon="download" as="a" href={api.qaExportUrl(p.projectId, p.detail.id, "xlsx")}>Unduh matriks (XLSX)</Button>
         {!p.locked && (
           <>
@@ -62,13 +61,13 @@ export function QaCasesPanel(p: PanelProps) {
       {p.detail.cases.length === 0 && <StateBlock kind="empty" compact title="Belum ada test case" hint="Mulai dari satu aktivitas, misalnya login. Isi langkahnya, hasil yang diharapkan, lalu catat hasil saat dicoba." />}
       {p.detail.cases.map((c) => <CaseCard key={c.id} c={c} p={p} onRemove={() => void removeCase(c)} />)}
       {!p.locked && (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <div style={{ flex: "1 1 240px" }}>
-            <QaField label="Nama pengujian baru">
+        <div className="hn-qa-add">
+          <div className="hn-qa-add-field">
+            <Field label="Nama pengujian baru">
               <Input placeholder="Contoh: Login dengan akun yang benar" value={title}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
                 onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter") void add(); }} />
-            </QaField>
+            </Field>
           </div>
           <Button leftIcon="plus" onClick={() => void add()} disabled={!title.trim()}>Tambah</Button>
         </div>
@@ -105,40 +104,43 @@ function CaseCard({ c, p, onRemove }: { c: QaCaseView; p: PanelProps; onRemove: 
     value: d[k], disabled: p.locked, onBlurCapture: () => commit(k),
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setD((s) => ({ ...s, [k]: e.target.value })),
   });
-  const grid: React.CSSProperties = { display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))" };
+  const saveText = save.state === "saving" ? "Menyimpan…" : save.state === "saved" ? "Tersimpan" : save.state === "error" ? save.message : "";
   return (
     <Card padding={14}>
-      <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ flex: "0 1 120px" }}><QaField label="Kode"><Input aria-label={`Kode ${c.code}`} maxLength={40} placeholder="kosong = nomor otomatis" {...bind("code")} /></QaField></div>
-        <div style={{ flex: "1 1 200px" }}><QaField label="Nama pengujian"><Input aria-label={`Nama pengujian ${c.code}`} placeholder="mis. Login dengan akun yang benar" {...bind("title")} /></QaField></div>
-        {/* Status tampil sekali: select ini sekaligus penanda status (terkunci bila laporan closed). */}
-        <div style={{ flex: "0 0 auto" }}>
-          <QaField label="Status">
-            <Select aria-label={`Status ${c.code}`} value={c.status} disabled={p.locked}
-              onChange={(e) => void persist({ status: e.target.value as QaCaseStatus })}
-              options={QA_CASE_STATUSES.map((s) => ({ value: s, label: CASE_LABEL[s] }))} />
-          </QaField>
-        </div>
+      <div className="hn-qa-case-head">
+        <div className="hn-qa-case-code"><Field label="Kode"><Input aria-label={`Kode ${c.code}`} maxLength={40} placeholder="kosong = nomor otomatis" {...bind("code")} /></Field></div>
+        <div className="hn-qa-case-name"><Field label="Nama pengujian"><Input aria-label={`Nama pengujian ${c.code}`} placeholder="mis. Login dengan akun yang benar" {...bind("title")} /></Field></div>
         {!p.locked && (
-          <div style={{ paddingTop: 26 }}>
-            <Button size="sm" variant="ghost" leftIcon="trash-2" aria-label={`Hapus ${c.code}`} onClick={onRemove} />
-          </div>
+          <OverflowActions label={`Menu ${c.code}`} title={`Test case ${c.code}`}
+            items={[{ key: "remove", label: "Hapus test case", icon: "trash-2", tone: "danger", onSelect: onRemove }]} />
         )}
       </div>
-      <div role={save.state === "error" ? "alert" : "status"}
-        style={{ fontSize: "var(--text-xs)", color: save.state === "error" ? "var(--status-err)" : "var(--text-subtle)", minHeight: 16, marginBottom: 6 }}>
-        {save.state === "saving" ? "Menyimpan…" : save.state === "saved" ? "Tersimpan" : save.state === "error" ? save.message : ""}
+      <div className="hn-qa-case-status">
+        {/* Satu ketukan per status. Status tampil sekali di sini; tak ada select atau badge kedua. */}
+        <RadioGroup aria-label={`Status ${c.code}`} value={c.status} direction="row" disabled={p.locked} className="hn-qa-seg"
+          onChange={(v) => void persist({ status: v as QaCaseStatus })}>
+          {QA_CASE_STATUSES.map((s) => (
+            <Radio key={s} value={s} label={CASE_LABEL[s]} className={c.status === s ? "is-on" : undefined} />
+          ))}
+        </RadioGroup>
+        <span role={save.state === "error" ? "alert" : "status"}
+          className={`hn-qa-save is-${save.state === "error" ? "error" : save.state}`}>
+          {save.state === "saving" && <Icon name="loader-circle" size={13} />}
+          {save.state === "saved" && <Icon name="circle-check" size={13} />}
+          {save.state === "error" && <Icon name="circle-x" size={13} />}
+          {saveText}
+        </span>
       </div>
-      <div style={grid}>
-        <QaField label="Langkah pengujian" hint="Satu langkah per baris.">
+      <div className="hn-qa-case-grid">
+        <Field label="Langkah pengujian" hint="Satu langkah per baris.">
           <HnTextarea rows={4} placeholder={"Buka halaman login\nIsi email dan kata sandi\nKlik Masuk"} aria-label={`Langkah pengujian ${c.code}`} {...bind("steps")} />
-        </QaField>
-        <QaField label="Hasil yang diharapkan">
+        </Field>
+        <Field label="Hasil yang diharapkan">
           <HnTextarea rows={4} placeholder="Contoh: Halaman beranda terbuka." aria-label={`Hasil yang diharapkan ${c.code}`} {...bind("expected")} />
-        </QaField>
-        <QaField label="Hasil yang terjadi">
-          <HnTextarea rows={4} placeholder="Tulis apa yang terlihat saat dicoba." aria-label={`Hasil yang terjadi ${c.code}`} {...bind("actual")} />
-        </QaField>
+        </Field>
+        <Field label="Hasil yang terjadi">
+          <HnTextarea rows={4} placeholder="Contoh: Tombol Masuk tidak bereaksi." aria-label={`Hasil yang terjadi ${c.code}`} {...bind("actual")} />
+        </Field>
       </div>
       <QaAttachments {...p} ownerType="case" ownerId={c.id} compact />
     </Card>

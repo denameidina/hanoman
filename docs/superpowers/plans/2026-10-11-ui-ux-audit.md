@@ -28,7 +28,7 @@ yang tersentuh diperbarui dalam commit yang sama. Baseline gagal sebelum perubah
 - [x] 2B a11y DS: Field/Input/Select, Radio, Modal inert+h2, shell h1+skip link, Toast antrean + undo, Icon aria-hidden
 - [x] 2C command palette + shortcut + notifikasi "Jawab"
 - [x] 2D map label terpusat + glosarium copy + skeleton/loading
-- [ ] 2E layout inline → kelas `hn-*`, hapus `!important`/`[style*=`
+- [x] 2E pembersihan CSS: kelas `hn-*` mati dan Dalang lama dicabut, `!important` 45 → 30 (sisa dicatat), font tak lagi render-blocking. Layout inline yang tersisa belum dipindah (lihat frontend-implementation § Fase 2E)
 
 ## Fase 3 — redesign
 - [x] 3A ADR IA baru (17 → 8 menu) + nav hub — ADR-0205; tanpa redirect (path section tak berubah, URL lama tetap hidup)
@@ -41,7 +41,12 @@ yang tersentuh diperbarui dalam commit yang sama. Baseline gagal sebelum perubah
   `screens/settings/**`, satu aturan simpan (`useSettingField`), override satu-bentuk, Telegram satu tempat, dokumentasi webhook
   dilipat, "Cari pengaturan", deep link `#bagian=` (Fase 3C di frontend-implementation.md; ADR IA Pengaturan belum ditulis)
 - [x] 3H IDE "Perubahan dulu": empat tab (Perubahan · Riwayat · Cabang · Berkas), toolbar ≤6 kontrol, branch + worktree dalam satu daftar (CabangPanel), menu konteks pohon, pemisah panel keyboard (Fase 3 · IDE di frontend-implementation.md)
-- [ ] 3L Review, 3M Portal, 3N Onboarding
+- [x] 3L QA: editor lembar kerja (header sticky, aksi utama kontekstual, ⋯ untuk ekspor/pratinjau/hapus), Info laporan
+  ringkas + drawer, tab Langkah uji/Temuan selalu terlihat, status test case satu ketukan, temuan sebagai RowList dengan satu
+  aksi per baris, dialog Tinjau dan ajukan, hasil Kirim semua per temuan, daftar laporan RowList (Fase 3 · QA di frontend-implementation.md)
+- [x] 3L′ Review: kepala ringkas, daftar + viewer, bar keputusan sticky (Buka di Backlog / Terminal / IDE, `onGoto` opsional), Konflik sinkron hanya field berbeda (Fase 3 · Review, Auth, Portal, Onboarding di frontend-implementation.md)
+- [x] 3M Portal: Beranda Klien (Keluhan saya · Progres pekerjaan · Tanya & ide), linimasa 4 langkah, sheet Lapor masalah dua langkah, Help Center memakai komponen bersama
+- [x] 3N Onboarding: setup satu layar (Lanjutan tertutup, penomoran 1/2), AuthScreen 2/2 bila `setupStep` dikirim (butuh App.tsx)
 - [x] 3K Skills: master-detail (daftar ringkas + chip lapis Global/Project/Plugin, editor dengan footer Simpan sticky dan konfirmasi pindah), tab Skill · Agen, modal agen tiga tab, bukti dilipat (Fase 3 · Projects, PRD, Docs, Skills di frontend-implementation.md)
 - [x] 3P Projects · PRD · Docs: daftar diurut perhatian + chip hitungan, detail tiga pintu + Pengaturan lipat, PRD dengan indeks per status dan sheet "Jadikan backlog", Docs Baca|Edit dengan bar simpan sticky dan pohon role=tree (label 3P; 3I di rencana sudah milik Scheduler)
 - [x] 3G Klien: tab Perangkat · Akun · Log; selektor tingkat Lihat/Kerja/Tulis (grant API tak berubah); banner brass sticky (Fase 3 · Klien & VPS di frontend-implementation.md)

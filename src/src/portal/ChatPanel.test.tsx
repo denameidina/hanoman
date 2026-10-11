@@ -46,10 +46,10 @@ describe("permukaan chat portal (SPEC-854)", () => {
   });
 
   // Bedanya dari Help desk harus terbaca klien, bukan disimpulkan sendiri (constraint brief).
-  it("menjelaskan bedanya dengan Laporan & keluhan", async () => {
+  it("menjelaskan bedanya dengan Keluhan saya", async () => {
     render(<ChatPanel projectId="p1" />);
     const b = await screen.findByTestId("chat-beda-help");
-    expect(b.textContent).toMatch(/Laporan/i);
+    expect(b.textContent).toMatch(/Keluhan saya/);
   });
 
   it("mengirim pesan menampilkan giliran klien lalu jawaban hanoman", async () => {

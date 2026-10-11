@@ -4,9 +4,9 @@
 // menggantikan state-nya — tak ada penghitungan nomor/statistik di klien.
 import React from "react";
 import type { QaReportDetail, QaReportView } from "@hanoman/shared";
-import { Button, Callout, Input, Modal, Select, StateBlock } from "../../ds";
+import { Button, Callout, Field, Input, Modal, Select, SkeletonList, StateBlock } from "../../ds";
 import { useApi } from "../../api/instance";
-import { QaField } from "./QaField";
+import "../styles/qa.css";
 import { QaReportEditor } from "./QaReportEditor";
 import { QaReportList } from "./QaReportList";
 import { errText } from "./qa-ui";
@@ -18,15 +18,6 @@ type Props = {
   onToast?: (m: string) => void;
   onOpenSession?: (id: string) => void;
 };
-
-// Input file bergaya DS: tombol pilih memakai token yang sama dengan Button sekunder.
-const FILE_CSS = [
-  ".qa-file{display:block;width:100%;max-width:100%;font:var(--text-sm)/1.4 var(--font-ui);color:var(--text-body)}",
-  ".qa-file::file-selector-button{margin-right:10px;height:34px;padding:0 12px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface-card);color:var(--text-strong);font:var(--weight-medium) var(--text-sm)/1 var(--font-ui);cursor:pointer;box-shadow:var(--shadow-xs)}",
-  ".qa-file::file-selector-button:hover{background:var(--bone-100)}",
-  ".qa-file:focus-visible{outline:2px solid var(--border-focus);outline-offset:3px;border-radius:var(--radius-sm)}",
-  ".qa-file:disabled{opacity:.5}",
-].join("");
 
 export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onOpenSession }: Props) {
   const api = useApi();
@@ -95,10 +86,9 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onO
   };
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <style>{FILE_CSS}</style>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <Select aria-label="Project" value={projectId} onChange={(e) => onSelectProject(e.target.value)}
+    <div className="hn-qa-stack">
+      <div className="hn-qa-toolbar">
+        <Select aria-label="Project" className="hn-qa-toolbar-project" value={projectId} onChange={(e) => onSelectProject(e.target.value)}
           options={projects.map((p) => ({ value: p.id, label: p.name }))} />
         <Button variant="secondary" disabled={syncBusy} loading={syncBusy} onClick={() => void synchronize()}>Sinkronkan QA</Button>
         {!open && (
@@ -110,12 +100,12 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onO
         )}
       </div>
 
-      {!open && <p style={{ margin: 0, color: "var(--text-subtle)", maxWidth: "70ch" }}>Catat hasil pengujian aplikasi dalam satu laporan. Mulai dengan laporan baru, atau unduh template Excel lalu isi dan impor kembali bersama lampirannya.</p>}
+      {!open && <p className="hn-qa-intro">Catat hasil pengujian aplikasi dalam satu laporan. Mulai dengan laporan baru, atau unduh template Excel lalu isi dan impor kembali bersama lampirannya.</p>}
       {importWarnings.length > 0 && (
         <div role="status">
           <Callout tone="warn" title="Laporan berhasil diimpor. Beberapa lampiran perlu ditambahkan."
             action={<Button size="sm" variant="ghost" onClick={() => setImportWarnings([])}>Tutup</Button>}>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>{importWarnings.map((m, i) => <li key={i}>{m}</li>)}</ul>
+            <ul className="hn-qa-note-list">{importWarnings.map((m, i) => <li key={i}>{m}</li>)}</ul>
           </Callout>
         </div>
       )}
@@ -127,30 +117,34 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onO
       ) : error ? (
         <StateBlock kind="error" title="Gagal memuat laporan QA" action={() => void reload()} actionLabel="Coba lagi" />
       ) : reports === null ? (
-        <StateBlock kind="loading" />
+        <SkeletonList rows={3} label="Memuat laporan QA…" rowHeight={64} />
       ) : (
-        <QaReportList reports={reports} onOpen={(id) => void openReport(id)} />
+        <QaReportList projectId={projectId} reports={reports} onOpen={(id) => void openReport(id)} />
       )}
 
       <Modal open={importing} title="Impor laporan QA" width={620} onClose={() => { if (!importBusy) setImporting(false); }}
         footer={<><Button variant="ghost" disabled={importBusy} onClick={() => setImporting(false)}>Batal</Button><Button disabled={!importFile || importBusy} loading={importBusy} onClick={() => void doImport()}>Impor laporan</Button></>}>
-        <p style={{ margin: "0 0 14px" }}>Isi template Excel, lalu pilih berkasnya di bawah. Laporan hasil ekspor juga dapat diimpor kembali.</p>
-        <QaField label="Berkas laporan (wajib)" hint="Excel (.xlsx), ZIP dengan Excel dan lampiran, atau Markdown (.md).">
-          <input type="file" className="qa-file" accept=".xlsx,.zip,.md" disabled={importBusy} onChange={(e) => setImportFile(e.target.files?.[0])} />
-        </QaField>
-        <QaField label="Berkas lampiran (opsional)" hint="Pilih semua screenshot atau log yang disebut pada sheet Lampiran. Nama berkas harus sama dengan kolom Berkas; kolom Pemilik diisi Laporan, TC-01, atau F-01.">
-          <input type="file" multiple className="qa-file" accept=".png,.jpg,.jpeg,.webp,.pdf,.md,.txt,.log,.json,.csv" disabled={importBusy} onChange={(e) => setAttachments(Array.from(e.target.files ?? []))} />
-        </QaField>
-        <p style={{ color: "var(--text-subtle)", fontSize: "var(--text-xs)", margin: "0 0 4px" }}>Maksimal 10 MB per lampiran, 30 lampiran dan 100 MB per laporan. Untuk ZIP, sertakan report.xlsx dan folder attachments/. Gambar yang ditempel di sel Excel perlu disertakan sebagai berkas terpisah.</p>
-        {importError && <p role="alert" style={{ color: "var(--status-err)", fontSize: "var(--text-sm)" }}>{importError}</p>}
+        <div className="hn-qa-modal-stack">
+          <p className="hn-qa-note">Isi template Excel, lalu pilih berkasnya di bawah. Laporan hasil ekspor juga dapat diimpor kembali.</p>
+          <Field label="Berkas laporan (wajib)" hint="Excel (.xlsx), ZIP dengan Excel dan lampiran, atau Markdown (.md).">
+            <input type="file" className="hn-qa-file" aria-label="Berkas laporan (wajib)" accept=".xlsx,.zip,.md" disabled={importBusy}
+              onChange={(e) => setImportFile(e.target.files?.[0])} />
+          </Field>
+          <Field label="Berkas lampiran (opsional)" hint="Pilih semua screenshot atau log yang disebut pada sheet Lampiran. Nama berkas harus sama dengan kolom Berkas; kolom Pemilik diisi Laporan, TC-01, atau F-01.">
+            <input type="file" multiple className="hn-qa-file" aria-label="Berkas lampiran (opsional)" accept=".png,.jpg,.jpeg,.webp,.pdf,.md,.txt,.log,.json,.csv" disabled={importBusy}
+              onChange={(e) => setAttachments(Array.from(e.target.files ?? []))} />
+          </Field>
+          <p className="hn-qa-note">Maksimal 10 MB per lampiran, 30 lampiran dan 100 MB per laporan. Untuk ZIP, sertakan report.xlsx dan folder attachments/. Gambar yang ditempel di sel Excel perlu disertakan sebagai berkas terpisah.</p>
+          {importError && <p role="alert" className="hn-qa-error">{importError}</p>}
+        </div>
       </Modal>
 
       <Modal open={creating} title="Laporan QA baru" onClose={() => setCreating(false)}
         footer={<><Button variant="ghost" onClick={() => setCreating(false)}>Batal</Button><Button onClick={() => void create()} disabled={!title.trim()}>Buat</Button></>}>
-        <QaField label="Judul" hint="Contoh: Pengujian fitur login versi 1.0">
+        <Field label="Judul" hint="Contoh: Pengujian fitur login versi 1.0">
           <Input value={title} autoFocus placeholder="mis. Regresi rilis 1.1" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
             onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter") void create(); }} />
-        </QaField>
+        </Field>
       </Modal>
     </div>
   );

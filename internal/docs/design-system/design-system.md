@@ -146,10 +146,12 @@ mengganti role memutus ~11 berkas test sekaligus. Menu ARIA penuh adalah tindak 
 dulu dikenali selektor itu kini membawa `hn-grow` (`flex: 1 1 0%`, identik dengan inline `flex: 1`).
 Header `Card` (`.hn-card-header`) menyusun dirinya lewat kelas, sehingga `align-items` di mobile
 tak lagi butuh `!important`. `!important` yang dihapus: outline `:focus-visible` (role tab/checkbox/radio/
-switch, `.hn-select select`, `.hn-textarea-core`), karena tak ada gaya inline yang bersaing. Sisanya
-(`.hn-modal-*`, `.hn-viewport-popover`, `.hn-project-*`, `.hn-backlog-*`, `.hn-portal-*`, `.hn-setting-*`,
-`.hn-dense-row`, `.hn-grid-mobile`, `.hn-touch-target`) **masih perlu `!important`** karena menimpa layout
-inline di TSX; menghapusnya berarti memindahkan layout inline itu ke kelas (Fase 2E).
+switch, `.hn-select select`, `.hn-textarea-core`), karena tak ada gaya inline yang bersaing. Fase 2E
+mencabut kelas mati (`.hn-project-*`, `.hn-backlog-*`, `.hn-team-*`, `.hn-vps-*`, `.hn-dlg-*` lama). Sisanya
+(`.hn-modal-*`, `.hn-viewport-popover`, `.hn-portal-*`, `.hn-setting-*`, `.hn-picker-*`, `.hn-dense-row`,
+`.hn-grid-mobile`, `.hn-stack-mobile`, `.hn-touch-target`) **masih perlu `!important`**: menimpa layout inline di
+TSX atau kaskade `settings.css`. Penyebab per kelompok ada di frontend-implementation.md § Fase 2E. Menghapusnya
+berarti memindahkan layout inline itu ke kelas.
 
 Test: `src/test/ds-layout-primitives.test.tsx`, `ds-feedback-a11y.test.tsx`, `ds-css-contract.test.ts`,
 serta `use-live-topic.test.tsx` (wilayah live) dan `overflow-actions.test.tsx`.
@@ -364,6 +366,18 @@ berhenti karena itu bukan selalu pojok: ia berdiri di tempat terakhir manusia me
 di pojok bila belum pernah diseret. Kontrak DOM,
 lifecycle panel, mesin berkeliaran, dan pengujiannya dijelaskan di
 [frontend-implementation](../frontend/frontend-implementation.md#pet-hanoman-status-sesi-sebagai-sprite-hidup-spec-585--spec-648--pet-hidup-a-adr-0140--pet-hidup-b-spec-897--pet-hidup-c-spec-898-adr-0141--pet-hidup-d-spec-899-adr-0142--pet-hidup-e-spec-904--pet-hidup-f-spec-905-adr-0144).
+
+## Klien, Help Center, dan sheet dua langkah (Audit UI/UX 2026-10 · Fase 3M)
+
+Rincian di [frontend-implementation § Fase 3 · Review, Auth, Portal, Onboarding](../frontend/frontend-implementation.md#audit-uiux-2026-10--fase-3--review-auth-portal-onboarding-3l--3m--3n).
+
+| Pola | Aturan |
+|---|---|
+| Linimasa keluhan | `TicketTimeline` + `ticketTimeline()` (`portal/`). Empat langkah Diterima → Ditinjau → Dikerjakan → Selesai. Jangan menyalin pemetaan status ke layar. |
+| Sheet dua langkah | `Modal` dengan `footer`; penanda `langkah n dari N` di eyebrow; Lanjut nonaktif wajib menyebut alasannya. |
+| Bar keputusan | Sticky di bawah (`.hn-review-decide`), tiga aksi maksimum, aksi utama satu. Aksi yang hanya berpindah layar memakai `onGoto` atau tautan. |
+| Input klien/publik | Teks minimal 16 px (`Input size="lg"`, `.hn-portal-textarea`, `.hn-public-input`) agar iOS tidak men-zoom. |
+| Konflik sinkron | Hanya field yang berbeda yang ditampilkan; desktop dua kolom, mobile bertumpuk. |
 
 ## Placeholder: contoh nilai, bukan pengulangan label (SPEC-490)
 

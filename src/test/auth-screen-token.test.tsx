@@ -107,3 +107,23 @@ describe("AuthScreen · galat dibedakan dan alasan tombol nonaktif (audit)", () 
     expect(screen.getByText(/~\/\.hanoman\/setup\.token/)).toBeTruthy();
   });
 });
+
+// Audit UI/UX 2026-10 · Fase 3 (3N): penomoran jujur. "setup 2/2" hanya bila wizard tadi tampil
+// (layar induk memberi `setupStep`); tanpa itu, layar akun tak mengklaim nomor langkah.
+describe("AuthScreen · penomoran setup (Fase 3N)", () => {
+  it("langkah ke-2 dari 2 bila layar induk memberi setupStep", () => {
+    render(<AuthScreen needsSetup setupStep={2} onDone={() => {}} />);
+    expect(screen.getByText("hanoman · setup 2/2")).toBeTruthy();
+  });
+
+  it("tanpa setupStep, tak ada nomor langkah yang diklaim", () => {
+    render(<AuthScreen needsSetup onDone={() => {}} />);
+    expect(screen.getByText("hanoman · setup")).toBeTruthy();
+  });
+
+  it("tombol 'Buat akun & masuk' memberi alasan saat belum lengkap", () => {
+    render(<AuthScreen needsSetup setupStep={2} onDone={() => {}} />);
+    expect(screen.getByRole("button", { name: /Buat akun & masuk/ })).toBeDisabled();
+    expect(screen.getByText("Isi email yang valid.")).toBeTruthy();
+  });
+});

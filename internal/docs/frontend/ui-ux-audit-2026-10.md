@@ -268,7 +268,7 @@ ada di kode; `[ ]` berarti belum. Rincian per layar ada di
 - [x] 5. `viewport-fit=cover`; `hn-grid-mobile` pada tiga grid inline `App.tsx`; tombol keluar Dalang 44×44
   pada mobile dan pointer kasar.
 - [x] 6. Digest snapshot WS `sessions`/`pending`/`leadAsks`; ticker dan jam Dalang terisolasi; `preconnect`
-  font; throttle tulis scroll. `@import` font belum diubah (lihat tindak lanjut).
+  font; throttle tulis scroll. `@import` font dipindah ke `index.html` di Fase 2E (tindak lanjut 13).
 - [x] 7. `projectId` tab IDE di Klien; Edit IDE diblokir saat ref lain dipilih; `FolderPicker` bisa dinavigasi
   keyboard; galat `ReconcileModal` tak lagi tampil sebagai "Tak ada konflik".
 
@@ -285,8 +285,7 @@ di Terminal; persist Settings yang jujur; label ramah Portal.
 - [ ] Toast antrean dengan aksi "Batalkan" dan `aria-live` permanen (saat ini satu toast, tanpa aksi).
 - [ ] Command palette (⌘K), shortcut `g`+huruf dan `?`, tombol "Jawab" di toast dan notifikasi keputusan.
 - [ ] Satu skeleton untuk loading; glosarium dan map label terpusat.
-- [ ] Hapus layout inline: `style={{` di `screens/` naik dari 1.416 menjadi 1.545; `!important` di `app.css`
-  berjumlah 49; `[style*=` tersisa satu selektor di `app.css:297`.
+- [ ] Hapus layout inline: `style={{` di `screens/` naik dari 1.416 menjadi 1.545 (belum dikerjakan: layout inline tetap, lihat Fase 2E). `!important` di `app.css` (Fase 2E, dihitung ulang): 45 → 30 deklarasi, sisanya dicatat di frontend-implementation § Fase 2E; `[style*=` sudah tak ada di `app.css`.
 - [ ] Varian `danger` pada `ProgressBar`, `Radio`, `Field`, `Callout`, dan `OverflowActions`; hanya `Button` yang punya.
 
 ### Fase 3 — redesign per layar (sebagian)
@@ -298,6 +297,10 @@ di Terminal; persist Settings yang jujur; label ramah Portal.
 - [x] Terminal (Fase 3E): default **Fokus** berisi rail sesi bertanda status dan satu pane; Grid tetap opsional
   dan memakai workspace kanonik. Menu ⋯ per sesi (Tutup dikonfirmasi), toolbar ≤ 6 kontrol, dan laci mobile.
   Rincian: [frontend-implementation § Fase 3E](frontend-implementation.md#audit-uiux-2026-10--fase-3e--terminal-rail-sesi-dan-mode-fokus).
+- [x] Review, Auth/Setup, Portal, dan Onboarding (3L · 3M · 3N): alur "Tinjau lalu Putuskan" dengan bar keputusan,
+  setup satu layar dengan penomoran jujur, dan Beranda Klien dengan linimasa keluhan. Rincian dan keputusan:
+  [frontend-implementation § Fase 3 · Review, Auth, Portal, Onboarding](frontend-implementation.md#audit-uiux-2026-10--fase-3--review-auth-portal-onboarding-3l--3m--3n).
+  Belum dirender di browser; dua prop opsional menunggu `App.tsx` (`onGoto`, `setupStep`).
 - [ ] Redesign per layar sesuai urutan usulan: Overview → Settings → Backlog/Tim → Triase/Lead →
   Klien → IDE → Scheduler → VPS → Skills → Review → Portal → Onboarding.
 
@@ -336,6 +339,6 @@ di Terminal; persist Settings yang jujur; label ramah Portal.
 11. **Review belum punya aksi keputusan.** `screens/ReviewScreen.tsx` hanya memiliki Muat ulang, Preview,
   tab Diff/Sumber, dan kembali; Merge dan Buang belum ada.
 12. **Setup status 400 masih memuat "Password minimal 8 karakter"** (`screens/AuthScreen.tsx:22`).
-13. **Font masih `@import`** di `ds/tokens/fonts.css:9` (render-blocking). `preconnect` sudah ada.
+13. **Font `@import`** (render-blocking): *selesai di Fase 2E.* `ds/tokens/fonts.css` tak lagi memuat `@import`; stylesheet Google Fonts dimuat dari `index.html` lewat preload + swap, dengan `<noscript>`. `preconnect` sudah ada.
 14. **`screenReaderMode` xterm belum ada di kode** (`src/` dan `shared/`); menunggu uji VoiceOver.
 15. **Verifikasi visual belum dilakukan** di 320, 390, 768, dan 1024 px. Audit ini statis; belum ada screenshot.

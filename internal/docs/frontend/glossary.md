@@ -23,6 +23,9 @@ Dokumen ini adalah kontrak untuk teks yang tampil ke operator. Kode penegaknya: 
 | Waktu relatif | "baru saja", "5 menit lalu", "2 jam lalu", "kemarin", "3 hari lalu", lalu tanggal ("4 Okt") | "5m lalu", "5 mnt", "2j lalu", "baru saja lalu" | Lihat "Waktu relatif" di bawah. |
 | Mode tampilan terminal | **Fokus** (satu pane + daftar sesi), **Grid** (beberapa pane) | Split, Tabs, Panel | Default Fokus sejak Fase 3E. Pilihan tersimpan per browser. |
 | Buka sesi lain | **Buka…** (menu: Ambil backlog, Riwayat sesi, Terminal biasa) | Impor, Attach | Pemicu bertulisan di toolbar Terminal. |
+| Laporan dari klien (tiket) | **Keluhan** (tab "Keluhan saya", tombol "Lapor masalah") | Laporan & keluhan, Help desk, Tiket, Bug | Di layar Klien dan Help Center. Kategori "Ada masalah" untuk `bug`. |
+| Obrolan klien | **Tanya & ide** (tab di Klien) | Obrolan, Chat | Sesi chat milik project, bukan milik satu keluhan. |
+| Pemilik konflik sinkron | **server pusat** | hub, Instance, Pusat | Diputuskan di Fase 3L. Dipakai di copy konflik dan sinkronisasi. |
 
 ## Aturan voice
 
@@ -48,7 +51,7 @@ import { labelOf, PRIORITY_LABEL, FLOW_LABEL } from "../lib/labels";
 
 - `Record<Union, string>` memaksa peta lengkap: enum baru di shared gagal di typecheck sampai ia diberi label.
 - `labelOf(map, value)` tak pernah melempar. Nilai kosong/null → `—`. Nilai tak dikenal → `humanize` (`no_effort` → `No effort`). Properti bawaan objek (`constructor`) tidak pernah lolos sebagai label.
-- Jangan menyalin peta ke berkas layar. Bila nama lama dibutuhkan, re-export dari berkas itu (`export { X } from "../lib/labels"`), seperti `screens/qa/qa-ui.ts` dan `screens/DalangStage.tsx`.
+- Jangan menyalin peta ke berkas layar. Bila nama lama dibutuhkan, re-export dari berkas itu (`export { X } from "../lib/labels"`), seperti `screens/qa/qa-ui.ts`. (`screens/DalangStage.tsx` yang dulu juga begitu sudah dihapus di Fase 2E.)
 - Label yang sengaja huruf kecil (aria phrase, kalimat di dalam teks) dicatat di komentar peta, mis. `PHASE_STATUS_LABEL`, `QUEUE_STATUS_LABEL`, `LEAD_*`.
 - Nilai yang sama punya kata yang sama di mana pun: `SEVERITY_LABEL` memakai kata QA; `FLOW_LABEL` satu sumber untuk Dalang, Overview, dan Settings orkestrasi.
 
@@ -87,7 +90,6 @@ Daftar ini sama dengan allowlist `UTANG Fase 3`. Setiap baris dihapus dari allow
 |---|---|---|
 | `screens/LogsPanel.tsx` | `aria-label="Device"` | Di luar wilayah Fase 2D (copy, bukan label dedupe) |
 | `screens/PhasePlanPreview.tsx` | "Pratinjau ini memakai Setting hub ini…" | Keputusan istilah server pusat |
-| `screens/ReconcileModal.tsx` | "Hub …" (4 kalimat) | Keputusan istilah server pusat |
 | `screens/SyncButton.tsx` | "Instance ini hub", "… ke hub …" | Keputusan istilah server pusat |
 | `screens/WebhookDocs.tsx` | "bisa basi", "Retry, pengiriman ganda…", "… retry setelah …" | Keputusan "Retry" → "Kirim ulang" |
 | `ds/shell.tsx` | nav "Docs · SoT" | Berkas milik agen 3A (shell) |
@@ -95,12 +97,12 @@ Daftar ini sama dengan allowlist `UTANG Fase 3`. Setiap baris dihapus dari allow
 Sisa di luar pemindai (bukan wilayah Fase 2D, tercatat untuk Fase 3):
 
 - `notifications/NotificationBell.tsx`, `notifications/NotificationsArchiveModal.tsx`: waktu relatif sendiri (`5m lalu`, `2j lalu`). Ganti ke `relativeTime`.
-- `portal/labels.ts`: peta kategori dan prioritas klien (`Prioritas tinggi`) masih berdiri sendiri. Pusatkan bila portal masuk cakupan.
+- `portal/labels.ts` sudah menjadi satu-satunya peta kosakata Klien dan Help Center (Fase 3M); status tiket klien dipetakan di `portal/ticket-timeline.ts`.
 - `screens/VpsChecklist.tsx`: peta `MODE_LABEL` (Otomatis/Audit/Info) masih lokal. Pindahkan ke `lib/labels.ts`. Tooltip dan lencana sudah memakai `VPS_SEVERITY_LABEL` dan `VPS_ITEM_STATUS_LABEL` (Fase 3J).
 - `screens/SpecDocsModal.tsx` (`KIND_LABEL`), `screens/settings/Advanced.tsx` (`GROUP_LABEL`, `SOURCE_WORD`, `APPLY_WORD`; pindah dari `SettingsScreen.tsx` di Fase 3C), `screens/RemoteControlPanel.tsx` (`RELAY_LABEL`): peta lokal yang belum dipindah.
 
 ## Keputusan terbuka
 
-- **Istilah server pusat.** `hub` dipakai di copy sinkronisasi dan konflik. Pilihan: "server pusat" (sudah dipakai di `RemoteControlPanel`) atau "Instance". Diputuskan sebelum Fase 3 Triase/Konflik.
+- **Istilah server pusat — DIPUTUSKAN (Fase 3L).** "server pusat" (sudah dipakai di `RemoteControlPanel`) dipakai di copy konflik (`ReconcileModal`). Copy sinkronisasi di `SyncButton.tsx` masih memakai "hub" sampai layar Sinkronisasi diredesain.
 - **"Retry".** Pilihan: "Coba lagi" untuk galat, "Kirim ulang" untuk pengiriman webhook.
 - **Istilah "effort".** Dipertahankan sebagai istilah teknis (`Tanpa effort`, nilai effort per runtime). Belum dibahas sebagai copy.

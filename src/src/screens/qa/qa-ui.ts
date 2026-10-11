@@ -1,6 +1,6 @@
 import { failureMessage } from "../../lib/report-error";
 import type {
-  QaAttachmentSyncState, QaCaseStatus, QaFindingStatus, QaPriority, QaReportStatus, QaSeverity, QaVerdict,
+  QaAttachmentSyncState, QaCaseStatus, QaExportFormat, QaFindingStatus, QaPriority, QaReportStatus, QaSeverity, QaVerdict,
 } from "@hanoman/shared";
 
 // Peta label dipusatkan di lib/labels.ts (Audit 2026-10 · Fase 2D). Nama lama tetap diekspor di sini
@@ -20,6 +20,16 @@ export const REPORT_TONE: Record<QaReportStatus, Tone> = { draft: "neutral", sub
 export const VERDICT_TONE: Record<QaVerdict, Tone> = { go: "ok", "no-go": "err", conditional: "warn" };
 
 export const pct = (r: number | null): string => (r === null ? "—" : `${Math.round(r * 100)}%`);
+
+/**
+ * Format ekspor laporan. ZIP = laporan + lampiran (bisa diimpor kembali) dan jadi pintu utama; DOCX/PDF untuk
+ * dibaca dan diserahkan; XLSX = laporan lengkap; CSV = matriks test case; MD = dokumennya saja.
+ */
+export const QA_EXPORTS: { format: QaExportFormat; label: string }[] = [
+  { format: "zip", label: "Unduh ZIP (laporan + lampiran)" }, { format: "docx", label: "Unduh DOCX" },
+  { format: "pdf", label: "Unduh PDF" }, { format: "xlsx", label: "Unduh XLSX" },
+  { format: "csv", label: "Unduh CSV (test case)" }, { format: "md", label: "Unduh .md" },
+];
 
 /**
  * Alasan galat yang layak dibaca: pesan server (`detail.error`), selain itu status HTTP. Pesan bawaan
