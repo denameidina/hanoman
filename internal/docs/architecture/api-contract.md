@@ -68,11 +68,16 @@ POST /auth/change-password { currentPassword, newPassword }  # 200 + cookie baru
 #   BUKAN /auth/users — memisahkannya menutup jalan memutar mengubah kredensial admin lewat pintu klien.
 ```
 
-## Portal klien (SPEC-617 · [ADR-0110](../adr/0110-portal-klien-read-only.md) · SPEC-626 · [ADR-0111](../adr/0111-portal-klien-kirim-tiket.md)) — **COOKIE_ONLY**
+## Portal klien (SPEC-617 · [ADR-0110](../adr/0110-portal-klien-read-only.md) · SPEC-626 · [ADR-0111](../adr/0111-portal-klien-kirim-tiket.md)) — sesi cookie klien; BACA terbuka bagi agen lewat `portal:read` (ADR-0195)
 
 Permukaan untuk `User.role === "client"`. Sumber datanya **sama** dengan dashboard operator
 (`liveSpecs()` + `prisma.ticket`) — tak ada pipeline data kedua; yang berbeda hanya proyeksinya.
-`capabilityForRoute` memetakan `portal` ke **COOKIE_ONLY**: agent token tak pernah menjangkaunya.
+`capabilityForRoute` memetakan **GET** `portal/**` ke `portal:read` dan **semua tulis** ke COOKIE_ONLY
+([ADR-0195](../adr/0195-portal-klien-dilihat-agen-atas-nama-klien.md)). Agent token tak punya `req.user`, jadi handler
+mensyaratkan `?asClient=<id akun klien>` eksplisit untuk principal agen (`services/portal-principal.ts`):
+tanpa itu **400**, bukan akun ber-role klien **404**, dan sesi cookie klien **selalu menang** atas parameter itu
+(tanpa prioritas itu `?asClient` jadi IDOR antar-klien). Kirim tiket dan chat (mulai sesi, kirim pesan) tetap
+cookie-only: itu bertindak SEBAGAI klien.
 
 ```
 GET /portal/projects[?page=&limit=]         -> { items: [{ id, name }], total, page, pageSize }   # HANYA project yang ditugaskan
@@ -111,7 +116,7 @@ POST /portal/projects/:id/tickets           -> 201 PortalTicket        # multipa
 #   sebagai method — route portal berikutnya tetap tertutup secara default.
 ```
 
-## Obrolan portal klien (SPEC-854 · [ADR-0129](../adr/0129-mesin-chat-portal-klien.md) · [ADR-0130](../adr/0130-kuota-chat-portal-klien.md)) — **COOKIE_ONLY**
+## Obrolan portal klien (SPEC-854 · [ADR-0129](../adr/0129-mesin-chat-portal-klien.md) · [ADR-0130](../adr/0130-kuota-chat-portal-klien.md)) — sesi cookie klien; tiga GET terbuka via `portal:read` + `?asClient=` (ADR-0195), POST tetap cookie-only
 
 Percakapan yang dijawab hanoman sendiri — beda dari Help Center, yang antrean tiket ke manusia.
 Tiap giliran memanggil satu proses agen berumur pendek di **workspace dokumen** ber-tool baca-saja;
@@ -157,7 +162,7 @@ GET  /portal-chat/export?project=&from=&to=       -> application/x-ndjson (trans
 Tak satu pun route ini ada di `clientRouteAllowed`, jadi gerbang `app.ts` membalasnya **403** untuk
 akun klien.
 
-## Kelola akun klien (SPEC-617 · ADR-0110) — **COOKIE_ONLY, admin**
+## Kelola akun klien (SPEC-617 · ADR-0110 · [ADR-0194](../adr/0194-webhook-dan-akun-klien-terjangkau-agen.md)) — admin cookie, atau agen ber-`clients:read|write`
 
 ```
 GET    /client-accounts        -> { items: ClientAccountView[] }
@@ -829,11 +834,13 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > **Read-only global** (`/limits`,`/limits/codex`,`/update`,`/events/ws`,`/fs/browse`,`/health`) → token
 > ber-capability apa pun — bahkan token TANPA satu pun capability — **hanya untuk method baca**
 > (SPEC-405 · ADR-0088). Keempat yang bukan WS/health punya tool MCP ber-`capability: null` (ADR-0157). **Tak-boleh-didelegasikan** (agent → 403):
-> `/auth`, `/agent-tokens`, `/device-tokens`, `/sync`, `/webhooks` (ADR-0100), `/portal` &
-> `/client-accounts` (ADR-0110), `/session-events` (ADR-0146), `/presence` (ADR-0147),
+> `/auth`, `/agent-tokens`, `/device-tokens`, `/sync`, tulis `/portal` (ADR-0195; baca = `portal:read`),
+> `/session-events` (ADR-0146), `/presence` (ADR-0147),
 > `/remote-control` (SPEC-1215 · ADR-0165), `/devices/:deviceId/relay/*` (SPEC-1216 · ADR-0165 §6 —
 > menjalankan aksi sesi di mesin lain atas nama pemanggil), dan
-> `/telegram/{settings,test,credentials}` (ADR-0097); route tak dikenal peta → cookie-only. Master switch
+> route tak dikenal peta → cookie-only. **Dibuka oleh capability BARU opt-in** (membalik ADR-0097/0100/0110, lewat
+> ADR-0193/0194/0195): `/telegram/{settings,test,credentials}` → `telegram:admin` (danger), `/webhooks` → `webhooks:read|write`,
+> `/client-accounts` → `clients:read|write`, baca `/portal` → `portal:read`. Master switch
 > `Setting.agentAccessEnabled` (PUT /settings) mematikan semua. **Kecuali** endpoint `PUBLIC`
 > (`/health`, `/auth/status`, `/auth/login`, `/auth/setup`, `/agent-integration.md`) yang tak pernah
 > menyentuh gate ini sama sekali.
@@ -2239,7 +2246,11 @@ matrix per-fase karena mekanisme itu tak andal, dan SPEC-487 mengukur kelasnya (
 sedang menjalankan giliran mendarat sebagai **pesan liar**). Jalur yang dijanjikan `/engine restart`
 — deterministik, dan konteks selamat lewat ringkasan + curated memory yang memang hidup di DB.
 
-### Kredensial dari Settings (SPEC-477 · ADR-0097) — **COOKIE_ONLY**
+### Kredensial dari Settings (SPEC-477 · ADR-0097 · [ADR-0193](../adr/0193-kredensial-telegram-terjangkau-agen.md)) — cookie, atau agen ber-`telegram:admin`
+
+> `telegram:admin` (akses danger) TIDAK diimplikasikan `telegram:write` maupun `settings:write` — token gateway sendiri
+> tetap tak menjangkaunya. `PUT` dari agent token menolak **403** bila token gateway efektif memegang capability yang
+> tak dimiliki pemanggil (`gatewayEscalation`, anti-eskalasi diri). Respons tetap tersamar (`masked`).
 
 ```text
 GET    /api/telegram/settings      → { fields: [{ key, label, help?, kind, source, hasValue, masked?, value? }] }
@@ -2298,11 +2309,12 @@ balasan final, 25 detik saat idle) — nol timer baru, ADR-0024 utuh.
 Endpoint context/memory tidak pernah mengembalikan token atau teks inbound. Audit hanya metadata
 correlation/method/path/status, tanpa body/header.
 
-## Webhook keluar (SPEC-481 · [ADR-0100](../adr/0100-webhook-keluar-peristiwa.md)) — **COOKIE_ONLY**
+## Webhook keluar (SPEC-481 · [ADR-0100](../adr/0100-webhook-keluar-peristiwa.md) · [ADR-0194](../adr/0194-webhook-dan-akun-klien-terjangkau-agen.md)) — cookie, atau agen ber-`webhooks:read|write`
 
-`capabilityForRoute` memetakan seluruh prefix `webhooks` ke `COOKIE_ONLY`, apa pun method-nya:
-permukaan ini memegang **secret penandatanganan** dan menentukan ke mana data workspace mengalir
-keluar (preseden `/telegram/{settings,test,credentials}`, ADR-0097). Tak ada jalur AgentToken.
+`capabilityForRoute` memetakan prefix `webhooks` MENURUT METHOD ke `webhooks:read|write` (dulu `COOKIE_ONLY`, ADR-0100).
+Permukaan ini memegang **secret penandatanganan** dan menentukan ke mana data workspace mengalir keluar; karena itu
+`allowPrivate` (mematikan pagar SSRF) tetap keputusan manusia: agent token yang menyalakannya, atau memindahkan URL
+endpoint yang sudah ber-`allowPrivate`, ditolak **403** di handler.
 
 | Method | Path | Keterangan |
 | --- | --- | --- |

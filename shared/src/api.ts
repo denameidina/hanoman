@@ -220,7 +220,7 @@ export const paths = {
     `${API}/custom-agents/invocations/${encodeURIComponent(id)}`,
   // SPEC-484 · ADR-0101 · sumber daftar tools/model/runtime untuk form (mention dari `customAgents`).
   customAgentCatalog: `${API}/custom-agents/catalog`,
-  // SPEC-481 · ADR-0100 · webhook keluar (cookie-only)
+  // SPEC-481 · ADR-0100 · webhook keluar (dashboard = cookie; agen lewat `webhooks:*`, ADR-0194)
   webhooks: `${API}/webhooks`,
   webhook: (id: string) => `${API}/webhooks/${encodeURIComponent(id)}`,
   webhookTest: (id: string) => `${API}/webhooks/${encodeURIComponent(id)}/test`,

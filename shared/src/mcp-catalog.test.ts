@@ -203,7 +203,7 @@ describe("tingkat mode", () => {
 // dijaga adalah INVARIANNYA. Dua arah dikunci, dan arah kedua yang paling mudah lolos: sebuah tool
 // bisa bermode `danger` sambil menuntut capability yang lemah, dan tak ada yang menyadarinya sampai
 // seseorang memakainya.
-const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"]);
+const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "telegram:admin"]);
 
 // Tool DESTRUKTIF yang capability-nya tetap `:write` — bukan karena ringan, melainkan karena tak
 // ada capability `danger` di domainnya. Mode `danger`-nya murni ergonomi (mencegah salah pilih),
@@ -233,6 +233,13 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   // ADR-0157 · papan Tim. Menghapus kartu/anggota permanen di seluruh mesin tersync, tapi domain
   // `team` tak punya pecahan `danger` — mode `danger`-nya ergonomi, bukan gerbang.
   "hanoman_task_delete", "hanoman_member_delete",
+  // ADR-0194 · webhook keluar & akun klien. Domain `webhooks`/`clients` tak punya pecahan `danger`;
+  // semua tulisnya bermode `danger` (mengirim data keluar / membuka login baru) tapi capability-nya
+  // tetap `:write`. Mode `danger`-nya ergonomi, bukan gerbang.
+  "hanoman_webhook_create", "hanoman_webhook_update", "hanoman_webhook_delete",
+  "hanoman_webhook_test", "hanoman_webhook_delivery_retry",
+  "hanoman_client_account_create", "hanoman_client_account_update",
+  "hanoman_client_account_password_reset", "hanoman_client_account_delete",
 ]);
 
 describe("mode ⇔ capability", () => {

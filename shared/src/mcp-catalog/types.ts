@@ -43,6 +43,13 @@ export type McpToolDef = {
   samplePath: string;
   /** Method contoh, dipakai uji kontrak yang sama. */
   sampleMethod: McpRequest["method"];
+  /**
+   * ADR-0193..0195 · nama argumen yang berisi RAHASIA yang dikirim pemanggil (password akun klien,
+   * bot token). Nilainya disensor dari SEMUA teks keluar tool ini (hasil & galat) oleh runtime MCP.
+   * Rahasia yang dibangkitkan SERVER (secret webhook sekali-tampil) sengaja tidak termasuk — itu
+   * hasil yang memang harus sampai ke pemanggil.
+   */
+  secretArgs?: readonly string[];
   build(args: Args): McpRequest | null;
   shape(raw: unknown, args: Args): unknown;
 };

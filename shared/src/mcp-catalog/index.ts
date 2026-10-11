@@ -20,6 +20,7 @@ import { LEAD_TOOLS } from "./lead";
 import { TEAM_TOOLS } from "./team";
 import { QA_TOOLS } from "./qa";
 import { SYSTEM_TOOLS } from "./system";
+import { INTEGRATIONS_TOOLS } from "./integrations";
 import type { McpToolDef } from "./types";
 
 export const MCP_TOOLS: readonly McpToolDef[] = [
@@ -43,4 +44,5 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
   ...TEAM_TOOLS,
   ...QA_TOOLS,        // Workspace QA · laporan, test case, temuan
   ...SYSTEM_TOOLS,
+  ...INTEGRATIONS_TOOLS,   // ADR-0193..0195 · kredensial Telegram, webhook keluar, akun klien, portal-sebagai-klien
 ];

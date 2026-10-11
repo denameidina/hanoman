@@ -12,17 +12,22 @@ describe("agent capabilities", () => {
   // ADR-0157 · +domain `team` (papan Tim: `/api/tasks` & `/api/members`) → 13 domain, 30 id.
   // ADR-0172 · +domain `skills` (skill library: `/api/skills*`) → 14 domain, 32 id.
   // ADR-0174 · +domain `qa` (Workspace QA: `/api/projects/:id/qa/**`, `/api/qa/**`) → 15 domain, 34 id.
-  it("has 16 domains, 36 capability ids across three access levels, all in metadata", () => {
-    expect(CAPABILITY_IDS.length).toBe(36);
-    expect(new Set(CAPABILITY_IDS).size).toBe(36);
-    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(16);
+  // ADR-0182 menghapus domain `memory` (-> 15 domain, 34 id). ADR-0193..0195 menambah `webhooks`,
+  // `clients`, `portal` (read/write/read), dan akses `danger` `telegram:admin` -> 18 domain, 40 id.
+  it("has 18 domains, 40 capability ids across three access levels, all in metadata", () => {
+    expect(CAPABILITY_IDS.length).toBe(40);
+    expect(new Set(CAPABILITY_IDS).size).toBe(40);
+    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(18);
     expect(CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id).sort())
-      .toEqual(["backlog:lifecycle", "ide:git", "sessions:spawn", "vps:exec"]);
+      .toEqual(["backlog:lifecycle", "ide:git", "sessions:spawn", "telegram:admin", "vps:exec"]);
     expect(CAPABILITIES.map((c) => c.id).sort()).toEqual([...CAPABILITY_IDS].sort());
     expect(zCapability.safeParse("projects:read").success).toBe(true);
     expect(zCapability.safeParse("telegram:write").success).toBe(true);
     expect(zCapability.safeParse("skills:write").success).toBe(true);
     expect(zCapability.safeParse("qa:write").success).toBe(true);
+    expect(zCapability.safeParse("webhooks:write").success).toBe(true);
+    expect(zCapability.safeParse("portal:read").success).toBe(true);
+    expect(zCapability.safeParse("portal:write").success).toBe(false);   // ADR-0195 · tak ada tulis atas nama klien
     expect(zCapability.safeParse("nope:read").success).toBe(false);
   });
 
@@ -34,6 +39,10 @@ describe("agent capabilities", () => {
     expect(grantsCapability(["vps:exec"], "vps:exec")).toBe(true);
     // dan sebaliknya: danger tak memberi baca.
     expect(grantsCapability(["vps:exec"], "vps:read")).toBe(false);
+    // ADR-0193 · kredensial Telegram: tak diimplikasikan telegram:write maupun settings:write
+    // (yang wajib dipegang gateway), jadi token gateway tak pernah menjangkaunya.
+    expect(grantsCapability(["telegram:write", "settings:write"], "telegram:admin")).toBe(false);
+    expect(grantsCapability(["telegram:admin"], "telegram:read")).toBe(false);
   });
 
   it("write implies read; unrelated caps do not grant", () => {

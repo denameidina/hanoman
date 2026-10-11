@@ -30,9 +30,10 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   const top = seg[0] ?? "";
 
   // tak-boleh-didelegasikan.
-  // SPEC-617 · ADR-0110 · `portal` & `client-accounts` ikut: portal adalah permukaan SESI COOKIE
-  // ber-scope akun (respons bergantung `req.user`, jadi tak ada capability yang bisa berarti
-  // apa pun di sana), dan client-accounts memegang kredensial (preseden /agent-tokens).
+  // SPEC-617 · ADR-0110 · `portal` & `client-accounts` DULU ikut di sini. ADR-0194/0195 membalik
+  // keduanya (lihat blok `portal`/`client-accounts` di bawah): client-accounts jadi `clients:*`,
+  // portal jadi `portal:read` HANYA untuk method baca dan HANYA atas nama akun klien eksplisit.
+  // Tulis ke portal (kirim tiket, mulai/kirim chat) tetap cookie-only — lihat catatan di bawah.
   // SPEC-909 · ADR-0146 · `session-events` ikut: pemanggilnya hook sesi ber-token turunan, bukan
   // manusia dan bukan agen. Agen yang bisa memalsukan "sesi X bertanya Y" bisa menggerakkan lead
   // atas nama sesi mana pun — itu bukan capability, itu peniruan identitas.
@@ -47,7 +48,7 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // lintas device) — preseden `presence`: tak ada capability yang berarti apa pun untuk itu.
   if (top === "auth" || top === "agent-tokens" || top === "device-tokens" || top === "sync"
     || top === "presence" || top === "models" || top === "remote-control" || top === "logs"
-    || top === "portal" || top === "client-accounts" || top === "session-events"
+    || top === "session-events"
     || top === "devices") return "COOKIE_ONLY";
   // read-only global (status). SPEC-405 · ADR-0088 · `GLOBAL_READ` HANYA untuk method baca:
   // `POST /update/apply` me-restart instance, dan itu tak pernah boleh lolos hanya karena
@@ -79,18 +80,28 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // sesi baru, jadi izin baca tak pernah cukup untuk menulisnya.
   if (top === "skills") return rw("skills");
   // SPEC-477 · ADR-0097 · permukaan KREDENSIAL bukan permukaan kerja sesi operator: ia menyimpan
-  // bot token & AgentToken, jadi agent token mana pun (termasuk milik gateway itu sendiri, yang
-  // wajib memegang `settings:write`) tak boleh menyentuhnya. Sub-path `/telegram/*` yang lain
-  // tetap domain `telegram` seperti ADR-0096.
+  // bot token & AgentToken. ADR-0193 membalik "cookie-only"-nya menjadi capability `telegram:admin`
+  // (akses danger) — BARU dan opt-in, jadi `telegram:write` dan `settings:write` (yang wajib dipegang
+  // gateway) tetap TIDAK menjangkaunya. Dipetakan apa pun methodnya: GET (isian tersamar) pun
+  // membuka allowlist & chat target. Sub-path `/telegram/*` yang lain tetap domain `telegram` (ADR-0096).
   if (top === "telegram") {
     const sub = seg[1] ?? "";
-    if (sub === "settings" || sub === "test" || sub === "credentials") return "COOKIE_ONLY";
+    if (sub === "settings" || sub === "test" || sub === "credentials") return "telegram:admin";
     return rw("telegram");
   }
   // SPEC-481 · ADR-0100 · pengelolaan webhook memegang SECRET penandatanganan dan menentukan ke
-  // mana data workspace mengalir keluar. Tak ada capability yang cukup untuk itu — cookie-only,
-  // apa pun methodnya (preseden /telegram/{settings,test,credentials}, ADR-0097).
-  if (top === "webhooks") return "COOKIE_ONLY";
+  // mana data workspace mengalir keluar. ADR-0194 membuka lewat domain BARU `webhooks:read|write`
+  // (opt-in, menurut METHOD — kelas bug SPEC-405). Pagar yang tak bisa dinyatakan di peta ini
+  // (`allowPrivate` = SSRF ke jaringan internal) hidup di handler routes/webhooks.ts.
+  if (top === "webhooks") return rw("webhooks");
+  // SPEC-617 · ADR-0110 · akun klien memegang kredensial login orang luar. ADR-0194: `clients:*`
+  // menurut method. Hanya baris ber-role klien yang terjangkau (handler), akun operator tidak.
+  if (top === "client-accounts") return rw("clients");
+  // ADR-0195 · portal klien: respons bergantung identitas akun KLIEN, yang tak dimiliki agent token.
+  // Yang dibuka hanya BACA, dan handler mensyaratkan `?asClient=<id akun klien>` eksplisit untuk
+  // agent token. Tulis (POST kirim tiket, mulai/kirim chat) tetap cookie-only: itu bertindak SEBAGAI
+  // klien — peniruan identitas, bukan capability.
+  if (top === "portal") return read ? "portal:read" : "COOKIE_ONLY";
   if (top === "settings" || top === "config") return rw("settings");
   if (top === "specs") {
     // ADR-0155 · integrate & hapus backlog menghapus artefak dokumen. `PATCH /specs/:id {stage}`

@@ -224,8 +224,17 @@ describe("GET /api/portal (SPEC-617)", () => {
       .toMatchObject({ items: [], total: 0 });
   });
 
-  it("portal tak bisa disentuh agent token (cookie-only)", async () => {
+  // ADR-0195 · BACA dibuka untuk agent token (portal:read, atas nama akun klien eksplisit); TULIS
+  // tetap cookie-only karena itu bertindak SEBAGAI klien. Perilaku handler diuji di
+  // portal-agent-access.test.ts.
+  it("portal: baca -> portal:read, semua tulis tetap cookie-only", async () => {
     const { capabilityForRoute } = await import("../src/services/agent-capabilities");
-    expect(capabilityForRoute("GET", "/api/portal/projects")).toBe("COOKIE_ONLY");
+    expect(capabilityForRoute("GET", "/api/portal/projects")).toBe("portal:read");
+    expect(capabilityForRoute("GET", "/api/portal/projects/p1/chat/sessions/s1")).toBe("portal:read");
+    for (const [m, p] of [
+      ["POST", "/api/portal/projects/p1/tickets"],
+      ["POST", "/api/portal/projects/p1/chat/sessions"],
+      ["POST", "/api/portal/projects/p1/chat/sessions/s1/messages"],
+    ] as const) expect(capabilityForRoute(m, p), `${m} ${p}`).toBe("COOKIE_ONLY");
   });
 });

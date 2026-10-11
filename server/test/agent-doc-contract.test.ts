@@ -24,14 +24,19 @@ describe("naskah panduan AI agent", () => {
     // selalu 403 dan naskah harus mengatakannya.
     // SPEC-919 · ADR-0147 · `presence` ikut: naskah ini ada untuk MENJELASKAN arti 403, jadi 403
     // yang baru tanpa penjelasan meninggalkan agen eksternal tanpa rujukan sama sekali.
-    const kandidat = ["auth", "agent-tokens", "device-tokens", "sync", "webhooks",
-      "portal", "client-accounts", "presence", "remote-control"];
+    // ADR-0193..0195 · `webhooks` & `client-accounts` KELUAR dari daftar (kini capability opt-in),
+    // `portal` hanya cookie-only untuk method TULIS (lihat bawah).
+    const kandidat = ["auth", "agent-tokens", "device-tokens", "sync", "presence", "remote-control"];
     for (const seg of kandidat) expect(capabilityForRoute("GET", `/api/${seg}`)).toBe("COOKIE_ONLY");
     const hilang = kandidat.filter((s) => !doc.includes(`/api/${s}`));
     expect(hilang).toEqual([]);
-    // Sub-path kredensial Telegram (ADR-0097) juga cookie-only dan wajib disebut.
-    expect(capabilityForRoute("GET", "/api/telegram/credentials")).toBe("COOKIE_ONLY");
+    // ADR-0193..0195 · yang dulu cookie-only kini capability opt-in, dan naskah wajib menyebutnya.
+    expect(capabilityForRoute("GET", "/api/telegram/credentials")).toBe("telegram:admin");
+    for (const seg of ["webhooks", "client-accounts", "portal"]) expect(doc).toContain(`/api/${seg}`);
     expect(doc).toContain("/api/telegram/credentials");
+    // Tulis ke portal (kirim tiket, mulai/kirim chat) = bertindak SEBAGAI klien: tetap cookie-only.
+    expect(capabilityForRoute("POST", "/api/portal/projects/p1/tickets")).toBe("COOKIE_ONLY");
+    expect(doc).toContain("`portal:read`");
   });
 
   it("menyebut SETIAP nilai source backlog di tabel payload", () => {

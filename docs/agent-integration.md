@@ -91,8 +91,9 @@ host-mu benar dan masalahnya ada pada token atau master switch.
 ## 3. Capability
 
 Capability berformat `"<domain>:<access>"`, `access ∈ {read, write}`, dan **write meng-implikasikan
-read** pada domain yang sama. Ada **13 domain**; empat di antaranya punya akses KETIGA `danger`
-(ADR-0155) yang **tak diimplikasikan `:write`**, sehingga totalnya **30 capability**. Katalog resmi (dengan label &
+read** pada domain yang sama. Ada **18 domain**; lima di antaranya punya akses KETIGA `danger`
+(ADR-0155, ADR-0193) yang **tak diimplikasikan `:write`**, sehingga totalnya **40 capability**
+(`portal` hanya punya `read` — lihat tabel). Katalog resmi (dengan label &
 deskripsi) tampil di panel **Settings → Akses AI Agent** saat manusia membuat token; endpoint
 katalognya (`GET /api/agent-tokens/capabilities`) bersifat **cookie-only** (lihat §5) — kamu tak
 perlu mengambilnya, cukup rujuk tabel di bawah:
@@ -111,7 +112,10 @@ perlu mengambilnya, cukup rujuk tabel di bawah:
 | `lead` | `/api/lead*` | minta putusan ke hanoman-lead & baca jejaknya — **`lead:write` bisa menggerakkan sesi** (ADR-0091) |
 | `agents` | `/api/custom-agents*` | katalog custom agent global & per project — **`agents:write` mengubah apa yang dilihat SETIAP sesi baru** (ADR-0094) |
 | `skills` | `/api/skills*` | skill global hanoman, user, plugin (baca-saja) & per project, termasuk isi berkasnya — **`skills:write` pada skill global hanoman mengubah instruksi SETIAP sesi baru di semua project** |
-| `telegram` | `/api/telegram*` kecuali sub-path kredensial | context/memory/reply/audit kanal operator Telegram (ADR-0096) |
+| `telegram` | `/api/telegram*` kecuali sub-path kredensial | context/memory/reply/audit kanal operator Telegram (ADR-0096). Sub-path **kredensial** (`/api/telegram/settings`, `/api/telegram/test`, `/api/telegram/credentials`) menuntut capability `danger` **`telegram:admin`** (ADR-0193) — tak diimplikasikan `telegram:write` maupun `settings:write`, sehingga token gateway Telegram sendiri tetap tak menjangkaunya. **Anti-eskalasi (403):** token gateway efektif tak boleh memegang capability yang tak dimiliki token pemanggil |
+| `webhooks` | `/api/webhooks*` | webhook keluar: endpoint, putar secret, ping, riwayat & ulang pengiriman (ADR-0194). **`webhooks:write` menentukan ke mana data workspace mengalir keluar**; secret penandatanganan tampil **sekali** saat dibuat/diputar. `allowPrivate` (SSRF ke jaringan internal) tetap keputusan manusia — agent token ditolak 403 bila menyalakannya |
+| `clients` | `/api/client-accounts*` | akun login portal klien: daftar, buat, ubah akses project/nonaktifkan, reset password, hapus (ADR-0194). `clients:write` **membuka login baru ke data project** |
+| `portal` | `/api/portal*` (**baca** saja) | lihat portal **atas nama satu akun klien** yang disebut eksplisit lewat `?asClient=<id akun klien>` (ADR-0195); hanya `portal:read`, tak ada `portal:write`. Chat portal memuat percakapan klien |
 | `team` | `/api/tasks*`, `/api/members*` | papan **Tim**: kartu kerja MANUSIA & direktori anggota (ADR-0157). `status` kartu milik manusia — ia **bukan** `stage` backlog. `POST /api/tasks/:id/escalate` melahirkan backlog item dan tetap `team:write` (cermin `POST /api/tickets/:id/accept`) |
 
 ## 4. Aturan gate & kode status
@@ -137,14 +141,15 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
 - `/api/auth/*` — kelola user & password
 - `/api/agent-tokens*` — agen tak boleh mencetak/menaikkan token sendiri
 - `/api/device-tokens*`, `/api/sync*` — identitas mesin & sync hub
-- `/api/webhooks*` — memegang secret penandatanganan **dan** menentukan ke mana data workspace
-  mengalir keluar (ADR-0100)
-- `/api/telegram/settings`, `/api/telegram/test`, `/api/telegram/credentials` — permukaan
-  **kredensial** (bot token & agent token), beda dari sisa `/api/telegram*` (ADR-0097)
-- `/api/portal*` — portal klien: isinya ditentukan **akun yang login** (`ClientProjectAccess`), jadi
-  tak ada capability yang bisa berarti apa pun di sana. Backlog & tiket yang sama tersedia lewat
-  `/api/specs` dan `/api/tickets` dengan capability `backlog`/`support` (ADR-0110)
-- `/api/client-accounts*` — membuat & mencabut akun klien beserta password awalnya (ADR-0110)
+- **Tulis** ke `/api/portal*` (`POST …/tickets`, `POST …/chat/sessions`, `POST …/messages`) — itu
+  bertindak **sebagai klien** (tiket multipart; chat menghabiskan kuota klien dan tertulis sebagai
+  ucapannya): peniruan identitas, bukan capability. Membaca portal sebagai klien tersedia lewat
+  capability `portal:read` (ADR-0195)
+
+> Dulu cookie-only, kini capability **opt-in** (manusia yang mencentangnya di Settings → Akses AI
+> Agent): `/api/webhooks*` → `webhooks:*` (ADR-0194), `/api/client-accounts*` → `clients:*`
+> (ADR-0194), `/api/telegram/{settings,test,credentials}` → `telegram:admin` (ADR-0193), dan
+> **baca** `/api/portal*` → `portal:read` (ADR-0195). Lihat tabel §3.
 - `/api/session-events` — event pertanyaan sesi untuk hanoman-lead (SPEC-909/ADR-0146). Pemanggilnya
   **hook sesi**, bukan manusia dan bukan agen: kredensialnya token turunan per sesi, dan agen yang
   bisa memalsukan "sesi X bertanya Y" bisa menggerakkan lead atas nama sesi mana pun — itu peniruan

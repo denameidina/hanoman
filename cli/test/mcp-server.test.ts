@@ -139,6 +139,47 @@ describe("buildMcpServer", () => {
   });
 });
 
+// ADR-0193..0195 · rahasia yang DIKIRIM pemanggil (password akun klien, bot token) disensor dari
+// keluaran tool; rahasia yang dibangkitkan SERVER (secret webhook sekali-tampil) tidak — itu hasil
+// yang memang harus sampai ke pemanggil.
+describe("redaksi rahasia integrasi", () => {
+  const callMsg = (id: number, name: string, args: Record<string, unknown>) =>
+    ({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } });
+  const dangerCfg: Partial<McpConfig> = { level: "danger" };
+
+  it("password akun klien yang dikirim disensor dari galat, juga bila server memantulkannya", async () => {
+    const echo = vi.fn(async (..._a: CallArgs): Promise<CallResult> =>
+      ({ ok: false, message: "Permintaan ditolak: password rahasia-123 terlalu lemah" }));
+    const { t } = await boot(dangerCfg, echo);
+    t.feed(callMsg(20, "hanoman_client_account_create", { email: "k@x.co", password: "rahasia-123" }));
+    await tick();
+    const text = reply(t, 20)?.result.content[0].text as string;
+    expect(text).not.toContain("rahasia-123");
+    expect(text).toContain("disembunyikan");
+    // permintaan ke server tetap membawa nilai aslinya (disensor hanya di KELUARAN)
+    expect(echo.mock.calls[0]?.[0]).toMatchObject({ body: { password: "rahasia-123" } });
+  });
+
+  it("bot token yang dikirim disensor dari hasil sukses", async () => {
+    const bot = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw";
+    const echo = vi.fn(async (..._a: CallArgs): Promise<CallResult> => ({ ok: true, body: { eko: bot } }));
+    const { t } = await boot(dangerCfg, echo);
+    t.feed(callMsg(21, "hanoman_telegram_settings_set", { botToken: bot }));
+    await tick();
+    expect(reply(t, 21)?.result.content[0].text).not.toContain(bot);
+  });
+
+  it("secret webhook BUATAN SERVER tampil utuh, sekali, persis seperti REST", async () => {
+    const secret = "k3yR4ndomDariServerYangPanjangSekali_-abcdef";
+    const create = vi.fn(async (..._a: CallArgs): Promise<CallResult> =>
+      ({ ok: true, body: { id: "w1", secret, secretHint: secret.slice(-4) } }));
+    const { t } = await boot(dangerCfg, create);
+    t.feed(callMsg(22, "hanoman_webhook_create", { name: "CI", url: "https://x.id/h", events: ["*"] }));
+    await tick();
+    expect(reply(t, 22)?.result.content[0].text).toContain(secret);
+  });
+});
+
 describe("tool yang dihapus", () => {
   it("MCP tidak menawarkan memori project atau changelog di mode danger", async () => {
     const { t } = await boot({ level: "danger" });
