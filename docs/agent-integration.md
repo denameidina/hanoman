@@ -290,7 +290,8 @@ Tool MCP-nya (semua tulis bermode `danger`, hanya tampil dengan `--danger`):
 | `GET /api/specs/:id/attachments/:attId` | `backlog:read` | byte satu lampiran. |
 | `DELETE /api/specs/:id/attachments/:attId` | `backlog:write` | hapus satu lampiran. |
 | `GET /api/specs/:id/docs` | `backlog:read` | dokumen yang ditulis sesi item itu. |
-| `GET /api/specs/:id/review` | `backlog:read` | diff hasil kerja sesi. |
+| `GET /api/specs/:id/review` | `backlog:read` | diff hasil kerja sesi. Bila belum ada worktree maupun commit: **200** dengan `empty: true` dan `reason` — `no-worktree` (belum pernah dimulai) atau `no-commit` (worktree sudah lenyap tanpa commit); `base`, `files`, dan `changed` kosong. Itu keadaan, bukan galat (ADR-0213). |
+| `DELETE /api/specs/:id/worktree` | `ide:git` (danger) | hapus worktree satu item (tool `hanoman_backlog_worktree_delete`, ADR-0213). Perubahan yang belum di-commit di dalamnya **hilang** dan sesi yang berjalan di sana ditutup; cabang dan commit tetap. Balasan **200** `{ name, ok, cleanup, closedSession?, error? }` — `ok: false` bila worktree tak ditemukan atau tak bisa dihapus. Capability-nya sama dengan `POST /api/projects/:id/worktrees/delete`, bukan `backlog:write`. |
 | `GET /api/projects/:id/docs` | `docs:read` | index Source of Truth project. |
 | `GET /api/projects/:id/docs/<path>` | `docs:read` | isi satu dokumen. |
 | `GET /api/terminal/sessions` | `sessions:read` | sesi yang sedang hidup. |
@@ -354,8 +355,8 @@ capability-nya. Capability menjawab "boleh?", bukan "sebaiknya?".
 | `POST /api/update/apply`, `POST /api/restart` | memasang paket npm dan **me-restart server** (ADR-0200): dashboard & koneksi MCP putus beberapa detik; pane tmux selamat. Selalu `confirm: false` dulu untuk membaca jumlah sesi hidup. |
 | `POST /api/sync/conflicts/:entity/:recordId/resolve` | **membuang data satu sisi** (lokal atau hub) tanpa jalan pulang (ADR-0199). Baca `differs` dari `hanoman_sync_conflicts` dulu. |
 
-Perlakukan `POST /api/specs/:id/integrate`, `DELETE /api/specs/:id`, dan perubahan `stage` dengan
-disiplin yang sama: ketiganya mengubah sejarah git atau membuang pekerjaan. `POST /api/specs/:id/done`
+Perlakukan `POST /api/specs/:id/integrate`, `DELETE /api/specs/:id`, `DELETE /api/specs/:id/worktree`,
+dan perubahan `stage` dengan disiplin yang sama: keempatnya mengubah sejarah git atau membuang pekerjaan. `POST /api/specs/:id/done`
 tak menyentuh git, tetapi ia **menyatakan pekerjaan orang lain selesai** — pakai hanya bila kamu punya
 buktinya, dan tulis buktinya di `reason`.
 

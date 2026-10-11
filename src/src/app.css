@@ -321,61 +321,74 @@ textarea:focus-visible,
   .hn-topbar-label { display: none; }
   .hn-topbar-label-short { display: inline; }
   .hn-shell button { min-width: var(--touch-target); min-height: var(--touch-target); }
-  .hn-viewport-popover {
-    position: fixed !important;
-    inset: auto max(var(--page-gutter-x), var(--safe-right)) calc(var(--page-gutter-y) + var(--safe-bottom)) max(var(--page-gutter-x), var(--safe-left)) !important;
-    width: auto !important;
+  /* Popover ponsel = lembar bawah. `div.` (0,1,1) mengalahkan posisi dan lebar dasar tiap popover
+     (.hn-notif-popover, .hn-account-menu, .hn-lim-popover, .hn-upd-popover) di berkas per layar yang
+     dimuat sesudah app.css. Keempatnya <div>. */
+  div.hn-viewport-popover {
+    position: fixed;
+    inset: auto max(var(--page-gutter-x), var(--safe-right)) calc(var(--page-gutter-y) + var(--safe-bottom)) max(var(--page-gutter-x), var(--safe-left));
+    width: auto;
     max-width: none;
-    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--page-gutter-y) - var(--page-gutter-y)) !important;
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--page-gutter-y) - var(--page-gutter-y));
     overflow: auto;
   }
-  .hn-modal-overlay {
-    align-items: flex-end !important;
+  /* Modal ponsel = lembar bawah (kit.tsx). `div.` menambah spesifisitas: aturan dasar `.hn-modal-scrim`,
+     `.hn-modal-sheet`, serta `.hn-modal-header/body/footer` ada di app-shell.css, yang dimuat sesudah app.css. */
+  div.hn-modal-overlay {
+    align-items: flex-end;
     padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
   }
-  .hn-modal-panel {
+  /* Lebar: kit.tsx memberi `style={{ width }}` inline, dan inline hanya bisa dikalahkan deklarasi penting.
+     Sisanya tanpa itu. max-width 100% sudah dari `.hn-modal-sheet` (app-shell.css). */
+  div.hn-modal-panel {
     width: 100% !important;
-    max-width: 100% !important;
-    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom)) !important;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
-  .hn-modal-header,
-  .hn-modal-body { padding-inline: var(--page-gutter-x) !important; }
-  .hn-modal-footer { padding-inline: var(--page-gutter-x) !important; }
+  div.hn-modal-header,
+  div.hn-modal-body { padding-inline: var(--page-gutter-x); }
+  .hn-modal-panel > div.hn-modal-footer { padding-inline: var(--page-gutter-x); }
   .hn-modal-footer > * { min-height: var(--touch-target); }
-  .hn-grid-mobile { grid-template-columns: minmax(0, 1fr) !important; }
-  .hn-stack-mobile { align-items: stretch !important; flex-direction: column; }
+  /* `div.` (0,1,1): `.hn-grid-split/even` (app-shell.css) dan `.hn-terminal-tabs-row` (terminal.css)
+     dimuat sesudah app.css dengan kelas tunggal. Semua pemakainya <div>. */
+  div.hn-grid-mobile { grid-template-columns: minmax(0, 1fr); }
+  div.hn-stack-mobile { align-items: stretch; flex-direction: column; }
+  /* Tetap deklarasi penting: CabangPanel.tsx memberi `alignItems: center` inline pada baris ini, dan
+     inline tak bisa dikalahkan selektor biasa. */
   .hn-dense-row { align-items: flex-start !important; flex-wrap: wrap; }
   .hn-dense-row > .hn-grow { min-width: min(220px, 100%); }
   /* SPEC-763 · baris pemilih (Ambil backlog, Riwayat sesi): judul adalah satu-satunya pembeda
      antar-baris, tapi `flex-basis: 0` membuatnya kalah dari tetangga yang basis-nya selebar isi —
      terukur di 390px judul tersisa "Ba…" (konten terpotong 667px) sementara id project yang
      identik di semua baris tampil penuh. Di mobile judulnya turun ke barisnya sendiri dan
-     membungkus; `!important` wajib karena `white-space: nowrap`-nya inline. */
+     membungkus. Selektor dua kelas ini (0,2,0) mengalahkan `.hn-terminal-*-title` (0,1,0) di terminal.css. */
   .hn-picker-row { flex-wrap: wrap; }
   .hn-picker-row > .hn-picker-title {
     order: 2;
-    flex: 1 1 100% !important;
-    min-width: 100% !important;
-    white-space: normal !important;
-    overflow: visible !important;
+    flex: 1 1 100%;
+    min-width: 100%;
+    white-space: normal;
+    overflow: visible;
   }
   .hn-card-header { align-items: stretch; flex-direction: column; }
   .hn-card-actions { max-width: 100%; }
   .hn-card-actions > * { max-width: 100%; }
   .hn-settings-layout { width: 100%; }
-  .hn-portal-header {
-    height: auto !important;
+  /* `header.` / `div.` (0,1,1): portal.css memuat `.hn-portal-header` (height, padding) dan
+     `.hn-portal-content` (padding di 767px) dengan kelas tunggal, dimuat sesudah app.css. */
+  header.hn-portal-header {
+    height: auto;
     min-height: var(--topbar-h);
     flex-wrap: wrap;
-    padding: max(8px, var(--safe-top)) max(var(--page-gutter-x), var(--safe-right)) 8px max(var(--page-gutter-x), var(--safe-left)) !important;
+    padding: max(8px, var(--safe-top)) max(var(--page-gutter-x), var(--safe-right)) 8px max(var(--page-gutter-x), var(--safe-left));
   }
   .hn-portal-header > div { flex-basis: 1px; }
-  .hn-portal-content {
+  div.hn-portal-content {
     box-sizing: border-box;
-    padding: 16px max(var(--page-gutter-x), var(--safe-right)) calc(24px + var(--safe-bottom)) max(var(--page-gutter-x), var(--safe-left)) !important;
+    padding: 16px max(var(--page-gutter-x), var(--safe-right)) calc(24px + var(--safe-bottom)) max(var(--page-gutter-x), var(--safe-left));
   }
-  .hn-portal-row { align-items: flex-start !important; flex-wrap: wrap; min-height: var(--touch-target); }
+  /* Nilai yang sama dengan portal.css untuk breakpoint ini, jadi tak perlu deklarasi penting. */
+  .hn-portal-row { align-items: flex-start; flex-wrap: wrap; min-height: var(--touch-target); }
   .hn-portal-row > span:nth-child(2) { flex-basis: calc(100% - 110px); }
 }
 
@@ -389,12 +402,14 @@ textarea:focus-visible,
 }
 
 @media (max-width: 767px) {
-  .hn-setting-row { align-items: stretch !important; flex-direction: column; }
+  /* `div.` (0,1,1): settings.css memuat `.hn-set-row` (align-items: center) dengan kelas tunggal. */
+  div.hn-setting-row { align-items: stretch; flex-direction: column; }
   .hn-setting-control { width: 100%; }
+  /* Lebar pilihan (`.hn-set-w-*`, kelas tunggal 0,1,0) kalah dari selektor di bawah ini tanpa penanda penting. */
   .hn-setting-control > .hn-touch-target,
-  .hn-setting-control > div { width: 100% !important; max-width: 100%; }
+  .hn-setting-control > div { width: 100%; max-width: 100%; }
   .hn-setting-control > div { flex-wrap: wrap; }
-  .hn-setting-control > div > div.hn-touch-target { flex: 1 1 200px; width: auto !important; max-width: 100%; }
+  .hn-setting-control > div > div.hn-touch-target { flex: 1 1 200px; width: auto; max-width: 100%; }
 }
 
 .hn-local-overflow {
@@ -534,6 +549,8 @@ input[type="file"] { min-height: 24px; }
   input[type="checkbox"], input[type="radio"] { padding: 14px; }
   /* Input file (Help Center, Keluhan, QA): tinggi tap 44, sebab kontrol bawaan browser hanya ~21 px. */
   input[type="file"] { min-height: var(--touch-target); }
+  /* Target sentuh 44 px harus menang atas min-width/min-height komponen (24–40 px) yang tersebar di banyak
+     berkas dengan spesifisitas beragam, mis. `.hn-shell .hn-shell-subrow button` (0,2,1). Karena itu deklarasi penting. */
   .hn-touch-target,
   .hn-terminal-unplaced-action,
   [role="button"][tabindex="0"] {
@@ -864,6 +881,8 @@ input[type="file"] { min-height: 24px; }
   .hn-responsive-panels--desktop .hn-responsive-panel[aria-hidden="true"] { display: block; }
 }
 
+/* Selektor `*` berspesifisitas 0: tanpa deklarasi penting, transisi dan animasi kelas mana pun di berkas
+   komponen akan menang. Sengaja global, sebab gerak dimatikan di mana pun. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;

@@ -40,10 +40,17 @@ Primitive bersama:
   Di ponsel kolom menumpuk satu kolom. Dikunci `src/test/board-layout-css.test.ts` (tiap kolom bertetap lebar
   wajib punya papan induk flex/grid).
 - `.hn-ide-head` + `.hn-ide-toolbar` adalah baris kepala layar IDE: strip tab `flex: 0 0 auto` di
-  samping toolbar ber-**basis dinyatakan** `flex: 1 1 480px`, yang turun ke barisnya sendiri dan
-  menggulir saat ruangnya kurang. Basis `auto` membuat pecah-baris ditentukan lebar isi, dan dengan
-  itu bentuk kepala berubah hanya karena label tab aktif ditebalkan atau nama project bertambah
-  panjang (SPEC-879).
+  samping toolbar ber-**basis dinyatakan** `flex: 1 1 480px`. Basis itu, bukan lebar isi (`auto`), yang
+  memutuskan pecah-baris, sehingga bentuk kepala tak berubah hanya karena label tab aktif ditebalkan atau
+  nama project bertambah panjang (dasar SPEC-879, tetap berlaku). **Toolbar IDE tidak lagi menggulir**:
+  ini membalik aturan SPEC-879 untuk toolbar. Di `ide.css`, `.hn-ide-head > .hn-ide-toolbar` memakai
+  `flex-wrap: wrap; overflow: visible`, sehingga kontrolnya membungkus di dalam toolbar dan tak ada
+  scroller mendatar yang menyembunyikan selector cabang (Audit UI/UX 2026-10, QA P1). Selector project dan
+  ref boleh menyusut (`min-width: 0`, `flex: 1 1 140px`, maksimum 320 px dan 220 px, teks dipotong ellipsis
+  dengan `title` berisi nama lengkap). Di ponsel (≤ 767 px) project mengambil baris penuh sendiri, dan ref
+  serta tombol mengalir di bawahnya. Override ini hidup di `ide.css`, bukan `app.css`, karena `app.css`
+  masih memuat `nowrap` dan `overflow-x: auto` untuk toolbar yang sama; selektor dua kelasnya menang tanpa
+  bergantung urutan pemuatan.
 - **Pet Hanoman duduk di alur layout, tak pernah melayang** ([ADR-0206](../adr/0206-pet-footer-sidebar-default-per-tier.md), menggantikan sebagian [ADR-0144](../adr/0144-pet-diseret-sumbu-y-jalur-melebar.md)). Pet dibuat sekali di `App` dan disalurkan lewat
   `PetDockContext`; `Shell` menaruhnya di slot-nya. Desktop (≥1200): **footer sidebar** (`.hn-shell-dock`, di
   bawah daftar hub, `margin-top: auto`). Tablet dan ponsel: **lajur di bawah `<main>`** (`.hn-shell-lane`),
@@ -176,8 +183,15 @@ Sumber: `ds/components/layout.tsx`, `skeleton.tsx`, dan bagian yang diubah di `f
 **Feedback yang diubah.** `Badge` dan `StatusPill` mendapat `variant="dot"` (titik status + teks, tanpa latar;
 titik `aria-hidden`, maknanya selalu ikut sebagai teks). `ProgressBar`: `aria-*` berjalan ke elemen
 `role="progressbar"` (track), `label` string menjadi nama aksesibel bila tak ada `aria-label`, dan `valueText`
-menjadi `aria-valuetext`. `Callout`: `err` → `role="alert"`, `warn` dan `ok` → `role="status"`, `info` dan
-`brass` → `role="note"`; prop `role` eksplisit tetap menang. `LiveConnectionBadge` kini selalu merender
+menjadi `aria-valuetext`. `Callout`: `err` dan `danger` → `role="alert"`, `warn` dan `ok` → `role="status"`, `info` dan
+`brass` → `role="note"`; prop `role` eksplisit tetap menang.
+
+**Varian `danger`.** `ProgressBar` dan `Callout` menerima `tone="danger"`, nama kanonik lintas DS (sama dengan
+`Button`, `ConfirmDialog`, dan `Field`). Warnanya token `--status-err` (= `--clay-600`): isian untuk ProgressBar,
+dan teks `--clay-600` di atas `--status-err-tint` dengan batas `--clay-500` untuk Callout. `err` tetap jalan dan
+memakai nilai serta role yang sama. Warna tone kedua komponen kini hidup di `ds/components/feedback.css` lewat
+`data-tone` (isian: `.hn-progress-fill`; akar Callout: `.hn-callout`), bukan style inline. Lebar isian ProgressBar
+tetap inline karena nilainya dinamis. `LiveConnectionBadge` kini selalu merender
 wilayah `role="status"` (aria-live polite) dan hanya isinya yang berubah.
 
 **Token teks yang lolos 4,5:1 (dihitung dari hex).** Warna teks di atas tint memakai token ini; token
@@ -283,6 +297,12 @@ Hint dan error ditautkan lewat `aria-describedby`. `error` menyalakan `aria-inva
 tampil dengan `role="alert"`. `id` dan `aria-describedby` yang dipasang pemanggil langsung **menang** atas
 tautan otomatis. Elemen `<input>`/`<textarea>` native di dalam Field tak ikut ditautkan: beri `aria-label`.
 
+**Field · varian danger.** `<Field tone="danger">` menyalakan keadaan invalid **tanpa pesan**: label berwarna
+`--status-err` (aturan `.hn-field[data-tone="danger"]` di `forms.css`), dan kontrol di dalamnya menerima
+`aria-invalid` serta border `--status-err`, persis seperti `invalid` pada Input, Select, dan HnTextarea. Pesan
+tetap lewat `error` (`role="alert"`); tone hanya mengatur tampilan dan tautan. Karena tone danger memasang
+`aria-invalid`, pakai hanya bila kontrolnya memang tak valid, dan letakkan penjelasannya di `error` atau `hint`.
+
 **Input · Select · HnTextarea.** Ketiganya menerima `invalid` (border error + `aria-invalid`), `aria-invalid`,
 dan `aria-describedby`. `HnTextarea` kini menggabungkan `onFocus`/`onBlur` pemanggil, tak lagi menimpanya.
 Fokus digambar sekali oleh pembungkus (border + ring): outline bawaan `input:focus-visible` dimatikan untuk
@@ -302,6 +322,12 @@ di layar sentuh tetap 44×44 lewat `.hn-choice-target`. Pilihan tunggal sebagai 
 item yang tabbable (roving tabindex): yang terpilih, atau item aktif pertama bila belum ada pilihan. ↑/↓/←/→
 memindahkan fokus **dan** memilih, berputar di ujung dan melewati item `disabled`; Home/End ke ujung.
 Spasi/Enter memilih item yang fokus. Radio tanpa grup (`checked` + `onChange`) tetap bekerja seperti dulu.
+
+**Radio · varian danger.** `<RadioGroup tone="danger">` (atau `<Radio tone="danger">` tanpa grup) mewarnai cincin,
+titik, dan label dengan `--status-err` / `--clay-600`. Warnanya lewat `forms.css` (`data-tone="danger"` di `<label>`),
+bukan inline. Tone grup berlaku ke tiap Radio, kecuali Radio itu memberi tone sendiri. Keadaan terpilih dan
+keyboard tak berubah. Cincin dan titik kini memakai kelas `.hn-radio-ring` / `.hn-radio-dot`, dan keadaan terpilih
+dibaca dari `aria-checked` pada elemen `role="radio"`.
 
 **Modal.** Judul dirender sebagai `<h2>` dan dirujuk `aria-labelledby`. Saat terbuka, saudara dari setiap
 leluhur panel diberi `inert` ke anak `body`, sehingga fokus dan pembaca layar tak masuk ke belakang modal.

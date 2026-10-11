@@ -17,8 +17,9 @@ import {
 } from "../ds";
 import { api, ApiError, type SourceResetPending } from "../api/client";
 import { failureMessage } from "../lib/report-error";
-import { PRIORITY_LABEL } from "../lib/labels";
+import { PRIORITY_LABEL, WORKTREE_SCOPE_LABEL } from "../lib/labels";
 import { mergeSlim } from "../lib/specs-digest";
+import { WORKTREE_SCOPE_OPTS, scopeByWorktree, type WorktreeScope } from "./backlog-worktree";
 import { SpecDocsModal } from "./SpecDocsModal";
 import { SpecAttachmentsPanel, type AttachmentToast } from "./SpecAttachments";
 import { IntegrateDialog } from "./IntegrateDialog";
@@ -955,6 +956,9 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   // SPEC-178 · search + filter prioritas, semua view-local (tak diangkat ke App).
   const [q, setQ] = usePersistedState("backlog", "q", "", isStr);
   const [prioFilter, setPrioFilter] = usePersistedState("backlog", "prio", "all", isStr);
+  // ADR-0214 · "Ber-worktree": item yang pernah dibuatkan worktree (`baseSha`). Disaring di klien.
+  const [wt, setWt] = usePersistedState<WorktreeScope>("backlog", "worktree", "all",
+    oneOf<WorktreeScope>("all", "worktree"));
   // SPEC-408 · ADR-0090 · rentang tanggal. `dateField` memilih sumbunya (dibuat / dikerjakan);
   // `from`/`to` = "YYYY-MM-DD" apa adanya dari <input type="date">, inklusif, boleh sendirian.
   const [dateField, setDateField] = usePersistedState<"created" | "started">(
@@ -995,14 +999,14 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   // terbaca sebagai backlog kosong.
   const activeFilters = [
     tab !== "all", proj !== "all", q.trim() !== "", stage !== "all",
-    prioFilter !== "all", from !== "", to !== "",
+    prioFilter !== "all", from !== "", to !== "", wt !== "all",
   ].filter(Boolean).length;
   // Scroll dipulihkan sesudah potongan pertama dari server mendarat — sebelum itu tinggi
   // daftar belum final dan posisinya meleset.
   const listRef = useScrollRestore("backlog", "scroll", data.length > 0);
   React.useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
   useResetOnChange(
-    JSON.stringify([tab, proj, stage, prioFilter, dq, dateField, from, to]),
+    JSON.stringify([tab, proj, stage, prioFilter, dq, dateField, from, to, wt]),
     () => setPage(1));
   React.useEffect(() => {
     let alive = true;
@@ -1044,13 +1048,15 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     () => data.map((s) => mergeSlim(s, backlogById.get(s.id))),
     [data, backlogById],
   );
+  // Himpunan setelah filter cakupan worktree: angka segmen dan isi daftar memakai himpunan ini.
+  const scoped = React.useMemo(() => scopeByWorktree(items, wt), [items, wt]);
   // Hitungan per segmen dari himpunan yang SAMA dengan daftar: satu sumber untuk angka dan isi.
   const counts = React.useMemo(() => {
     const out = {} as Record<StageGroup, number>;
-    for (const g of STAGE_GROUPS) out[g.key] = items.filter((s) => inStageGroup(s.stage, g.key)).length;
+    for (const g of STAGE_GROUPS) out[g.key] = scoped.filter((s) => inStageGroup(s.stage, g.key)).length;
     return out;
-  }, [items]);
-  const visible = React.useMemo(() => items.filter((s) => inStageGroup(s.stage, stage)), [items, stage]);
+  }, [scoped]);
+  const visible = React.useMemo(() => scoped.filter((s) => inStageGroup(s.stage, stage)), [scoped, stage]);
   const sp = serverPage(visible.length, page, pageSize);
   const pageItems = visible.slice((sp.page - 1) * pageSize, sp.page * pageSize);
   const [detail, setDetail] = React.useState<Spec | null>(null);
@@ -1098,7 +1104,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   } : undefined;
   const resetAll = () => {
     setTab("all"); setProj("all"); setQ(""); setStage("all"); setPrioFilter("all");
-    setDateField("created"); setFrom(""); setTo(""); setPage(1);
+    setDateField("created"); setFrom(""); setTo(""); setWt("all"); setPage(1);
   };
   // Chip untuk filter yang ada di popover. Tahap tak perlu chip: ia sudah segmen yang tampak.
   const chips: FilterChip[] = [
@@ -1110,6 +1116,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
       onRemove: () => setPrioFilter("all") }] : []),
     ...(from || to ? [{ key: "date", label: `Tanggal ${dateField === "created" ? "dibuat" : "dikerjakan"}: ${from || "…"} – ${to || "…"}`,
       onRemove: () => { setFrom(""); setTo(""); } }] : []),
+    ...(wt !== "all" ? [{ key: "wt", label: WORKTREE_SCOPE_LABEL.worktree, onRemove: () => setWt("all") }] : []),
   ];
   // Isi popover "Filter": sumber, project, prioritas, dan rentang tanggal. Dibuka dari satu tombol.
   const filtersPanel = (
@@ -1123,6 +1130,11 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
       </Field>
       <Field label="Prioritas">
         <Select size="sm" aria-label="Filter prioritas" value={prioFilter} onChange={(e) => setPrioFilter(e.target.value)} options={PRIO_FILTER_OPTS} />
+      </Field>
+      {/* ADR-0214 · predikat jujur: hanya "pernah dibuatkan worktree", bukan "belum ditinjau". */}
+      <Field label="Worktree" hint="Hanya item yang pernah dibuatkan worktree oleh hanoman. Pekerjaan di luar hanoman tidak terhitung.">
+        <Select size="sm" aria-label="Filter worktree" value={wt} onChange={(e) => setWt(e.target.value as WorktreeScope)}
+          options={WORKTREE_SCOPE_OPTS.map((o) => ({ value: o.value, label: o.label }))} />
       </Field>
       {/* SPEC-408 · ADR-0090 · rentang tanggal: satu sumbu + dua batas inklusif. */}
       <Field label="Tanggal">

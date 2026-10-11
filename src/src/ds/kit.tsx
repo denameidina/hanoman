@@ -5,6 +5,8 @@ import { Icon } from "./icon";
 import { FieldLinkContext, ariaInvalid, useFieldLink, type FieldLinkValue } from "./components/forms";
 // Kelas Toast, Modal, Field, dan Pager (dan App/PetAnswer). Diimpor di sini: setelah app.css (main.tsx).
 import "../styles/app-shell.css";
+// Varian danger Field (`.hn-field[data-tone]`) hidup di forms.css bersama Radio.
+import "./components/forms.css";
 
 const modalStack: symbol[] = [];
 
@@ -245,8 +247,11 @@ export function Modal({ open, title, eyebrow, icon, onClose, footer, width = 560
 // pemilik (kontrol pertama di dalamnya); hint dan error ditautkan lewat aria-describedby; error
 // tampil dengan role="alert" dan menyalakan aria-invalid pada kontrol. Pembungkus tak lagi
 // memuat seluruh isi di dalam <label>.
-export function Field({ label, hint, error, children }: {
-  label?: React.ReactNode; hint?: React.ReactNode; error?: React.ReactNode; children?: React.ReactNode;
+// `tone="danger"` menyalakan keadaan invalid TANPA pesan: label berwarna galat dan kontrol di dalamnya
+// mendapat border `--status-err` + aria-invalid, persis seperti `invalid` (Input). Pesan tetap lewat `error`.
+export function Field({ label, hint, error, tone = "default", children }: {
+  label?: React.ReactNode; hint?: React.ReactNode; error?: React.ReactNode; tone?: "default" | "danger";
+  children?: React.ReactNode;
 }) {
   const uid = React.useId();
   const hintId = hint ? `${uid}-hint` : undefined;
@@ -265,12 +270,13 @@ export function Field({ label, hint, error, children }: {
   }, []);
   const owner = claims[0] ?? null;
   const describedBy = [errorId, hintId].filter(Boolean).join(" ") || undefined;
+  const invalid = !!error || tone === "danger";
   const link = React.useMemo<FieldLinkValue>(() => ({
-    owner, describedBy, invalid: !!error, register, unregister,
-  }), [owner, describedBy, error, register, unregister]);
+    owner, describedBy, invalid, register, unregister,
+  }), [owner, describedBy, invalid, register, unregister]);
   return (
     <FieldLinkContext.Provider value={link}>
-      <div className="hn-field">
+      <div className="hn-field" data-tone={tone}>
         {label && (
           <label htmlFor={owner?.id} className="hn-field-label">{label}</label>
         )}

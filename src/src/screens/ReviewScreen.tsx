@@ -40,6 +40,8 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
   const [review, setReview] = React.useState<SpecReview | null>(null);
   const [state, setState] = React.useState<"loading" | "ready" | "error" | "empty">("loading");
   const [errMsg, setErrMsg] = React.useState("");
+  // ADR-0213 · alasan keadaan kosong dari server (`no-worktree` | `no-commit`). Undefined = jalur 409 lama (sesi).
+  const [emptyReason, setEmptyReason] = React.useState<SpecReview["reason"]>();
   const [selected, setSelected] = React.useState("");
   const [file, setFile] = React.useState<ReviewFile | null>(null);
   // Gagal memuat berkas ≠ "Memuat file…" selamanya: keadaannya dipisah dan bisa dicoba ulang.
@@ -60,14 +62,16 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
     setState("loading");
     fetchReview(specId).then((r) => {
       if (!alive) return;
-      setReview(r); setState("ready");
+      // ADR-0213 · `empty` = belum ada worktree maupun commit. Itu keadaan, bukan galat: 200, bukan 409.
+      if (r.empty) { setReview(null); setEmptyReason(r.reason); setState("empty"); return; }
+      setReview(r); setEmptyReason(undefined); setState("ready");
       setSelected(r.changed[0]?.path ?? r.files[0] ?? "");
     }).catch((e) => {
       if (!alive) return;
-      // 409 (worktree/repoDir) → empty jelas, bukan error merah. Pesan teknisnya tak ditampilkan:
-      // ia hanya di atribut data-detail dan di console untuk penelusuran.
+      // 409 (sesi project yang worktree-nya lenyap, dan galat repoDir) → empty jelas, bukan error merah.
+      // Pesan teknisnya tak ditampilkan: ia hanya di atribut data-detail dan di console untuk penelusuran.
       if (e?.status === 409) {
-        setState("empty"); setErrMsg(String(e?.message ?? ""));
+        setEmptyReason(undefined); setState("empty"); setErrMsg(String(e?.message ?? ""));
         console.debug("review: belum ada worktree", e?.message);
       } else setState("error");
     });
@@ -183,10 +187,12 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
 
   if (state === "loading") return <StateBlock kind="loading" title="Memuat review…" hint={specId} />;
   if (state === "error") return <StateBlock kind="error" title="Gagal memuat review" hint={specId} action={() => setTries((n) => n + 1)} />;
-  if (state === "empty") return <div className="hn-review-empty" data-review-state="empty" data-status="409"
+  if (state === "empty") return <div className="hn-review-empty" data-review-state="empty" data-reason={emptyReason ?? "409"} data-status={emptyReason ? "200" : "409"}
     data-detail={errMsg || undefined}>
     <StateBlock kind="empty" icon="git-branch" title="Belum ada perubahan untuk ditinjau"
-      hint="Sesi belum membuat worktree. Jalankan atau lanjutkan sesinya dulu, lalu muat ulang." />
+      hint={emptyReason === "no-commit"
+        ? "Worktree sudah dilepas dan belum ada commit untuk ditinjau. Jalankan sesinya lagi bila perlu."
+        : "Sesi belum membuat worktree. Jalankan atau lanjutkan sesinya dulu, lalu muat ulang."} />
     <Inline gap={2} justify="center">
       {kind === "spec" && goButton(goBacklog, "Buka di Backlog", "list-checks", "primary")}
       {goButton(goTerminal, "Buka di Terminal", "terminal", kind === "session" ? "primary" : "secondary")}

@@ -171,6 +171,10 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     // juga — tapi keputusannya bergantung BODY, dan fungsi ini sengaja tak pernah melihat body
     // (kemurnian (method, path) itulah yang membuat uji kontrak katalog MCP mungkin). Gerbang
     // stage-nya hidup di handler `PATCH /specs/:id` di routes/specs.ts.
+    // ADR-0213 · hapus worktree satu item (tombol Hapus worktree di Review) = aksi `worktrees/delete`
+    // IDE, jadi `ide:git` — BUKAN `backlog:write` yang akan diturunkan `rw()`. Dicocokkan ke method DAN
+    // panjang segmen, bukan prefix (kelas bug SPEC-405).
+    if (method === "DELETE" && seg.length === 3 && seg[2] === "worktree") return "ide:git";
     if (method === "DELETE" && seg.length === 2) return "backlog:lifecycle";
     if (seg[2] === "integrate") return "backlog:lifecycle";
     return rw("backlog");

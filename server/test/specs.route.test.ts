@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { zSpecReview } from "@hanoman/shared";
 import { fileURLToPath } from "node:url";
 import { buildApp } from "../src/app";
 import { killAll, getSession } from "../src/services/pty";
@@ -20,6 +23,7 @@ const FAKE_CLAUDE = fileURLToPath(new URL("./fixtures/fake-claude.sh", import.me
 const app = buildApp({ requireAuth: false });
 const brief = { context: "c", outcome: "o", constraints: "", priority: "sedang" as const };
 let artifactRepo: string;
+let delRepoDir: string;
 beforeAll(async () => {
   await resetDb();
   // repo nyata: branch `main` + `dev`. Daftar branch-nya adalah whitelist validasi (SPEC-143).
@@ -40,6 +44,8 @@ beforeAll(async () => {
   await makeProject({ id: "pr", repoDir: wtRepo });
   await makeSpec({ id: "SPEC-171", projectId: "pr", stage: "executing", branchFrom: null });
   await makeSpec({ id: "SPEC-172", projectId: "pr", stage: "executing" });
+  // ADR-0213 · sudah dimulai (baseSha tercatat) tetapi worktree lenyap dan tanpa commit.
+  await makeSpec({ id: "SPEC-173", projectId: "pr", stage: "executing", baseSha: "deadbeef" });
   // SPEC-171 · item selesai: worktree lenyap, review jatuh ke commit history `(spec-N)`.
   const histRepo = makeRepoWithSpecCommits(
     { "keep.txt": "satu\n" },
@@ -55,6 +61,13 @@ beforeAll(async () => {
   const shaHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: shaRepo, encoding: "utf8" }).trim();
   await makeProject({ id: "psha", repoDir: shaRepo });
   await makeSpec({ id: "SPEC-960", projectId: "psha", stage: "done", baseSha: shaBase, headSha: shaHead });
+  // ADR-0213 · hapus worktree dari Review: satu worktree hidup, dan project tanpa repoDir.
+  const delRepo = makeRepoWithWorktree("SPEC-DEL", { "keep.txt": "a\n" }, { "keep.txt": "a\nb\n" });
+  await makeProject({ id: "pdel", repoDir: delRepo });
+  await makeSpec({ id: "SPEC-DEL", projectId: "pdel", stage: "executing" });
+  await makeProject({ id: "pnorepo" });
+  await makeSpec({ id: "SPEC-NR", projectId: "pnorepo", stage: "executing" });
+  delRepoDir = delRepo;
   // SPEC-186 · edit konten selagi belum dimulai.
   await makeSpec({ id: "SPEC-186A", projectId: "p1", stage: "brainstorming",
     priority: "sedang", objective: "lama", payload: { context: "c0", outcome: "o0", constraints: "", priority: "sedang" } });
@@ -342,9 +355,20 @@ describe("GET /specs/:id/review", () => {
     expect(b.files).toContain("new.txt");
     expect(b.changed.map((c: any) => c.path).sort()).toEqual(["keep.txt", "new.txt"]);
   });
-  it("worktree tak ada & tanpa commit → 409", async () => {
+  // ADR-0213 · tanpa worktree maupun commit = keadaan (200, `empty`), bukan galat 409.
+  it("belum pernah dimulai (tanpa baseSha) → 200 empty reason no-worktree", async () => {
     const res = await app.inject({ url: "/api/specs/SPEC-172/review" });
-    expect(res.statusCode).toBe(409);
+    expect(res.statusCode).toBe(200);
+    expect(zSpecReview.parse(res.json())).toEqual({ base: "", files: [], changed: [], empty: true, reason: "no-worktree" });
+  });
+  it("sudah dimulai tapi worktree lenyap & tanpa commit → 200 empty reason no-commit", async () => {
+    const res = await app.inject({ url: "/api/specs/SPEC-173/review" });
+    expect(res.statusCode).toBe(200);
+    expect(zSpecReview.parse(res.json())).toEqual({ base: "", files: [], changed: [], empty: true, reason: "no-commit" });
+  });
+  it("balasan dengan isi tetap lolos zSpecReview tanpa field `empty`", async () => {
+    const res = await app.inject({ url: "/api/specs/SPEC-171/review" });
+    expect(zSpecReview.parse(res.json()).empty).toBeUndefined();
   });
   it("item selesai tanpa worktree → review dari commit history (200)", async () => {
     const res = await app.inject({ url: "/api/specs/SPEC-901/review" });
@@ -381,6 +405,28 @@ describe("GET /specs/:id/review", () => {
   it("path di luar daftar → 404", async () => {
     const res = await app.inject({ url: "/api/specs/SPEC-171/review/does/not/exist.ts" });
     expect(res.statusCode).toBe(404);
+  });
+});
+
+// ADR-0213 · hapus worktree satu backlog item dari layar Review. Service & capability sama dengan
+// `POST /projects/:id/worktrees/delete`; cabang dan commit tetap.
+describe("DELETE /specs/:id/worktree", () => {
+  it("menghapus worktree hidup: 200 ok, direktorinya lenyap", async () => {
+    const res = await app.inject({ method: "DELETE", url: "/api/specs/SPEC-DEL/worktree" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ name: "spec-del", ok: true });
+    expect(existsSync(join(delRepoDir, ".worktrees", "spec-del"))).toBe(false);
+  });
+  it("worktree sudah tak ada → 200 dengan ok:false (galat hidup di baris, bukan status HTTP)", async () => {
+    const res = await app.inject({ method: "DELETE", url: "/api/specs/SPEC-DEL/worktree" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: false, error: "worktree tak ditemukan" });
+  });
+  it("spec tak ada → 404", async () => {
+    expect((await app.inject({ method: "DELETE", url: "/api/specs/SPEC-999/worktree" })).statusCode).toBe(404);
+  });
+  it("project tanpa repoDir → 409", async () => {
+    expect((await app.inject({ method: "DELETE", url: "/api/specs/SPEC-NR/worktree" })).statusCode).toBe(409);
   });
 });
 

@@ -1456,8 +1456,8 @@ function AppInner() {
     } catch { showToast("Gagal mengembalikan stage " + spec.id, "err", "x-circle"); return undefined; }
   }
 
-  // Audit UI/UX 3L′ · aksi keputusan di layar Review memakai jalur yang SUDAH ada (integrateSpec,
-  // deleteWorktrees) — tanpa endpoint baru. Galat dilempar agar ditampilkan di bar keputusan.
+  // Audit UI/UX 3L′ · aksi keputusan di layar Review memakai jalur yang sudah ada (integrateSpec) dan
+  // endpoint item (ADR-0213, `DELETE /specs/:id/worktree`). Galat dilempar agar ditampilkan di bar keputusan.
   async function integrateReviewSpec(spec: SpecSlim) {
     const { defaultBranch } = await api.listBranches(spec.projectId);
     const base = spec.branchFrom ?? defaultBranch;
@@ -1465,10 +1465,8 @@ function AppInner() {
     await integrateSpec(spec, "merge", "local:" + base);
   }
   async function discardReviewWorktree(spec: SpecSlim) {
-    const name = spec.id.toLowerCase().replace(/[^a-z0-9_-]/g, "_");
-    const { results } = await api.deleteWorktrees(spec.projectId, { names: [name] });
-    const r = results[0];
-    if (!r?.ok) throw new Error(r?.error ?? "worktree tidak ditemukan");
+    const r = await api.deleteSpecWorktree(spec.id);
+    if (!r.ok) throw new Error(r.error ?? "worktree tidak ditemukan");
     showToast(spec.id + " · worktree dihapus", "ok", "trash-2");
   }
 
@@ -1571,7 +1569,7 @@ function AppInner() {
   if (!auth.user) return <AuthScreen needsSetup={auth.needsSetup}
     setupTokenRequired={auth.setupTokenRequired ?? false}
     setupTokenPath={auth.setupTokenPath}
-    setupStep={auth.needsSetup && setupStatus?.needed === false ? 2 : undefined}
+    setupStep={auth.needsSetup && setupDone ? 2 : undefined}
     onDone={(u) => setAuth({ needsSetup: false, user: u })} />;
   // SPEC-617 · ADR-0110 · akun klien mendarat di permukaannya sendiri, bukan dashboard operator.
   // Percabangan di SINI (bukan di dalam Shell) supaya tak satu pun state/efek dashboard operator

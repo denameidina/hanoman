@@ -7,7 +7,8 @@ import { paths, type Paginated, type ProjectView, type Spec, type SpecListItem, 
   type CreateMemberInput, type PatchMemberInput,
   type RemoteControlView, type RemoteControlPut,
   type LogEntryView, type LogRetention,
-  type SkillEntry, type SkillLibraryView, type SkillTreeView, type SkillFileView } from "@hanoman/shared";
+  type SkillEntry, type SkillLibraryView, type SkillTreeView, type SkillFileView,
+  type SpecReview, type ReviewFile, type ChangedFile } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -61,13 +62,9 @@ export type SourceResetPending = {
 // SPEC-170 · dokumen backlog item
 export type DocKind = "audit" | "spec" | "plan" | "objective" | "brainstorm" | "other";
 export type SpecDoc = { kind: DocKind; path: string; name: string };
-// SPEC-171 · review worktree backlog item.
-export type ChangedFile = { path: string; add: number; del: number; status: "A" | "M" | "D"; binary: boolean };
-export type SpecReview = { base: string; files: string[]; changed: ChangedFile[] };
-export type ReviewFile = {
-  path: string; status: "A" | "M" | "D" | null; binary: boolean;
-  truncated: boolean; diff: string | null; content: string | null;
-};
+// SPEC-171 · review worktree backlog item. Kontraknya di shared (ADR-0213); `empty`/`reason` ada
+// di SpecReview bila belum ada worktree maupun commit.
+export type { ChangedFile, SpecReview, ReviewFile } from "@hanoman/shared";
 // SPEC-182 · IDE Visual
 export type RepoFile = { path: string; content: string | null; binary: boolean; truncated: boolean };
 // Pohon berkas Explorer. `dirs` = direktori yang isinya BELUM dimuat (direktori terabaikan yang
@@ -321,6 +318,9 @@ export function createApi(o: { base?: string } = {}) {
   // SPEC-171 · all files + file changed dari worktree backlog item.
   specReview: (id: string) => j<SpecReview>(paths.specReview(id)),
   specReviewFile: (id: string, path: string) => j<ReviewFile>(paths.specReviewFile(id, path)),
+  // ADR-0213 · hapus worktree satu item (cabang & commit tetap). Selalu 200 bila spec ada; galat
+  // hidup di `ok`/`error`, cermin `deleteWorktrees`.
+  deleteSpecWorktree: (id: string) => j<WorktreeDeleteResult>(paths.specWorktree(id), { method: "DELETE" }),
   getSettings: () => j<Setting>(paths.settings),
   putSettings: (b: unknown) => j<Setting>(paths.settings, { method: "PUT", ...body(b) }),
   getTelegramStatus: () => j<TelegramGatewayStatus>(paths.telegramStatus),

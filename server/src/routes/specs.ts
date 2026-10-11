@@ -1,8 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
-import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, grantsCapability, type Stage } from "@hanoman/shared";
+import { basename } from "node:path";
+import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, grantsCapability, type SpecReview, type Stage } from "@hanoman/shared";
 import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { integrate, sourceBranch } from "../services/integrate";
+import { deleteProjectWorktrees } from "../services/worktree-delete";
 import { listSessions } from "../services/pty";
 import { createAgentSession } from "../services/session-launch-gate";
 import { conflictSessionDefaults } from "../services/settings";
@@ -548,10 +550,10 @@ export default async function (app: FastifyInstance) {
   // Worktree hidup <repoDir>/.worktrees/<specid> → diff atas working tree. Worktree lenyap
   // (item selesai) → diff `baseSha..headSha` tersimpan (SPEC-176, ADR-0030), atau fallback
   // range commit `oldest(spec-N)^..newest` di history untuk spec lama tanpa SHA. Tak ada
-  // sumber apa pun → 409. Gerbang path ada di reviewFile*.
+  // sumber apa pun → null: keadaan kosong (ADR-0213), bukan 409. Gerbang path ada di reviewFile*.
   const specWithProject = (id: string) =>
     prisma.spec.findUnique({ where: { id }, include: { project: true } });
-  // wt hidup > SHA tersimpan (bila objeknya masih terjangkau) > grep pesan commit. Null = 409.
+  // wt hidup > SHA tersimpan (bila objeknya masih terjangkau) > grep pesan commit. Null = kosong.
   const resolveReview = async (
     repoDir: string, spec: { id: string; baseSha: string | null; headSha: string | null },
   ) => {
@@ -570,9 +572,32 @@ export default async function (app: FastifyInstance) {
     const repoDir = await resolveRepoDir(spec.projectId);
     if (!repoDir) return reply.code(409).send({ error: "project belum punya repoDir" });
     const r = await resolveReview(repoDir, spec);
-    if (!r) return reply.code(409).send({ error: "belum ada worktree atau commit untuk di-review — jalankan/lanjutkan sesi backlog dulu" });
+    // ADR-0213 · tanpa worktree maupun commit = KEADAAN, bukan galat: 200 dengan `empty` + `reason`.
+    // `base`/`files`/`changed` ikut kosong supaya klien lama (yang hanya mengenal bentuk SpecReview)
+    // menampilkan daftar kosong, tak crash. `no-worktree`: belum pernah dimulai (tanpa baseSha).
+    // `no-commit`: sudah dimulai, worktree-nya lenyap, dan tak ada commit untuk ditinjau.
+    if (!r) {
+      const empty: SpecReview = { base: "", files: [], changed: [], empty: true,
+        reason: spec.baseSha ? "no-commit" : "no-worktree" };
+      return empty;
+    }
     return r.wt ? specReview(repoDir, id, spec.baseSha, spec.branchFrom)
       : specReviewRange(repoDir, r.base, r.head);
+  });
+  // ADR-0213 · hapus worktree satu backlog item (tombol "Hapus worktree" di Review). Service dan
+  // capability SAMA dengan `POST /projects/:id/worktrees/delete` (`ide:git`, lihat
+  // agent-capabilities). Cabang dan commit tetap: tak ada penghapusan branch di sini. Selalu 200 bila
+  // spec ada — galat hidup di `ok`/`error` (cermin worktrees/delete); 404 hanya bila spec-nya tak ada.
+  app.delete("/specs/:id/worktree", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const spec = await prisma.spec.findUnique({ where: { id }, select: { id: true, projectId: true } });
+    if (!spec) return reply.code(404).send({ error: "not found" });
+    // SPEC-217 · path efektif, sama dengan GET review: worktree hidup di repoDir yang sama.
+    const repoDir = await resolveRepoDir(spec.projectId);
+    if (!repoDir) return reply.code(409).send({ error: "project belum punya repoDir" });
+    const { results } = await deleteProjectWorktrees(spec.projectId, repoDir,
+      [basename(worktreeDir(repoDir, id))], { withBranch: false });
+    return results[0]!;
   });
   app.get("/specs/:id/review/*", async (req, reply) => {
     const { id } = req.params as { id: string };

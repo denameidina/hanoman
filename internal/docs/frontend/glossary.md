@@ -27,6 +27,7 @@ Dokumen ini adalah kontrak untuk teks yang tampil ke operator. Kode penegaknya: 
 | Laporan dari klien (tiket) | **Keluhan** (tab "Keluhan saya", tombol "Lapor masalah") | Laporan & keluhan, Help desk, Tiket, Bug | Di layar Klien dan Help Center. Kategori "Ada masalah" untuk `bug`. |
 | Obrolan klien | **Tanya & ide** (tab di Klien) | Obrolan, Chat | Sesi chat milik project, bukan milik satu keluhan. |
 | Pemilik konflik sinkron | **server pusat** | hub, Instance, Pusat | Diputuskan di Fase 3L. Dipakai di copy konflik dan sinkronisasi. |
+| Item yang pernah punya worktree | **Ber-worktree** (filter Backlog) | Perlu ditinjau, Belum ditinjau | Predikat `baseSha` terisi: hanoman pernah membuatkan worktree. Bukan status tinjau; status itu tak tercatat di daftar (ADR-0214). |
 
 ## Aturan voice
 

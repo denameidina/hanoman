@@ -41,7 +41,8 @@ describe("kontrak capability katalog MCP", () => {
       const startsWork =
         t.samplePath === "/terminal/sessions" && t.sampleMethod === "POST" ? "sessions:spawn"
         : /^\/vps\/[^/]+\/(console|session|audit|probe|test|harden|provision|remediate)/.test(t.samplePath) ? "vps:exec"
-        : /\/git(\/|$)/.test(t.samplePath) || /branches\/delete|worktrees\/delete/.test(t.samplePath) ? "ide:git"
+        : /\/git(\/|$)/.test(t.samplePath) || /branches\/delete|worktrees\/delete/.test(t.samplePath)
+          || /^\/specs\/[^/]+\/worktree$/.test(t.samplePath) ? "ide:git"   // ADR-0213 · hapus worktree backlog
         : null;
       if (!startsWork) continue;
       expect(t.capability, t.name).toBe(startsWork);

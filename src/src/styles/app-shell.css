@@ -69,8 +69,8 @@
 }
 
 /* ---------- Modal (ds/kit.tsx) ----------
-   Lebar panel tetap inline (prop `width`). Mobile di app.css memakai !important untuk lebar,
-   tinggi, dan padding, jadi kelas ini tak mengubah perilaku di sana. */
+   Lebar panel tetap inline (prop `width`). Override mobile di app.css (selektor `div.`, tanpa
+   deklarasi penting, kecuali lebar: inline hanya bisa dikalahkan deklarasi penting). */
 .hn-modal-scrim {
   position: fixed; inset: 0; z-index: 150; display: flex; align-items: center; justify-content: center;
   background: color-mix(in srgb, var(--ink-900) 42%, transparent);

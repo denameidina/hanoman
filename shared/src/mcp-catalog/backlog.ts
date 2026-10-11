@@ -139,8 +139,8 @@ const CORE: readonly McpToolDef[] = [
 ];
 
 // ADR-0155 · sisa permukaan domain `backlog`: sisa permukaan yang terjangkau agent token, termasuk
-// TIGA tool bermode `danger`. Dua di antaranya (`delete`, `integrate`) menuntut capability
-// `backlog:lifecycle`; yang ketiga (`stage_set`) TIDAK — lihat komentar di entrinya.
+// EMPAT tool bermode `danger`. Dua (`delete`, `integrate`) menuntut capability `backlog:lifecycle`;
+// `stage_set` tidak — lihat komentar di entrinya; `worktree_delete` menuntut `ide:git` (ADR-0213).
 const LIFECYCLE_AND_MORE: readonly McpToolDef[] = [
   {
     name: "hanoman_backlog_batch_create",
@@ -266,7 +266,7 @@ const LIFECYCLE_AND_MORE: readonly McpToolDef[] = [
     name: "hanoman_backlog_review",
     title: "Review diff backlog",
     description:
-      "Diff pekerjaan sebuah backlog item. Tanpa `path` ia mengembalikan daftar berkas yang berubah; mengisi `path` mengembalikan diff satu berkas. Menjawab 409 bila belum ada worktree maupun commit — itu berarti sesinya belum pernah jalan, bukan galat.",
+      "Diff pekerjaan sebuah backlog item. Tanpa `path` ia mengembalikan daftar berkas yang berubah; mengisi `path` mengembalikan diff satu berkas. Bila belum ada worktree maupun commit, balasannya 200 dengan `empty: true` dan `reason`: `no-worktree` (sesinya belum pernah jalan) atau `no-commit` (worktree sudah lenyap tanpa commit). Itu keadaan, bukan galat.",
     inputSchema: obj({
       properties: {
         spec: str(ID_HINT),
@@ -339,6 +339,20 @@ const LIFECYCLE_AND_MORE: readonly McpToolDef[] = [
     mode: "danger", capability: "backlog:lifecycle",
     samplePath: "/specs/SPEC-1", sampleMethod: "DELETE",
     build: (a) => ({ method: "DELETE", path: `/specs/${enc(String(a.spec))}` }),
+    shape: (raw) => raw,
+  },
+  // ADR-0213 · hapus worktree satu item (tombol Hapus worktree di layar Review). Capability-nya
+  // `ide:git` — sama dengan hanoman_ide_worktree_delete, karena yang dihapus adalah direktori kerja
+  // (dan sesi di dalamnya), bukan backlog-nya. Cabang dan commit tetap ada.
+  {
+    name: "hanoman_backlog_worktree_delete",
+    title: "Hapus worktree backlog (BERBAHAYA)",
+    description:
+      "BERBAHAYA — menghapus worktree satu backlog item. Perubahan yang belum di-commit di dalamnya HILANG, dan sesi yang sedang berjalan di worktree itu ditutup. Branch dan commit item tetap ada. Menjawab 200 dengan `ok` dan `error`; `ok: false` bila worktree tak ditemukan atau tak bisa dihapus. Menuntut `ide:git` (sama dengan hanoman_ide_worktree_delete); `backlog:write` tidak cukup. Hanya muncul saat tingkat `--danger` menyala.",
+    inputSchema: obj({ properties: { spec: str(ID_HINT) }, required: ["spec"] }),
+    mode: "danger", capability: "ide:git",
+    samplePath: "/specs/SPEC-1/worktree", sampleMethod: "DELETE",
+    build: (a) => ({ method: "DELETE", path: `/specs/${enc(String(a.spec))}/worktree` }),
     shape: (raw) => raw,
   },
 ];

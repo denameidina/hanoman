@@ -39,6 +39,8 @@ export const paths = {
   specAttachment: (id: string, attId: string) => `${API}/specs/${id}/attachments/${attId}`,
   specReview: (id: string) => `${API}/specs/${id}/review`,
   specReviewFile: (id: string, path: string) => `${API}/specs/${id}/review/${path}`,
+  // ADR-0213 · hapus worktree satu backlog item (cabang & commit tetap).
+  specWorktree: (id: string) => `${API}/specs/${id}/worktree`,
   settings: `${API}/settings`,
   notifications: `${API}/notifications`,
   // ADR-0204 · tandai satu notifikasi terbaca (POST, idempoten).

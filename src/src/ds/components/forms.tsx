@@ -274,21 +274,27 @@ type RadioGroupValue = {
   value: string | null | undefined;
   tabTarget: string | null;
   disabled: boolean;
+  tone: RadioTone;
   onSelect: (v: string, e: React.MouseEvent | React.KeyboardEvent) => void;
 };
+// `danger` (Audit UI/UX 2026-10, varian danger): cincin, titik, dan label memakai --status-err / --clay-600
+// lewat forms.css (`data-tone` di <label>). Di dalam RadioGroup, tone grup berlaku untuk tiap Radio kecuali
+// Radio itu memberi tone sendiri.
+export type RadioTone = "default" | "danger";
 const RadioGroupContext = React.createContext<RadioGroupValue | null>(null);
 
 // Radio tanpa grup tetap memakai `checked` seperti dulu. Di dalam <RadioGroup> (butuh `value`),
 // keadaan dipegang grup dan tabindex-nya mengikuti roving tabindex grup.
 type RadioProps = { checked?: boolean; value?: string; onChange?: (e: React.MouseEvent | React.KeyboardEvent) => void;
-  label?: React.ReactNode; description?: React.ReactNode; disabled?: boolean;
+  label?: React.ReactNode; description?: React.ReactNode; disabled?: boolean; tone?: RadioTone;
   style?: React.CSSProperties } & Record<string, any>;
-export function Radio({ checked: checkedProp = false, value, onChange, label, description, disabled: disabledProp = false, className = "", style = {}, ...rest }: RadioProps) {
+export function Radio({ checked: checkedProp = false, value, onChange, label, description, disabled: disabledProp = false, tone: toneProp, className = "", style = {}, ...rest }: RadioProps) {
   const textId = React.useId();
   const group = React.useContext(RadioGroupContext);
   const inGroup = !!group && value !== undefined;
   const disabled = disabledProp || !!group?.disabled;
   const checked = inGroup ? group.value === value : checkedProp;
+  const tone: RadioTone = toneProp ?? group?.tone ?? "default";
   const tabIndex = disabled ? -1 : group && value !== undefined && group.tabTarget !== value ? -1 : 0;
   const { "aria-label": ariaLabel, "aria-labelledby": ariaLabelledBy, ...outerProps } = rest;
   const pick = (e: React.MouseEvent | React.KeyboardEvent) => {
@@ -297,7 +303,7 @@ export function Radio({ checked: checkedProp = false, value, onChange, label, de
     onChange && onChange(e);
   };
   return React.createElement("label", _extends({
-    className: `hn-choice-target ${className}`.trim(),
+    className: `hn-choice-target ${className}`.trim(), "data-tone": tone,
     style: { display: "inline-flex", alignItems: description ? "flex-start" : "center", gap: 10,
       cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.55 : 1, ...style },
   }, outerProps),
@@ -315,15 +321,10 @@ export function Radio({ checked: checkedProp = false, value, onChange, label, de
       // Area sentuh 24×24 (WCAG 2.5.8); lingkaran yang tampak tetap 18px di tengahnya.
       style: { display: "inline-grid", placeItems: "center", width: 24, height: 24,
         marginTop: description ? -1 : 0, flex: "0 0 auto" },
-    }, React.createElement("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18,
-      borderRadius: "var(--radius-pill)", background: "var(--surface-card)",
-      border: `1.5px solid ${checked ? "var(--accent)" : "var(--border-strong)"}`,
-      boxShadow: checked ? "none" : "var(--shadow-inset)", transition: "var(--transition-fast)" } },
-    checked && React.createElement("span", { style: { width: 8, height: 8,
-      borderRadius: "var(--radius-pill)", background: "var(--accent)" } }))),
+    }, React.createElement("span", { className: "hn-radio-ring" },
+    checked && React.createElement("span", { className: "hn-radio-dot" }))),
     (label || description) && React.createElement("span", { id: textId, onClick: pick, style: { userSelect: "none" } },
-      label && React.createElement("span", { style: { display: "block", fontSize: "var(--text-md)",
-        color: "var(--text-strong)", lineHeight: 1.4 } }, label),
+      label && React.createElement("span", { className: "hn-radio-label" }, label),
       description && React.createElement("span", { style: { display: "block", fontSize: "var(--text-sm)",
         color: "var(--text-muted)", lineHeight: 1.45 } }, description)));
 }
@@ -343,6 +344,7 @@ type RadioGroupProps = {
   label?: React.ReactNode;
   direction?: "column" | "row";
   disabled?: boolean;
+  tone?: RadioTone;
   children?: React.ReactNode;
   style?: React.CSSProperties;
 } & Record<string, any>;
@@ -353,7 +355,7 @@ function enabledRadios(root: HTMLElement | null): HTMLElement[] {
     .filter((el) => el.getAttribute("aria-disabled") !== "true");
 }
 
-export function RadioGroup({ value, onChange, label, direction = "column", disabled = false, children, style = {}, ...rest }: RadioGroupProps) {
+export function RadioGroup({ value, onChange, label, direction = "column", disabled = false, tone = "default", children, style = {}, ...rest }: RadioGroupProps) {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const labelId = React.useId();
   const [tabTarget, setTabTarget] = React.useState<string | null>(null);
@@ -365,7 +367,7 @@ export function RadioGroup({ value, onChange, label, direction = "column", disab
     setTabTarget((prev) => (prev === next ? prev : next));
   });
   const onSelect = React.useCallback((v: string, e: React.MouseEvent | React.KeyboardEvent) => { onChange?.(v, e); }, [onChange]);
-  const ctx = React.useMemo<RadioGroupValue>(() => ({ value, tabTarget, disabled, onSelect }), [value, tabTarget, disabled, onSelect]);
+  const ctx = React.useMemo<RadioGroupValue>(() => ({ value, tabTarget, disabled, tone, onSelect }), [value, tabTarget, disabled, tone, onSelect]);
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"].includes(e.key)) return;
     const items = enabledRadios(rootRef.current);

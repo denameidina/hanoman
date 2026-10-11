@@ -111,11 +111,11 @@ describe("SPEC-763 · baris pemilih tak diperas di bawah kontennya", () => {
     expect(row).toMatch(/<span className="hn-dense-row hn-picker-row/);
   });
 
-  it("memberi judul barisnya sendiri di mobile lewat aturan yang menang atas nowrap inline", () => {
+  it("memberi judul barisnya sendiri di mobile lewat aturan yang lebih spesifik dari nowrap kelas terminal", () => {
     expect(mobile).toMatch(/\.hn-picker-row\s*\{\s*flex-wrap:\s*wrap/);
     const rule = mobile.slice(mobile.indexOf(".hn-picker-row > .hn-picker-title"));
-    expect(rule).toMatch(/flex:\s*1 1 100%\s*!important/);
-    expect(rule).toMatch(/white-space:\s*normal\s*!important/);
+    expect(rule).toMatch(/flex:\s*1 1 100%/);
+    expect(rule).toMatch(/white-space:\s*normal/);
   });
 });
 

@@ -37,3 +37,26 @@
 .hn-btn-danger-outline:focus-visible {
   outline: 2px solid var(--border-focus); outline-offset: 2px;
 }
+
+/* Radio (forms.tsx). Cincin dan titik lewat kelas, bukan style inline, supaya varian danger bisa menimpanya.
+   Keadaan terpilih dibaca dari aria-checked di elemen role="radio" (induk cincin), tak perlu atribut baru. */
+.hn-radio-ring {
+  display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+  border-radius: var(--radius-pill); background: var(--surface-card);
+  border: 1.5px solid var(--border-strong); box-shadow: var(--shadow-inset);
+  transition: var(--transition-fast);
+}
+.hn-choice-control[aria-checked="true"] > .hn-radio-ring { border-color: var(--accent); box-shadow: none; }
+.hn-radio-dot { width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--accent); }
+.hn-radio-label { display: block; font-size: var(--text-md); color: var(--text-strong); line-height: 1.4; }
+
+/* Varian danger Radio/RadioGroup (`data-tone="danger"` di <label>): warna galat, tanpa mengubah keadaan. */
+.hn-choice-target[data-tone="danger"] .hn-radio-ring,
+.hn-choice-target[data-tone="danger"] .hn-choice-control[aria-checked="true"] > .hn-radio-ring { border-color: var(--status-err); }
+.hn-choice-target[data-tone="danger"] .hn-radio-dot { background: var(--status-err); }
+.hn-choice-target[data-tone="danger"] .hn-radio-label { color: var(--clay-600); }
+
+/* Varian danger Field (kit.tsx, `data-tone="danger"` di .hn-field): label memakai warna galat yang sama
+   dengan border kontrol invalid (Input/Select/HnTextarea dengan invalid: --status-err). Kontrolnya sendiri
+   ditandai lewat tautan Field (aria-invalid), jadi tampilannya identik dengan keadaan invalid. */
+.hn-field[data-tone="danger"] > .hn-field-label { color: var(--status-err); }

@@ -3,6 +3,7 @@
 // Token fill (--amber-600, --brass-600, --clay-600 …) hanya untuk titik, batas, dan isian progres.
 import React from "react";
 import { Icon } from "../icon";
+import "./feedback.css";
 const _extends = Object.assign;
 
 type Tone = "neutral" | "brass" | "info" | "ok" | "warn" | "err";
@@ -52,27 +53,29 @@ export function Badge({ children, tone = "neutral", icon, variant = "soft", size
     children);
 }
 
-type CalloutTone = "info" | "ok" | "warn" | "err" | "brass";
+// `danger` = nama kanonik lintas DS (Button, ConfirmDialog, Field) untuk `err`: warna sama, role sama.
+type CalloutTone = "info" | "ok" | "warn" | "err" | "danger" | "brass";
 type CalloutProps = { children?: React.ReactNode; tone?: CalloutTone;
   title?: React.ReactNode; icon?: string; action?: React.ReactNode; role?: string;
   style?: React.CSSProperties } & Record<string, any>;
-// `role` mengikuti keparahan: err = alert (diumumkan segera), warn/ok = status (sopan), info/brass = note.
-// Pemanggil boleh menimpa lewat prop `role`.
-const CALLOUT_TONES: Record<CalloutTone, { fg: string; bg: string; bd: string; icon: string; role: string }> = {
-  info: { fg: "var(--wind-700)", bg: "var(--wind-050)", bd: "var(--wind-500)", icon: "info", role: "note" },
-  ok: { fg: "var(--leaf-600)", bg: "var(--leaf-100)", bd: "var(--leaf-500)", icon: "check-circle-2", role: "status" },
-  warn: { fg: "var(--status-warn)", bg: "var(--status-warn-tint)", bd: "var(--amber-500)", icon: "alert-triangle", role: "status" },
-  err: { fg: "var(--clay-600)", bg: "var(--status-err-tint)", bd: "var(--clay-500)", icon: "octagon-alert", role: "alert" },
-  brass: { fg: "var(--brass-700)", bg: "var(--brass-050)", bd: "var(--brass-400)", icon: "sparkles", role: "note" },
+// `role` mengikuti keparahan: err/danger = alert (diumumkan segera), warn/ok = status (sopan), info/brass = note.
+// Pemanggil boleh menimpa lewat prop `role`. Warna tiap tone ada di feedback.css (`data-tone`).
+const CALLOUT_TONES: Record<CalloutTone, { icon: string; role: string }> = {
+  info: { icon: "info", role: "note" },
+  ok: { icon: "check-circle-2", role: "status" },
+  warn: { icon: "alert-triangle", role: "status" },
+  err: { icon: "octagon-alert", role: "alert" },
+  danger: { icon: "octagon-alert", role: "alert" },
+  brass: { icon: "sparkles", role: "note" },
 };
 export function Callout({ children, tone = "info", title, icon, action, role, className = "", style = {}, ...rest }: CalloutProps) {
-  const t = CALLOUT_TONES[tone] || CALLOUT_TONES.info!;
+  const key: CalloutTone = CALLOUT_TONES[tone] ? tone : "info";
+  const t = CALLOUT_TONES[key]!;
   return React.createElement("div", _extends({
-    className, role: role ?? t.role,
-    style: { display: "flex", gap: 12, padding: "14px 16px", background: t.bg, border: `1px solid ${t.bd}`,
-      borderLeft: `3px solid ${t.fg}`, borderRadius: "var(--radius-md)", ...style },
+    className: `hn-callout ${className}`.trim(), "data-tone": key, role: role ?? t.role,
+    style: { display: "flex", gap: 12, padding: "14px 16px", borderRadius: "var(--radius-md)", ...style },
   }, rest),
-    React.createElement(Icon, { name: icon || t.icon, size: 19, color: t.fg, style: { marginTop: 1 } }),
+    React.createElement(Icon, { name: icon || t.icon, size: 19, style: { marginTop: 1 } }),
     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
       title && React.createElement("div", { style: { fontFamily: "var(--font-ui)", fontSize: "var(--text-md)",
         fontWeight: "var(--weight-semibold)", color: "var(--text-strong)", marginBottom: children ? 3 : 0 } }, title),
@@ -81,20 +84,20 @@ export function Callout({ children, tone = "info", title, icon, action, role, cl
       action && React.createElement("div", { style: { marginTop: 10 } }, action)));
 }
 
-type ProgressProps = { value?: number; max?: number; tone?: "brass" | "ok" | "warn" | "err" | "info";
+// `danger` = nama kanonik untuk `err` (token --status-err); keduanya isian yang sama.
+type ProgressProps = { value?: number; max?: number; tone?: "brass" | "ok" | "warn" | "err" | "danger" | "info";
   size?: "sm" | "md" | "lg"; showLabel?: boolean;
   /** Keterangan yang terlihat di atas bar. Bila string dan tanpa `aria-label`, ia juga nama aksesibelnya. */
   label?: React.ReactNode;
   /** Teks nilai untuk pembaca layar (`aria-valuetext`), mis. "3 dari 8 tahap". */
   valueText?: string;
   style?: React.CSSProperties } & Record<string, any>;
-const PROGRESS_TONES: Record<string, string> = { brass: "var(--accent)", ok: "var(--leaf-600)",
-  warn: "var(--amber-600)", err: "var(--clay-600)", info: "var(--wind-600)" };
+const PROGRESS_TONES = new Set<string>(["brass", "ok", "warn", "err", "danger", "info"]);
 export function ProgressBar({ value = 0, max = 100, tone = "brass", size = "md", showLabel = false, label,
   valueText, className = "", style = {}, ...rest }: ProgressProps) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   const h = size === "sm" ? 5 : size === "lg" ? 10 : 7;
-  const color = PROGRESS_TONES[tone] || PROGRESS_TONES.brass!;
+  const toneKey = PROGRESS_TONES.has(tone) ? tone : "brass";
   // `aria-*` berjalan ke elemen `role="progressbar"` (track), bukan ke pembungkus visualnya.
   const ariaProps: Record<string, unknown> = {};
   const wrapperProps: Record<string, unknown> = {};
@@ -115,8 +118,9 @@ export function ProgressBar({ value = 0, max = 100, tone = "brass", size = "md",
       "aria-label": accessibleName, "aria-valuetext": valueText,
       style: { height: h, background: "var(--bone-300)", borderRadius: "var(--radius-pill)", overflow: "hidden" },
     }, ariaProps),
-      React.createElement("div", { style: { width: pct + "%", height: "100%", background: color,
-        borderRadius: "var(--radius-pill)", transition: "width var(--dur-slow) var(--ease-out)" } })));
+      React.createElement("div", { className: "hn-progress-fill", "data-tone": toneKey,
+        style: { width: pct + "%", height: "100%", borderRadius: "var(--radius-pill)",
+          transition: "width var(--dur-slow) var(--ease-out)" } })));
 }
 
 type StatusPillProps = { status?: string; children?: React.ReactNode; size?: "sm" | "md";

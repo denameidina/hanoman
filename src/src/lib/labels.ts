@@ -42,6 +42,9 @@ export function labelOf(map: Readonly<Record<string, string>>, value: string | n
 
 export const PRIORITY_LABEL: Record<Priority, string> = { tinggi: "Tinggi", sedang: "Sedang", rendah: "Rendah" };
 
+/** Cakupan worktree di filter Backlog (ADR-0214). Bukan enum shared: `worktree` = `baseSha` terisi. */
+export const WORKTREE_SCOPE_LABEL: Record<"all" | "worktree", string> = { all: "Semua item", worktree: "Ber-worktree" };
+
 /** Severity QA. `blocker` = tak bisa dipakai; `trivial` = hanya tampilan. */
 export const QA_SEVERITY_LABEL: Record<QaSeverity, string> = {
   blocker: "Tidak bisa digunakan", critical: "Kritis", major: "Fitur terganggu", minor: "Gangguan kecil", trivial: "Tampilan saja",

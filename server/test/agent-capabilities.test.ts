@@ -278,6 +278,8 @@ describe("route berbahaya pindah ke capability danger", () => {
       expect(capabilityForRoute("POST", `/api/projects/p/${p}`), p).toBe("ide:git");
     expect(capabilityForRoute("POST", "/api/projects/p/branches/delete")).toBe("ide:git");
     expect(capabilityForRoute("POST", "/api/projects/p/worktrees/delete")).toBe("ide:git");
+    // ADR-0213 · hapus worktree satu backlog item = aksi yang sama, BUKAN `backlog:write` hasil rw().
+    expect(capabilityForRoute("DELETE", "/api/specs/SPEC-1/worktree")).toBe("ide:git");
     // Menulis berkas TIDAK ikut pindah.
     expect(capabilityForRoute("PUT", "/api/projects/p/file")).toBe("ide:write");
     expect(capabilityForRoute("POST", "/api/projects/p/entry")).toBe("ide:write");
@@ -287,6 +289,9 @@ describe("route berbahaya pindah ke capability danger", () => {
   it("SELURUH pembacaan tak tersentuh pemecahan ini", () => {
     expect(capabilityForRoute("GET", "/api/projects/p/worktrees")).toBe("ide:read");
     expect(capabilityForRoute("GET", "/api/projects/p/worktrees/stats")).toBe("ide:read");
+    // ADR-0213 · review tetap pembacaan backlog; hapus item penuh tetap `backlog:lifecycle`.
+    expect(capabilityForRoute("GET", "/api/specs/SPEC-1/review")).toBe("backlog:read");
+    expect(capabilityForRoute("DELETE", "/api/specs/SPEC-1")).toBe("backlog:lifecycle");
     expect(capabilityForRoute("GET", "/api/projects/p/status")).toBe("ide:read");
     // `branches` BUKAN anggota IDE_SUBS dan tak dijadikan anggota: daftar branch adalah permukaan
     // project (projects.ts), bukan IDE. Hanya `branches/delete` yang pindah, karena ia merusak.

@@ -417,9 +417,21 @@ GET  /specs/:id/escalation             # SPEC-340 · ADR-0076 · { escalation, d
 GET  /specs/:id/review                 # { base, files:string[], changed:{path,add,del,status,binary}[] }  (SPEC-171)
 #   worktree hidup <repoDir>/.worktrees/<specid> → diff working tree, base = merge-base(branchFrom‖main, HEAD).
 #   worktree lenyap (done) → diff baseSha..headSha tersimpan (SPEC-176, ADR-0030), fallback grep (spec-N) utk spec lama.
-#   files = git ls-files (tracked ∪ untracked-tak-ignored, minus --deleted). 409 bila tak ada sumber apa pun.
+#   files = git ls-files (tracked ∪ untracked-tak-ignored, minus --deleted).
+#   ADR-0213 · tak ada sumber apa pun → 200 { base:"", files:[], changed:[], empty:true, reason }, BUKAN 409.
+#   reason: `no-worktree` (item belum pernah dimulai, tanpa baseSha) | `no-commit` (baseSha tercatat, worktree
+#   lenyap, tak ada commit). Field aditif: klien lama tetap jalan (membaca daftar kosong, tak crash), dan
+#   klien yang mengenal `empty` menampilkan keadaan kosong. Bentuk tervalidasi: `zSpecReview` (shared).
+#   409 pada route ini tinggal untuk `project belum punya repoDir`.
 GET  /specs/:id/review/*path           # { path, status, binary, truncated, diff, content }  isi 1 file (256 KB)
-#   404 bila path di luar (files ∪ changed) — sekaligus gerbang path traversal.
+#   404 bila path di luar (files ∪ changed) — sekaligus gerbang path traversal. ADR-0213: tanpa sumber sama
+#   sekali tetap 409 (tak ada berkas untuk dibaca; layar Review tak pernah memanggilnya dalam keadaan kosong).
+DELETE /specs/:id/worktree             # { name, ok, cleanup|null, closedSession?, error? }  (ADR-0213)
+#   Hapus worktree SATU backlog item. Service sama dengan `POST /projects/:id/worktrees/delete`
+#   (services/worktree-delete.ts), capability `ide:git` (danger), tool MCP `hanoman_backlog_worktree_delete`.
+#   Cabang & commit tetap (tak ada deleteBranch). Sesi hidup di worktree ditutup lebih dulu. 200 bila spec
+#   ada — `ok:false` + `error` ("worktree tak ditemukan", "tak bisa dihapus: …") ada di balasan, cermin
+#   worktrees/delete. 404 bila spec tak ada; 409 `project belum punya repoDir`.
 POST /specs/:id/integrate     { op:"merge"|"rebase", target:"local:<b>"|"origin:<b>" }  (SPEC-175 · ADR-0031)
 #   Rebase/merge branch hasil done spec `hanoman/<id>`. Hanya stage `done` (else 409). Server jalankan git
 #   di worktree isolasi <repoDir>/.worktrees/merge-<id>, TAK menyentuh working tree utama.
