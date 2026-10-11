@@ -174,6 +174,7 @@ describe("sync:* — tiga permukaan UI", () => {
     for (const [method, url] of [
       ["GET", "/api/sync/pull"], ["GET", "/api/sync/bootstrap"], ["POST", "/api/sync/push"],
       ["POST", "/api/sync/logs"], ["GET", "/api/sync/attachments/k"], ["GET", "/api/sync/qa-attachments/i"],
+      ["GET", "/api/sync/git-credential"],
     ] as const) {
       const r = await app.inject({ method, url, headers: h, payload: method === "POST" ? { records: [] } : undefined });
       expect(r.statusCode, `${method} ${url}`).toBe(401);

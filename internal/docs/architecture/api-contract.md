@@ -221,6 +221,8 @@ GET    /projects/:id/binding  -> { repoDir: string | null }   # nilai override m
 PUT    /projects/:id/binding  { repoDir }   # 200 { repoDir }; set override; 400 kosong; 404 project.
 DELETE /projects/:id/binding  # 204 · kosongkan override → path efektif jatuh ke Project.repoDir (SPEC-217). 404 project.
 POST   /projects/:id/clone    { dir }   # 201 { repoDir } · git clone gitRemote→dir lalu set binding; 409 tanpa gitRemote / clone gagal.
+#   ADR-0203 · jalur yang sama dengan auto-clone saat launch: asinkron, memakai GITHUB_TOKEN (atau token hub), satu
+#   clone per project, folder berisi repo dengan remote sama dipakai ulang (201), folder berisi hal lain → 409 (tak ditimpa).
 #   409 clone gagal membawa `detail` = stderr git — satu-satunya keterangan yang bisa ditindaklanjuti.
 #   SPEC-867 · bukan hanya jalur pembuatan project: kartu "Belum ada checkout di mesin ini" di detail
 #   project memanggil endpoint yang SAMA untuk project yang sudah ada (dari sync hub, atau yang
@@ -1423,6 +1425,9 @@ POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bu
 
 ```
 # ── HUB ──────────────────────────────────────────────────────────────────────────────────────────
+GET    /sync/git-credential              # ADR-0203 · Bearer device token → 200 { token: string | null } (GITHUB_TOKEN hub),
+                                         # cache-control: no-store. Tanpa token / agent token → 401. Dipakai KLIEN saat clone/
+                                         # fetch dan token lokal kosong; tak disimpan ulang. UNWRAPPED di MCP (membawa rahasia).
 GET    /sync/relay/ws                    # Bearer device token (query → 401). Dibuka KLIEN hanya bila grant lokal
                                          # menyala; satu per device (baru menggantikan lama: 4000). Frame .strict():
                                          # hub→klien welcome|req|cancel|open|data|credit|close,

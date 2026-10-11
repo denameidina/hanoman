@@ -59,6 +59,7 @@ const UNWRAPPED = new Map<string, string>([
   // dibungkus hanya tiga permukaan UI sync (now/conflicts/pending → hanoman_sync_*).
   ["GET /sync/pull", "mesin-ke-mesin: Bearer device-token, bukan permukaan agen (ADR-0199)"],
   ["GET /sync/bootstrap", "mesin-ke-mesin: Bearer device-token (ADR-0199)"],
+  ["GET /sync/git-credential", "mesin-ke-mesin: Bearer device-token; membawa rahasia (ADR-0203)"],
   ["POST /sync/push", "mesin-ke-mesin: Bearer device-token (ADR-0199)"],
   ["POST /sync/logs", "mesin-ke-mesin: Bearer device-token, gzip (ADR-0199)"],
   ["GET /sync/attachments/:storageKey", "mesin-ke-mesin: Bearer device-token + biner (ADR-0199)"],

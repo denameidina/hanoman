@@ -54,7 +54,7 @@ Frontend tidak berubah: tombol "Jalankan git clone" sudah ada di `src/src/screen
   - `isGithubHttps(remote: string): boolean`
   - `gitAuthEnv(token: string): Record<string, string>` — berisi `GIT_ASKPASS`, `GIT_TERMINAL_PROMPT`, `HANOMAN_GIT_TOKEN`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/git-auth.test.ts
@@ -96,12 +96,12 @@ describe("gitAuthEnv", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && pnpm vitest --run test/git-auth.test.ts --no-file-parallelism`
 Expected: FAIL — `Failed to resolve import "../src/services/git-auth"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/git-auth.ts
@@ -142,12 +142,12 @@ export function gitAuthEnv(token: string): Record<string, string> {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd server && pnpm vitest --run test/git-auth.test.ts --no-file-parallelism`
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/git-auth.ts server/test/git-auth.test.ts docs/superpowers/plans/2026-10-11-checkout-otomatis.md
@@ -175,7 +175,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
   - `resolveGitToken(deps?: { hub?: () => Promise<string | null> }): Promise<string | null>`
   - Route `GET /api/sync/git-credential` → `200 { token: string | null }`, header `cache-control: no-store`; 401 tanpa device token.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/git-token.test.ts
@@ -250,12 +250,12 @@ describe("hubGitToken", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/git-token.test.ts --no-file-parallelism`
 Expected: FAIL — import `../src/services/git-token` tidak ditemukan.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/git-token.ts
@@ -323,12 +323,12 @@ Tambahkan di `server/test/instance-sync-gate.test.ts` pada array URL tes "kanal 
       ["GET", "/api/sync/git-credential"],
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/git-token.test.ts test/instance-sync-gate.test.ts test/mcp-coverage.test.ts --no-file-parallelism`
 Expected: PASS. Bila `mcp-coverage` gagal karena route tak terdaftar di inventaris, periksa regex `routeInventory()` dan pastikan entri `UNWRAPPED` persis `"GET /sync/git-credential"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/git-token.ts server/src/routes/sync.ts server/test/git-token.test.ts server/test/mcp-coverage.test.ts server/test/instance-sync-gate.test.ts docs/superpowers/plans/2026-10-11-checkout-otomatis.md
@@ -354,7 +354,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
   - `cloneProjectCheckout(projectId: string, opts?: { dir?: string; token?: string | null }): Promise<string>` — mengembalikan dir, binding terpasang
   - `fetchRefIfMissing(repoDir: string, rev: string | null | undefined, token?: string | null): Promise<void>`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/project-checkout.test.ts
@@ -467,12 +467,12 @@ describe("fetchRefIfMissing", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/project-checkout.test.ts --no-file-parallelism`
 Expected: FAIL — import `../src/services/project-checkout` tidak ditemukan.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/project-checkout.ts
@@ -592,12 +592,12 @@ export async function fetchRefIfMissing(repoDir: string, rev: string | null | un
 
 Catatan untuk implementer: `fetch origin` pada remote ber-URL SSH tidak memakai token (askpass tidak dipakai SSH), sehingga perilaku mesin yang sudah punya ssh key tak berubah.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/project-checkout.test.ts --no-file-parallelism`
 Expected: PASS (10 tests). Test "pesan galat tidak memuat token" butuh jaringan atau gagal cepat di DNS; keduanya menghasilkan `CheckoutError` tanpa token, jadi aman offline.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/project-checkout.ts server/test/project-checkout.test.ts docs/superpowers/plans/2026-10-11-checkout-otomatis.md
@@ -618,7 +618,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `cloneProjectCheckout`, `CheckoutError`, `fetchRefIfMissing` (Task 3).
 - Produces: `LaunchError.kind` bertambah `"checkout"` (route `POST /terminal/sessions` memetakannya ke 422 lewat cabang default yang sudah ada — tidak perlu mengubah `terminal.ts`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan di `server/test/session-launch.test.ts` (impor `mkdtempSync`, `tmpdir`, `join`, `existsSync` sudah ada; tambahkan `makeRepoWithBranches` dari `./factory` dan `resolveRepoDir` dari `../src/services/local-binding`):
 
@@ -657,12 +657,12 @@ Tambahkan di `server/test/session-launch.test.ts` (impor `mkdtempSync`, `tmpdir`
 
 Test lama "throws LaunchError needs-bind when the project has no local checkout" (project tanpa `gitRemote`) harus tetap lulus tanpa diubah.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/session-launch.test.ts --no-file-parallelism -t "meng-clone otomatis|clone gagal"`
 Expected: FAIL — launch melempar `needs-bind` karena belum ada auto-clone.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Di `server/src/services/session-launch.ts`:
 
@@ -705,12 +705,12 @@ async function autoCheckout(projectId: string): Promise<string> {
     if (!resume?.worktreeKept) await fetchRefIfMissing(repoDir, spec.branchFrom);
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/session-launch.test.ts test/session-launch-admission.test.ts test/structured-launch-admission.test.ts --no-file-parallelism`
 Expected: PASS, termasuk test lama `needs-bind`. Bila ada `switch` pada `LaunchError.kind` yang tidak lengkap, `grep -rn "LaunchError" server/src` dan tangani kind `checkout` seperti `worktree` (gagal → `markFailed`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/session-launch.ts server/test/session-launch.test.ts docs/superpowers/plans/2026-10-11-checkout-otomatis.md
@@ -731,7 +731,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 - Consumes: `cloneProjectCheckout`, `CheckoutError` (Task 3).
 - Produces: kontrak HTTP tetap — `201 { repoDir }`, `404`, `409 { error, detail? }`. Body tetap `{ dir }` wajib (MCP `hanoman_project_clone` tidak berubah).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Tambahkan di `server/test/bindings.route.test.ts`, di dalam `describe` yang ada:
 
@@ -758,12 +758,12 @@ Tambahkan di `server/test/bindings.route.test.ts`, di dalam `describe` yang ada:
 
 dan tambahkan `writeFileSync` ke impor `node:fs` di file itu.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/bindings.route.test.ts --no-file-parallelism`
 Expected: FAIL pada test "folder yang sudah berisi hal lain" (`git clone` ke folder tak kosong gagal, tapi `detail` bentuk lama dan test kedua gagal karena `detail` kosong untuk path non-repo). Catat output sebenarnya sebelum lanjut.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Ganti handler `app.post("/projects/:id/clone", …)` di `server/src/routes/bindings.ts` dan hapus impor `spawnSync` yang tak terpakai:
 
@@ -789,12 +789,12 @@ dengan impor:
 import { CheckoutError, cloneProjectCheckout } from "../services/project-checkout";
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/bindings.route.test.ts test/binding-routes.test.ts test/binding-edit.test.ts test/binding-aware.test.ts --no-file-parallelism`
 Expected: PASS, termasuk test lama (201 + `.git`, 409 tanpa gitRemote).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/routes/bindings.ts server/test/bindings.route.test.ts docs/superpowers/plans/2026-10-11-checkout-otomatis.md
@@ -814,15 +814,15 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Interfaces:** tidak ada kode baru.
 
-- [ ] **Step 1: Tulis ADR**
+- [x] **Step 1: Tulis ADR**
 
 Isi `internal/docs/adr/0203-checkout-otomatis-token-git-dari-hub.md` (format mengikuti ADR-0199): Tanggal 2026-10-11, Status diterima; **Konteks** (checkout LOCAL-only tak ikut sync — ADR-0135; device baru butuh clone + login git manual); **Keputusan** (1. launch tanpa binding meng-clone otomatis ke `$HANOMAN_HOME/projects/<id>`; 2. token = `GITHUB_TOKEN` lokal lalu hub via `GET /sync/git-credential` Bearer device-token, tidak disimpan ulang di client; 3. askpass env-only, hanya `https://github.com/`; 4. clone asinkron, satu per project; 5. folder terisi tak pernah ditimpa; 6. endpoint credential masuk `UNWRAPPED` — agent token tak bisa memakainya, ADR-0199 butir 4); **Alternatif ditolak** (model `GitCredential` + sealed box per instance: topologi hub–client sudah mengautentikasi device token, jadi lapisan kedua hanya menambah permukaan; token yang di-cache di client: pencabutan di hub tak berlaku); **Konsekuensi** (tanpa migration; hub offline = clone repo private gagal dengan pesan jelas; token hub dapat dibaca setiap device token aktif — cabut device token untuk mencabut akses).
 
-- [ ] **Step 2: Perbarui kontrak dan indeks**
+- [x] **Step 2: Perbarui kontrak dan indeks**
 
 Tambahkan di `api-contract.md` baris `GET /sync/git-credential   # Bearer device token → 200 { token: string | null }, cache-control: no-store; tanpa token → 401; agent token → 401`. Tambahkan tautan ADR-0203 di `internal/docs/README.md` pada daftar ADR.
 
-- [ ] **Step 3: Uji nyata end-to-end di lokal**
+- [x] **Step 3: Uji nyata end-to-end di lokal**
 
 Run:
 ```bash
@@ -836,12 +836,12 @@ curl -s -i localhost:<port>/api/sync/git-credential   # Expected: 401 tanpa Bear
 ```
 Expected: clone → `201 {"repoDir":…}`; credential tanpa Bearer → `401`. Catat port dan output di komentar commit.
 
-- [ ] **Step 4: Jalankan seluruh set test yang tersentuh**
+- [x] **Step 4: Jalankan seluruh set test yang tersentuh**
 
 Run: `pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism` dengan `TEST_DATABASE_URL` terpisah.
 Expected: PASS. Bila gagal 404/P2022 masif, itu isolasi DB (SPEC-479), bukan regresi — ulangi dengan `TEST_DATABASE_URL` baru.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs/adr/0203-checkout-otomatis-token-git-dari-hub.md internal/docs/architecture/api-contract.md internal/docs/README.md docs/superpowers/plans/2026-10-11-checkout-otomatis.md

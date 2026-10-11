@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { mkdtempSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, existsSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildApp } from "../src/app";
@@ -41,6 +41,24 @@ describe("LocalBinding bind/clone (SPEC-213 AC-6/7)", () => {
     expect(existsSync(join(dest, ".git"))).toBe(true);
     expect(await resolveRepoDir("p1")).toBe(dest);
     rmSync(dest, { recursive: true, force: true });
+  });
+
+  it("clone ke folder yang sudah berisi hal lain → 409 dan isinya tidak ditimpa", async () => {
+    await pathlessProject(makeRepoWithBranches("main"));
+    const dest = mkdtempSync(join(tmpdir(), "hn-clone-"));
+    writeFileSync(join(dest, "milik-orang.txt"), "x");
+    const r = await app.inject({ method: "POST", url: "/api/projects/p1/clone", payload: { dir: dest } });
+    expect(r.statusCode).toBe(409);
+    expect(existsSync(join(dest, "milik-orang.txt"))).toBe(true);
+  });
+
+  it("clone gagal → 409 dengan detail stderr git dan tanpa binding", async () => {
+    await pathlessProject(join(tmpdir(), "tidak-ada-repo-ini"));
+    const dest = join(mkdtempSync(join(tmpdir(), "hn-clone-")), "repo");
+    const r = await app.inject({ method: "POST", url: "/api/projects/p1/clone", payload: { dir: dest } });
+    expect(r.statusCode).toBe(409);
+    expect(r.json().detail).toBeTruthy();
+    expect(await resolveRepoDir("p1")).toBeNull();
   });
 
   it("clone without gitRemote → 409", async () => {

@@ -3,6 +3,7 @@ import type { Spec } from "@prisma/client";
 import { realGit, startPrompt, continuePrompt, resumePrompt, startGoalPrompt, resolveGoalCondition, buildPhaseAgents, fromAuditOf, specContext, goalContext, type Flow, type Autonomy, type VerifyScope, type ResumeCtx } from "@hanoman/runner";
 import { resolveMethod, readSpecMethod, stampSpecMethod, isGoalShapedFlow, LOCAL_DEVICE_ID, type Agent, type PhaseOverrides } from "@hanoman/shared";
 import { resolveRepoDir } from "./local-binding";
+import { CheckoutError, cloneProjectCheckout, fetchRefIfMissing } from "./project-checkout";
 import { getSetting } from "./settings";
 import { ensureCodexTrust } from "./codex-trust";
 import { createSession, getSessionAsync, killSession, sessionIdForSpec } from "./pty";
@@ -27,7 +28,7 @@ export class LaunchError extends Error {
   // SPEC-447 · `blockers` hanya terisi untuk kind "blocked"; route memetakannya ke body 409.
   constructor(
     message: string,
-    readonly kind: "needs-bind" | "worktree" | "blocked" | "not-approved" | "remote-session" | "confirm-required",
+    readonly kind: "needs-bind" | "worktree" | "blocked" | "not-approved" | "remote-session" | "confirm-required" | "checkout",
     readonly blockers: SpecBlocker[] = [],
     // SPEC-1216 · ADR-0165 §6 · terisi untuk kind "remote-session"/"confirm-required".
     readonly remoteSession?: { deviceId: string; name: string; sessionId: string | null },
@@ -67,6 +68,19 @@ function buildResumeCtx(repoDir: string, id: string, flow: Flow, worktreeKept: b
     next: phases.find((p) => p.state === "active")?.name,
     worktreeKept,
   };
+}
+
+// ADR-0203 · binding kosong bukan lagi jalan buntu: project yang punya gitRemote di-clone sendiri.
+// Tanpa gitRemote tak ada yang bisa di-clone, jadi perilaku lama (needs-bind) dipertahankan.
+async function autoCheckout(projectId: string): Promise<string> {
+  try {
+    return await cloneProjectCheckout(projectId);
+  } catch (e) {
+    if (!(e instanceof CheckoutError)) throw e;
+    if (e.kind === "no-remote" || e.kind === "not-found")
+      throw new LaunchError(`project "${projectId}" belum di-bind ke checkout lokal`, "needs-bind");
+    throw new LaunchError(`gagal menyiapkan checkout: ${e.message}`, "checkout");
+  }
 }
 
 export async function startSpecSession(
@@ -124,8 +138,8 @@ export async function startSpecSession(
     catch (error) { throw new LaunchError((error as Error).message, "not-approved"); }
     // SPEC-213 · binding lokal per-device menang atas Project.repoDir (AC-8). Tanpa checkout lokal →
     // minta bind/clone dulu (route: 400 needsBind; governor: markFailed).
-    const repoDir = await resolveRepoDir(spec.projectId);
-    if (!repoDir) throw new LaunchError(`project "${spec.projectId}" belum di-bind ke checkout lokal`, "needs-bind");
+    // ADR-0203 · binding kosong + gitRemote → clone otomatis (token dari GITHUB_TOKEN/hub).
+    const repoDir = (await resolveRepoDir(spec.projectId)) ?? (await autoCheckout(spec.projectId));
 
     // SPEC-394 · ADR-0084 — pane HIDUP adalah sesinya: re-attach (ADR-0015), jangan sentuh apa pun.
     // Pane MATI bukan sesi: tmux menahannya (`remain-on-exit on`) hanya supaya layar terakhirnya
@@ -192,6 +206,10 @@ export async function startSpecSession(
     // SPEC-338 · buka gerbang trust codex untuk ROOT REPO sebelum worktree lahir — worktree
     // mewarisi trust root, jadi cukup sekali per project. Gagal-diam di dalam.
     if (agent === "codex") ensureCodexTrust(repoDir);
+
+    // ADR-0203 · branch dasar yang hanya ada di device lain: ambil dulu. Best-effort — bila tetap tak
+    // resolve, `addWorktree` melempar dengan nama revisinya (tak ada fallback diam-diam ke HEAD).
+    if (!resume?.worktreeKept) await fetchRefIfMissing(repoDir, spec.branchFrom);
 
     let baseSha: string;
     if (resume?.worktreeKept) {

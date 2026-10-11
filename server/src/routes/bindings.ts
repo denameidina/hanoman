@@ -1,8 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import { spawnSync } from "node:child_process";
 import { z } from "zod";
 import { prisma } from "../db";
 import { getBinding, setBinding, clearBinding } from "../services/local-binding";
+import { CheckoutError, cloneProjectCheckout } from "../services/project-checkout";
 
 // SPEC-213 · ADR-0043 · bind/clone project server ke checkout lokal (per-device, LOCAL-only).
 const zBind = z.object({ repoDir: z.string().min(1) });
@@ -36,12 +36,16 @@ export default async function (app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const p = zClone.safeParse(req.body);
     if (!p.success) return reply.code(400).send({ error: p.error.flatten() });
-    const project = await prisma.project.findUnique({ where: { id } });
-    if (!project) return reply.code(404).send({ error: "not found" });
-    if (!project.gitRemote) return reply.code(409).send({ error: "project tidak punya gitRemote untuk clone" });
-    const res = spawnSync("git", ["clone", project.gitRemote, p.data.dir], { encoding: "utf8" });
-    if (res.status !== 0) return reply.code(409).send({ error: "git clone gagal", detail: res.stderr });
-    await setBinding(id, p.data.dir);
-    return reply.code(201).send({ repoDir: p.data.dir });
+    // ADR-0203 · jalur yang sama dengan auto-clone saat launch: asinkron, token GitHub, satu clone
+    // per project, dan folder yang sudah terisi hal lain tidak pernah ditimpa.
+    try {
+      const repoDir = await cloneProjectCheckout(id, { dir: p.data.dir });
+      return reply.code(201).send({ repoDir });
+    } catch (e) {
+      if (!(e instanceof CheckoutError)) throw e;
+      if (e.kind === "not-found") return reply.code(404).send({ error: "not found" });
+      if (e.kind === "no-remote") return reply.code(409).send({ error: "project tidak punya gitRemote untuk clone" });
+      return reply.code(409).send({ error: e.message, ...(e.detail ? { detail: e.detail } : {}) });
+    }
   });
 }
