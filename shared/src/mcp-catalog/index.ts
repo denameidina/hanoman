@@ -20,6 +20,12 @@ import { LEAD_TOOLS } from "./lead";
 import { TEAM_TOOLS } from "./team";
 import { QA_TOOLS } from "./qa";
 import { SYSTEM_TOOLS } from "./system";
+import { OBSERVABILITY_TOOLS } from "./observability";
+import { TRANSFER_TOOLS } from "./transfer";
+import { GATES_TOOLS } from "./gates";
+import { INTEGRATIONS_TOOLS } from "./integrations";
+import { ADMIN_TOOLS } from "./admin";
+import { INSTANCE_TOOLS } from "./instance";
 import type { McpToolDef } from "./types";
 
 export const MCP_TOOLS: readonly McpToolDef[] = [
@@ -43,4 +49,10 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
   ...TEAM_TOOLS,
   ...QA_TOOLS,        // Workspace QA · laporan, test case, temuan
   ...SYSTEM_TOOLS,
+  ...OBSERVABILITY_TOOLS,   // ADR-0187/0188/0189 · mesin, log aktivitas, chat portal operator
+  ...TRANSFER_TOOLS,  // ADR-0183 · route multipart/biner + hapus QA
+  ...GATES_TOOLS,     // ADR-0190/0191/0192 · dialog sesi (sessions:decide) + cronjob (scheduler:*)
+  ...INTEGRATIONS_TOOLS,   // ADR-0193..0195 · kredensial Telegram, webhook keluar, akun klien, portal-sebagai-klien
+  ...ADMIN_TOOLS,     // ADR-0196..0198 · kredensial, akun, kendali jarak jauh, relay, log, presence, metrik
+  ...INSTANCE_TOOLS,  // ADR-0199/0200 · sync UI, pasang pembaruan/restart, panduan agen
 ];

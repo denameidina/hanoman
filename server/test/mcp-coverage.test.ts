@@ -16,8 +16,17 @@ function routeInventory(): { method: string; path: string }[] {
   const out: { method: string; path: string }[] = [];
   for (const f of readdirSync(ROUTES_DIR).filter((x) => x.endsWith(".ts"))) {
     const src = readFileSync(join(ROUTES_DIR, f), "utf8");
-    for (const m of src.matchAll(/^\s*app\.(get|post|patch|put|delete)\(\s*"([^"]+)"/gm))
+    // ADR-0199 · regex LAMA hanya mengenal receiver `app.`, jadi route di scope bersarang
+    // (`logs.post("/sync/logs")`, `qb.get|put("/sync/qa-attachments/:id")` di sync.ts) tak pernah
+    // masuk inventaris. Receiver apa pun boleh, tetapi path WAJIB berawalan "/" — itu yang
+    // membedakan route dari `map.get("kunci")`.
+    for (const m of src.matchAll(/^\s*[A-Za-z_$][\w$]*\.(get|post|patch|put|delete)\(\s*"(\/[^"]*)"/gm))
       out.push({ method: m[1]!.toUpperCase(), path: m[2]! });
+    // `app.route({ method, url })` (devices-relay.ts). Method literal → satu entri; array/identifier
+    // (mis. `NON_GET_METHODS`) tak bisa dibaca statis → semua method bermutasi, supaya tak ada yang lolos.
+    for (const m of src.matchAll(/\.route\(\{\s*method:\s*(?:"(\w+)"|[^,]+),\s*url:\s*"([^"]+)"/g))
+      for (const method of m[1] ? [m[1].toUpperCase()] : ["POST", "PUT", "PATCH", "DELETE"])
+        out.push({ method, path: m[2]! });
   }
   return out;
 }
@@ -25,37 +34,44 @@ function routeInventory(): { method: string; path: string }[] {
 // Route yang SENGAJA tak punya tool MCP. Alasannya wajib ditulis di sebelahnya — daftar tanpa
 // alasan kehilangan gunanya dalam beberapa bulan.
 const UNWRAPPED = new Map<string, string>([
-  ["POST /specs/:id/attachments", "multipart — tak ada bentuk masuk akal lewat tool teks"],
-  ["POST /projects/:id/upload", "multipart"],
-  ["GET /projects/:id/archive", "biner (zip)"],
   ["GET /terminal/sessions/:id/ws", "WebSocket, bukan request-response"],
   // ADR-0157 · GLOBAL_READ tapi tetap di luar: kanal siar, bukan request-response. Tool MCP tak
   // punya bentuk untuk aliran yang tak pernah selesai.
   ["GET /events/ws", "WebSocket siar, bukan request-response"],
-  // Byte mentah dengan content-disposition: lampiran bisa berupa gambar, dan tool teks akan
-  // mengembalikan sampah. Sekelas dengan `archive` di atas.
-  ["GET /specs/:id/attachments/:attId", "biner (unduhan lampiran)"],
-  ["GET /tickets/:id/attachments/:attId", "biner (unduhan lampiran)"],
-  ["POST /terminal/sessions/:id/attachments", "multipart"],
-  // SPEC-899 · ADR-0142 · BUKAN kelalaian: agen yang bisa menjawab `AskUserQuestion` bisa menjawab
-  // pertanyaannya SENDIRI, dan gerbang "manusia yang terakhir memutuskan" runtuh lewat pintu itu.
-  // Assert terpisah di mcp-capability.test.ts menjaga agar tak ada samplePath yang memuat /dialog.
-  ["GET /terminal/sessions/:id/dialog", "gerbang keputusan manusia (SPEC-899)"],
-  ["POST /terminal/sessions/:id/dialog/answer", "gerbang keputusan manusia (SPEC-899)"],
-  ["POST /terminal/sessions/:id/dialog/takeover", "gerbang keputusan manusia (SPEC-899)"],
-  // Workspace QA · sengaja tanpa tool: hapus tak punya jalan pulang (dilakukan manusia di dashboard),
-  // sisanya biner/multipart. Agen membaca laporan lewat hanoman_qa_report_get.
-  ["DELETE /projects/:pid/qa/reports/:rid", "destruktif — dihapus manusia di dashboard"],
-  ["DELETE /projects/:pid/qa/reports/:rid/cases/:cid", "destruktif — dihapus manusia di dashboard"],
-  ["DELETE /projects/:pid/qa/reports/:rid/findings/:fid", "destruktif — dihapus manusia di dashboard"],
-  ["POST /projects/:pid/qa/reports/:rid/attachments", "multipart"],
-  ["GET /projects/:pid/qa/reports/:rid/attachments/:aid", "biner (unduhan lampiran)"],
-  ["DELETE /projects/:pid/qa/reports/:rid/attachments/:aid", "destruktif — dihapus manusia di dashboard"],
-  ["GET /projects/:pid/qa/reports/:rid/export", "biner (ZIP/DOCX/PDF/XLSX) / teks (MD/CSV) unduhan; agen memakai hanoman_qa_report_get"],
-  ["POST /projects/:pid/qa/import", "multipart"],
-  ["POST /projects/:pid/qa/reports/:rid/cases/import", "multipart (XLSX/CSV)"],
-  ["GET /qa/template.md", "unduhan template untuk manusia"],
-  ["GET /qa/template.xlsx", "biner (template Excel untuk manusia), sama dengan template.md"],
+  // ADR-0183 · route multipart/biner (lampiran, ekspor, impor, unggah IDE, arsip) dan hapus QA sudah
+  // TIDAK di daftar ini: tool-nya ada di shared/src/mcp-catalog/transfer.ts.
+  // ADR-0190 · route dialog sesi dibungkus gates.ts (sessions:decide); ADR-0191 · /scheduler/crons* dibungkus gates.ts (scheduler:*).
+  // ADR-0196..0198 · route admin yang DIBUKA kini punya tool (admin.ts). Yang di bawah ini tetap
+  // cookie-only karena TAK BISA dibungkus bermakna secara teknis — kejujuran lebih penting dari
+  // centang. Semuanya COOKIE_ONLY di capabilityForRoute, jadi gerbang cakupan tak menuntutnya;
+  // dicatat di sini agar alasannya tak hilang, dan uji "daftar dikecualikan" memastikan route-nya ada.
+  ["GET /auth/status", "PUBLIK dan dijawab tanpa auth; `user` selalu null untuk agent token — tak ada isi untuk agen (hanoman_about / GET /health untuk probe)"],
+  ["POST /auth/setup", "bootstrap akun pertama + cookie sesi + setup token di berkas HANOMAN_HOME; bukan operasi agen"],
+  ["POST /auth/login", "menerbitkan cookie sesi untuk browser; agen tak punya sesi cookie (kredensialnya agent token)"],
+  ["POST /auth/logout", "menghapus cookie sesi browser; tak ada artinya untuk Bearer agent token"],
+  ["GET /terminal/workspace", "tata letak tab/pane BROWSER per akun (req.user.id); agent token tak punya req.user"],
+  ["PUT /terminal/workspace", "tata letak tab/pane BROWSER per akun (req.user.id); agent token tak punya req.user"],
+  ["POST /session-events", "kredensial = token HMAC turunan per sesi (header x-hanoman-session), bukan agent token; gate cookie mem-bypass-nya dan agent token dijawab 401 (SPEC-909/ADR-0146)"],
+  // ADR-0199 §3 · kanal sync MESIN-KE-MESIN. Semuanya COOKIE_ONLY di peta capability (jadi gerbang
+  // di atas tak menuntutnya), dan dicatat di sini supaya alasannya terbaca: auth-nya Bearer
+  // DEVICE-TOKEN (atau tiket WS) yang ditegakkan route-nya sendiri. Agent token BUKAN device token —
+  // membungkusnya berarti mengeluarkan kredensial mesin ke agen, atau tool yang pasti 401. Yang
+  // dibungkus hanya tiga permukaan UI sync (now/conflicts/pending → hanoman_sync_*).
+  ["GET /sync/pull", "mesin-ke-mesin: Bearer device-token, bukan permukaan agen (ADR-0199)"],
+  ["GET /sync/bootstrap", "mesin-ke-mesin: Bearer device-token (ADR-0199)"],
+  ["POST /sync/push", "mesin-ke-mesin: Bearer device-token (ADR-0199)"],
+  ["POST /sync/logs", "mesin-ke-mesin: Bearer device-token, gzip (ADR-0199)"],
+  ["GET /sync/attachments/:storageKey", "mesin-ke-mesin: Bearer device-token + biner (ADR-0199)"],
+  ["GET /sync/qa-attachments/:id", "mesin-ke-mesin: Bearer device-token + biner (ADR-0199)"],
+  ["PUT /sync/qa-attachments/:id", "mesin-ke-mesin: Bearer device-token + biner (ADR-0199)"],
+  ["GET /sync/ws", "WebSocket mesin-ke-mesin, Bearer device-token (ADR-0199)"],
+  ["GET /sync/relay/ws", "WebSocket relay mesin-ke-mesin, Bearer device-token (ADR-0199)"],
+  ["POST /ws-tickets", "menerbitkan tiket WebSocket sekali-pakai untuk sesi cookie; tiket = kredensial, bukan data (ADR-0199)"],
+  // ADR-0201 · Help Center publik: ANONIM by design, bypass gerbang /api (app.ts), dan tak pernah
+  // memegang capability — tool apa pun di atasnya tak menambah akses, hanya menambah jalur masuk.
+  ["GET /help/:slug", "publik anonim; operator memakai hanoman_help_center_get (ADR-0201)"],
+  ["POST /help/:slug/tickets", "publik anonim + honeypot + rate-limit untuk MANUSIA; agen yang mengirim = membanjiri jalur anonim (ADR-0201)"],
+  ["GET /help/:slug/tickets/:key", "publik anonim, otorisasi kunci opaque pelapor; status mentah tiket sudah terbaca operator lewat hanoman_ticket_get/support:read (ADR-0201)"],
 ]);
 
 // Route yang TERCAKUP tool bercabang. Tool semacam itu memilih endpoint menurut argumen (isi `q` →
@@ -63,6 +79,11 @@ const UNWRAPPED = new Map<string, string>([
 // Dicatat di sini dengan NAMA tool-nya, bukan sekadar di-skip: bila tool-nya berganti nama atau
 // hilang, assert di bawah merah — jadi daftar ini tak bisa jadi tempat menyembunyikan route.
 const COVERED_BY_BRANCH = new Map<string, string>([
+  // ADR-0197 · satu tool `hanoman_device_relay` memilih method menurut argumen (relay meneruskan SEMUA method).
+  ["GET /devices/:deviceId/relay/*", "hanoman_device_relay"],
+  ["PUT /devices/:deviceId/relay/*", "hanoman_device_relay"],
+  ["PATCH /devices/:deviceId/relay/*", "hanoman_device_relay"],
+  ["DELETE /devices/:deviceId/relay/*", "hanoman_device_relay"],
   ["GET /projects/:id/prds", "hanoman_prds_list"],
   ["GET /projects/:id/graph/search", "hanoman_ide_graph"],
   ["GET /projects/:id/compare/file", "hanoman_ide_compare"],
@@ -73,6 +94,10 @@ const COVERED_BY_BRANCH = new Map<string, string>([
   ["POST /vps/:id/items/na-bulk", "hanoman_vps_item_na"],
   ["GET /skills/:key/file", "hanoman_skill_read"],
   ["DELETE /skills/:key/entry", "hanoman_skill_entry"],
+  // ADR-0195 · tool portal memilih endpoint menurut argumen opsional (`spec`/`ticket`/`session`).
+  ["GET /portal/projects/:id/backlog/:specId", "hanoman_portal_backlog"],
+  ["GET /portal/projects/:id/tickets/:ticketId", "hanoman_portal_tickets"],
+  ["GET /portal/projects/:id/chat/sessions/:sid", "hanoman_portal_chat_sessions"],
 ]);
 
 /** Path route Fastify (`/specs/:id`) → regex yang mencocokkan samplePath katalog (`/specs/SPEC-1`). */
@@ -85,6 +110,11 @@ describe("cakupan katalog MCP", () => {
     expect(inv.length).toBeGreaterThan(200);
     expect(inv).toContainEqual({ method: "GET", path: "/specs" });
     expect(inv).toContainEqual({ method: "POST", path: "/terminal/sessions" });
+    // ADR-0199 · bentuk yang DULU lolos dari regex: receiver bersarang (`logs.`, `qb.`) dan `.route({...})`.
+    expect(inv).toContainEqual({ method: "POST", path: "/sync/logs" });
+    expect(inv).toContainEqual({ method: "PUT", path: "/sync/qa-attachments/:id" });
+    expect(inv).toContainEqual({ method: "GET", path: "/devices/:deviceId/relay/*" });
+    expect(inv).toContainEqual({ method: "DELETE", path: "/devices/:deviceId/relay/*" });
   });
 
   it("setiap route yang TERJANGKAU agent token punya tool, atau terdaftar dikecualikan", () => {

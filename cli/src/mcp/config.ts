@@ -1,6 +1,7 @@
 // SPEC-482 · ADR-0099 · resolusi konfigurasi `hanoman mcp`. Murni: argv + env + pembaca berkas
 // disuntikkan, jadi seluruh percabangan bisa diuji tanpa filesystem.
 import { DEFAULT_MAX_BYTES, type McpLevel } from "@hanoman/shared";
+import { resolveTransferPolicy, type TransferEnv, type TransferPolicy } from "./transfer";
 
 export type McpConfig = {
   host: string;
@@ -8,8 +9,16 @@ export type McpConfig = {
   /** ADR-0155 · tingkat mode. Yang lebih sempit selalu menang, apa pun urutan argumen. */
   level: McpLevel;
   maxBytes: number;
+  /** ADR-0183 · batas transfer berkas lokal. Opsional agar konfigurasi lama/test tetap sah; klien memakai default aman. */
+  transfer?: TransferPolicy;
   /** Keluhan konfigurasi. Non-kosong = setiap panggilan tool menjawab dengan kalimat ini. */
   problems: string[];
+  /**
+   * ADR-0192 · `HANOMAN_SESSION_ID` yang diwarisi bila proses MCP ini berjalan di dalam sesi
+   * hanoman. Dikirim sebagai `x-hanoman-session`; server memakainya untuk menolak agen-di-dalam-
+   * sesi memutuskan dialog. Id sesi bukan rahasia.
+   */
+  sessionId?: string;
 };
 
 const flagValue = (argv: string[], name: string): string | undefined => {
@@ -21,6 +30,7 @@ export function resolveMcpConfig(
   argv: string[],
   env: Record<string, string | undefined>,
   readTokenFile: () => string | null,
+  transferEnv?: TransferEnv,
 ): McpConfig {
   const problems: string[] = [];
 
@@ -64,5 +74,11 @@ export function resolveMcpConfig(
   const parsed = rawMax === undefined ? NaN : Number(rawMax);
   const maxBytes = Number.isFinite(parsed) && parsed >= 512 ? Math.floor(parsed) : DEFAULT_MAX_BYTES;
 
-  return { host, token, level, maxBytes, problems };
+  // ADR-0183 · batas transfer berkas. Keluhannya (mis. root `/`) ikut `problems`: konfigurasi yang
+  // meniadakan batasan lebih baik menolak SEMUA panggilan daripada diam-diam diturut.
+  const t = resolveTransferPolicy(argv, env, transferEnv);
+  problems.push(...t.problems);
+
+  const sessionId = (env.HANOMAN_SESSION_ID ?? "").trim();
+  return { host, token, level, maxBytes, transfer: t.policy, problems, ...(sessionId ? { sessionId } : {}) };
 }

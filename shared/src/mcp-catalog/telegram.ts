@@ -1,10 +1,10 @@
 // ADR-0099 · ADR-0155 · katalog tool domain `telegram`: status gateway, context & memory per chat,
 // reply, dan audit.
 //
-// EMPAT route permukaan KREDENSIAL (`/telegram/{settings,test,credentials}`) sengaja tak ada di
-// sini dan tak bisa ada: `capabilityForRoute` memberinya COOKIE_ONLY karena ia menyimpan bot token
-// dan AgentToken — termasuk milik gateway itu sendiri, yang wajib memegang `settings:write`
-// (ADR-0097). Agen yang bisa membacanya bisa mencuri kredensialnya sendiri.
+// EMPAT route permukaan KREDENSIAL (`/telegram/{settings,test,credentials}`) TIDAK ada di berkas
+// ini: dulu COOKIE_ONLY (ADR-0097), kini capability `telegram:admin` (danger) dan tool-nya hidup di
+// `integrations.ts` (ADR-0193). Capability itu tak diimplikasikan `telegram:write`/`settings:write`,
+// jadi token gateway sendiri tetap tak menjangkaunya, dan server menolak eskalasi diri.
 import { enumStr, int, obj, str, strArray } from "../mcp-schema";
 import { enc, n, query, s } from "./helpers";
 import type { McpToolDef } from "./types";

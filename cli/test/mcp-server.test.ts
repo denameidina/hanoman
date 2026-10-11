@@ -120,7 +120,11 @@ describe("buildMcpServer", () => {
     // agen yang menemukan sebuah tool tak ada tak boleh menyimpulkan ia berhak memanggilnya.
     expect(String(about.modeNote)).toMatch(/bukan kontrol keamanan/i);
     expect(text).not.toContain("hnm_agt_secret");
-    expect(JSON.stringify(about)).not.toMatch(/token/i);
+    // ADR-0196 · daftar `tools` kini memuat NAMA tool & capability pengelola kredensial
+    // (`hanoman_agent_token_create`, `tokens:write`) — kata itu sah di sana. Yang dijaga tetap sama:
+    // bagian lain balasan (host/mode/catatan/keluhan) tak menyebut "token" sama sekali.
+    const { tools: _tools, ...rest } = about;
+    expect(JSON.stringify(rest)).not.toMatch(/token/i);
   });
 
   it("hanoman_about tetap menjawab meski konfigurasi bermasalah, dan menyebut keluhannya", async () => {
@@ -136,6 +140,92 @@ describe("buildMcpServer", () => {
     t.feed({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "hanoman_ticket_get", arguments: { ticket: "t1" } } });
     await tick();
     expect(reply(t, 9)?.result.content[0].text).not.toContain("hnm_agt_secret");
+  });
+
+  // ADR-0196 · SATU-SATUNYA pengecualian atas aturan di atas: tool pencetak kredensial. Plaintext
+  // token BARU yang dikembalikan REST sekali-tampil harus sampai ke pemanggil (tanpa itu tool-nya
+  // tak berguna), tapi token konfigurasi proses ini, field password, dan SEMUA galat tetap masked.
+  describe("revealsSecret", () => {
+    const run = async (name: string, args: Record<string, unknown>, call: ReturnType<typeof vi.fn>) => {
+      const { t } = await boot({ level: "danger" }, call as never);
+      t.feed({ jsonrpc: "2.0", id: 21, method: "tools/call", params: { name, arguments: args } });
+      await tick();
+      return reply(t, 21)?.result as { content: { text: string }[]; isError?: boolean };
+    };
+
+    it("hasil sukses agent_token_create membawa plaintext token BARU, tapi tidak token konfigurasi", async () => {
+      const call = vi.fn(async (): Promise<CallResult> => ({
+        ok: true, body: { id: "t9", token: "hnm_agt_NEWNEWNEW", bocor: "hnm_agt_secret" },
+      }));
+      const r = await run("hanoman_agent_token_create", { name: "anak", capabilities: ["projects:read"] }, call);
+      const text = r.content[0]!.text;
+      expect(text).toContain("hnm_agt_NEWNEWNEW");
+      expect(text).not.toContain("hnm_agt_secret");
+      expect(text).toContain("«token disembunyikan»");
+    });
+
+    it("device_token_create juga; tool LAIN yang kebetulan memuat pola token tetap masked", async () => {
+      const okDevice = vi.fn(async (): Promise<CallResult> => ({ ok: true, body: { id: "d1", token: "abcDEF_ghi-123" } }));
+      expect((await run("hanoman_device_token_create", { name: "laptop" }, okDevice)).content[0]!.text).toContain("abcDEF_ghi-123");
+      const other = vi.fn(async (): Promise<CallResult> => ({ ok: true, body: { x: "hnm_agt_NEWNEWNEW" } }));
+      expect((await run("hanoman_agent_tokens_list", {}, other)).content[0]!.text).not.toContain("hnm_agt_NEWNEWNEW");
+    });
+
+    it("GALAT dari tool pencetak tetap masked penuh", async () => {
+      const call = vi.fn(async (): Promise<CallResult> => ({ ok: false, message: "ditolak: hnm_agt_NEWNEWNEW hnm_agt_secret" }));
+      const r = await run("hanoman_agent_token_create", { name: "x", capabilities: [] }, call);
+      expect(r.isError).toBe(true);
+      expect(r.content[0]!.text).not.toContain("hnm_agt_NEWNEWNEW");
+      expect(r.content[0]!.text).not.toContain("hnm_agt_secret");
+    });
+
+    it("password disensor dari keluaran walau server memantulkannya", async () => {
+      const call = vi.fn(async (): Promise<CallResult> => ({ ok: true, body: { id: "u1", password: "hunter2hunter2", user: { newPassword: "x y" } } }));
+      const r = await run("hanoman_user_create", { email: "a@b.co", password: "hunter2hunter2" }, call);
+      expect(r.content[0]!.text).not.toContain("hunter2hunter2");
+      expect(r.content[0]!.text).not.toContain("x y");
+    });
+  });
+});
+
+// ADR-0193..0195 · rahasia yang DIKIRIM pemanggil (password akun klien, bot token) disensor dari
+// keluaran tool; rahasia yang dibangkitkan SERVER (secret webhook sekali-tampil) tidak — itu hasil
+// yang memang harus sampai ke pemanggil.
+describe("redaksi rahasia integrasi", () => {
+  const callMsg = (id: number, name: string, args: Record<string, unknown>) =>
+    ({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } });
+  const dangerCfg: Partial<McpConfig> = { level: "danger" };
+
+  it("password akun klien yang dikirim disensor dari galat, juga bila server memantulkannya", async () => {
+    const echo = vi.fn(async (..._a: CallArgs): Promise<CallResult> =>
+      ({ ok: false, message: "Permintaan ditolak: password rahasia-123 terlalu lemah" }));
+    const { t } = await boot(dangerCfg, echo);
+    t.feed(callMsg(20, "hanoman_client_account_create", { email: "k@x.co", password: "rahasia-123" }));
+    await tick();
+    const text = reply(t, 20)?.result.content[0].text as string;
+    expect(text).not.toContain("rahasia-123");
+    expect(text).toContain("disembunyikan");
+    // permintaan ke server tetap membawa nilai aslinya (disensor hanya di KELUARAN)
+    expect(echo.mock.calls[0]?.[0]).toMatchObject({ body: { password: "rahasia-123" } });
+  });
+
+  it("bot token yang dikirim disensor dari hasil sukses", async () => {
+    const bot = "123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw";
+    const echo = vi.fn(async (..._a: CallArgs): Promise<CallResult> => ({ ok: true, body: { eko: bot } }));
+    const { t } = await boot(dangerCfg, echo);
+    t.feed(callMsg(21, "hanoman_telegram_settings_set", { botToken: bot }));
+    await tick();
+    expect(reply(t, 21)?.result.content[0].text).not.toContain(bot);
+  });
+
+  it("secret webhook BUATAN SERVER tampil utuh, sekali, persis seperti REST", async () => {
+    const secret = "k3yR4ndomDariServerYangPanjangSekali_-abcdef";
+    const create = vi.fn(async (..._a: CallArgs): Promise<CallResult> =>
+      ({ ok: true, body: { id: "w1", secret, secretHint: secret.slice(-4) } }));
+    const { t } = await boot(dangerCfg, create);
+    t.feed(callMsg(22, "hanoman_webhook_create", { name: "CI", url: "https://x.id/h", events: ["*"] }));
+    await tick();
+    expect(reply(t, 22)?.result.content[0].text).toContain(secret);
   });
 });
 

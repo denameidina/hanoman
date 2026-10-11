@@ -1,4 +1,5 @@
-// SPEC-617 · ADR-0110 · kelola akun klien (cookie-only, admin). Hanya menyentuh baris
+// SPEC-617 · ADR-0110 · kelola akun klien (admin cookie, atau agent token ber-`clients:read|write`
+// — ADR-0194). Hanya menyentuh baris
 // ber-`role="client"` — akun operator tetap dikelola /auth/users, jadi pintu ini tak pernah bisa
 // jadi jalan memutar mengubah kredensial admin.
 import type { FastifyInstance } from "fastify";

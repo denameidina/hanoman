@@ -1,6 +1,6 @@
 import {
-  configEntry, maskSecret, parseConfigValue, TELEGRAM_CONFIG_KEYS,
-  type TelegramConfigKey, type TelegramInboundReadinessView,
+  configEntry, grantsCapability, maskSecret, parseConfigValue, TELEGRAM_CONFIG_KEYS,
+  type Capability, type TelegramConfigKey, type TelegramInboundReadinessView,
 } from "@hanoman/shared";
 import { clearConfig, effectiveStr, setConfig, sourceOf } from "../../config";
 import { verifyAgentToken as verifyAgentTokenReal } from "../agent-token";
@@ -99,6 +99,39 @@ export function telegramCredentialView(): TelegramCredentialsView {
         : { ...base, kind: "string", value: eff ?? null };
     }),
   };
+}
+
+/**
+ * ADR-0193 · tak ada eskalasi diri lewat kredensial. Gateway Telegram menjalankan pekerjaan operator
+ * DENGAN capability AgentToken-nya, atas perintah user yang ada di allowlist. Jadi siapa pun yang
+ * boleh mengganti bot token, allowlist, atau AgentToken gateway pada dasarnya menentukan siapa yang
+ * mewarisi capability token gateway itu. Untuk pemanggil ber-AGENT TOKEN (bukan cookie manusia),
+ * token gateway EFEKTIF — yang baru dikirim di patch, atau yang sudah tersimpan — tidak boleh
+ * memegang capability yang tak dimiliki pemanggil. `null` = lolos.
+ *
+ * Token yang tak bisa diverifikasi (belum diisi / tak dikenal) tak memicu penolakan di sini: gateway
+ * dengan token seperti itu tak bisa berjalan (`installTelegramGateway` menolaknya), dan
+ * `saveTelegramCredentials` sendiri menolak token baru yang kurang capability.
+ */
+export async function gatewayEscalation(
+  callerCaps: readonly string[],
+  patch: Record<string, unknown>,
+  deps: Pick<TelegramGateDeps, "verify"> = {},
+): Promise<{ error: string; missing: string[] } | null> {
+  const key = "HANOMAN_TELEGRAM_AGENT_TOKEN";
+  const sent = typeof patch[key] === "string" ? (patch[key] as string).trim() : "";
+  const token = sent || effectiveStr(key)?.trim();
+  if (!token) return null;
+  const target = await (deps.verify ?? verifyAgentTokenReal)(token);
+  if (!target) return null;
+  const missing = target.capabilities.filter((c) => !grantsCapability([...callerCaps], c as Capability));
+  return missing.length
+    ? {
+      error: "eskalasi ditolak: token gateway Telegram memegang capability yang tak dimiliki token pemanggil — "
+        + "mengubah kredensial gateway berarti menentukan siapa yang mewarisinya",
+      missing,
+    }
+    : null;
 }
 
 /**

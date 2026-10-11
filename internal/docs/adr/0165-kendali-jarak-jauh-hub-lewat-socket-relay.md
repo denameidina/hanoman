@@ -1,5 +1,7 @@
 # ADR-0165 — Kendali jarak jauh hub → klien: socket relay kedua dari klien, route yang sudah ada, grant LOCAL-only
 
+> **Amandemen 2026-10-11 ([ADR-0197](0197-mcp-kendali-jarak-jauh-relay-log-presence.md)):** §4 "cookie-only" untuk `/api/remote-control` dan `/api/devices/:id/relay/*` dibalik atas permintaan pemilik repo — kini `remote:read` / `remote:control` (danger) / `relay:exec` (danger), opt-in. Grant yang diberikan agen ⊆ capability pemanggil; relay agen beraktor `agent:<id>`; allowlist route mesin tujuan tetap berlaku; WebSocket relay tetap tak tersedia untuk agen.
+
 **Status:** diterima (SPEC-1215, fase Spec) · 2026-09-15 · **turunan A mendarat** (SPEC-1215): §1 socket
 relay, §3 principal `remote`, §4 grant + `/api/remote-control`, §5 allowlist, §7 pencabutan seketika, dan
 §9 frame `capacity` + `control`. **Turunan B mendarat** (SPEC-1216): §6 approval/`force`/langganan dan §8

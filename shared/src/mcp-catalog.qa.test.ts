@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MCP_TOOLS } from "./mcp";
+import { TRANSFER_TOOLS } from "./mcp-catalog/transfer";
 
 const tool = (name: string) => {
   const t = MCP_TOOLS.find((x) => x.name === name);
@@ -20,7 +21,10 @@ describe("katalog MCP · qa", () => {
   });
 
   it("sebelas tool terdaftar dengan capability qa:read / qa:write sesuai mode", () => {
-    const names = MCP_TOOLS.filter((t) => t.name.startsWith("hanoman_qa_")).map((t) => [t.name, t.capability, t.mode]);
+    // Tool transfer/hapus QA (ADR-0183) punya berkas test sendiri: mcp-catalog.transfer.test.ts.
+    const transfer = new Set(TRANSFER_TOOLS.map((t) => t.name));
+    const names = MCP_TOOLS.filter((t) => t.name.startsWith("hanoman_qa_") && !transfer.has(t.name))
+      .map((t) => [t.name, t.capability, t.mode]);
     expect(names).toEqual([
       ["hanoman_qa_reports_list", "qa:read", "read"],
       ["hanoman_qa_report_get", "qa:read", "read"],

@@ -14,7 +14,10 @@ afterEach(async () => {
 });
 describe("model discovery API", () => {
   it("serves sanitized snapshot and keeps discovery admin-only", async () => {
-    expect(capabilityForRoute("GET", "/api/models")).toBe("COOKIE_ONLY");
+    // ADR-0187 · katalog model adalah properti MESIN yang sudah disaring parser (tanpa detail akun),
+    // jadi terbaca SETIAP agent token sah; yang tetap admin-only adalah method TULIS di prefix itu.
+    expect(capabilityForRoute("GET", "/api/models")).toBe("GLOBAL_READ");
+    expect(capabilityForRoute("POST", "/api/models")).toBe("COOKIE_ONLY");
     const app = buildApp();
     try {
       expect((await app.inject({ url: "/api/models" })).statusCode).toBe(401);

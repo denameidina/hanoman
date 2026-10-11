@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { agentMetrics, updateAgentInvocationDisposition } from "../services/agent-invocations";
+import { auditAgentAdmin } from "../services/admin-audit";
 
 const zQuery = z.object({
   projectId: z.string().min(1).optional(),
@@ -30,6 +31,12 @@ export default async function (app: FastifyInstance) {
     const view = await updateAgentInvocationDisposition(
       id, body.data.disposition, body.data.note, body.data.reworkRequired,
     );
-    return view ?? reply.code(404).send({ error: "invocation tidak ditemukan" });
+    if (!view) return reply.code(404).send({ error: "invocation tidak ditemukan" });
+    // ADR-0198 · dulu cookie-only (vonis manusia). Bila pelakunya agent token pemegang `metrics:write`,
+    // jejaknya dicatat: siapa yang menilai invokasi mana, dan nilainya apa.
+    await auditAgentAdmin(req, "invocation.disposition", `disposisi invokasi ${id} → ${body.data.disposition}`, {
+      invocationId: id, disposition: body.data.disposition, reworkRequired: body.data.reworkRequired ?? null,
+    }, "info");
+    return view;
   });
 }

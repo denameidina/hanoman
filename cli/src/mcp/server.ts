@@ -8,7 +8,7 @@ import {
 } from "@hanoman/shared";
 import type { McpConfig } from "./config";
 import type { Caller } from "./client";
-import { redactToken } from "./redact";
+import { redactKeepingFresh, redactSecrets, redactToken, secretValues } from "./redact";
 
 
 export function buildMcpServer(
@@ -17,8 +17,13 @@ export function buildMcpServer(
   const server = new McpServer({ name: "hanoman", version: cliVersion }, { instructions: MCP_INSTRUCTIONS });
   const tools = mcpToolsFor(cfg.level);
   const mask = (s: string) => redactToken(s, cfg.token);
-  const text = (s: string, isError = false) =>
-    ({ content: [{ type: "text" as const, text: mask(s) }], ...(isError ? { isError: true } : {}) });
+  // `secrets` = rahasia yang DIKIRIM pemanggil pada panggilan ini (tool.secretArgs, ADR-0193..0195).
+  // `keepFresh` = hasil sukses tool `revealsSecret` (ADR-0196): kredensial baru sekali-tampil lolos topeng pola.
+  const text = (s: string, isError = false, secrets: readonly string[] = [], keepFresh = false) =>
+    ({
+      content: [{ type: "text" as const, text: redactSecrets(keepFresh ? redactKeepingFresh(s, cfg.token) : mask(s), secrets) }],
+      ...(isError ? { isError: true } : {}),
+    });
 
   for (const tool of tools) {
     server.registerTool(
@@ -55,11 +60,13 @@ export function buildMcpServer(
           }, cfg.maxBytes));
         }
 
+        const secrets = secretValues(tool.secretArgs, args);
         const built = tool.build(args);
-        if (!built) return text(`Tool ${tool.name} tak punya panggilan REST.`, true);
+        if (!built) return text(`Tool ${tool.name} tak punya panggilan REST.`, true, secrets);
         const r = await call(built, tool.name);
-        if (!r.ok) return text(r.message, true);
-        return text(renderResult(tool.shape(r.body, args), cfg.maxBytes));
+        if (!r.ok) return text(r.message, true, secrets);
+        // ADR-0196 · hanya HASIL SUKSES tool `revealsSecret` yang lolos topeng pola token.
+        return text(renderResult(tool.shape(r.body, args), cfg.maxBytes), false, secrets, tool.revealsSecret === true);
       },
     );
   }

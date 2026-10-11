@@ -30,9 +30,13 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   const top = seg[0] ?? "";
 
   // tak-boleh-didelegasikan.
-  // SPEC-617 · ADR-0110 · `portal` & `client-accounts` ikut: portal adalah permukaan SESI COOKIE
-  // ber-scope akun (respons bergantung `req.user`, jadi tak ada capability yang bisa berarti
-  // apa pun di sana), dan client-accounts memegang kredensial (preseden /agent-tokens).
+  // SPEC-617 · ADR-0110 · `portal` & `client-accounts` DULU ikut di sini. ADR-0194/0195 membalik
+  // keduanya (lihat blok `portal`/`client-accounts` di bawah): client-accounts jadi `clients:*`,
+  // portal jadi `portal:read` HANYA untuk method baca dan HANYA atas nama akun klien eksplisit.
+  // Tulis ke portal (kirim tiket, mulai/kirim chat) tetap cookie-only — lihat catatan di bawah.
+  // (Catatan sejarah di bawah: alasan `auth`/`agent-tokens`/`device-tokens`/
+  // `presence`/`remote-control`/`logs`/`devices`/metrik DIAMANDEMEN ADR-0196..0198 — kini capability
+  // opt-in; hanya sisa yang disebut di paragraf terakhir yang tetap cookie-only.)
   // SPEC-909 · ADR-0146 · `session-events` ikut: pemanggilnya hook sesi ber-token turunan, bukan
   // manusia dan bukan agen. Agen yang bisa memalsukan "sesi X bertanya Y" bisa menggerakkan lead
   // atas nama sesi mana pun — itu bukan capability, itu peniruan identitas.
@@ -45,15 +49,68 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // (preseden `remote-control`).
   // SPEC-1217 · `logs` memaparkan lajur event/server/transcript SELURUH mesin operator (LogEntry
   // lintas device) — preseden `presence`: tak ada capability yang berarti apa pun untuk itu.
-  if (top === "auth" || top === "agent-tokens" || top === "device-tokens" || top === "sync"
-    || top === "presence" || top === "models" || top === "remote-control" || top === "logs"
-    || top === "portal" || top === "client-accounts" || top === "session-events"
-    || top === "devices") return "COOKIE_ONLY";
+  // ADR-0199 · `sync` DIBELAH: tiga permukaan UI (pemicu manual, antrean konflik, hapus-tertunda)
+  // dibuka lewat capability `sync:*` yang opt-in; SEMUA sisanya — pull/bootstrap/push/logs/
+  // attachments/qa-attachments/ws/relay/ws — tetap COOKIE_ONLY. Itu kanal mesin-ke-mesin ber-Bearer
+  // DEVICE-TOKEN (route-nya sendiri yang menegakkan, app.ts mem-bypass gate cookie untuknya);
+  // agent token bukan device token, dan membungkusnya berarti menyerahkan device-token ke agen.
+  // Dicocokkan ke PANJANG segmen + method PERSIS, bukan prefix (kelas bug SPEC-405).
+  if (top === "sync") {
+    if (method === "POST" && seg.length === 2 && seg[1] === "now") return "sync:write";
+    if (read && seg.length === 2 && (seg[1] === "conflicts" || seg[1] === "pending")) return "sync:read";
+    // Memilih sisi pemenang MEMBUANG sisi yang kalah — capability danger tersendiri, bukan `sync:write`.
+    if (method === "POST" && seg.length === 5 && seg[1] === "conflicts" && seg[4] === "resolve") return "sync:resolve";
+    return "COOKIE_ONLY";
+  }
+  // ADR-0200 · memasang pembaruan & me-restart instance: capability danger tersendiri. Dicocokkan ke
+  // method + panjang segmen — `GET /update` tetap GLOBAL_READ (status), `POST /update/apply` dan
+  // `POST /restart` menuntut `instance:admin`, sisanya cookie-only.
+  if (!read && top === "update" && seg.length === 2 && seg[1] === "apply") return "instance:admin";
+  if (top === "restart") return !read && seg.length === 1 ? "instance:admin" : "COOKIE_ONLY";
+  // ADR-0200 · panduan agen: PUBLIK (app.ts PUBLIC) — dipetakan agar tool baca-nya sah tanpa capability.
+  if (top === "agent-integration.md") return read ? "GLOBAL_READ" : "COOKIE_ONLY";
+  //
+  // ADR-0196..0198 · pemilik repo MEMINTA permukaan admin ini terbuka, jadi ADR-0065/0097/0110/0146/
+  // 0147/0165 diamandemen: `agent-tokens`, `device-tokens`, `auth/users`, `auth/change-password`,
+  // `remote-control`, `devices/:id/relay`, `logs`, `presence`, dan metrik custom agent KINI
+  // dipetakan ke capability baru yang opt-in (lihat blok di bawah). Pagar tak-eskalasi-diri hidup di
+  // HANDLER server (kemurnian (method, path) peta ini tak melihat body). Yang TETAP cookie-only dan
+  // tak bisa dibungkus secara teknis: `auth/{status,setup,login,logout}` (cookie sesi/bootstrap),
+  // `sync` (Bearer device-token mesin-ke-mesin), `session-events` (token HMAC per sesi),
+  // `terminal/workspace` (tata letak browser per-akun). (`portal` tulis tetap cookie-only: ADR-0195.)
+  if (top === "session-events") return "COOKIE_ONLY";
+  if (top === "auth") {
+    // Hanya pengelolaan akun yang terbuka. status/setup/login/logout = cookie sesi & bootstrap.
+    if (seg[1] === "users") return read ? "access:read" : "access:admin";
+    if (seg[1] === "change-password") return "access:admin";
+    return "COOKIE_ONLY";
+  }
+  if (top === "agent-tokens") return rw("tokens");
+  if (top === "device-tokens") return rw("devices");
+  if (top === "remote-control") return read ? "remote:read" : "remote:control";
+  // Relay menjalankan aksi di MESIN LAIN: satu capability untuk SEMUA method (baca isi sesi mesin
+  // lain pun sensitif), dipisah dari `remote:control` (grant mesin INI).
+  if (top === "devices") return "relay:exec";
+  if (top === "logs") return rw("logs");
+  if (top === "presence") return read ? "presence:read" : "COOKIE_ONLY";
   // read-only global (status). SPEC-405 · ADR-0088 · `GLOBAL_READ` HANYA untuk method baca:
   // `POST /update/apply` me-restart instance, dan itu tak pernah boleh lolos hanya karena
   // prefix-nya kebetulan sama dengan endpoint status. Cookie = akses penuh, seperti sebelumnya.
-  if (top === "limits" || top === "update" || top === "events" || top === "fs" || top === "health")
+  // ADR-0187 · `models`, `methods`, `codex` pindah dari cookie-only ke baca-global: ketiganya
+  // properti MESIN (katalog model hasil probe CLI, kesiapan skill metode, versi codex), bukan
+  // properti akun, dan tak satu pun handler-nya membaca `req.user`. `models` dulu cookie-only
+  // semata karena ia lahir sebagai data picker dashboard (SPEC-339); katalognya sudah di-allowlist
+  // parser sehingga detail akun CLI tak pernah tersimpan. Method tulis tetap cookie-only.
+  if (top === "limits" || top === "update" || top === "events" || top === "fs" || top === "health"
+    || top === "models" || top === "methods" || top === "codex")
     return read ? "GLOBAL_READ" : "COOKIE_ONLY";
+  // ADR-0188 · log aktivitas (SessionResult). MENURUT METHOD: DELETE = purge yang menyeberang ke
+  // semua mesin lewat tombstone sync (ADR-0119), jadi `activity:read` tak pernah cukup untuknya.
+  if (top === "session-results") return rw("activity");
+  // ADR-0189 · obrolan portal sisi OPERATOR. Dicocokkan ke segmen PERSIS `portal-chat` — bukan
+  // prefix `portal` (permukaan sesi cookie klien, ADR-0110) yang tetap cookie-only di atas.
+  // `rw()` menurunkan read/write dari method: ekspor & daftar = baca, `POST …/prd` = tulis.
+  if (top === "portal-chat") return rw("portal-chat");
   if (top === "scheduler") {
     // SPEC-646 · ADR-0112 · cron BUKAN knob. Ia adalah `POST /terminal/sessions` yang ditunda:
     // sebuah baris cron membuat hanoman membuka sesi agen di worktree project, berulang, tanpa
@@ -61,7 +118,11 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     // `settings:write` bisa menjadwalkan sesi tanpa batas — persis kelas eskalasi yang ditutup
     // SPEC-405 untuk `/update/apply` dan ADR-0097/0100 untuk permukaan kredensial. ADR-0099 sudah
     // menetapkan bahwa MCP tak mengekspos tool yang mengeksekusi; cron adalah eksekusi.
-    if (seg[1] === "crons") return "COOKIE_ONLY";
+    // ADR-0191 · membalik ADR-0112 DENGAN pagar: `crons` kini domain `scheduler` (menurut method),
+    // opt-in, tak diwarisi `settings:*`. Capability itu SAJA tak pernah cukup untuk eksekusi — handler
+    // di routes/scheduler.ts menuntut `sessions:spawn` juga untuk create/patch-eksekusi/run. Fungsi
+    // ini sengaja tak melihat body (kemurnian (method, path)), jadi gerbang kedua itu hidup di handler.
+    if (seg[1] === "crons") return rw("scheduler");
     return rw("settings");   // SPEC-294 · sisanya = setelan instance
   }
   // SPEC-409 · ADR-0091 · domain TERSENDIRI. `POST /lead/decisions` adalah endpoint TULIS: ia
@@ -72,25 +133,38 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // SPEC-450 · ADR-0094 keputusan 8 · dipetakan MENURUT METHOD, bukan prefix (kelas bug SPEC-405):
   // menulis definisi agen mengubah apa yang dilihat SETIAP sesi baru di seluruh workspace.
   if (top === "custom-agents") {
-    if (seg[1] === "metrics" || seg[1] === "invocations") return "COOKIE_ONLY";
+    // ADR-0198 · metrik & disposisi punya domain TERSENDIRI (`metrics`), bukan `agents`: menulis
+    // disposisi = vonis manusia atas mutu agen, dan `agents:write` (definisi agen) tak boleh
+    // diam-diam membuka penilaian-diri. Menurut METHOD (kelas bug SPEC-405).
+    if (seg[1] === "metrics" || seg[1] === "invocations") return rw("metrics");
     return rw("agents");
   }
   // Skills library · MENURUT METHOD (kelas bug SPEC-405): skill global hanoman disuntik ke setiap
   // sesi baru, jadi izin baca tak pernah cukup untuk menulisnya.
   if (top === "skills") return rw("skills");
   // SPEC-477 · ADR-0097 · permukaan KREDENSIAL bukan permukaan kerja sesi operator: ia menyimpan
-  // bot token & AgentToken, jadi agent token mana pun (termasuk milik gateway itu sendiri, yang
-  // wajib memegang `settings:write`) tak boleh menyentuhnya. Sub-path `/telegram/*` yang lain
-  // tetap domain `telegram` seperti ADR-0096.
+  // bot token & AgentToken. ADR-0193 membalik "cookie-only"-nya menjadi capability `telegram:admin`
+  // (akses danger) — BARU dan opt-in, jadi `telegram:write` dan `settings:write` (yang wajib dipegang
+  // gateway) tetap TIDAK menjangkaunya. Dipetakan apa pun methodnya: GET (isian tersamar) pun
+  // membuka allowlist & chat target. Sub-path `/telegram/*` yang lain tetap domain `telegram` (ADR-0096).
   if (top === "telegram") {
     const sub = seg[1] ?? "";
-    if (sub === "settings" || sub === "test" || sub === "credentials") return "COOKIE_ONLY";
+    if (sub === "settings" || sub === "test" || sub === "credentials") return "telegram:admin";
     return rw("telegram");
   }
   // SPEC-481 · ADR-0100 · pengelolaan webhook memegang SECRET penandatanganan dan menentukan ke
-  // mana data workspace mengalir keluar. Tak ada capability yang cukup untuk itu — cookie-only,
-  // apa pun methodnya (preseden /telegram/{settings,test,credentials}, ADR-0097).
-  if (top === "webhooks") return "COOKIE_ONLY";
+  // mana data workspace mengalir keluar. ADR-0194 membuka lewat domain BARU `webhooks:read|write`
+  // (opt-in, menurut METHOD — kelas bug SPEC-405). Pagar yang tak bisa dinyatakan di peta ini
+  // (`allowPrivate` = SSRF ke jaringan internal) hidup di handler routes/webhooks.ts.
+  if (top === "webhooks") return rw("webhooks");
+  // SPEC-617 · ADR-0110 · akun klien memegang kredensial login orang luar. ADR-0194: `clients:*`
+  // menurut method. Hanya baris ber-role klien yang terjangkau (handler), akun operator tidak.
+  if (top === "client-accounts") return rw("clients");
+  // ADR-0195 · portal klien: respons bergantung identitas akun KLIEN, yang tak dimiliki agent token.
+  // Yang dibuka hanya BACA, dan handler mensyaratkan `?asClient=<id akun klien>` eksplisit untuk
+  // agent token. Tulis (POST kirim tiket, mulai/kirim chat) tetap cookie-only: itu bertindak SEBAGAI
+  // klien — peniruan identitas, bukan capability.
+  if (top === "portal") return read ? "portal:read" : "COOKIE_ONLY";
   if (top === "settings" || top === "config") return rw("settings");
   if (top === "specs") {
     // ADR-0155 · integrate & hapus backlog menghapus artefak dokumen. `PATCH /specs/:id {stage}`
@@ -126,7 +200,16 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   if (top === "terminal") {
     // SPEC-786 · workspace memuat preferensi per akun dan diturunkan dari req.user.id;
     // capability sesi tak membawa identitas admin yang diperlukan untuk isolasi row ini.
+    // ADR-0196 · DIPERTAHANKAN cookie-only setelah ditinjau ulang: ini tata letak tab/pane BROWSER
+    // satu akun manusia (revisi optimistik per akun), bukan data kerja. Agent token tak punya
+    // `req.user` — handler akan jatuh di `request.user!.id` — dan menulisnya hanya merusak layout
+    // operator tanpa nilai bagi agen. Bukan celah yang bisa dibungkus bermakna.
     if (seg[1] === "workspace") return "COOKIE_ONLY";
+    // ADR-0190 · ADR-0192 · SELURUH sub-pohon `/dialog` (baca, jawab, rebut) = `sessions:decide`,
+    // APA PUN method-nya. Dulu `rw("sessions")`: token ber-`sessions:write` — yang cukup untuk
+    // steer/interrupt — otomatis bisa menjawab dialog. Membaca ikut digerbangi karena `screenHash`
+    // dari GET adalah satu-satunya jalan menuju jawaban, dan pertanyaan sesi bisa memuat rahasia.
+    if (seg[1] === "sessions" && seg[3] === "dialog") return "sessions:decide";
     if (seg[seg.length - 1] === "ws") return "sessions:write"; // WS = kontrol interaktif
     // ADR-0155 · membuka sesi BARU ≠ mengendalikan sesi yang sudah ada. Dicocokkan ke panjang
     // segmen PERSIS (`/terminal/sessions`), bukan prefix: `/terminal/sessions/:id/steer`
@@ -139,7 +222,9 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     // Workspace QA · laporan QA adalah domain TERSENDIRI. Tanpa baris ini `/projects/:id/qa/**` jatuh
     // ke `rw("projects")` — agen harus dipercaya menyunting & menghapus project hanya untuk menulis
     // laporan. `rw()` menurunkan read/write DARI METHOD (kelas bug SPEC-405).
-    if (sub === "qa") return rw("qa");
+    // ADR-0183 · HANYA method DELETE yang pindah ke `qa:delete` (akses danger, tak diimplikasikan
+    // `qa:write`): laporan/test case/temuan/lampiran yang dihapus ikut terhapus di mesin tersync.
+    if (sub === "qa") return method === "DELETE" ? "qa:delete" : rw("qa");
     if (sub === "docs" || sub === "prds") return rw("docs");
     if (sub === "github") return rw("support");   // SPEC-471 · ADR-0095 · tarik/daftar issue
     // ADR-0155 · HANYA tulisan yang merusak yang pindah ke `ide:git`; seluruh pembacaan tetap

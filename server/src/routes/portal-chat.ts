@@ -7,6 +7,7 @@ import {
 import { prisma } from "../db";
 import { paginate } from "../services/paginate";
 import { hasProjectAccess } from "../services/client-access";
+import { portalUserId } from "../services/portal-principal";
 import { getSetting } from "../services/settings";
 import { runTurn } from "../services/portal-chat/turn";
 import { sanitizeClientText } from "../services/portal-chat/guard-input";
@@ -56,28 +57,34 @@ export default async function (app: FastifyInstance) {
 
   app.get("/portal/projects/:id/chat", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const cfg = await gate(req.user!.id, id);
+    const uid = await portalUserId(req, reply);   // ADR-0195
+    if (!uid) return reply;
+    const cfg = await gate(uid, id);
     if (!cfg) return reply.code(404).send(NOT_FOUND);
     return quotaView(id, cfg);
   });
 
   app.get("/portal/projects/:id/chat/sessions", async (req, reply) => {
     const { id } = req.params as { id: string };
-    if (!(await gate(req.user!.id, id))) return reply.code(404).send(NOT_FOUND);
+    const uid = await portalUserId(req, reply);   // ADR-0195
+    if (!uid) return reply;
+    if (!(await gate(uid, id))) return reply.code(404).send(NOT_FOUND);
     const { page, limit } = req.query as { page?: string; limit?: string };
     const rows = await prisma.portalChatSession.findMany({
-      where: { projectId: id, userId: req.user!.id }, orderBy: { updatedAt: "desc" } });
+      where: { projectId: id, userId: uid }, orderBy: { updatedAt: "desc" } });
     return paginate(rows.map(toSessionView), page, limit);
   });
 
   app.post("/portal/projects/:id/chat/sessions", async (req, reply) => {
     const { id } = req.params as { id: string };
-    const cfg = await gate(req.user!.id, id);
+    const uid = await portalUserId(req, reply);   // ADR-0195
+    if (!uid) return reply;
+    const cfg = await gate(uid, id);
     if (!cfg) return reply.code(404).send(NOT_FOUND);
     const parsed = zStart.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: "tipe sesi tak dikenal" });
     const hasil = await startSessionWithQuota({
-      projectId: id, userId: req.user!.id, type: parsed.data.type, cfg });
+      projectId: id, userId: uid, type: parsed.data.type, cfg });
     // BUKAN pesan galat: klien membaca sisa jatah & tanggal resetnya dalam bahasa biasa (huruf C).
     // Statusnya tetap 409 supaya klien HTTP tak menganggapnya sesi yang lahir.
     if ("error" in hasil)
@@ -87,8 +94,10 @@ export default async function (app: FastifyInstance) {
 
   app.get("/portal/projects/:id/chat/sessions/:sid", async (req, reply) => {
     const { id, sid } = req.params as { id: string; sid: string };
-    if (!(await gate(req.user!.id, id))) return reply.code(404).send(NOT_FOUND);
-    const s = await ownSession(req.user!.id, id, sid);
+    const uid = await portalUserId(req, reply);   // ADR-0195
+    if (!uid) return reply;
+    if (!(await gate(uid, id))) return reply.code(404).send(NOT_FOUND);
+    const s = await ownSession(uid, id, sid);
     if (!s) return reply.code(404).send(NOT_FOUND);
     const { page, limit } = req.query as { page?: string; limit?: string };
     const rows = await prisma.portalChatMessage.findMany({
@@ -98,9 +107,11 @@ export default async function (app: FastifyInstance) {
 
   app.post("/portal/projects/:id/chat/sessions/:sid/messages", async (req, reply) => {
     const { id, sid } = req.params as { id: string; sid: string };
-    const cfg = await gate(req.user!.id, id);
+    const uid = await portalUserId(req, reply);   // ADR-0195
+    if (!uid) return reply;
+    const cfg = await gate(uid, id);
     if (!cfg) return reply.code(404).send(NOT_FOUND);
-    const s = await ownSession(req.user!.id, id, sid);
+    const s = await ownSession(uid, id, sid);
     if (!s) return reply.code(404).send(NOT_FOUND);
     const parsed = zSend.safeParse(req.body);
     const text = parsed.success ? sanitizeClientText(parsed.data.text).trim() : "";

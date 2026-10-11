@@ -12,17 +12,22 @@ describe("agent capabilities", () => {
   // ADR-0157 · +domain `team` (papan Tim: `/api/tasks` & `/api/members`) → 13 domain, 30 id.
   // ADR-0172 · +domain `skills` (skill library: `/api/skills*`) → 14 domain, 32 id.
   // ADR-0174 · +domain `qa` (Workspace QA: `/api/projects/:id/qa/**`, `/api/qa/**`) → 15 domain, 34 id.
-  it("has 16 domains, 36 capability ids across three access levels, all in metadata", () => {
-    expect(CAPABILITY_IDS.length).toBe(36);
-    expect(new Set(CAPABILITY_IDS).size).toBe(36);
-    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(16);
+  // ADR-0188 · +domain `activity` (log aktivitas `/api/session-results`) → 16 domain, 36 id.
+  // ADR-0189 · +domain `portal-chat` (permukaan operator chat portal) → 17 domain, 38 id.
+  // (Angka 36/16 sebelumnya sudah basi sejak ADR-0182 mencabut domain `memory`: basisnya 34/15.)
+  it("has 32 domains, 66 capability ids across three access levels, all in metadata", () => {
+    expect(CAPABILITY_IDS.length).toBe(66);
+    expect(new Set(CAPABILITY_IDS).size).toBe(66);
+    expect(new Set(CAPABILITIES.map((c) => c.domain)).size).toBe(32);
     expect(CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.id).sort())
-      .toEqual(["backlog:lifecycle", "ide:git", "sessions:spawn", "vps:exec"]);
+      .toEqual(["access:admin", "backlog:lifecycle", "ide:git", "instance:admin", "qa:delete", "relay:exec", "remote:control", "sessions:decide", "sessions:spawn", "sync:resolve", "telegram:admin", "vps:exec"]);
     expect(CAPABILITIES.map((c) => c.id).sort()).toEqual([...CAPABILITY_IDS].sort());
     expect(zCapability.safeParse("projects:read").success).toBe(true);
     expect(zCapability.safeParse("telegram:write").success).toBe(true);
     expect(zCapability.safeParse("skills:write").success).toBe(true);
     expect(zCapability.safeParse("qa:write").success).toBe(true);
+    expect(zCapability.safeParse("activity:write").success).toBe(true);
+    expect(zCapability.safeParse("portal-chat:write").success).toBe(true);
     expect(zCapability.safeParse("nope:read").success).toBe(false);
   });
 
@@ -34,6 +39,10 @@ describe("agent capabilities", () => {
     expect(grantsCapability(["vps:exec"], "vps:exec")).toBe(true);
     // dan sebaliknya: danger tak memberi baca.
     expect(grantsCapability(["vps:exec"], "vps:read")).toBe(false);
+    // ADR-0193 · kredensial Telegram: tak diimplikasikan telegram:write maupun settings:write
+    // (yang wajib dipegang gateway), jadi token gateway tak pernah menjangkaunya.
+    expect(grantsCapability(["telegram:write", "settings:write"], "telegram:admin")).toBe(false);
+    expect(grantsCapability(["telegram:admin"], "telegram:read")).toBe(false);
   });
 
   it("write implies read; unrelated caps do not grant", () => {
@@ -70,8 +79,19 @@ describe("agent capabilities", () => {
     expect(risky).toContain("vps:write");
     // ADR-0155 · keempat capability `danger` wajib bertanda risk; tanpa itu grid Settings
     // merendernya tanpa ⚠ dan pemecahannya kehilangan separuh gunanya.
-    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"])
+    for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "sessions:decide", "scheduler:write"])
       expect(risky, id).toContain(id);
+  });
+
+  // ADR-0190/0191 · pecahan baru juga tak diimplikasikan `:write`. Dan grid Settings hanya punya SATU
+  // sel `berbahaya` per domain, jadi dua capability danger tak boleh berbagi domain tampilan —
+  // yang kedua tak akan punya kotak centang, dan manusia tak bisa memberikannya sama sekali.
+  it("sessions:decide tak diimplikasikan sessions:write; satu danger per domain tampilan", () => {
+    expect(grantsCapability(["sessions:write", "sessions:spawn"], "sessions:decide")).toBe(false);
+    expect(grantsCapability(["scheduler:write"], "scheduler:read")).toBe(true);
+    expect(grantsCapability(["settings:write", "sessions:write"], "scheduler:read")).toBe(false);
+    const dangerDomains = CAPABILITIES.filter((c) => c.access === "danger").map((c) => c.domain);
+    expect(new Set(dangerDomains).size).toBe(dangerDomains.length);
   });
 
   it("zAgentTokenCreate rejects unknown capability and empty name", () => {

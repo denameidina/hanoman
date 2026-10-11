@@ -364,7 +364,7 @@ Pakai skill lebih sempit saat task cocok:
   ganda ke manusia; di sini kontraknya at-least-once ber-id stabil); (6) klien Prisma yang diekspor
   kini **ber-extension** sehingga tak assignable ke `PrismaClient`/`Prisma.TransactionClient` —
   pakai alias **`Db`/`DbTx`** dari `db.ts`, jangan mengetik ulang tipe Prisma polos. Pengelolaannya
-  **COOKIE_ONLY** (memegang secret + menentukan ke mana data mengalir), secret terenkripsi lewat
+  dulu **COOKIE_ONLY**; sejak ADR-0194 terjangkau agen lewat `webhooks:read|write` (opt-in; `allowPrivate` tetap keputusan manusia, ditolak 403 untuk agen), secret terenkripsi lewat
   `secret-box.ts` dan ditampilkan sekali, SSRF diperiksa saat simpan (bentuk + IP literal, **tanpa
   DNS**) dan lagi di **tiap percobaan kirim** (resolve DNS, fail-closed).
 - **Auto-merge saat sesi selesai — kebijakan per project/spec, dieksekusi SWEEP tanpa call site**
@@ -492,17 +492,27 @@ Pakai skill lebih sempit saat task cocok:
   *(default)* (129) → `--danger` (165); yang lebih sempit **menghilangkan** tool, bukan menolaknya
   saat dipanggil, dan yang lebih sempit selalu menang. Tingkat itu **BUKAN kontrol keamanan** —
   ia mencegah salah pilih; yang menahan sungguhan adalah capability pada token.
-  **Yang tetap di luar katalog, dan alasannya:** empat route kredensial Telegram (ADR-0097), tiga
-  route dialog sesi (SPEC-899 — agen yang bisa menjawab `AskUserQuestion` bisa menjawab
-  pertanyaannya sendiri), enam route `scheduler/crons` (ADR-0112 — cron adalah
-  `POST /terminal/sessions` yang ditunda), multipart/biner, dan `password` VPS.
+  **ADR-0199/0200/0201** menambah empat capability opt-in: `sync:read|write` + `sync:resolve` (danger;
+  hanya tiga permukaan UI sync — `now`, `conflicts`, `pending` — sedangkan kanal mesin-ke-mesin
+  ber-device-token dan `POST /ws-tickets` tetap cookie-only) dan `instance:admin` (danger;
+  `POST /update/apply` + `POST /restart`, wajib `confirm`, balasan 202 dikirim SEBELUM proses keluar via
+  `afterReplyFlushed`). Tool baru: `hanoman_sync_*`, `hanoman_update_apply`, `hanoman_instance_restart`,
+  `hanoman_agent_guide` (baca `GET /agent-integration.md` berpotongan). Help Center publik `/help/*`
+  sengaja TANPA tool (anonim by design).
+  **Yang tetap di luar katalog, dan alasannya:** empat route kredensial Telegram (ADR-0097),
+  multipart/biner, dan `password` VPS. **Tiga route dialog sesi (SPEC-899) dan enam route
+  `scheduler/crons` (ADR-0112) dulu juga di luar, dan DIBUNGKUS atas permintaan pemilik** lewat
+  gerbang di server: ADR-0190/0192 — capability **`sessions:decide`** (danger, domain tampilan
+  `decisions`; token yang meluncurkan sesinya atau memanggil dari dalam sesi ditolak 403; `steer`
+  ke dialog ikut digerbangi) dan ADR-0191 — **`scheduler:read|write`** (create/patch-eksekusi/run
+  juga menuntut `sessions:spawn`, ditegakkan di handler).
   **ADR-0157 menutup dua lubang terakhir.** (a) Papan Tim (`/api/tasks*`, `/api/members*`) yang
   jatuh ke `null` di `capabilityForRoute` — kini domain **`team:read`/`team:write`** (capability
   **28 → 30**, **13 domain**), satu domain untuk dua permukaan karena kartu tanpa nama penanggung
   jawab hanyalah judul, dan TERSENDIRI dari `backlog` karena `status` kartu milik manusia sementara
   `Spec.stage` diturunkan dari fase sesi. `POST /tasks/:id/escalate` melahirkan `Spec` tapi tetap
   `team:write` (preseden `/tickets/:id/accept`); yang menahan peluncuran tetap `launchPrincipal` —
-  tanpa `sessions:write`, Spec-nya lahir TANPA `launchApprovedAt`. (b) Empat route **`GLOBAL_READ`**
+  tanpa `sessions:write`, Spec-nya lahir TANPA `launchApprovedAt`. **ADR-0193/0194/0195 (integrasi) membalik tiga keputusan cookie-only lama** lewat capability BARU opt-in: `telegram:admin` (danger; kredensial Telegram — token gateway efektif tak boleh melebihi capability pemanggil, 403), `webhooks:read|write` (webhook keluar; agen tak boleh `allowPrivate`), `clients:read|write` (akun klien portal), dan `portal:read` (**baca** portal atas nama akun klien eksplisit `?asClient=`; tulis atas nama klien tetap cookie-only). Capability **34 → 40**, 18 domain. (b) Empat route **`GLOBAL_READ`**
   (`/limits`, `/limits/codex`, `/update`, `/fs/browse`) yang sudah terjangkau SETIAP token sah tanpa
   satu pun capability — gerbang cakupan me-`continue` padanya sehingga mereka terlihat "tercakup"
   sementara nol tool menyentuhnya. **Jebakan yang lahir bersamanya:** `capability: null` kini punya
@@ -1561,7 +1571,7 @@ Pakai skill lebih sempit saat task cocok:
   Checkbox GFM wajib `disabled`, kelas hanya task-list/`language-*`, dan kegagalan parse/sanitasi
   jatuh ke `<pre>` ter-escape. Jangan membuat renderer Markdown kedua.
 - Auth (ADR-0028): login email/password menggerbangi **seluruh `/api`** (gate `onRequest`, 401 tanpa sesi, termasuk upgrade WebSocket `/api/terminal`). Publik hanya `GET /health`, `GET /auth/status`, `POST /auth/login`, `POST /auth/setup`.
-- **Agent token — akses AI agent** (SPEC-257/ADR-0065, diperkeras SPEC-761): jalur auth kedua memakai `Authorization: Bearer`; query credential dicabut. Capability per-domain default-deny; `/auth`, token/device/sync/webhook dan config sensitif cookie-only. Hanya `sessions:write` dapat memberi launch approval, yang diperiksa ulang di launcher; eksekusi production berada di rootless OS sandbox.
+- **Agent token — akses AI agent** (SPEC-257/ADR-0065, diperkeras SPEC-761): jalur auth kedua memakai `Authorization: Bearer`; query credential dicabut. Capability per-domain default-deny; `/auth/{status,setup,login,logout}`, sync/webhook/portal/session-events/`terminal/workspace` dan config sensitif cookie-only. **ADR-0196..0198:** pengelolaan agent token, device token, akun/password, grant jarak jauh, relay, log, presence, dan metrik custom agent dibuka lewat capability BARU yang opt-in (`tokens`, `devices`, `access`, `remote`, `relay`, `logs`, `presence`, `metrics`; danger: `access:admin`, `remote:control`, `relay:exec`) dengan pagar tak-eskalasi-diri di HANDLER (`exceedingCapabilities`; token sendiri tak bisa diubah/dicabut). Hanya `sessions:write` dapat memberi launch approval, yang diperiksa ulang di launcher; eksekusi production berada di rootless OS sandbox.
 - Password: `crypto.scrypt` (stdlib) + salt acak + `timingSafeEqual`; tak pernah dikembalikan ke client. Sesi: token opaque 256-bit di cookie `httpOnly`; DB menyimpan `sha256(token)`, revocable. Login di-throttle per IP; error selalu generic.
 - **Dua peran user** (SPEC-617/ADR-0110, diperkeras SPEC-761/ADR-0117): `admin` atau `client` scoped. Klien digerbangi allowlist deny-by-default `client-access.ts`; project asing 404; disable ditegakkan saat login dan lookup; admin terakhir dijaga; proyeksi portal adalah allowlist field. **Ingress lebih dulu:** public host hanya static/health/Help, control host menolak Help dan berada di access proxy. Bootstrap meminta token console 0600 one-time 15 menit dan create atomik; tidak ada lagi jendela first-user-wins.
 - **Obrolan portal klien** (SPEC-854/[ADR-0129](../../docs/adr/0129-mesin-chat-portal-klien.md) · kuota [ADR-0130](../../docs/adr/0130-kuota-chat-portal-klien.md)): klien punya percakapan yang dijawab hanoman sendiri — dua tipe sesi (`brainstorm` → PRD draft, `tanya` → jawaban langsung), beda dari Help Center yang antrean tiket ke manusia. Tiap giliran = **proses `claude -p` berumur pendek** di **workspace dokumen** (direktori temp berisi hanya proyeksi portal project itu — tanpa source code), ber-`--tools "Read,Glob,Grep"`, **tanpa** flag bypass/MCP/skill/settings, **tanpa tmux/PTY**. Empat lapis penjagaan, semuanya fungsi murni: gerbang masukan (pesan klien jadi blok bahan ber-nonce) · workspace (allowlist berkas) · argv (flag wajib-ada & wajib-tak-ada) · gerbang keluaran (tolak kode/path/email/istilah teknis/**nama project lain**). Teks penolakan selalu **dikarang server**. Fail closed di production tanpa sandbox — **kebalikan** jalur pty. **Khusus claude**: `--tools` tak punya padanan di `codex exec`. Jatah bulanan per (project × tipe), satuannya sesi yang LAHIR.

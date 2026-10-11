@@ -5,7 +5,8 @@ import { zTelegramReplyInput } from "@hanoman/shared";
 import { prisma } from "../db";
 import { reloadTelegramGateway } from "../services/telegram/bootstrap";
 import {
-  clearTelegramCredentials, saveTelegramCredentials, telegramCredentialView, testTelegramConnection,
+  clearTelegramCredentials, gatewayEscalation, saveTelegramCredentials, telegramCredentialView,
+  testTelegramConnection,
 } from "../services/telegram/credentials";
 import { telegramRuntimeStatus } from "../services/telegram/runtime";
 import { TelegramStore } from "../services/telegram/store";
@@ -21,13 +22,19 @@ const zContextPatch = z.object({
 const zMemory = z.object({ content: z.string().trim().min(1).max(1_000) });
 
 export default async function telegramRoutes(app: FastifyInstance) {
-  // SPEC-477 · ADR-0097 · permukaan KREDENSIAL: cookie-only (lihat `capabilityForRoute`).
-  // Ia menyimpan bot token & AgentToken, jadi agent token mana pun — termasuk milik gateway
-  // itu sendiri, yang wajib memegang `settings:write` — tak boleh menyentuhnya.
+  // SPEC-477 · ADR-0097 · permukaan KREDENSIAL. ADR-0193: terjangkau agent token HANYA dengan
+  // `telegram:admin` (lihat `capabilityForRoute`) — capability yang TIDAK dimiliki token gateway
+  // sendiri (yang wajib memegang `settings:write` dsb.), jadi gateway tetap tak bisa menyentuhnya.
   app.get("/telegram/settings", async () => telegramCredentialView());
 
   app.put("/telegram/settings", async (req, reply) => {
     const body = typeof req.body === "object" && req.body !== null ? req.body as Record<string, unknown> : {};
+    // ADR-0193 · agent token tak boleh memberi gateway (atau orang di allowlist-nya) capability yang
+    // ia sendiri tak punya. Cookie manusia tak terkena: ia memang pemilik keputusan itu.
+    if (req.agent) {
+      const denied = await gatewayEscalation(req.agent.capabilities, body);
+      if (denied) return reply.code(403).send(denied);
+    }
     const saved = await saveTelegramCredentials(body);
     if (!saved.ok) return reply.code(400).send({ error: saved.error, key: saved.key });
     await reloadTelegramGateway();

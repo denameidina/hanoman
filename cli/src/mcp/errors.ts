@@ -64,7 +64,19 @@ export function explainHttpError(status: number, body: unknown, ctx: ErrorCtx): 
     const need = (body as { need?: string })?.need;
     if (need)
       return `Token yang dipakai kurang capability \`${need}\`. Ini tak bisa diakali dari sisi agen: MANUSIA harus menambahkan \`${need}\` ke token itu di Settings → Akses AI Agent. Sebutkan capability persis itu saat memintanya.`;
-    return "Route ini sengaja hanya untuk sesi manusia yang login — agent token tak akan pernah bisa mengaksesnya, apa pun capability-nya (kelola user, agent token, device token, dan sync). Jangan cari jalan lain; sampaikan ke manusia bila memang perlu.";
+    // ADR-0192 · gerbang agen-tak-memutuskan-sesinya-sendiri menjawab 403 TANPA `need` tetapi dengan
+    // `reason`. Tanpa cabang ini ia jatuh ke kalimat cookie-only di bawah — salah alamat: yang ditolak
+    // bukan capability dan bukan route, melainkan PEMANGGILNYA.
+    const reason = (body as { reason?: string })?.reason;
+    if (reason === "self" || reason === "in-session" || reason === "launcher")
+      return `Ditolak gerbang keputusan manusia (${reason}): ${said ?? "agen tak boleh memutuskan dialog sesinya sendiri"}. Ini BUKAN soal capability dan tak bisa diakali dari sisi agen: dialog sebuah sesi hanya boleh diputuskan manusia di dashboard, atau token yang tidak dipakai di dalam sesi itu dan tidak meluncurkannya. Sampaikan pertanyaannya ke manusia.`;
+    // ADR-0196 · pagar tak-eskalasi-diri: capability SUDAH cukup, tapi server menolak isi permintaannya.
+    const b = body as { exceeds?: unknown; self?: unknown; error?: unknown } | null;
+    if (Array.isArray(b?.exceeds))
+      return `Ditolak oleh pagar tak-eskalasi-diri: ${typeof b?.error === "string" ? b.error : "permintaan melebihi hak pemanggil"} (melebihi: ${(b!.exceeds as unknown[]).map(String).join(", ")}). Token ini hanya boleh memberi/mengubah sebatas capability yang ia miliki sendiri — itu bukan galat, dan tak bisa diakali. Minta MANUSIA di Settings → Akses AI Agent bila memang perlu hak lebih.`;
+    if (b?.self === true)
+      return `${typeof b.error === "string" ? b.error : "Token tak boleh mengubah atau mencabut dirinya sendiri."} Itu pagar yang disengaja; sampaikan ke manusia.`;
+    return "Route ini sengaja hanya untuk sesi manusia yang login — agent token tak akan pernah bisa mengaksesnya, apa pun capability-nya (login/logout/setup akun, sync mesin-ke-mesin, event hook sesi, tata letak terminal, portal klien, webhook, kredensial Telegram). Jangan cari jalan lain; sampaikan ke manusia bila memang perlu.";
   }
 
   if (status === 400)
@@ -76,6 +88,20 @@ export function explainHttpError(status: number, body: unknown, ctx: ErrorCtx): 
     return said ? `Tidak ditemukan: ${said}` : `Tidak ditemukan: ${ctx.method} ${ctx.path}.`;
 
   if (status === 409) {
+    // ADR-0200 · `POST /update/apply` & `POST /restart` menjawab 409 dengan KODE, dan bodinya memuat
+    // angka yang dibutuhkan keputusan manusia (sesi hidup, versi). Kalimat generik "Bentrok: …"
+    // membuangnya — padahal `confirm:false` ada justru untuk membaca angka itu.
+    if (said === "confirm-required") {
+      const b = body as { liveSessions?: number; from?: string; to?: string };
+      return `Belum dijalankan: ${ctx.method} ${ctx.path} butuh \`confirm: true\` dan TIDAK mengubah apa pun. `
+        + (typeof b.liveSessions === "number" ? `Sesi hidup saat ini: ${b.liveSessions} (pane tmux selamat dari restart, tapi koneksi sesi putus sesaat). ` : "")
+        + (b.from && b.to ? `Versi ${b.from} → ${b.to}. ` : "")
+        + "Ulangi dengan confirm: true HANYA bila manusia sudah menyetujui.";
+    }
+    if (said === "unsupervised")
+      return "Instance ini tidak berjalan di bawah supervisor (`hanoman start`), jadi tak ada yang akan menghidupkannya lagi setelah keluar — restart/pembaruan ditolak dan proses TIDAK berhenti. Manusia harus menjalankan `hanoman update` / memulai ulang dari terminal.";
+    if (said === "up-to-date")
+      return "Sudah versi terbaru — tak ada yang dipasang dan proses TIDAK di-restart.";
     if (isLead)
       return `hanoman-lead tidak aktif untuk permintaan ini (lead mati, dijeda, atau proyeknya belum opt-in). Kembali ke perilaku biasa: berhenti dan tunggu manusia. ${said ?? ""}`.trim();
     if (ctx.toolName === "hanoman_backlog_update")

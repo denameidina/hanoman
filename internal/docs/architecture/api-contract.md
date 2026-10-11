@@ -68,11 +68,16 @@ POST /auth/change-password { currentPassword, newPassword }  # 200 + cookie baru
 #   BUKAN /auth/users — memisahkannya menutup jalan memutar mengubah kredensial admin lewat pintu klien.
 ```
 
-## Portal klien (SPEC-617 · [ADR-0110](../adr/0110-portal-klien-read-only.md) · SPEC-626 · [ADR-0111](../adr/0111-portal-klien-kirim-tiket.md)) — **COOKIE_ONLY**
+## Portal klien (SPEC-617 · [ADR-0110](../adr/0110-portal-klien-read-only.md) · SPEC-626 · [ADR-0111](../adr/0111-portal-klien-kirim-tiket.md)) — sesi cookie klien; BACA terbuka bagi agen lewat `portal:read` (ADR-0195)
 
 Permukaan untuk `User.role === "client"`. Sumber datanya **sama** dengan dashboard operator
 (`liveSpecs()` + `prisma.ticket`) — tak ada pipeline data kedua; yang berbeda hanya proyeksinya.
-`capabilityForRoute` memetakan `portal` ke **COOKIE_ONLY**: agent token tak pernah menjangkaunya.
+`capabilityForRoute` memetakan **GET** `portal/**` ke `portal:read` dan **semua tulis** ke COOKIE_ONLY
+([ADR-0195](../adr/0195-portal-klien-dilihat-agen-atas-nama-klien.md)). Agent token tak punya `req.user`, jadi handler
+mensyaratkan `?asClient=<id akun klien>` eksplisit untuk principal agen (`services/portal-principal.ts`):
+tanpa itu **400**, bukan akun ber-role klien **404**, dan sesi cookie klien **selalu menang** atas parameter itu
+(tanpa prioritas itu `?asClient` jadi IDOR antar-klien). Kirim tiket dan chat (mulai sesi, kirim pesan) tetap
+cookie-only: itu bertindak SEBAGAI klien.
 
 ```
 GET /portal/projects[?page=&limit=]         -> { items: [{ id, name }], total, page, pageSize }   # HANYA project yang ditugaskan
@@ -111,7 +116,7 @@ POST /portal/projects/:id/tickets           -> 201 PortalTicket        # multipa
 #   sebagai method — route portal berikutnya tetap tertutup secara default.
 ```
 
-## Obrolan portal klien (SPEC-854 · [ADR-0129](../adr/0129-mesin-chat-portal-klien.md) · [ADR-0130](../adr/0130-kuota-chat-portal-klien.md)) — **COOKIE_ONLY**
+## Obrolan portal klien (SPEC-854 · [ADR-0129](../adr/0129-mesin-chat-portal-klien.md) · [ADR-0130](../adr/0130-kuota-chat-portal-klien.md)) — sesi cookie klien; tiga GET terbuka via `portal:read` + `?asClient=` (ADR-0195), POST tetap cookie-only
 
 Percakapan yang dijawab hanoman sendiri — beda dari Help Center, yang antrean tiket ke manusia.
 Tiap giliran memanggil satu proses agen berumur pendek di **workspace dokumen** ber-tool baca-saja;
@@ -152,12 +157,15 @@ POST /portal-chat/sessions/:id/prd                <- { slug }  -> 201 { path }
 #   pekerjaan apa pun — eskalasi adalah keputusan manusia pemilik project (SPEC-854 huruf B).
 #   400 slug tak aman · 409 project tanpa checkout
 GET  /portal-chat/export?project=&from=&to=       -> application/x-ndjson (transkrip untuk training)
+#   from/to cacat -> 400 (ADR-0189; dulu 500).
+#   Gerbang agent token (ADR-0189): GET = `portal-chat:read`, POST = `portal-chat:write`. Tool MCP:
+#   hanoman_portal_admin_chat_{sessions,session_get,export,prd_write}; export & prd_write bermode `danger`.
 ```
 
 Tak satu pun route ini ada di `clientRouteAllowed`, jadi gerbang `app.ts` membalasnya **403** untuk
 akun klien.
 
-## Kelola akun klien (SPEC-617 · ADR-0110) — **COOKIE_ONLY, admin**
+## Kelola akun klien (SPEC-617 · ADR-0110 · [ADR-0194](../adr/0194-webhook-dan-akun-klien-terjangkau-agen.md)) — admin cookie, atau agen ber-`clients:read|write`
 
 ```
 GET    /client-accounts        -> { items: ClientAccountView[] }
@@ -692,6 +700,11 @@ GET/PUT  /settings                      # Setting blob (zSetting): model, effort
 #                                           menjatuhkan readiness ke `error` gara-gara satu dropdown.
 #                                         PUT ganti seluruh blob (full replace).
 GET      /codex/version                 # { version: string|null, minRequired: "0.144.0", ok: boolean }  (SPEC-339)
+#   Baca-global (ADR-0187): agent token mana pun, tanpa capability. Tool MCP: `hanoman_codex_version`.
+GET      /session-results?projectId&limit  # SessionResultView[] terbaru dulu · limit default 200, maks 1000 (SPEC-213/ADR-0047)
+DELETE   /session-results?projectId&before # { purged } · 400 tanpa keduanya / `before` cacat · tiap baris dihapus lewat
+#   `deleteSynced` -> tombstone menyeberang ke SEMUA mesin (ADR-0119). Agent token (ADR-0188): GET =
+#   `activity:read`, DELETE = `activity:write`. Tool MCP: hanoman_activity_{list,purge}; purge bermode `danger`.
 #   Versi codex CLI pada konteks sesi efektif (host: `<HANOMAN_CODEX_BIN> --version`; sandbox:
 #   probe biner yang sama di `HANOMAN_SESSION_IMAGE`, cache 5 menit). `version: null` = tak
 #   terdeteksi (biner/image tak ada / keluaran tak dikenal) dan itu TIDAK dianggap gagal → `ok: true`.
@@ -710,7 +723,8 @@ GET      /methods/status               # { agents[], methods[] }  (SPEC-739/ADR-
 #   `install[]` = perintah dari katalog untuk agen itu. Pencocokan KETAT & id persis — skill polos
 #   `brainstorming` TIDAK memuaskan `superpowers:brainstorming`. Murni observabilitas: metode belum
 #   siap ditandai, TIDAK pernah memblokir Start (ADR-0037), cermin GET /codex/version.
-#   Cookie-only (`capabilityForRoute` tak mengenal prefix `methods`).
+#   Baca-global (ADR-0187, mengamandemen ADR-0114 §4): `GET` terbuka untuk agent token mana pun tanpa
+#   capability, method tulis tetap cookie-only. Tool MCP: `hanoman_methods_status`.
 GET      /limits/codex                  # CodexLimitsDTO { status, windows[], fetchedAt, plan }  (SPEC-338/ADR-0074)
 #   Limit langganan CODEX. Sumbernya BUKAN jaringan: codex menulis `rate_limits` (used_percent,
 #   window_minutes, resets_at, plan_type, rate_limit_reached_type) ke rollout sesinya di
@@ -809,8 +823,10 @@ GET /agent-integration.md   -> 200 text/markdown; charset=utf-8   # isi docs/age
 > Panduan berhadapan-agen (cara AI agent eksternal terhubung, langkah demi langkah + contoh `curl`): [`docs/agent-integration.md`](../../../docs/agent-integration.md) — **naskah yang sama** disajikan runtime di `GET /api/agent-integration.md` (publik, markdown mentah) dan dirender di panel "Akses AI Agent" di UI (SPEC-265/489).
 
 ```
-# Kelola kredensial AI agent — COOKIE-ONLY (agent token sendiri → 403; anti privilege-escalation).
-GET    /agent-tokens/capabilities   -> { capabilities: CapabilityInfo[] }   # katalog 30 (13 domain; 4 punya akses ke-3 `danger`) untuk UI
+# Kelola kredensial AI agent — sesi cookie (manusia, tak dibatasi) ATAU agent token ber-`tokens:read|write`
+# (ADR-0196: pagar tak-eskalasi-diri di handler — token hasil cetak/ubahan ⊆ capability pemanggil, target
+# tak boleh lebih berkuasa dari pemanggil, token sendiri tak bisa diubah/dicabut → 403 `{ exceeds | self }`).
+GET    /agent-tokens/capabilities   -> { capabilities: CapabilityInfo[] }   # katalog 48 (23 domain; 7 punya akses ke-3 `danger`) untuk UI
 GET    /agent-tokens                 -> { items: AgentTokenView[] }          # tanpa hash/plaintext
 POST   /agent-tokens { name, capabilities[] }  -> 201 { ...AgentTokenView, token }   # plaintext hnm_agt_… SEKALI
 #   400 nama kosong / capability asing (divalidasi vs CAPABILITY_IDS). createdBy = user pemanggil.
@@ -820,7 +836,7 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 ```
 
 > **Capability** = `"<domain>:<access>"`, `access ∈ {read,write,danger}`, **write⊇read** dan `danger`
-> tak diimplikasikan apa pun (ADR-0155). 13 domain: `projects`,
+> tak diimplikasikan apa pun (ADR-0155). 23 domain (15 inti + 8 admin ADR-0196..0198 di bawah): `projects`,
 > `backlog`, `sessions` (spawn agen = RCE), `docs`, `ide`, `vps` (remote exec), `settings` (+`/scheduler`),
 > `support` (tickets + issue GitHub), `notifications`, `lead` (ADR-0091), `agents` (ADR-0094),
 > `telegram` (ADR-0096), `team` (papan Tim: `/tasks*` + `/members*`, ADR-0157). Peta route→capability di `server/src/services/agent-capabilities.ts`:
@@ -829,11 +845,23 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > **Read-only global** (`/limits`,`/limits/codex`,`/update`,`/events/ws`,`/fs/browse`,`/health`) → token
 > ber-capability apa pun — bahkan token TANPA satu pun capability — **hanya untuk method baca**
 > (SPEC-405 · ADR-0088). Keempat yang bukan WS/health punya tool MCP ber-`capability: null` (ADR-0157). **Tak-boleh-didelegasikan** (agent → 403):
-> `/auth`, `/agent-tokens`, `/device-tokens`, `/sync`, `/webhooks` (ADR-0100), `/portal` &
-> `/client-accounts` (ADR-0110), `/session-events` (ADR-0146), `/presence` (ADR-0147),
+> `/auth`, `/agent-tokens`, `/device-tokens`, `/sync`, tulis `/portal` (ADR-0195; baca = `portal:read`),
+> `/session-events` (ADR-0146), `/presence` (ADR-0147),
 > `/remote-control` (SPEC-1215 · ADR-0165), `/devices/:deviceId/relay/*` (SPEC-1216 · ADR-0165 §6 —
 > menjalankan aksi sesi di mesin lain atas nama pemanggil), dan
-> `/telegram/{settings,test,credentials}` (ADR-0097); route tak dikenal peta → cookie-only. Master switch
+> route tak dikenal peta → cookie-only. **Dibuka oleh capability BARU opt-in** (membalik ADR-0097/0100/0110, lewat
+> ADR-0193/0194/0195): `/telegram/{settings,test,credentials}` → `telegram:admin` (danger), `/webhooks` → `webhooks:read|write`,
+> `/client-accounts` → `clients:read|write`, baca `/portal` → `portal:read`. Master switch
+> (SPEC-405 · ADR-0088). Keempat yang bukan WS/health punya tool MCP ber-`capability: null` (ADR-0157).
+> **Permukaan admin yang DIBUKA opt-in (ADR-0196..0198, mengamandemen ADR-0065/0165/0166/0147)** — domain
+> `tokens` (`/agent-tokens*`), `devices` (`/device-tokens*`), `access` (`/auth/users*`,
+> `/auth/change-password`; `access:admin` = danger), `remote` (`/remote-control`; `remote:control` = danger),
+> `relay` (`/devices/:deviceId/relay/*`; `relay:exec` = danger, semua method), `logs` (`/logs*`),
+> `presence` (`GET /presence`), `metrics` (`/custom-agents/{metrics,invocations/:id}`). **Tak-boleh-didelegasikan**
+> (agent → 403): `/auth/{status,setup,login,logout}`, `/sync`, `/webhooks` (ADR-0100), `/portal` &
+> `/client-accounts` (ADR-0110), `/session-events` (ADR-0146; agent token → 401 HMAC), `/terminal/workspace`
+> (tata letak browser per akun), dan `/telegram/{settings,test,credentials}` (ADR-0097); route tak dikenal
+> peta → cookie-only. Master switch
 > `Setting.agentAccessEnabled` (PUT /settings) mematikan semua. **Kecuali** endpoint `PUBLIC`
 > (`/health`, `/auth/status`, `/auth/login`, `/auth/setup`, `/agent-integration.md`) yang tak pernah
 > menyentuh gate ini sama sekali.
@@ -1111,7 +1139,9 @@ GET    /terminal/sessions/:id/dialog        # (SPEC-899, ADR-0142) 200 { dialog,
 #   204 = pane mati, layar bukan dialog, layar rekap rantai, ATAU dialog tanpa kolom bebas & tanpa
 #     kolom catatan. Yang terakhir itu dialog trust & prompt izin: `sendToPane` sengaja tak
 #     menyentuhnya, dan tombol dashboard yang menjawab prompt izin adalah kebalikan ADR-0037.
-#   Capability `sessions:read` — dari peta `rw("sessions")` yang sudah ada, nol perubahan peta.
+#   Capability `sessions:decide` (ADR-0190; dulu `sessions:read` dari `rw("sessions")`) untuk SEMUA method
+#   di sub-pohon `/dialog`. Agent token yang meluncurkan sesinya atau memanggil dari dalam sesi (header
+#   `x-hanoman-session`) → 403 `reason: launcher|self|in-session` (ADR-0192), SEBELUM 409 deciding/answering.
 POST   /terminal/sessions/:id/dialog/answer { screenHash, choice?, choices?[], text? }
 #   (SPEC-899, ADR-0142) 202 { accepted:true }. `choice`/`choices` = NOMOR BARIS yang dipancarkan
 #   GET (`options[].n`), bukan indeks array; keduanya saling eksklusif; salah satu dari ketiganya
@@ -1253,7 +1283,8 @@ DELETE /terminal/history?projectId&before
 
 ## Events (SPEC-199 · ADR-0039 · SPEC-908/ADR-0145)
 
-Katalog model runtime: `GET /api/models` (admin cookie, tanpa query/body) mengembalikan
+Katalog model runtime: `GET /api/models` (cookie ATAU agent token tanpa capability — `GLOBAL_READ`, ADR-0187;
+tanpa query/body) mengembalikan
 `{claude: [{id,label,efforts?}], codex: [{id,label,efforts,fallback,minClient}],
 providers: {claude,codex}}`. Status provider = `{source:"bundled"|"cache"|"cli",
 checkedAt:string|null, updatedAt:string|null, error:string|null}`.
@@ -1912,8 +1943,11 @@ POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # cance
 > ### Cronjob per project (SPEC-646 · [ADR-0112](../adr/0112-cronjob-per-project-scheduler.md))
 >
 > Jadwal jam tertentu (HH:MM) yang ditunda ADR-0072, di atas engine yang SAMA — tanpa timer kedua.
-> Seluruhnya **COOKIE_ONLY**: sebuah cron adalah `POST /terminal/sessions` yang DITUNDA, jadi
-> `settings:write` tak pernah cukup untuknya (`capabilityForRoute` punya cabang `seg[1] === "crons"`).
+> Capability (ADR-0191, membalik "COOKIE_ONLY" ADR-0112): `scheduler:read` (GET) / `scheduler:write`
+> (lainnya) — BUKAN `settings:*`. Sebuah cron adalah `POST /terminal/sessions` yang DITUNDA, jadi agent
+> token juga wajib `sessions:spawn` untuk `POST /crons`, `POST /crons/:id/run`, dan `PATCH` yang
+> menyentuh `prompt`/`agent`/`model`/`effort`/`expr` atau `enabled:true` → 403
+> `{ need: "sessions:spawn", reason: "cron-executes" }` (ditegakkan di handler; cookie tak dinilai).
 >
 > | Method | Path | Keterangan |
 > |---|---|---|
@@ -2239,7 +2273,11 @@ matrix per-fase karena mekanisme itu tak andal, dan SPEC-487 mengukur kelasnya (
 sedang menjalankan giliran mendarat sebagai **pesan liar**). Jalur yang dijanjikan `/engine restart`
 — deterministik, dan konteks selamat lewat ringkasan + curated memory yang memang hidup di DB.
 
-### Kredensial dari Settings (SPEC-477 · ADR-0097) — **COOKIE_ONLY**
+### Kredensial dari Settings (SPEC-477 · ADR-0097 · [ADR-0193](../adr/0193-kredensial-telegram-terjangkau-agen.md)) — cookie, atau agen ber-`telegram:admin`
+
+> `telegram:admin` (akses danger) TIDAK diimplikasikan `telegram:write` maupun `settings:write` — token gateway sendiri
+> tetap tak menjangkaunya. `PUT` dari agent token menolak **403** bila token gateway efektif memegang capability yang
+> tak dimiliki pemanggil (`gatewayEscalation`, anti-eskalasi diri). Respons tetap tersamar (`masked`).
 
 ```text
 GET    /api/telegram/settings      → { fields: [{ key, label, help?, kind, source, hasValue, masked?, value? }] }
@@ -2298,11 +2336,12 @@ balasan final, 25 detik saat idle) — nol timer baru, ADR-0024 utuh.
 Endpoint context/memory tidak pernah mengembalikan token atau teks inbound. Audit hanya metadata
 correlation/method/path/status, tanpa body/header.
 
-## Webhook keluar (SPEC-481 · [ADR-0100](../adr/0100-webhook-keluar-peristiwa.md)) — **COOKIE_ONLY**
+## Webhook keluar (SPEC-481 · [ADR-0100](../adr/0100-webhook-keluar-peristiwa.md) · [ADR-0194](../adr/0194-webhook-dan-akun-klien-terjangkau-agen.md)) — cookie, atau agen ber-`webhooks:read|write`
 
-`capabilityForRoute` memetakan seluruh prefix `webhooks` ke `COOKIE_ONLY`, apa pun method-nya:
-permukaan ini memegang **secret penandatanganan** dan menentukan ke mana data workspace mengalir
-keluar (preseden `/telegram/{settings,test,credentials}`, ADR-0097). Tak ada jalur AgentToken.
+`capabilityForRoute` memetakan prefix `webhooks` MENURUT METHOD ke `webhooks:read|write` (dulu `COOKIE_ONLY`, ADR-0100).
+Permukaan ini memegang **secret penandatanganan** dan menentukan ke mana data workspace mengalir keluar; karena itu
+`allowPrivate` (mematikan pagar SSRF) tetap keputusan manusia: agent token yang menyalakannya, atau memindahkan URL
+endpoint yang sudah ber-`allowPrivate`, ditolak **403** di handler.
 
 | Method | Path | Keterangan |
 | --- | --- | --- |

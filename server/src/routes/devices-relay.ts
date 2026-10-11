@@ -21,9 +21,15 @@ function specIdOf(path: string, body: unknown): string | undefined {
 
 export default async function (app: FastifyInstance, opts: { allowedOrigins?: Set<string> } = {}) {
   async function handler(req: FastifyRequest, reply: FastifyReply) {
-    // Principal: gate app.ts sudah menolak req.agent/req.remote lebih dulu (route COOKIE_ONLY),
-    // jadi di sini req.user wajib ada.
-    if (!req.user) return reply.code(401).send({ error: "unauthorized" });
+    // Principal: cookie manusia, ATAU (ADR-0196) agent token pemegang `relay:exec` — gate app.ts
+    // sudah menolak token tanpa capability itu; principal `remote` (relay masuk) tak punya `req.user`
+    // dan tak membawa `req.agent` → jatuh ke 401 di bawah, jadi relay tak pernah berantai.
+    // Aktor yang diteruskan ke klien adalah KLAIM hub; untuk agen ia ditandai `agent:<id>` supaya
+    // audit di mesin tujuan tak mengira ada manusia di pane.
+    const principal = req.user
+      ? { id: req.user.id, email: req.user.email }
+      : req.agent ? { id: `agent:${req.agent.id}`, email: `agent:${req.agent.id}` } : null;
+    if (!principal) return reply.code(401).send({ error: "unauthorized" });
     const { deviceId } = req.params as { deviceId: string };
     const wildcard = (req.params as { "*"?: string })["*"] ?? "";
     const path = `/api/${wildcard}`;
@@ -42,13 +48,13 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     const audit = (status: number, extra: Record<string, unknown> = {}) => appendEvent({
       kind: "relay.request", level: status >= 500 ? "error" : status >= 400 ? "warn" : "info",
       msg: `${method} ${path} → ${status}`, specId,
-      data: { deviceId, actor: { userId: req.user!.id, email: req.user!.email }, method, path, status, ms: Date.now() - started, ...extra },
+      data: { deviceId, actor: { userId: principal.id, email: principal.email }, method, path, status, ms: Date.now() - started, ...extra },
     });
 
     if (!device) { await audit(404); return reply.code(404).send({ error: "device tak dikenal", relay: "unknown-device" }); }
 
     const hubOrigin = String(req.headers.origin ?? `${req.protocol}://${req.headers.host}`).slice(0, 200);
-    const actor: RelayActor = { hubOrigin, userId: req.user.id, email: req.user.email };
+    const actor: RelayActor = { hubOrigin, userId: principal.id, email: principal.email };
     const timeoutMs = method === "POST" && path === "/api/terminal/sessions" ? RELAY_SPAWN_TIMEOUT_MS : RELAY_REQ_TIMEOUT_MS;
 
     let res: RelayResponse;

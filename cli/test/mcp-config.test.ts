@@ -4,6 +4,15 @@ import { resolveMcpConfig } from "../src/mcp/config";
 const noFile = () => null;
 
 describe("resolveMcpConfig", () => {
+  // ADR-0192 · identitas sesi untuk gerbang agen-tak-memutuskan-sesinya-sendiri: hanya dari ENV,
+  // dan hanya bila ada.
+  it("HANOMAN_SESSION_ID yang diwarisi dibawa sebagai sessionId; tanpa itu field-nya tak ada", () => {
+    const base = { HANOMAN_HOST: "http://x", HANOMAN_AGENT_TOKEN: "t" };
+    expect(resolveMcpConfig([], { ...base, HANOMAN_SESSION_ID: " spec-1 " }, noFile).sessionId).toBe("spec-1");
+    expect(resolveMcpConfig([], base, noFile)).not.toHaveProperty("sessionId");
+    expect(resolveMcpConfig([], { ...base, HANOMAN_SESSION_ID: "  " }, noFile)).not.toHaveProperty("sessionId");
+  });
+
   it("membaca host & token dari env", () => {
     const c = resolveMcpConfig([], { HANOMAN_HOST: "http://localhost:8787", HANOMAN_AGENT_TOKEN: "hnm_agt_x" }, noFile);
     expect(c).toMatchObject({ host: "http://localhost:8787", token: "hnm_agt_x", level: "default", problems: [] });

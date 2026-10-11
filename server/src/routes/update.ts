@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { zUpdateApplyBody } from "@hanoman/shared";
 import { getUpdateStatus, requestRestartForUpdate, supervised } from "../services/update";
 import { listSessions } from "../services/pty";
-import { requestManualRestart } from "../services/restart";
+import { afterReplyFlushed, requestManualRestart } from "../services/restart";
 
 // GET /api/update — status auto-update (SPEC-214/398). Auth-gated otomatis (bukan anggota PUBLIC
 // di app.ts). Realtime lewat WS siar grup "update".
@@ -31,7 +31,10 @@ export default async function update(app: FastifyInstance) {
     // manusia yang memutuskan, dan pane tmux memang selamat dari restart (ADR-0016).
     if (!parsed.data.confirm) return reply.code(409).send({ error: "confirm-required", liveSessions, from, to });
 
-    requestRestartForUpdate();
+    // ADR-0200 · jawab DULU, mati kemudian: exit dijadwalkan sesudah balasan 202 selesai ditulis
+    // (bukan dari timer yang mulai berdetak sebelum balasan mengalir) — pemanggil agent token
+    // tak boleh menerima koneksi putus tanpa tahu apakah restart diterima.
+    afterReplyFlushed(reply.raw, requestRestartForUpdate);
     return reply.code(202).send({ accepted: true, from, to, liveSessions });
   });
 
@@ -43,7 +46,7 @@ export default async function update(app: FastifyInstance) {
     if (!supervised()) return reply.code(409).send({ error: "unsupervised" });
     const liveSessions = listSessions().filter((s) => !s.exited).length;
     if (!parsed.data.confirm) return reply.code(409).send({ error: "confirm-required", liveSessions });
-    requestManualRestart();
+    afterReplyFlushed(reply.raw, () => requestManualRestart());   // ADR-0200 · jawab dulu, mati kemudian
     return reply.code(202).send({ accepted: true, liveSessions });
   });
 }

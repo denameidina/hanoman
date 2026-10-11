@@ -42,6 +42,19 @@ describe("admitRemoteRequest — unit (SPEC-1215 · ADR-0165 §3–5)", () => {
     expect(await admitRemoteRequest(fakeReq({ url, headers: { [RELAY_MODE_HEADER]: "read" } }), grant(["sessions:read"]))).toMatchObject({ ok: true });
     expect(await admitRemoteRequest(fakeReq({ url }), grant(["sessions:read"]))).toMatchObject({ ok: false, status: 403, body: { need: "sessions:write" } });
   });
+  // ADR-0190 · dialog sesi menjadi `sessions:decide` bagi AGENT TOKEN, tetapi operator hub adalah
+  // MANUSIA dan `sessions:decide` tak ada di REMOTE_CAPABILITIES. Tanpa pengecualian di
+  // `remoteCapabilityFor`, memperketat agent token diam-diam akan mencabut hak operator hub.
+  it("dialog sesi lewat relay tetap sessions:read (baca) / sessions:write (jawab, rebut) — bukan sessions:decide", async () => {
+    const dialog = (method: string, sub: string) =>
+      fakeReq({ method, url: `/api/terminal/sessions/spec-1/${sub}` });
+    expect(await admitRemoteRequest(dialog("GET", "dialog"), grant(["sessions:read"]))).toMatchObject({ ok: true });
+    expect(await admitRemoteRequest(dialog("POST", "dialog/answer"), grant(["sessions:read", "sessions:write"]))).toMatchObject({ ok: true });
+    expect(await admitRemoteRequest(dialog("POST", "dialog/takeover"), grant(["sessions:read", "sessions:write"]))).toMatchObject({ ok: true });
+    // kontrol negatif: tanpa sessions:write jawab/rebut tetap ditolak, dan yang disebut bukan decide
+    expect(await admitRemoteRequest(dialog("POST", "dialog/answer"), grant(["sessions:read"])))
+      .toMatchObject({ ok: false, status: 403, body: { need: "sessions:write" } });
+  });
   it("lolos: aktor klaim hub + capability grant", async () => {
     const v = await admitRemoteRequest(fakeReq(), grant(["sessions:read", "ide:read"]));
     expect(v).toEqual({ ok: true, remote: { actor, capabilities: ["sessions:read", "ide:read"], mode: "write" } });

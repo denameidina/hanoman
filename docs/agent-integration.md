@@ -91,28 +91,57 @@ host-mu benar dan masalahnya ada pada token atau master switch.
 ## 3. Capability
 
 Capability berformat `"<domain>:<access>"`, `access ∈ {read, write}`, dan **write meng-implikasikan
-read** pada domain yang sama. Ada **13 domain**; empat di antaranya punya akses KETIGA `danger`
-(ADR-0155) yang **tak diimplikasikan `:write`**, sehingga totalnya **30 capability**. Katalog resmi (dengan label &
+read** pada domain yang sama. Ada **17 domain**; empat di antaranya punya akses KETIGA `danger`
+(ADR-0155) yang **tak diimplikasikan `:write`**, sehingga totalnya **38 capability**. Katalog resmi (dengan label &
+read** pada domain yang sama. Ada **18 domain**; lima di antaranya punya akses KETIGA `danger`
+(ADR-0155, ADR-0193) yang **tak diimplikasikan `:write`**, sehingga totalnya **40 capability**
+(`portal` hanya punya `read` — lihat tabel). Katalog resmi (dengan label &
 deskripsi) tampil di panel **Settings → Akses AI Agent** saat manusia membuat token; endpoint
 katalognya (`GET /api/agent-tokens/capabilities`) bersifat **cookie-only** (lihat §5) — kamu tak
 perlu mengambilnya, cukup rujuk tabel di bawah:
+read** pada domain yang sama. Ada **23 domain** dan **48 capability**; domain yang punya akses KETIGA
+`danger` (`sessions:spawn`, `ide:git`, `backlog:lifecycle`, `vps:exec` — ADR-0155 — dan, sejak
+ADR-0196..0198, `access:admin`, `remote:control`, `relay:exec`) **tak diimplikasikan `:write`**.
+Katalog resmi (dengan label & deskripsi) tampil di panel **Settings → Akses AI Agent** saat manusia
+membuat token; endpoint katalognya (`GET /api/agent-tokens/capabilities`) kini terbaca dengan
+`tokens:read` — selain itu cukup rujuk tabel di bawah:
 
 | Domain | Cakupan endpoint | Catatan |
 |---|---|---|
 | `projects` | `/api/projects*` | project, branch, binding, Help Center |
 | `backlog` | `/api/specs*` | spec/backlog, dokumen, review diff, integrate |
-| `sessions` | `/api/terminal*` (+ WS terminal) | jalankan sesi agen/shell, kirim input, baca & jawab dialog sesi (SPEC-899) — **high-risk (RCE)** |
+| `sessions` | `/api/terminal*` (+ WS terminal) | jalankan sesi agen/shell, kirim input — **high-risk (RCE)**. Sub-pohon `/dialog` **bukan** domain ini sejak ADR-0190: lihat `decisions`. `steer` ke sesi yang sedang menampilkan dialog juga digerbangi `sessions:decide` |
 | `docs` | `/api/prds*`, `/api/projects/:id/{docs,prds}*` | dokumen SoT project & PRD |
 | `ide` | `/api/projects/:id/{tree,file,file-diff,working-status,graph,commit,git,status,stashes,remotes,compare,archive,pr-url}*` | tree/file working tree, operasi git |
 | `vps` | `/api/vps*` | kelola VPS, audit, harden, konsol — **high-risk (remote exec)** |
-| `settings` | `/api/settings*`, `/api/config*`, `/api/scheduler*` | setelan instance & config runtime |
+| `settings` | `/api/settings*`, `/api/config*`, `/api/scheduler*` kecuali `/api/scheduler/crons*` | setelan instance & config runtime |
 | `support` | `/api/tickets*`, `/api/github-issues*`, `/api/projects/:id/github*` | tiket Help Center & issue GitHub (triase) |
 | `notifications` | `/api/notifications*` | notifikasi |
 | `lead` | `/api/lead*` | minta putusan ke hanoman-lead & baca jejaknya — **`lead:write` bisa menggerakkan sesi** (ADR-0091) |
 | `agents` | `/api/custom-agents*` | katalog custom agent global & per project — **`agents:write` mengubah apa yang dilihat SETIAP sesi baru** (ADR-0094) |
 | `skills` | `/api/skills*` | skill global hanoman, user, plugin (baca-saja) & per project, termasuk isi berkasnya — **`skills:write` pada skill global hanoman mengubah instruksi SETIAP sesi baru di semua project** |
 | `telegram` | `/api/telegram*` kecuali sub-path kredensial | context/memory/reply/audit kanal operator Telegram (ADR-0096) |
+| `qa` | `/api/projects/:id/qa*`, `/api/qa*` | laporan QA per project: test case, temuan, lampiran |
+| `activity` | `/api/session-results*` | log aktivitas lintas device (stage, commit, PR); **`activity:write` = purge yang menyeberang ke SEMUA mesin lewat sync** (ADR-0188) |
+| `portal-chat` | `/api/portal-chat*` | chat portal klien sisi OPERATOR: sesi, PRD draft, ekspor transkrip — berisi **email & percakapan klien**; `portal-chat:write` menulis `docs/prd/<slug>.md` di checkout (ADR-0189). Beda dari `/api/portal*` yang tetap cookie-only |
+| `telegram` | `/api/telegram*` kecuali sub-path kredensial | context/memory/reply/audit kanal operator Telegram (ADR-0096). Sub-path **kredensial** (`/api/telegram/settings`, `/api/telegram/test`, `/api/telegram/credentials`) menuntut capability `danger` **`telegram:admin`** (ADR-0193) — tak diimplikasikan `telegram:write` maupun `settings:write`, sehingga token gateway Telegram sendiri tetap tak menjangkaunya. **Anti-eskalasi (403):** token gateway efektif tak boleh memegang capability yang tak dimiliki token pemanggil |
+| `webhooks` | `/api/webhooks*` | webhook keluar: endpoint, putar secret, ping, riwayat & ulang pengiriman (ADR-0194). **`webhooks:write` menentukan ke mana data workspace mengalir keluar**; secret penandatanganan tampil **sekali** saat dibuat/diputar. `allowPrivate` (SSRF ke jaringan internal) tetap keputusan manusia — agent token ditolak 403 bila menyalakannya |
+| `clients` | `/api/client-accounts*` | akun login portal klien: daftar, buat, ubah akses project/nonaktifkan, reset password, hapus (ADR-0194). `clients:write` **membuka login baru ke data project** |
+| `portal` | `/api/portal*` (**baca** saja) | lihat portal **atas nama satu akun klien** yang disebut eksplisit lewat `?asClient=<id akun klien>` (ADR-0195); hanya `portal:read`, tak ada `portal:write`. Chat portal memuat percakapan klien |
 | `team` | `/api/tasks*`, `/api/members*` | papan **Tim**: kartu kerja MANUSIA & direktori anggota (ADR-0157). `status` kartu milik manusia — ia **bukan** `stage` backlog. `POST /api/tasks/:id/escalate` melahirkan backlog item dan tetap `team:write` (cermin `POST /api/tickets/:id/accept`) |
+| `qa` | `/api/projects/:id/qa/**`, `/api/qa/**` | laporan QA, test case, temuan, lampiran, ekspor/impor. Method `DELETE` menuntut `qa:delete` (akses `danger`, ADR-0185), bukan `qa:write` |
+| `decisions` | `/api/terminal/sessions/:id/dialog*` (capability `sessions:decide`, akses `danger`) | **gerbang manusia-yang-memutuskan** (ADR-0190, ADR-0192): baca, jawab, dan rebut dialog `AskUserQuestion` sebuah sesi. **Tak diimplikasikan `sessions:write`.** Beri HANYA ke token yang tidak dipakai agen di dalam sesi hanoman — lihat §13 |
+| `scheduler` | `/api/scheduler/crons*` | cronjob per project — **cron = sesi agen berizin penuh yang ditunda** (ADR-0191). Membuat, mengubah prompt/agen/model/effort/jadwal, mengaktifkan, dan menjalankan cron menuntut **`scheduler:write` DAN `sessions:spawn`**; server menjawab 403 `need: sessions:spawn` bila yang kedua tak dicentang |
+| `tokens` | `/api/agent-tokens*` | cetak/ubah/cabut **agent token**. Dulu cookie-only (ADR-0065); ADR-0196 membukanya dengan **pagar tak-eskalasi-diri** (§5b). `tokens:write` **bukan** izin menaikkan hak sendiri |
+| `devices` | `/api/device-tokens*` | **device token** (identitas mesin untuk sync & relay) atas nama akun admin yang menerbitkan agent token ini (ADR-0197). Plaintext sekali-tampil |
+| `access` | `/api/auth/users*`, `POST /api/auth/change-password` | daftar akun (`access:read`); **`access:admin`** (danger) membuat akun admin, menghapus akun, dan menyetel ulang password akun lain — **setara akses penuh instance** |
+| `remote` | `/api/remote-control` | grant kendali jarak jauh mesin ini. `remote:read` membaca; **`remote:control`** (danger) mengubahnya — grant yang menyala membuat hub menjalankan agen di mesin ini (ADR-0165, ADR-0197) |
+| `relay` | `/api/devices/:id/relay/*` | **`relay:exec`** (danger): meneruskan aksi sesi ke mesin LAIN lewat relay hub, atas nama operator — eksekusi lintas mesin (ADR-0165 §4, ADR-0197) |
+| `logs` | `/api/logs*` | log terpusat lintas device: cari, transkrip, retensi (`logs:read`); `logs:write` mengubah retensi & lajur pengiriman log (memendekkan retensi menghapus jejak audit) |
+| `presence` | `/api/presence` | peta sesi hidup di seluruh device operator (`presence:read`, ADR-0147/0197) |
+| `metrics` | `/api/custom-agents/{metrics,invocations}*` | metrik custom agent (`metrics:read`) dan disposisi per invokasi (`metrics:write` — vonis MANUSIA atas mutu agen; ADR-0198) |
+| `sync` | `GET /api/sync/{conflicts,pending}`, `POST /api/sync/now`, `POST /api/sync/conflicts/:entity/:recordId/resolve` | **hanya tiga permukaan UI sync** (ADR-0199): antrean konflik & hapus-tertunda (`sync:read`), pemicu sync manual (`sync:write`), memutuskan konflik (`sync:resolve`, akses `danger` — **membuang data satu sisi tanpa jalan pulang**, tak diimplikasikan `sync:write`). Kanal mesin-ke-mesin (`/api/sync/{pull,bootstrap,push,logs,attachments,qa-attachments,ws,relay}`) tetap bukan milik agen — lihat §5 |
+| `instance` | `POST /api/update/apply`, `POST /api/restart` | satu capability `instance:admin` (akses `danger`, ADR-0200): memasang versi hanoman terbaru dari registry npm dan me-**restart** proses server. Hanya sah bila instance punya supervisor (`canApply` di `GET /api/update`); wajib `{ "confirm": true }` dan balasan 202 dikirim **sebelum** proses keluar |
 
 ## 4. Aturan gate & kode status
 
@@ -137,6 +166,26 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
 - `/api/auth/*` — kelola user & password
 - `/api/agent-tokens*` — agen tak boleh mencetak/menaikkan token sendiri
 - `/api/device-tokens*`, `/api/sync*` — identitas mesin & sync hub
+- **Tulis** ke `/api/portal*` (`POST …/tickets`, `POST …/chat/sessions`, `POST …/messages`) — itu
+  bertindak **sebagai klien** (tiket multipart; chat menghabiskan kuota klien dan tertulis sebagai
+  ucapannya): peniruan identitas, bukan capability. Membaca portal sebagai klien tersedia lewat
+  capability `portal:read` (ADR-0195)
+
+> Dulu cookie-only, kini capability **opt-in** (manusia yang mencentangnya di Settings → Akses AI
+> Agent): `/api/webhooks*` → `webhooks:*` (ADR-0194), `/api/client-accounts*` → `clients:*`
+> (ADR-0194), `/api/telegram/{settings,test,credentials}` → `telegram:admin` (ADR-0193), dan
+> **baca** `/api/portal*` → `portal:read` (ADR-0195). Lihat tabel §3.
+- `/api/auth/{status,setup,login,logout}` — cookie sesi & bootstrap akun pertama (setup token di
+  `HANOMAN_HOME`). Agen tak punya sesi cookie, jadi tak ada yang bisa dibungkus bermakna. (Pengelolaan
+  akun — `/api/auth/users*` dan `change-password` — **dibuka** lewat `access:*`; lihat §5b.)
+- `/api/sync*` — sync mesin-ke-mesin; kredensialnya Bearer **device token**, bukan agent token
+- `/api/device-tokens*`, `/api/sync*` — identitas mesin & sync hub. **Pengecualian sempit (ADR-0199):**
+  tiga permukaan UI sync (`GET /api/sync/conflicts`, `GET /api/sync/pending`, `POST /api/sync/now`) dan
+  `POST /api/sync/conflicts/:entity/:recordId/resolve` terbuka lewat domain `sync` (§3). SEMUA sisanya
+  — `/api/sync/{pull,bootstrap,push,logs,attachments,qa-attachments,ws,relay/ws}` — adalah kanal
+  mesin-ke-mesin ber-**Bearer device-token** yang ditegakkan route-nya sendiri; agent token bukan
+  device token, dan membungkusnya berarti menyerahkan kredensial mesin ke agen. `POST /api/ws-tickets`
+  (tiket WebSocket sekali-pakai untuk sesi cookie) juga cookie-only
 - `/api/webhooks*` — memegang secret penandatanganan **dan** menentukan ke mana data workspace
   mengalir keluar (ADR-0100)
 - `/api/telegram/settings`, `/api/telegram/test`, `/api/telegram/credentials` — permukaan
@@ -150,6 +199,15 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
   bisa memalsukan "sesi X bertanya Y" bisa menggerakkan lead atas nama sesi mana pun — itu peniruan
   identitas, bukan capability. Agent token di sini menerima **401** (token sesi tak cocok), bukan
   403: gate cookie mem-bypass path-nya dan route menegakkan tokennya sendiri
+- `/api/terminal/workspace` — tata letak tab/pane **browser** satu akun manusia (revisi optimistik per
+  `req.user.id`); agent token tak punya akun, dan menulisnya hanya merusak layout operator
+- Frame siar `presence` di `/api/events/ws` — grup itu **tidak** dikirim ke principal non-cookie,
+  walau kanalnya sendiri `GLOBAL_READ`. Agen membaca peta yang sama lewat `GET /api/presence`
+  (`presence:read`, §5b). `PUT /api/settings` tetap tak bisa mengubah kunci `remoteControl`/
+  `logShipping`/`logRetention`; jalurnya hanya `PUT /api/remote-control` dan `PUT /api/logs/retention`
+- `POST /api/update/apply` dan tulis lain di bawah prefix status (`/api/limits`, `/api/update`,
+  `/api/events`, `/api/fs`, `/api/health`, serta — sejak ADR-0187 — `/api/models`, `/api/methods`,
+  `/api/codex`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya cookie-only
 - `/api/presence` — peta pekerjaan yang sedang berjalan di **seluruh mesin** operator: sesi apa
   hidup di device mana (SPEC-919/ADR-0147). Tak ada capability yang bisa berarti sesuatu untuk
   agregat lintas-mesin, jadi ia cookie-only apa pun method-nya. Frame siar `presence` di
@@ -164,13 +222,56 @@ token selalu **403**, apa pun capability-nya, dan tak ada capability yang bisa m
   mesin mana", dan agen yang bisa membacanya atau memendekkan retensinya bisa menyembunyikan atau
   memalsukan seluruh jejak sesi. Cookie-only apa pun method-nya — beda dari `POST /api/sync/logs`
   (pengiriman batch **dari** klien), yang tetap device-token seperti jalur sync lain
-- `POST /api/update/apply` dan tulis lain di bawah prefix status (`/api/limits`, `/api/update`,
-  `/api/events`, `/api/fs`, `/api/health`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya
-  cookie-only
+- Tulis lain di bawah prefix status (`/api/limits`, `/api/update`, `/api/events`, `/api/fs`,
+  `/api/health`) — **baca**-nya terbuka untuk token mana pun, **tulis**-nya cookie-only. Satu-satunya
+  pengecualian (ADR-0200): `POST /api/update/apply` dan `POST /api/restart` lewat capability danger
+  `instance:admin` (§3), tidak lewat capability lain
 
 Route yang tak dikenal peta juga **default cookie-only** (aman): endpoint baru tak pernah terbuka
 karena kelalaian. Endpoint `/api/help*` (Help Center publik) punya otorisasi sendiri (kunci tiket)
-dan tak memakai agent token.
+dan tak memakai agent token: ia anonim by design (honeypot + rate-limit dirancang untuk manusia
+pelapor), jadi **tak ada tool MCP** untuknya (ADR-0201) — operator membaca tiket lewat
+`hanoman_tickets_list`/`hanoman_ticket_get` dan URL publik lewat `hanoman_help_center_get`.
+
+## 5b. Permukaan admin yang dibuka opt-in (ADR-0196..0198)
+
+Sampai ADR-0196..0198, `/api/agent-tokens*`, `/api/device-tokens*`, `/api/auth/users*`,
+`/api/auth/change-password`, `/api/remote-control`, `/api/devices/:id/relay/*`, `/api/logs*`,
+`/api/presence`, dan metrik custom agent cookie-only. Pemilik repo meminta mereka dibungkus, jadi
+keputusan lama itu dibalik **dengan capability baru yang opt-in** (tak ada capability lama yang
+membukanya) dan **pagar yang ditegakkan di server**, bukan hanya di katalog tool:
+
+| Hal | Aturan |
+|---|---|
+| Cetak agent token (`POST /api/agent-tokens`) | `capabilities` token baru HARUS himpunan-bagian milik pemanggil (`write ⊇ read`; danger hanya bila dimiliki persis). Selebihnya **403** `{ error, exceeds: [...] }` |
+| Ubah agent token (`PATCH`) | `capabilities` baru ⊆ milik pemanggil, **dan** token target tak boleh lebih berkuasa dari pemanggil (agen lemah tak bisa menonaktifkan/menurunkan token yang manusia beri hak lebih) |
+| Cabut agent token (`DELETE`) | aturan target yang sama |
+| Token sendiri | **tak bisa** diubah atau dicabut oleh dirinya sendiri (403 `{ self: true }`) — minta manusia |
+| Plaintext token | hanya di balasan `POST` (agent maupun device token); tak pernah di daftar atau di log audit; runtime MCP melepas topeng token HANYA untuk hasil sukses dua tool pencetak |
+| Device token | dicetak atas nama akun admin yang menerbitkan agent token pemanggil (rantai `agent:<id>` ditelusuri); tanpa penerbit manusia → **409**. Agen hanya melihat/mencabut device token milik akun itu |
+| Akun | membuat akun admin, menghapus akun, menyetel ulang password akun lain = `access:admin` (danger). Reset password agen: `{ userId, newPassword }` tanpa password lama, mencabut semua sesi akun itu, dan **tidak** menerbitkan cookie. Admin terakhir tetap tak bisa dihapus. `access:admin` setara menyerahkan seluruh instance |
+| Grant jarak jauh (`PUT /api/remote-control`) | `control.capabilities` ⊆ milik pemanggil; mengubah lajur log (data keluar ke hub) menuntut juga `logs:write` |
+| Relay perangkat | `relay:exec` (danger) untuk semua method; aktor ditandai `agent:<id>`; allowlist route ditegakkan mesin tujuan; WebSocket relay tidak tersedia untuk agen |
+| Jejak | setiap aksi admin oleh agent token tercatat di log event (`kind` `admin.*`) tanpa rahasia; perubahan retensi log dicatat **sebelum** nilainya berubah |
+
+Tool MCP-nya (semua tulis bermode `danger`, hanya tampil dengan `--danger`):
+
+| Tool | Mode | Capability |
+|---|---|---|
+| `hanoman_agent_tokens_list`, `hanoman_agent_token_capabilities` | baca | `tokens:read` |
+| `hanoman_agent_token_create`, `hanoman_agent_token_update`, `hanoman_agent_token_revoke` | danger | `tokens:write` |
+| `hanoman_device_tokens_list` | baca | `devices:read` |
+| `hanoman_device_token_create`, `hanoman_device_token_revoke` | danger | `devices:write` |
+| `hanoman_users_list` | baca | `access:read` |
+| `hanoman_user_create`, `hanoman_user_delete`, `hanoman_user_password_reset` | danger | `access:admin` |
+| `hanoman_remote_control_get` | baca | `remote:read` |
+| `hanoman_remote_control_set` | danger | `remote:control` |
+| `hanoman_device_relay` | danger | `relay:exec` |
+| `hanoman_logs_search`, `hanoman_log_transcript`, `hanoman_logs_retention_get` | baca | `logs:read` |
+| `hanoman_logs_retention_set` | danger | `logs:write` |
+| `hanoman_presence_get` | baca | `presence:read` |
+| `hanoman_agent_metrics` | baca | `metrics:read` |
+| `hanoman_agent_invocation_disposition` | danger | `metrics:write` |
 
 ## 6. Endpoint yang paling sering dipakai
 
@@ -250,6 +351,8 @@ capability-nya. Capability menjawab "boleh?", bukan "sebaiknya?".
 | `POST /api/terminal/sessions` | melahirkan proses agen `--dangerously-skip-permissions` di sebuah worktree — **RCE efektif**. Batas satu-satunya adalah isolasi git worktree (ADR-0037). |
 | `POST`/`PUT`/`DELETE` di bawah `/api/vps` | **remote exec** di server produksi. |
 | `POST /api/lead/decisions` | putusannya bisa **menggerakkan sesi** (integrate ke main, menghentikan sesi) dan selalu melahirkan baris jejak permanen (ADR-0091/0098). |
+| `POST /api/update/apply`, `POST /api/restart` | memasang paket npm dan **me-restart server** (ADR-0200): dashboard & koneksi MCP putus beberapa detik; pane tmux selamat. Selalu `confirm: false` dulu untuk membaca jumlah sesi hidup. |
+| `POST /api/sync/conflicts/:entity/:recordId/resolve` | **membuang data satu sisi** (lokal atau hub) tanpa jalan pulang (ADR-0199). Baca `differs` dari `hanoman_sync_conflicts` dulu. |
 
 Perlakukan `POST /api/specs/:id/integrate`, `DELETE /api/specs/:id`, dan perubahan `stage` dengan
 disiplin yang sama: ketiganya mengubah sejarah git atau membuang pekerjaan. `POST /api/specs/:id/done`
@@ -433,6 +536,17 @@ Panduan siap salin untuk keempat klien, berikut tabel tool → capability, ada d
 | `hanoman_backlog_create`, `hanoman_backlog_update` | tulis | `backlog:write` |
 | `hanoman_notifications_mark_read` | tulis | `notifications:write` |
 | `hanoman_lead_ask` | tulis | `lead:write` |
+| `hanoman_health`, `hanoman_models`, `hanoman_codex_version`, `hanoman_methods_status` | baca | — (`GLOBAL_READ`, ADR-0187) |
+| `hanoman_activity_list` | baca | `activity:read` |
+| `hanoman_activity_purge` | **berbahaya** | `activity:write` |
+| `hanoman_portal_admin_chat_sessions`, `hanoman_portal_admin_chat_session_get` | baca | `portal-chat:read` |
+| `hanoman_portal_admin_chat_export` | **berbahaya** | `portal-chat:read` |
+| `hanoman_portal_admin_chat_prd_write` | **berbahaya** | `portal-chat:write` |
+| `hanoman_sync_conflicts`, `hanoman_sync_pending` | baca | `sync:read` |
+| `hanoman_sync_now` | tulis | `sync:write` |
+| `hanoman_sync_conflict_resolve` | **danger** | `sync:resolve` |
+| `hanoman_update_apply`, `hanoman_instance_restart` | **danger** | `instance:admin` |
+| `hanoman_agent_guide` | baca | — (membaca halaman ini lewat `GET /api/agent-integration.md`, publik) |
 
 ### Yang sengaja TIDAK tersedia lewat MCP
 
@@ -442,18 +556,70 @@ penghapusan backlog, dan perubahan `stage`. Batasan ini ada di katalog toolnya, 
 token yang punya `sessions:write` sekalipun tak akan menemukan tool untuk memakainya. Lihat §8.
 
 **Menjawab dialog sesi** (`GET /api/terminal/sessions/:id/dialog`,
-`POST /api/terminal/sessions/:id/dialog/answer`, dan sejak SPEC-909 · ADR-0146 juga
-`POST /api/terminal/sessions/:id/dialog/takeover` — merebut sesi dari hanoman-lead) sengaja **tak
-punya tool** — dan alasannya lebih tajam dari sekadar "mengeksekusi": endpoint itu menjawab pertanyaan
-yang **secara desain ditujukan kepada manusia** (`AskUserQuestion`). Agen yang bisa memanggilnya
-bisa menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang memutuskan" runtuh lewat
-pintu belakang. Capability-nya tetap ada (`sessions:read`/`sessions:write`) karena peta itu berlaku
-untuk seluruh permukaan HTTP, bukan hanya untuk yang muncul di MCP.
+`POST /api/terminal/sessions/:id/dialog/answer`, `POST /api/terminal/sessions/:id/dialog/takeover`)
+dulu sengaja tak punya tool (SPEC-899 · ADR-0142: agen yang bisa menjawab `AskUserQuestion` bisa
+menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang memutuskan" runtuh). Sejak
+**ADR-0190/ADR-0192** pemilik membungkusnya sebagai tool `hanoman_session_dialog_get|answer|takeover`
+(semuanya `danger`, hanya muncul dengan `--danger`) — dengan gerbang di **server**, bukan di
+deskripsi:
 
-**Lampiran backlog** (`/api/specs/:id/attachments*`, SPEC-843 · ADR-0124) juga sengaja **tak punya
-tool**: berkasnya lahir dari disk manusia, bukan dari model, dan tool MCP berbentuk JSON sehingga
-byte biner tak punya representasi di sana. REST-nya tetap terjangkau agent token
-ber-`backlog:read`/`backlog:write` — yang tak dipajang adalah **tool**-nya.
+- capability **`sessions:decide`** (domain `decisions`), terpisah dari `sessions:write`; `steer` ke
+  pane yang sedang menampilkan dialog pun menuntutnya;
+- **403** bila token ITU yang meluncurkan sesinya (`reason: "launcher"`), atau bila panggilan datang
+  dari dalam sesi hanoman — proses MCP yang diwarisi `HANOMAN_SESSION_ID` mengirim header
+  `x-hanoman-session` (`reason: "self"` / `"in-session"`);
+- **409** `deciding` (hanoman-lead sedang menyusun keputusan; rebut dulu lewat `takeover`) dan
+  `answering` tetap berlaku. 403 mendahului 409 supaya penolakan tak membocorkan keadaan lead.
+
+**Batas yang jujur:** server tak bisa membuktikan siapa di balik sebuah request Bearer — sesi tidak
+menerima agent token dari hanoman, jadi tak ada ikatan token↔sesi. Header `x-hanoman-session`
+bisa dilepas oleh klien yang sengaja memakai token yang sama lewat `curl`. Yang menutupnya adalah
+praktik: **jangan pasang token ber-`sessions:decide` di konfigurasi yang dibaca sesi hanoman**
+(mis. `~/.claude.json` tingkat-user diwarisi setiap sesi). Pakai token terpisah, di klien MCP yang
+dijalankan manusia di luar sesi.
+
+**Cronjob** (`/api/scheduler/crons*`, ADR-0191 membalik ADR-0112) kini punya tool
+`hanoman_scheduler_crons_list|cron_runs` (baca, `scheduler:read`) dan
+`hanoman_scheduler_cron_create|update|delete|run` (`danger`, `scheduler:write`). Karena sebuah cron
+adalah `POST /terminal/sessions` yang ditunda, **create, update yang menyentuh prompt/agen/model/
+effort/jadwal atau mengaktifkan, dan run** juga menuntut `sessions:spawn` — ditegakkan di handler
+server (403 `need: sessions:spawn`), bukan hanya disebut di deskripsi. Mengganti nama, menonaktifkan,
+dan menghapus cron cukup dengan `scheduler:write`.
+
+**Lampiran, ekspor/impor QA, unggah IDE, dan arsip git** punya tool sejak ADR-0183 — lihat
+[Transfer berkas](#transfer-berkas-adr-0183) di bawah. Yang tetap tak punya tool hanya WebSocket
+(`/terminal/sessions/:id/ws`, `/events/ws`) dan tiga route `dialog` di atas.
+
+### Transfer berkas (ADR-0183)
+
+Tool MCP berbicara JSON teks, jadi **byte tak pernah lewat model**. Satu mekanisme seragam:
+
+- **Unggah** — argumen `filePath` / `filePaths` / `files[].filePath` adalah path **lokal di mesin
+  tempat `hanoman mcp` berjalan**. Klien membacanya dan mengirimnya sebagai multipart.
+- **Unduh** — byte disimpan ke `savePath` lokal (default: direktori sementara aman); jawabannya
+  `{savedTo, filename, bytes, mime, sha256}`. `overwrite:true` wajib untuk menimpa berkas yang ada.
+  Teks kecil (template Markdown, ekspor `md`/`csv`) dikembalikan **inline** oleh
+  `hanoman_qa_template_md` dan `hanoman_qa_report_export_text`.
+- **Batas (ADR-0184)** — path hanya boleh di dalam direktori kerja MCP, direktori sementara MCP,
+  atau `HANOMAN_MCP_TRANSFER_DIRS`; `..`, symlink yang keluar, dan berkas rahasia (`.env`,
+  kunci SSH, `.git`, …) ditolak di kedua arah; ukuran dibatasi (default 100 MiB).
+- **Mode (ADR-0186)** — tool yang menyentuh disk klien bermode `write` walau capability-nya `:read`,
+  sehingga `--read-only` tak pernah menyentuh disk.
+
+| Tool | Mode | Capability |
+|---|---|---|
+| `hanoman_backlog_attachment_upload`, `hanoman_backlog_attachment_download` | tulis | `backlog:write` / `backlog:read` |
+| `hanoman_ticket_attachment_download` | tulis | `support:read` |
+| `hanoman_qa_attachment_upload`, `hanoman_qa_import`, `hanoman_qa_cases_import` | tulis | `qa:write` |
+| `hanoman_qa_attachment_download`, `hanoman_qa_template_xlsx`, `hanoman_qa_report_export_file` | tulis | `qa:read` |
+| `hanoman_qa_template_md`, `hanoman_qa_report_export_text` (inline) | baca | `qa:read` |
+| `hanoman_ide_upload` | tulis | `ide:write` |
+| `hanoman_ide_archive_download` | tulis | `ide:read` |
+| `hanoman_session_attachment_upload` (PNG/JPEG/WebP ≤ 5 MB; jawabannya path di SERVER) | tulis | `sessions:write` |
+| `hanoman_qa_report_delete`, `hanoman_qa_case_delete`, `hanoman_qa_finding_delete`, `hanoman_qa_attachment_delete` | **berbahaya** | `qa:delete` (ADR-0185) |
+
+`qa:delete` adalah akses `danger` yang **tak diimplikasikan `qa:write`**: token lama ber-`qa:write`
+tak lagi bisa menghapus data QA sampai manusia mencentang `qa:delete` di Settings → Akses AI Agent.
 
 ### Opsi
 
@@ -462,6 +628,8 @@ ber-`backlog:read`/`backlog:write` — yang tak dipajang adalah **tool**-nya.
 | `HANOMAN_HOST` / `--host <url>` | **Wajib.** Instance yang dituju. Agent token diterbitkan per-instance — token dari instance lain selalu 401 di sini, dan MCP server menjelaskannya, bukan meneruskan 401 telanjang. |
 | `HANOMAN_AGENT_TOKEN` | **Wajib.** Hanya dari env atau `~/.hanoman/agent-token` — **tak pernah** dari argumen baris perintah (ARGV terbaca proses lain di mesin yang sama). |
 | `HANOMAN_MCP_READ_ONLY=1` / `--read-only` | Menyembunyikan seluruh tool tulis dari `tools/list`. |
+| `HANOMAN_MCP_TRANSFER_DIRS` / `--transfer-dir <d>` | Direktori tambahan (dipisah `:`) yang boleh dibaca/ditulis tool transfer berkas, di luar direktori kerja MCP dan direktori sementara MCP. Akar filesystem ditolak. |
+| `HANOMAN_MCP_TRANSFER_MAX_BYTES` / `--transfer-max-bytes <n>` | Plafon ukuran per berkas dan total per panggilan transfer. Default 100 MiB, maks 2 GiB. |
 | `HANOMAN_MCP_MAX_BYTES` / `--max-bytes <n>` | Plafon ukuran balasan tool. Default 24576. Balasan yang dipotong ditandai `truncated: true` + `shown`/`total`. |
 
 Skema tool berversi (`MCP_TOOL_SCHEMA_VERSION`, saat ini **1**) dan aditif dalam satu versi:

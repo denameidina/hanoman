@@ -56,6 +56,32 @@ export async function listAgentTokens(): Promise<AgentTokenView[]> {
   return rows.map((r) => toAgentTokenView(r as Row));
 }
 
+export async function getAgentToken(id: string): Promise<AgentTokenView | null> {
+  const row = await prisma.agentToken.findUnique({ where: { id } });
+  return row ? toAgentTokenView(row as Row) : null;
+}
+
+/** Penanda `createdBy` untuk token yang dicetak OLEH agent token lain (ADR-0196): jejak rantainya. */
+export const AGENT_CREATOR_PREFIX = "agent:";
+
+/**
+ * ADR-0196 · akun manusia di balik sebuah agent token: `createdBy` dari token itu, atau dari
+ * leluhurnya bila ia dicetak agent token lain (`agent:<id>`), maksimal 8 tingkat. `null` bila rantai
+ * putus (token tanpa pencetak) atau pemiliknya bukan admin aktif — device token tak boleh dicetak
+ * atas nama akun klien/nonaktif.
+ */
+export async function agentOwnerUserId(agentId: string): Promise<string | null> {
+  let id = agentId;
+  for (let depth = 0; depth < 8; depth++) {
+    const row = await prisma.agentToken.findUnique({ where: { id }, select: { createdBy: true } });
+    if (!row?.createdBy) return null;
+    if (row.createdBy.startsWith(AGENT_CREATOR_PREFIX)) { id = row.createdBy.slice(AGENT_CREATOR_PREFIX.length); continue; }
+    const user = await prisma.user.findUnique({ where: { id: row.createdBy } });
+    return user && user.role === "admin" && !user.disabled ? user.id : null;
+  }
+  return null;
+}
+
 export async function patchAgentToken(
   id: string, patch: { name?: string; capabilities?: string[]; enabled?: boolean },
 ): Promise<AgentTokenView | null> {

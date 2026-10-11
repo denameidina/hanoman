@@ -71,6 +71,35 @@ describe("explainHttpError", () => {
     expect(msg).toMatch(/tak akan pernah|tidak akan pernah/);
   });
 
+  // ADR-0192 · 403 gerbang self-decision tak membawa `need`; tanpa cabang sendiri ia dibaca sebagai
+  // "route cookie-only", yang menyuruh agen berhenti dengan alasan yang SALAH.
+  it("403 self-decision dijelaskan sebagai penolakan PEMANGGIL, bukan cookie-only atau capability", () => {
+    for (const reason of ["self", "in-session", "launcher"]) {
+      const msg = explainHttpError(403, { error: "agen tak boleh memutuskan dialog sesinya sendiri", reason },
+        ctx({ method: "POST", path: "/terminal/sessions/s1/dialog/answer" }));
+      expect(msg, reason).toContain(reason);
+      expect(msg, reason).toMatch(/bukan soal capability/i);
+      expect(msg, reason).not.toMatch(/tak akan pernah bisa mengaksesnya/);
+    }
+  });
+
+  // ADR-0196 · capability SUDAH cukup tapi isinya melanggar pagar tak-eskalasi-diri: pesan harus
+  // menyebut apa yang melebihi dan bahwa ini bukan galat yang bisa diakali — bukan "cookie-only".
+  it("403 pagar tak-eskalasi-diri menyebut `exceeds` dan bukan pesan cookie-only", () => {
+    const msg = explainHttpError(403, { error: "token baru tidak boleh memuat capability yang tidak dimiliki pemanggil", exceeds: ["vps:exec"] },
+      ctx({ method: "POST", path: "/agent-tokens" }));
+    expect(msg).toContain("vps:exec");
+    expect(msg).toMatch(/MANUSIA/);
+    expect(msg).not.toMatch(/hanya untuk sesi manusia yang login/);
+  });
+
+  it("403 token-sendiri menjelaskan pagarnya", () => {
+    const msg = explainHttpError(403, { error: "agent token tidak boleh mengubah atau mencabut dirinya sendiri", self: true },
+      ctx({ method: "DELETE", path: "/agent-tokens/t1" }));
+    expect(msg).toMatch(/dirinya sendiri/);
+    expect(msg).toMatch(/manusia/);
+  });
+
   it("400 zod flatten diterjemahkan per-field, bukan objek mentah", () => {
     const msg = explainHttpError(
       400,
@@ -100,6 +129,30 @@ describe("explainHttpError", () => {
     );
     expect(msg).toContain("sudah dimulai");
     expect(msg).toContain("editable");
+  });
+
+  // ADR-0200 · 409 dengan KODE pada update/restart: angka di body (sesi hidup, versi) adalah alasan
+  // `confirm:false` ada, dan kalimat generik "Bentrok: …" akan membuangnya.
+  it("409 confirm-required pada update/restart menyebut sesi hidup, versi, dan bahwa tak ada yang berubah", () => {
+    const msg = explainHttpError(
+      409, { error: "confirm-required", liveSessions: 3, from: "0.9.20", to: "0.9.21" },
+      ctx({ method: "POST", path: "/update/apply", toolName: "hanoman_update_apply" }),
+    );
+    expect(msg).toContain("confirm: true");
+    expect(msg).toContain("3");
+    expect(msg).toContain("0.9.20 → 0.9.21");
+    expect(msg).toMatch(/TIDAK mengubah/);
+    const rs = explainHttpError(409, { error: "confirm-required", liveSessions: 0 },
+      ctx({ method: "POST", path: "/restart", toolName: "hanoman_instance_restart" }));
+    expect(rs).toContain("0");
+    expect(rs).not.toContain("undefined");
+  });
+
+  it("409 unsupervised / up-to-date dijelaskan sebagai 'proses tidak berhenti'", () => {
+    expect(explainHttpError(409, { error: "unsupervised" }, ctx({ method: "POST", path: "/restart" })))
+      .toMatch(/supervisor.*TIDAK berhenti/s);
+    expect(explainHttpError(409, { error: "up-to-date" }, ctx({ method: "POST", path: "/update/apply" })))
+      .toMatch(/TIDAK di-restart/);
   });
 
   it("409 pada lead menyuruh kembali menunggu manusia", () => {

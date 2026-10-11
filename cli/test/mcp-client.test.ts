@@ -16,6 +16,23 @@ describe("createCaller", () => {
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer hnm_agt_secret");
   });
 
+  // ADR-0192 · header identitas sesi: dari cfg (ENV proses), terpasang di SEMUA panggilan, dan
+  // tak bisa ditimpa oleh `headers` buatan sebuah tool.
+  it("x-hanoman-session dikirim bila proses ini berjalan di dalam sesi, dan tak bisa ditimpa tool", async () => {
+    const f = vi.fn(async () => json(200, {}));
+    await createCaller({ ...cfg, sessionId: "spec-9" }, f as unknown as typeof fetch)(
+      { method: "GET", path: "/specs", headers: { "x-hanoman-session": "palsu" } }, "t");
+    const [, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Record<string, string>)["x-hanoman-session"]).toBe("spec-9");
+  });
+
+  it("tanpa sessionId header itu tidak dikirim sama sekali", async () => {
+    const f = vi.fn(async () => json(200, {}));
+    await createCaller(cfg, f as unknown as typeof fetch)({ method: "GET", path: "/specs" }, "t");
+    const [, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.headers as Record<string, string>).not.toHaveProperty("x-hanoman-session");
+  });
+
   it("POST mengirim body JSON dengan content-type", async () => {
     const f = vi.fn(async () => json(201, { id: "SPEC-1" }));
     await createCaller(cfg, f as unknown as typeof fetch)({ method: "POST", path: "/specs", body: { a: 1 } }, "t");

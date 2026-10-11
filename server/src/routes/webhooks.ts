@@ -12,8 +12,11 @@ import {
 import { checkUrlShape } from "../services/webhooks/ssrf";
 import { sendOnce } from "../services/webhooks/sender";
 
-// SPEC-481 · ADR-0100 · pengelolaan endpoint webhook. COOKIE_ONLY ditegakkan
-// `capabilityForRoute`; route ini tak perlu memeriksanya lagi.
+// SPEC-481 · ADR-0100 · pengelolaan endpoint webhook. ADR-0194 membukanya untuk agent token lewat
+// `webhooks:read|write` (ditegakkan `capabilityForRoute`). Yang TIDAK bisa dinyatakan di peta itu
+// ada di sini: `allowPrivate` mematikan pagar SSRF (alamat loopback/internal), dan itu tetap
+// keputusan MANUSIA — agent token tak boleh menyalakannya maupun memindahkan endpoint yang sudah
+// ber-`allowPrivate` ke tujuan lain.
 
 const KNOWN = new Set(webhookEventTypes());
 const FAMILIES = new Set([...KNOWN].map((t) => `${t.split(".")[0]}.*`));
@@ -28,6 +31,10 @@ function checkUrl(url: string, allowPrivate: boolean): string | null {
   const r = checkUrlShape(url, allowPrivate);
   return r.ok ? null : r.error;
 }
+
+const AGENT_PRIVATE_DENIED = {
+  error: "agent token tidak boleh menyalakan allowPrivate atau mengubah tujuan endpoint ber-allowPrivate — keputusan manusia (ADR-0194)",
+};
 
 const pendingOf = (endpointId: string) => prisma.webhookDelivery.count({
   where: { endpointId, status: { in: ["pending", "sending"] } },
@@ -61,6 +68,9 @@ export default async function (app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
     const p = parsed.data;
 
+    // Sebelum validasi lain: agen tak boleh memakai respons 400 untuk meraba pagar SSRF.
+    if (req.agent && p.allowPrivate === true) return reply.code(403).send(AGENT_PRIVATE_DENIED);
+
     const unknown = unknownEvents(p.events);
     if (unknown.length) return reply.code(400).send({ error: "jenis peristiwa tak dikenal", unknown });
     const urlErr = checkUrl(p.url, p.allowPrivate ?? false);
@@ -89,6 +99,10 @@ export default async function (app: FastifyInstance) {
 
     const existing = await prisma.webhookEndpoint.findUnique({ where: { id } }) as unknown as EndpointRow | null;
     if (!existing) return reply.code(404).send({ error: "not found" });
+    // Dua jalan menuju SSRF internal oleh agen: menyalakan flag-nya, atau mengganti URL endpoint
+    // yang flag-nya SUDAH menyala (pagar IP literal tak diperiksa ulang untuk itu).
+    if (req.agent && (p.allowPrivate === true || (existing.allowPrivate && p.url !== undefined)))
+      return reply.code(403).send(AGENT_PRIVATE_DENIED);
 
     if (p.events) {
       const unknown = unknownEvents(p.events);
@@ -145,7 +159,9 @@ export default async function (app: FastifyInstance) {
     const envelope = {
       specVersion: WEBHOOK_SPEC_VERSION, id: eventId, type: WEBHOOK_PING_TYPE,
       createdAt: new Date().toISOString(), project: null,
-      actor: { kind: "user", id: null, label: req.user?.email ?? "operator" },
+      actor: req.agent
+        ? { kind: "agent", id: req.agent.id, label: `agent:${req.agent.id}` }
+        : { kind: "user", id: null, label: req.user?.email ?? "operator" },
       data: {
         entity: "webhook", id: row.id, action: "created", changed: [],
         before: null, after: { endpoint: row.name, message: "ping dari hanoman" },

@@ -38,9 +38,15 @@ describe("katalog tool MCP", () => {
     for (const t of executing) expect(visible.has(t.name), t.name).toBe(false);
   });
 
+  // ADR-0196..0198 · `auth/users`, `agent-tokens`, `device-tokens` kini punya tool (capability
+  // opt-in). Yang TETAP cookie-only dan tak boleh pernah dibungkus: login/logout/setup/status
+  // (cookie sesi & bootstrap) dan `sync` (Bearer device-token mesin-ke-mesin).
   it("tak ada tool yang menyentuh route cookie-only", () => {
-    for (const t of MCP_TOOLS)
-      expect(t.samplePath, t.name).not.toMatch(/^\/(auth|agent-tokens|device-tokens|sync)\b/);
+    for (const t of MCP_TOOLS) {
+      // ADR-0199 · `sync` dibelah: now/conflicts/pending punya tool; kanal mesin-ke-mesin ber-device-token tetap terlarang.
+      expect(t.samplePath, t.name).not.toMatch(/^\/(auth\/(status|setup|login|logout)|sync\/(pull|bootstrap|push|logs|attachments|qa-attachments|ws|relay)|session-events)\b/);
+      expect(t.samplePath, t.name).not.toMatch(/^\/terminal\/workspace/);
+    }
   });
 
   it("setiap tool punya deskripsi yang menyebut apa yang dikembalikan", () => {
@@ -203,7 +209,10 @@ describe("tingkat mode", () => {
 // dijaga adalah INVARIANNYA. Dua arah dikunci, dan arah kedua yang paling mudah lolos: sebuah tool
 // bisa bermode `danger` sambil menuntut capability yang lemah, dan tak ada yang menyadarinya sampai
 // seseorang memakainya.
-const DANGER_CAPS = new Set(["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec"]);
+const DANGER_CAPS = new Set([
+  "sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete", "sessions:decide", "telegram:admin",
+  "access:admin", "remote:control", "relay:exec", "sync:resolve", "instance:admin",
+]);
 
 // Tool DESTRUKTIF yang capability-nya tetap `:write` — bukan karena ringan, melainkan karena tak
 // ada capability `danger` di domainnya. Mode `danger`-nya murni ergonomi (mencegah salah pilih),
@@ -233,6 +242,31 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   // ADR-0157 · papan Tim. Menghapus kartu/anggota permanen di seluruh mesin tersync, tapi domain
   // `team` tak punya pecahan `danger` — mode `danger`-nya ergonomi, bukan gerbang.
   "hanoman_task_delete", "hanoman_member_delete",
+  // ADR-0188/0189 · tiga tool danger yang capability-nya domain biasa (`activity:write`,
+  // `portal-chat:write`/`:read`): purge menyeberang ke semua mesin lewat tombstone sync, tulis-PRD
+  // menimpa berkas di checkout dengan isi berasal dari klien, ekspor menarik email+transkrip klien.
+  // Tak satu pun MEMULAI pekerjaan di luar proses hanoman, jadi bukan `danger` berakses — mode
+  // `danger`-nya ergonomi (tak terlihat di tingkat default), bukan gerbang.
+  "hanoman_activity_purge", "hanoman_portal_admin_chat_prd_write", "hanoman_portal_admin_chat_export",
+  // ADR-0191 · cron: `scheduler:write` + (create/update/run) `sessions:spawn` yang ditegakkan di
+  // HANDLER server, bukan di katalog — katalog hanya menyebut satu capability per tool. Mode
+  // `danger`-nya bukan ergonomi belaka: tiga di antaranya membuka sesi berizin penuh secara tertunda.
+  "hanoman_scheduler_cron_create", "hanoman_scheduler_cron_update",
+  "hanoman_scheduler_cron_delete", "hanoman_scheduler_cron_run",
+  // ADR-0194 · webhook keluar & akun klien. Domain `webhooks`/`clients` tak punya pecahan `danger`;
+  // semua tulisnya bermode `danger` (mengirim data keluar / membuka login baru) tapi capability-nya
+  // tetap `:write`. Mode `danger`-nya ergonomi, bukan gerbang.
+  "hanoman_webhook_create", "hanoman_webhook_update", "hanoman_webhook_delete",
+  "hanoman_webhook_test", "hanoman_webhook_delivery_retry",
+  "hanoman_client_account_create", "hanoman_client_account_update",
+  "hanoman_client_account_password_reset", "hanoman_client_account_delete",
+  // ADR-0196..0198 · permukaan admin: tulisnya (`tokens:write`, `devices:write`, `logs:write`,
+  // `metrics:write`) mencetak/mencabut kredensial atau menghapus jejak audit/vonis manusia, tapi
+  // aksesnya `write` biasa di domainnya. Mode `danger` di sini ergonomi; gerbang sungguhannya
+  // adalah capability opt-in + pagar tak-eskalasi-diri di handler server.
+  "hanoman_agent_token_create", "hanoman_agent_token_update", "hanoman_agent_token_revoke",
+  "hanoman_device_token_create", "hanoman_device_token_revoke",
+  "hanoman_logs_retention_set", "hanoman_agent_invocation_disposition",
 ]);
 
 describe("mode ⇔ capability", () => {

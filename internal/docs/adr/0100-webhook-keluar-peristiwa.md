@@ -1,6 +1,6 @@
 # ADR-0100 — Webhook keluar: tap Prisma sebagai satu sumber peristiwa, amplop ber-versi, antrean SQLite
 
-**Status:** Diterima · 2026-08-01 · SPEC-481
+**Status:** Diterima · 2026-08-01 · SPEC-481 · **diamandemen [0194](0194-webhook-dan-akun-klien-terjangkau-agen.md)**: pengelolaan kini terjangkau agent token lewat `webhooks:read|write` (`allowPrivate` tetap keputusan manusia)
 **Terkait:** memperluas ADR-0049 (config) & ADR-0097 (secret at-rest) · ADR-0024, ADR-0037,
 ADR-0039, ADR-0065, ADR-0072, ADR-0079, ADR-0096 tetap utuh.
 

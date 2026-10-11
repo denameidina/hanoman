@@ -38,7 +38,7 @@ export const SYSTEM_TOOLS: readonly McpToolDef[] = [
     name: "hanoman_update_status",
     title: "Status versi & pembaruan",
     description:
-      "Versi hanoman yang berjalan, versi terbaru di registry npm, dan apakah instance ini PUNYA supervisor yang bisa memasangnya (`canApply`). Baca-saja: memasang pembaruan me-restart instance dan sengaja tetap tindakan manusia di dashboard — tak ada tool untuk itu, apa pun tingkat modenya. Tak menuntut capability apa pun.",
+      "Versi hanoman yang berjalan, versi terbaru di registry npm, dan apakah instance ini PUNYA supervisor yang bisa memasangnya (`canApply`). Baca-saja dan tak menuntut capability apa pun. Memasang pembaruan me-restart instance: itu hanoman_update_apply (capability `instance:admin`, tingkat `--danger`), dan hanya bila `canApply` true.",
     inputSchema: obj({ properties: {} }),
     mode: "read", capability: null, samplePath: "/update", sampleMethod: "GET",
     build: () => ({ method: "GET", path: "/update" }),
