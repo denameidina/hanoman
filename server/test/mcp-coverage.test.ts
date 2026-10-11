@@ -49,6 +49,10 @@ const COVERED_BY_BRANCH = new Map<string, string>([
   ["POST /vps/:id/items/na-bulk", "hanoman_vps_item_na"],
   ["GET /skills/:key/file", "hanoman_skill_read"],
   ["DELETE /skills/:key/entry", "hanoman_skill_entry"],
+  // ADR-0195 · tool portal memilih endpoint menurut argumen opsional (`spec`/`ticket`/`session`).
+  ["GET /portal/projects/:id/backlog/:specId", "hanoman_portal_backlog"],
+  ["GET /portal/projects/:id/tickets/:ticketId", "hanoman_portal_tickets"],
+  ["GET /portal/projects/:id/chat/sessions/:sid", "hanoman_portal_chat_sessions"],
 ]);
 
 /** Path route Fastify (`/specs/:id`) → regex yang mencocokkan samplePath katalog (`/specs/SPEC-1`). */

@@ -39,6 +39,10 @@ describe("agent capabilities", () => {
     expect(grantsCapability(["vps:exec"], "vps:exec")).toBe(true);
     // dan sebaliknya: danger tak memberi baca.
     expect(grantsCapability(["vps:exec"], "vps:read")).toBe(false);
+    // ADR-0193 · kredensial Telegram: tak diimplikasikan telegram:write maupun settings:write
+    // (yang wajib dipegang gateway), jadi token gateway tak pernah menjangkaunya.
+    expect(grantsCapability(["telegram:write", "settings:write"], "telegram:admin")).toBe(false);
+    expect(grantsCapability(["telegram:admin"], "telegram:read")).toBe(false);
   });
 
   it("write implies read; unrelated caps do not grant", () => {

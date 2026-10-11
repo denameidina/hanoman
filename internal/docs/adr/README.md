@@ -174,6 +174,9 @@ setiap sesi agen, riwayat ADR hanya saat seseorang butuh alasannya.
 - [0002 — Isolasi run dengan git worktree](0002-git-worktree-isolation.md)
 - [0001 — Docs sebagai Source of Truth](0001-docs-as-source-of-truth.md) — *superseded by 0023*
 
+- [0195 — Portal klien dilihat agen atas nama akun klien eksplisit: `portal:read` (baca-saja)](0195-portal-klien-dilihat-agen-atas-nama-klien.md) — **mengamandemen 0110 sebagian**; tulis atas nama klien tetap cookie-only.
+- [0194 — Webhook keluar dan akun klien terjangkau agen: domain `webhooks` dan `clients`](0194-webhook-dan-akun-klien-terjangkau-agen.md) — **mengamandemen 0100 & 0110**.
+- [0193 — Kredensial Telegram terjangkau agen: `telegram:admin` (danger) + anti-eskalasi di server](0193-kredensial-telegram-terjangkau-agen.md) — **mengamandemen 0097**.
 - [0182 — Hapus memori project dan changelog](0182-hapus-memori-project-dan-changelog.md) — penghapusan fitur dan data atas permintaan pengguna; menggantikan 0105 (changelog), 0178/0179/0181, dan bagian memori 0180.
 - [0183 — Transfer berkas lewat tool MCP: unggah dari `filePath`, unduh ke `savePath`](0183-transfer-berkas-lewat-tool-mcp.md) — **mengamandemen 0124 §6, 0099 & pengecualian lampiran/ekspor/impor QA**. 18 tool untuk route multipart/biner; `McpRequest` mendapat `multipart`/`download`, klien membaca/menulis disk LOKAL, model tak pernah menerima byte.
 - [0184 — Batas keamanan transfer berkas MCP](0184-batas-keamanan-transfer-berkas-mcp.md) — root yang diizinkan, `..` ditolak, symlink keluar ditolak (realpath), berkas rahasia ditolak, tanpa menimpa tanpa `overwrite`, batas ukuran saat mengalir.

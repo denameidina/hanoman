@@ -364,7 +364,7 @@ Pakai skill lebih sempit saat task cocok:
   ganda ke manusia; di sini kontraknya at-least-once ber-id stabil); (6) klien Prisma yang diekspor
   kini **ber-extension** sehingga tak assignable ke `PrismaClient`/`Prisma.TransactionClient` —
   pakai alias **`Db`/`DbTx`** dari `db.ts`, jangan mengetik ulang tipe Prisma polos. Pengelolaannya
-  **COOKIE_ONLY** (memegang secret + menentukan ke mana data mengalir), secret terenkripsi lewat
+  dulu **COOKIE_ONLY**; sejak ADR-0194 terjangkau agen lewat `webhooks:read|write` (opt-in; `allowPrivate` tetap keputusan manusia, ditolak 403 untuk agen), secret terenkripsi lewat
   `secret-box.ts` dan ditampilkan sekali, SSRF diperiksa saat simpan (bentuk + IP literal, **tanpa
   DNS**) dan lagi di **tiap percobaan kirim** (resolve DNS, fail-closed).
 - **Auto-merge saat sesi selesai — kebijakan per project/spec, dieksekusi SWEEP tanpa call site**
@@ -505,7 +505,7 @@ Pakai skill lebih sempit saat task cocok:
   jawab hanyalah judul, dan TERSENDIRI dari `backlog` karena `status` kartu milik manusia sementara
   `Spec.stage` diturunkan dari fase sesi. `POST /tasks/:id/escalate` melahirkan `Spec` tapi tetap
   `team:write` (preseden `/tickets/:id/accept`); yang menahan peluncuran tetap `launchPrincipal` —
-  tanpa `sessions:write`, Spec-nya lahir TANPA `launchApprovedAt`. (b) Empat route **`GLOBAL_READ`**
+  tanpa `sessions:write`, Spec-nya lahir TANPA `launchApprovedAt`. **ADR-0193/0194/0195 (integrasi) membalik tiga keputusan cookie-only lama** lewat capability BARU opt-in: `telegram:admin` (danger; kredensial Telegram — token gateway efektif tak boleh melebihi capability pemanggil, 403), `webhooks:read|write` (webhook keluar; agen tak boleh `allowPrivate`), `clients:read|write` (akun klien portal), dan `portal:read` (**baca** portal atas nama akun klien eksplisit `?asClient=`; tulis atas nama klien tetap cookie-only). Capability **34 → 40**, 18 domain. (b) Empat route **`GLOBAL_READ`**
   (`/limits`, `/limits/codex`, `/update`, `/fs/browse`) yang sudah terjangkau SETIAP token sah tanpa
   satu pun capability — gerbang cakupan me-`continue` padanya sehingga mereka terlihat "tercakup"
   sementara nol tool menyentuhnya. **Jebakan yang lahir bersamanya:** `capability: null` kini punya

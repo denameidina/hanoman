@@ -1,6 +1,6 @@
 # ADR-0097 — Kredensial Telegram di Settings: entri config terenkripsi, bukan `.env`
 
-- Status: Accepted
+- Status: Accepted — **diamandemen [0193](0193-kredensial-telegram-terjangkau-agen.md)**: permukaan kredensial kini terjangkau agent token lewat capability `telegram:admin` (danger), dengan anti-eskalasi di server
 - Tanggal: 2026-08-01
 - SPEC: SPEC-477
 - Terkait: **mengamandemen** [0096](0096-telegram-gateway-session-operator-persisten.md)

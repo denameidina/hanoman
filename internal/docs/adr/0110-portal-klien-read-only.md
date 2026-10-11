@@ -1,6 +1,6 @@
 # ADR-0110 — Portal klien read-only: peran `admin|client`, akses per project, gerbang deny-by-default
 
-- Status: accepted
+- Status: accepted — **diamandemen [0194](0194-webhook-dan-akun-klien-terjangkau-agen.md)** (`/client-accounts` → `clients:read|write`) dan **[0195](0195-portal-klien-dilihat-agen-atas-nama-klien.md)** (BACA `/portal` → `portal:read` atas nama akun klien eksplisit; tulis tetap cookie-only)
 - Tanggal: 2026-08-10
 - Konteks: SPEC-617
 - Memperluas: ADR-0028 (auth sesi opaque) — sesi cookie kini membawa **peran**

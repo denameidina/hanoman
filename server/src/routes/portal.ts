@@ -13,6 +13,7 @@ import { paginate } from "../services/paginate";
 import { clientProjectIds, hasProjectAccess } from "../services/client-access";
 import { portalTicketRateOk } from "../services/help-ratelimit";
 import { intakeTicket, parseTicketUpload } from "../services/ticket-intake";
+import { portalUserId } from "../services/portal-principal";
 
 // Project yang tak ditugaskan dan project yang tak ada menjawab hal yang SAMA: menjawab beda
 // membuat portal jadi alat enumerasi nama project (preseden Help Center, ADR-0062).
@@ -39,8 +40,10 @@ export default async function (app: FastifyInstance) {
   // seluruh baris (`paginate` memakai pageSize = total), karena ini PEMILIH project, bukan daftar
   // yang ditelusuri: project terpilih yang jatuh dari halaman justru mematahkan syarat
   // "perpindahan halaman mempertahankan project terpilih".
-  app.get("/portal/projects", async (req) => {
-    const ids = await clientProjectIds(req.user!.id);
+  app.get("/portal/projects", async (req, reply) => {
+    const uid = await portalUserId(req, reply);   // ADR-0195 · klien: dirinya; agent: ?asClient=
+    if (!uid) return reply;
+    const ids = await clientProjectIds(uid);
     const { page, limit } = req.query as { page?: string; limit?: string };
     const rows = await prisma.project.findMany({ where: { id: { in: ids } }, orderBy: { name: "asc" } });
     return paginate(rows.map(toPortalProject), page, limit);
@@ -48,7 +51,9 @@ export default async function (app: FastifyInstance) {
 
   app.get("/portal/projects/:id/backlog", async (req, reply) => {
     const { id } = req.params as { id: string };
-    if (!(await hasProjectAccess(req.user!.id, id))) return reply.code(404).send(NOT_FOUND);
+    const uid = await portalUserId(req, reply);
+    if (!uid) return reply;
+    if (!(await hasProjectAccess(uid, id))) return reply.code(404).send(NOT_FOUND);
     const { page, limit } = req.query as { page?: string; limit?: string };
     const specs = await liveSpecs({ project: id });
     return paginate(specs.map(toPortalSpec), page, limit);
@@ -56,7 +61,9 @@ export default async function (app: FastifyInstance) {
 
   app.get("/portal/projects/:id/backlog/:specId", async (req, reply) => {
     const { id, specId } = req.params as { id: string; specId: string };
-    if (!(await hasProjectAccess(req.user!.id, id))) return reply.code(404).send(NOT_FOUND);
+    const uid = await portalUserId(req, reply);
+    if (!uid) return reply;
+    if (!(await hasProjectAccess(uid, id))) return reply.code(404).send(NOT_FOUND);
     // Dibaca dari set live project itu, bukan findUnique: dengan begitu stage yang dilihat klien
     // sama dengan yang dilihat operator, dan spec milik project lain tak bisa ditarik lewat id.
     const spec = (await liveSpecs({ project: id })).find((s) => s.id === specId);
@@ -66,7 +73,9 @@ export default async function (app: FastifyInstance) {
 
   app.get("/portal/projects/:id/tickets", async (req, reply) => {
     const { id } = req.params as { id: string };
-    if (!(await hasProjectAccess(req.user!.id, id))) return reply.code(404).send(NOT_FOUND);
+    const uid = await portalUserId(req, reply);
+    if (!uid) return reply;
+    if (!(await hasProjectAccess(uid, id))) return reply.code(404).send(NOT_FOUND);
     const { page, limit } = req.query as { page?: string; limit?: string };
     const rows = await prisma.ticket.findMany({ where: { projectId: id }, orderBy: { createdAt: "desc" } });
     const stages = await specStages(rows.map((t) => t.specId));
@@ -75,7 +84,9 @@ export default async function (app: FastifyInstance) {
 
   app.get("/portal/projects/:id/tickets/:ticketId", async (req, reply) => {
     const { id, ticketId } = req.params as { id: string; ticketId: string };
-    if (!(await hasProjectAccess(req.user!.id, id))) return reply.code(404).send(NOT_FOUND);
+    const uid = await portalUserId(req, reply);
+    if (!uid) return reply;
+    if (!(await hasProjectAccess(uid, id))) return reply.code(404).send(NOT_FOUND);
     const t = await prisma.ticket.findUnique({ where: { id: ticketId } });
     // Tiket milik project lain dijawab 404 yang sama — id tiket tak boleh jadi jalan pintas
     // melewati scope project.
@@ -91,10 +102,12 @@ export default async function (app: FastifyInstance) {
   // membungkam klien yang memang sengaja diundang.
   app.post("/portal/projects/:id/tickets", async (req, reply) => {
     const { id } = req.params as { id: string };
+    const uid = await portalUserId(req, reply);
+    if (!uid) return reply;
     const p = await prisma.project.findUnique({ where: { id } });
     // Project tak ada dan project bukan haknya menjawab hal yang SAMA (ADR-0110 gotcha 6).
-    if (!p || !(await hasProjectAccess(req.user!.id, id))) return reply.code(404).send(NOT_FOUND);
-    if (!portalTicketRateOk(req.user!.id, id)) return reply.code(429).send({ error: "terlalu banyak permintaan" });
+    if (!p || !(await hasProjectAccess(uid, id))) return reply.code(404).send(NOT_FOUND);
+    if (!portalTicketRateOk(uid, id)) return reply.code(429).send({ error: "terlalu banyak permintaan" });
     if (!(req as any).isMultipart?.()) return reply.code(400).send({ error: "butuh multipart/form-data" });
 
     const upload = await parseTicketUpload(req);

@@ -23,6 +23,7 @@ import { SYSTEM_TOOLS } from "./system";
 import { OBSERVABILITY_TOOLS } from "./observability";
 import { TRANSFER_TOOLS } from "./transfer";
 import { GATES_TOOLS } from "./gates";
+import { INTEGRATIONS_TOOLS } from "./integrations";
 import type { McpToolDef } from "./types";
 
 export const MCP_TOOLS: readonly McpToolDef[] = [
@@ -49,4 +50,5 @@ export const MCP_TOOLS: readonly McpToolDef[] = [
   ...OBSERVABILITY_TOOLS,   // ADR-0187/0188/0189 · mesin, log aktivitas, chat portal operator
   ...TRANSFER_TOOLS,  // ADR-0183 · route multipart/biner + hapus QA
   ...GATES_TOOLS,     // ADR-0190/0191/0192 · dialog sesi (sessions:decide) + cronjob (scheduler:*)
+  ...INTEGRATIONS_TOOLS,   // ADR-0193..0195 · kredensial Telegram, webhook keluar, akun klien, portal-sebagai-klien
 ];

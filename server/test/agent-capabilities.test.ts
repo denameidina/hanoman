@@ -142,11 +142,12 @@ describe("status global read-only tak boleh tembus lewat method tulis (SPEC-405 
     expect(capabilityForRoute("HEAD", "/api/update")).toBe("GLOBAL_READ");
   });
   // SPEC-477 · ADR-0097 · permukaan KREDENSIAL bukan permukaan kerja sesi operator.
-  it("SPEC-477 · settings/test/credentials Telegram = COOKIE_ONLY, sisanya tetap domain telegram", () => {
-    expect(capabilityForRoute("GET", "/api/telegram/settings")).toBe("COOKIE_ONLY");
-    expect(capabilityForRoute("PUT", "/api/telegram/settings")).toBe("COOKIE_ONLY");
-    expect(capabilityForRoute("POST", "/api/telegram/test")).toBe("COOKIE_ONLY");
-    expect(capabilityForRoute("DELETE", "/api/telegram/credentials")).toBe("COOKIE_ONLY");
+  // ADR-0193 membalik "cookie-only" itu menjadi capability BARU `telegram:admin` (danger).
+  it("ADR-0193 · settings/test/credentials Telegram = telegram:admin, sisanya tetap domain telegram", () => {
+    expect(capabilityForRoute("GET", "/api/telegram/settings")).toBe("telegram:admin");
+    expect(capabilityForRoute("PUT", "/api/telegram/settings")).toBe("telegram:admin");
+    expect(capabilityForRoute("POST", "/api/telegram/test")).toBe("telegram:admin");
+    expect(capabilityForRoute("DELETE", "/api/telegram/credentials")).toBe("telegram:admin");
     expect(capabilityForRoute("GET", "/api/telegram/status")).toBe("telegram:read");
     expect(capabilityForRoute("POST", "/api/telegram/replies")).toBe("telegram:write");
     expect(capabilityForRoute("GET", "/api/telegram/audit")).toBe("telegram:read");

@@ -15,12 +15,16 @@ afterAll(async () => { await clean(); await refreshWebhookCache(); });
 const post = (payload: Record<string, unknown>) =>
   app.inject({ method: "POST", url: "/api/webhooks", payload });
 
-// SPEC-477 · pengelolaan yang memegang secret tak pernah boleh lewat agent token.
+// SPEC-477 · ADR-0100 dulu menutup ini sebagai COOKIE_ONLY. ADR-0194 membukanya lewat domain BARU
+// `webhooks`, dipetakan MENURUT METHOD (kelas bug SPEC-405).
 describe("capabilityForRoute · webhooks", () => {
-  it("COOKIE_ONLY untuk baca maupun tulis", () => {
-    for (const m of ["GET", "POST", "PATCH", "DELETE"])
-      expect(capabilityForRoute(m, "/api/webhooks")).toBe("COOKIE_ONLY");
-    expect(capabilityForRoute("GET", "/api/webhooks/abc/deliveries")).toBe("COOKIE_ONLY");
+  it("baca -> webhooks:read, tulis -> webhooks:write, apa pun sub-path-nya", () => {
+    expect(capabilityForRoute("GET", "/api/webhooks")).toBe("webhooks:read");
+    expect(capabilityForRoute("GET", "/api/webhooks/abc/deliveries")).toBe("webhooks:read");
+    for (const [m, p] of [
+      ["POST", "/api/webhooks"], ["PATCH", "/api/webhooks/abc"], ["DELETE", "/api/webhooks/abc"],
+      ["POST", "/api/webhooks/abc/test"], ["POST", "/api/webhooks/deliveries/d1/retry"],
+    ] as const) expect(capabilityForRoute(m, p), `${m} ${p}`).toBe("webhooks:write");
   });
 });
 

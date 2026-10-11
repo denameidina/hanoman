@@ -33,6 +33,11 @@ export const CAPABILITY_IDS = [
   // "Backlog — tulis" diam-diam membuka papan orang, dan sebaliknya.
   "team:read", "team:write",
   "qa:read", "qa:write",
+  // ADR-0193..0195 · permukaan integrasi yang dulu cookie-only (ADR-0097/0100/0110). Semuanya OPT-IN:
+  // tak ada yang diimplikasikan capability lama, dan tak ikut default token mana pun.
+  "webhooks:read", "webhooks:write",   // ADR-0194 · webhook keluar
+  "clients:read", "clients:write",     // ADR-0194 · akun klien portal
+  "portal:read",                       // ADR-0195 · lihat portal ATAS NAMA akun klien eksplisit (tak ada :write)
   // ADR-0155 · akses KETIGA: `danger`. Dipecah dari `:write` karena keempat operasi ini bukan
   // "menulis lebih banyak", melainkan menjalankan sesuatu di luar proses hanoman — sesi agen di
   // worktree, perintah di VPS, git yang mengubah sejarah, penghapusan artefak dokumen.
@@ -57,6 +62,9 @@ export const CAPABILITY_IDS = [
   // /terminal/sessions` yang ditunda (ADR-0112); karena itu server MENUNTUT `sessions:spawn` juga
   // untuk membuat/mengubah/menjalankannya — capability ini saja tidak pernah cukup untuk eksekusi.
   "scheduler:read", "scheduler:write",
+  // ADR-0193 · kredensial kanal Telegram (bot token + AgentToken gateway + allowlist). Akses `danger`:
+  // siapa yang memegang ini ikut menentukan SIAPA yang bisa memerintah gateway ber-capability penuh.
+  "telegram:admin",
 ] as const;
 export const zCapability = z.enum(CAPABILITY_IDS);
 export type Capability = z.infer<typeof zCapability>;
@@ -99,6 +107,11 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "team:write", domain: "team", access: "write", label: "Tim — tulis", desc: "Buat/ubah/hapus kartu papan Tim & anggota; eskalasi kartu jadi backlog item." },
   { id: "qa:read", domain: "qa", access: "read", label: "QA — baca", desc: "Lihat laporan QA, test case, temuan, dan lampirannya." },
   { id: "qa:write", domain: "qa", access: "write", label: "QA — tulis", desc: "Buat/ubah/hapus laporan QA, test case, temuan, lampiran; impor laporan Markdown/ZIP." },
+  { id: "webhooks:read", domain: "webhooks", access: "read", label: "Webhook — baca", desc: "Lihat endpoint webhook keluar (tanpa secret) dan riwayat pengiriman — termasuk payload peristiwa lintas project." },
+  { id: "webhooks:write", domain: "webhooks", access: "write", label: "Webhook — tulis", desc: "Daftarkan/ubah/hapus endpoint webhook, putar secret, kirim ping, ulangi pengiriman. Menentukan ke mana data workspace mengalir keluar.", risk: "exec" },
+  { id: "clients:read", domain: "clients", access: "read", label: "Akun klien — baca", desc: "Lihat akun login portal klien beserta project yang boleh dilihatnya." },
+  { id: "clients:write", domain: "clients", access: "write", label: "Akun klien — tulis", desc: "Buat/ubah/nonaktifkan/hapus akun klien, atur project yang boleh dilihat, reset password. Membuka login baru ke data project." },
+  { id: "portal:read", domain: "portal", access: "read", label: "Portal klien — lihat sebagai klien", desc: "Membaca portal (backlog, tiket, chat) ATAS NAMA satu akun klien yang disebut eksplisit. Baca-saja: tak ada tulis atas nama klien." },
   // ADR-0155 · akses `danger`. Tak satu pun diimplikasikan `:write` di domainnya; manusia harus
   // mencentangnya sendiri di Settings → Akses AI Agent.
   { id: "sessions:spawn", domain: "sessions", access: "danger", label: "Sesi — buka sesi baru", desc: "Membuka sesi agen BARU di worktree (menjalankan claude/codex dengan izin penuh). Dipisah dari Sesi — tulis: mengendalikan sesi yang sudah ada tak lagi cukup untuk membuka yang baru.", risk: "rce" },
@@ -117,6 +130,7 @@ export const CAPABILITIES: CapabilityInfo[] = [
   // ADR-0191
   { id: "scheduler:read", domain: "scheduler", access: "read", label: "Cronjob — baca", desc: "Lihat cronjob per project (jadwal, prompt, agen) dan riwayat run-nya." },
   { id: "scheduler:write", domain: "scheduler", access: "write", label: "Cronjob — tulis", desc: "Buat/ubah/hapus/jalankan cronjob. Membuat, mengubah prompt/agen/jadwal, mengaktifkan, dan menjalankan cron juga menuntut Sesi — buka sesi baru (cron = sesi agen tertunda).", risk: "exec" },
+  { id: "telegram:admin", domain: "telegram", access: "danger", label: "Telegram — kredensial", desc: "Baca/ubah/hapus bot token, AgentToken gateway & allowlist user Telegram, dan uji koneksi. Siapa pun yang boleh memerintah gateway mewarisi capability token gateway; server menolak bila token gateway melebihi capability pemanggil.", risk: "exec" },
 ];
 
 // SPEC-264 · Metadata per-domain untuk grid capability di Settings (label ramah + cakupan).
@@ -143,6 +157,9 @@ export const CAPABILITY_DOMAINS: { domain: string; label: string; desc: string }
   { domain: "portal-chat", label: "Chat portal", desc: "Percakapan klien di chat portal (berisi email klien), PRD draft, dan ekspor transkrip." },
   { domain: "decisions", label: "Keputusan sesi", desc: "Jawab/rebut dialog AskUserQuestion sesi — gerbang manusia yang memutuskan." },
   { domain: "scheduler", label: "Cronjob", desc: "Cronjob per project: sesi agen terjadwal. Eksekusinya juga menuntut Sesi — buka sesi baru." },
+  { domain: "webhooks", label: "Webhook", desc: "Endpoint webhook keluar, secret penandatanganan, riwayat pengiriman." },
+  { domain: "clients", label: "Akun klien", desc: "Akun login portal klien dan project yang boleh dilihatnya." },
+  { domain: "portal", label: "Portal klien", desc: "Lihat portal atas nama satu akun klien (baca-saja)." },
 ];
 
 // write meng-implikasikan read pada domain yang sama.
