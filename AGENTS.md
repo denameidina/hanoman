@@ -26,6 +26,7 @@ Jangan mulai implementasi dari ingatan atau konteks chat saja kalau doc/skill pr
 4. **Setiap sesi terisolasi di git worktree sendiri** (`.worktrees/<id>`, ADR-0002). Pull dari branch mana pun; integrasi (rebase/merge) ke target dipicu manual dari dashboard (ADR-0031). Jangan menyentuh worktree sesi lain; jangan pernah jalankan sesi di working tree utama.
 5. **Guardrail perintah berbahaya dicabut** (SPEC-197, ADR-0037): sesi jalan `--dangerously-skip-permissions`, agen dipercaya penuh; isolasi worktree adalah satu-satunya batas keamanan. Jangan hidupkan kembali tanpa ADR baru.
 6. **Jangan membunuh proses lewat pola** (SPEC-402): `pkill -f <pola>` / `killall` **mematikan agen sesi lain** — prompt tiap sesi hidup di ARGV proses agennya dan memuat `vitest`/`tsc`/`node`, sementara `pkill` mengecualikan leluhurnya sendiri sehingga korbannya selalu sesi tetangga. Bunuh per-PID (`ps` / `lsof -ti:<port>` → `kill <pid>`) atau sempitkan pola sampai memuat path worktree-mu.
+7. **Setiap API baru wajib punya keputusan MCP** (ADR-0202). Route/kanal baru atau yang kontraknya berubah → dalam commit yang sama putuskan: **buat tool** (`shared/src/mcp-catalog/*` + capability di `agent-capabilities.ts`, mode `read|write|danger`, test, `docs/agent-integration.md`) **atau** catat pengecualian beralasan di `UNWRAPPED`/`COOKIE_ONLY` (biner/multipart, WebSocket, auth bukan agent token, peniruan identitas, gerbang keputusan manusia). Ragu → buat tool di balik capability opt-in + `danger`. Gerbang `server/test/mcp-coverage.test.ts` hanya menangkap route yang terjangkau agent token; route `COOKIE_ONLY` tetap butuh keputusanmu.
 
 ## Eksekusi & Perintah
 
@@ -50,6 +51,7 @@ hanoman --version | --help
 
 ## Definition of done
 
+- **Keputusan MCP** untuk setiap API baru/berubah tercatat (tool dibuat atau pengecualian beralasan, aturan #7).
 - **Test yang tersentuh** hijau — `pnpm vitest --run --changed "$HANOMAN_BASE_SHA" --no-file-parallelism`
   (atau sebut path test-nya langsung) dan typecheck paket yang tersentuh (`pnpm --filter ./server typecheck`).
   **`--no-file-parallelism` wajib** bila set-nya menyentuh test server: run tingkat-root tak
