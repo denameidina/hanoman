@@ -24,6 +24,7 @@ import { readUpload } from "../services/uploads";
 import { QA_STORAGE_KEY, QA_SYNC_MAX_BYTES, qaBytesPresent, storeQaBytes, verifyQaBytes } from "../services/qa-attachment-sync";
 import { ingestBatch } from "../services/logs/ingest";
 import { effectiveStr } from "../config";
+import { localGitToken } from "../services/git-token";
 import { bearerToken, openWsConnection, revalidateWsPrincipal, WsMessageGuard } from "../services/ws-admission";
 
 // SPEC-213 · ADR-0045/0046 · surface sync mesin-ke-mesin (device-token). Isi file dokumen
@@ -87,6 +88,14 @@ export default async function (app: FastifyInstance) {
       // ADR-0180 · catch-up: hanya entitas opsional yang diminta, tanpa memindahkan kursor client.
       ...(q.only ? { only: acceptedOptional(q.only) } : {}),
     }));
+  });
+
+  // ADR-0203 · token GitHub hub untuk client yang menjalankan clone/fetch. Bearer device-token
+  // (bukan cookie, bukan agent token — lihat UNWRAPPED di mcp-coverage). `no-store`: rahasia tak
+  // boleh tertinggal di cache perantara.
+  app.get("/sync/git-credential", { preHandler: requireDeviceToken }, async (_req, reply) => {
+    reply.header("cache-control", "no-store");
+    return { token: localGitToken() };
   });
 
   // SPEC-272 · ADR-0068 · byte lampiran untuk fetch-through client (device-token, bukan cookie).

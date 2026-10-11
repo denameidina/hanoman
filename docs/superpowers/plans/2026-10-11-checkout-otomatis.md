@@ -175,7 +175,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
   - `resolveGitToken(deps?: { hub?: () => Promise<string | null> }): Promise<string | null>`
   - Route `GET /api/sync/git-credential` → `200 { token: string | null }`, header `cache-control: no-store`; 401 tanpa device token.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/git-token.test.ts
@@ -250,12 +250,12 @@ describe("hubGitToken", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/git-token.test.ts --no-file-parallelism`
 Expected: FAIL — import `../src/services/git-token` tidak ditemukan.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/git-token.ts
@@ -323,12 +323,12 @@ Tambahkan di `server/test/instance-sync-gate.test.ts` pada array URL tes "kanal 
       ["GET", "/api/sync/git-credential"],
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd server && TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" pnpm vitest --run test/git-token.test.ts test/instance-sync-gate.test.ts test/mcp-coverage.test.ts --no-file-parallelism`
 Expected: PASS. Bila `mcp-coverage` gagal karena route tak terdaftar di inventaris, periksa regex `routeInventory()` dan pastikan entri `UNWRAPPED` persis `"GET /sync/git-credential"`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/git-token.ts server/src/routes/sync.ts server/test/git-token.test.ts server/test/mcp-coverage.test.ts server/test/instance-sync-gate.test.ts docs/superpowers/plans/2026-10-11-checkout-otomatis.md
