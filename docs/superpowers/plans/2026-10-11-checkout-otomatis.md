@@ -54,7 +54,7 @@ Frontend tidak berubah: tombol "Jalankan git clone" sudah ada di `src/src/screen
   - `isGithubHttps(remote: string): boolean`
   - `gitAuthEnv(token: string): Record<string, string>` — berisi `GIT_ASKPASS`, `GIT_TERMINAL_PROMPT`, `HANOMAN_GIT_TOKEN`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // server/test/git-auth.test.ts
@@ -96,12 +96,12 @@ describe("gitAuthEnv", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd server && pnpm vitest --run test/git-auth.test.ts --no-file-parallelism`
 Expected: FAIL — `Failed to resolve import "../src/services/git-auth"`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 ```ts
 // server/src/services/git-auth.ts
@@ -142,12 +142,12 @@ export function gitAuthEnv(token: string): Record<string, string> {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd server && pnpm vitest --run test/git-auth.test.ts --no-file-parallelism`
 Expected: PASS (4 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/git-auth.ts server/test/git-auth.test.ts docs/superpowers/plans/2026-10-11-checkout-otomatis.md
