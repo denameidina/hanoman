@@ -68,4 +68,13 @@ describe("menu aksi (.hn-overflow-item*) · satu definisi, di ui.css", () => {
     expect(uiCss).toMatch(/\.hn-overflow-item:focus-visible\s*\{\s*outline:\s*2px solid var\(--border-focus\)/);
     expect(readFileSync(join(dsDir, "ui.tsx"), "utf8")).toMatch(/import "\.\/ui\.css";/);
   });
+
+  // Di subbaris ponsel app.css memberi tombol 40 px dengan (0,2,1), dan itu mengalahkan `.hn-overflow-item`
+  // (0,1,0): item "Hapus project…" terukur 40 px di 390. Aturan penguncinya harus lebih spesifik: (0,3,0).
+  it("item menu di subbaris ponsel tetap 44 px: (0,3,0) ui.css mengalahkan (0,2,1) app.css", () => {
+    const uiCss = readFileSync(join(dsDir, "ui.css"), "utf8");
+    expect(css).toMatch(/\.hn-shell \.hn-shell-subrow button,\s*\.hn-shell \.hn-shell-subrow input\s*\{\s*min-height:\s*40px/);
+    expect(uiCss).toMatch(/\.hn-shell \.hn-shell-subrow \.hn-overflow-item\s*\{\s*min-height:\s*var\(--touch-target\)/);
+    expect(uiCss).not.toMatch(/!important/);
+  });
 });

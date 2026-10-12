@@ -15,6 +15,10 @@
 /* Cincin fokus di dalam baris: baris menu sudah berlatar saat fokus, jadi cincin tak boleh keluar kotak. */
 .hn-overflow-item:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 .hn-overflow-item:disabled { color: var(--text-subtle); opacity: 0.5; cursor: not-allowed; }
+/* Di subbaris ponsel (≤767px) app.css memberi `.hn-shell .hn-shell-subrow button` min-height 40 px dengan
+   spesifisitas (0,2,1), yang mengalahkan `.hn-overflow-item` (0,1,0): item "Hapus project…" jadi 40 px, bukan 44.
+   Aturan ini (0,3,0) mengunci 44 px sentuh di subbaris tanpa penegas deklarasi. Di luar subbaris tetap min-height dari atas. */
+.hn-shell .hn-shell-subrow .hn-overflow-item { min-height: var(--touch-target); }
 
 /* tone danger: teks clay-600 (6,45:1 di kartu); hover dan fokus memakai tint galat. */
 .hn-overflow-item-danger { color: var(--clay-600); }

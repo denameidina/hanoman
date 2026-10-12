@@ -76,11 +76,12 @@ const LANE_W = 14, ROW_H = 30, DOT = 4;
 // padding 50. Di bawah ini kolom subject yang `flex: 1` runtuh ke 0px dan pill ref (yang
 // `flex: 0 0 auto`) meluber menimpa kolom author — terukur 200 tombol subject `0×44` di 390px.
 // Di ≤640px ide.css mengurangi lantai ini sebesar 148px: penulis dan kolom tanggal samping dilepas (tanggal
-// pindah ke baris kecil di bawah subjek, `.hn-git-text`).
+// pindah ke baris subjek, di kanannya; pil ref turun ke baris kedua, `.hn-git-refs`).
 const GRAPH_ROW_MIN = 460;
 // Lantai lebar kolom subject (160px) ada di `.hn-git-subject` (ide.css) dan hanya berlaku di desktop: di
 // pointer kasar atau ≤767px aturan `button:not(...)` app.css (0,1,1) menimpanya ke 44px. Pill ref `flex: 0 0 auto`
-// memakan kolom fleksibel lebih dulu, jadi di ponsel lebar subjek = sisa setelah pill (lihat ide.css).
+// memakan kolom fleksibel lebih dulu, jadi di atas 640px lebar subjek = sisa setelah pill; di ≤640px pil punya
+// baris sendiri di bawah subjek, jadi subjek selebar kolomnya (lihat ide.css).
 // SPEC-245 · kadens live-refresh git graph. SPEC-908 · tinggal kadens FALLBACK; jalur
 // normalnya langganan berparameter di `/events/ws`.
 const POLL_MS = 4000;
@@ -661,27 +662,31 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                   title={compareFrom ? "Ctrl/Cmd-klik untuk bandingkan dengan commit pertama" : "Ctrl/Cmd-klik untuk mulai compare"}>
                   <RowSvg row={r} edges={allEdges[i] ?? []} maxLanes={maxLanes} style={style} palette={palette} height={graphRowHeight} />
                   <div className="hn-git-main">
-                    {c.refs.map((ref) => (
-                      <button type="button" key={ref} title={isHead && ref === current ? `${ref} · branch aktif (HEAD) — pilih untuk aksi` : `${ref} · branch — pilih untuk aksi`}
-                        aria-label={`Aksi branch ${ref}`}
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
-                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
-                        className={isHead && ref === current ? "hn-git-ref hn-git-ref--head" : "hn-git-ref"}>
-                        <span className="hn-git-ref-text">{ref}</span>
-                      </button>
-                    ))}
-                    {/* SPEC-233 · tag = pill terpisah (warna leaf, ikon tag); klik-kanan → menu tag */}
-                    {c.tags.map((t) => (
-                      <button type="button" key={`tag:${t}`} title={`${t} · tag — pilih untuk aksi`} aria-label={`Aksi tag ${t}`}
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
-                        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
-                        className="hn-git-tag"><span className="hn-git-ref-text">⌂{t}</span></button>
-                    ))}
-                    {/* Merge dinyatakan TEKS, bukan hanya redup warnanya (audit a11y). */}
-                    {c.parents.length > 1 && <span className="hn-git-merge">merge</span>}
-                    {/* P2-3 · di ≤640 subjek dan tanggal berbagi satu kolom teks: tanggal turun ke baris kecil
-                        di bawah subjek (`.hn-git-date-under`), dan kolom tanggal samping dilepas. Di atas 640
-                        `.hn-git-text` tak membuat kotak (display: contents), jadi susunannya tetap seperti dulu. */}
+                    {/* Pil ref, tag, dan merge dibungkus satu baris: di ≤640 baris ini turun ke bawah subjek
+                        (`.hn-git-refs`, ide.css). Di desktop pembungkus tak membuat kotak (display: contents). */}
+                    <span className="hn-git-refs">
+                      {c.refs.map((ref) => (
+                        <button type="button" key={ref} title={isHead && ref === current ? `${ref} · branch aktif (HEAD) — pilih untuk aksi` : `${ref} · branch — pilih untuk aksi`}
+                          aria-label={`Aksi branch ${ref}`}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
+                          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
+                          className={isHead && ref === current ? "hn-git-ref hn-git-ref--head" : "hn-git-ref"}>
+                          <span className="hn-git-ref-text">{ref}</span>
+                        </button>
+                      ))}
+                      {/* SPEC-233 · tag = pill terpisah (warna leaf, ikon tag); klik-kanan → menu tag */}
+                      {c.tags.map((t) => (
+                        <button type="button" key={`tag:${t}`} title={`${t} · tag — pilih untuk aksi`} aria-label={`Aksi tag ${t}`}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
+                          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
+                          className="hn-git-tag"><span className="hn-git-ref-text">⌂{t}</span></button>
+                      ))}
+                      {/* Merge dinyatakan TEKS, bukan hanya redup warnanya (audit a11y). */}
+                      {c.parents.length > 1 && <span className="hn-git-merge">merge</span>}
+                    </span>
+                    {/* P2-3 · di ≤640 subjek dan tanggal berbagi baris pertama (subjek, lalu tanggal di kanannya,
+                        `.hn-git-date-under`), dan kolom tanggal samping dilepas. Di atas 640 `.hn-git-text` tak
+                        membuat kotak (display: contents), jadi susunannya tetap seperti dulu. */}
                     <span className="hn-git-text">
                       <button type="button" aria-label={`Buka commit ${c.sha}`} title={subject}
                         onClick={(event) => { event.stopPropagation(); onRowClick(event, c.sha); }}
