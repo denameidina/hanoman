@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, statSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   spawnHelperPaths, ensureSpawnHelpersExecutable, repairSpawnHelper,
-  ensureSpawnHelperOnce, resetSpawnHelperMemo,
+  ensureSpawnHelper, spawnWithHelperRecovery,
 } from "./spawn-helper";
 
 // SPEC-403 · terminal sesi BLANK di `npm i -g hanoman`. Sesi tmux-nya hidup dan berisi output,
@@ -109,16 +109,61 @@ describe("repairSpawnHelper", () => {
   });
 });
 
-describe("ensureSpawnHelperOnce", () => {
-  beforeEach(() => resetSpawnHelperMemo());
-
-  // Dipasang di `spawnPty`, yang dipanggil setiap sesi terminal lahir: pemeriksaan boleh murah,
-  // tapi tak boleh mengulang stat seluruh pohon prebuild seumur proses.
-  it("hanya menyentuh disk pada panggilan pertama", () => {
+describe("ensureSpawnHelper", () => {
+  // Regresi: server berumur panjang melewati `npm i -g hanoman`, yang mengembalikan `spawn-helper` ke
+  // 0644 di bawah prosesnya. Memoize "sekali per proses" membuat setiap sesi baru berlayar kosong.
+  it("memeriksa ULANG tiap panggilan: helper yang rusak lagi diperbaiki lagi", () => {
     const { resolve, helper } = fakePtyTree();
-    expect(ensureSpawnHelperOnce(resolve)).toEqual([helper]);
-    chmodSync(helper, 0o644);                       // rusak lagi di belakang punggung kita
-    expect(ensureSpawnHelperOnce(resolve)).toEqual([]);
-    expect(statSync(helper).mode & 0o111).toBe(0);  // memang tak diperiksa ulang
+    expect(ensureSpawnHelper(resolve)).toEqual([helper]);
+    chmodSync(helper, 0o644);                       // npm i -g menimpa berkas di belakang punggung kita
+    expect(ensureSpawnHelper(resolve)).toEqual([helper]);
+    expect(statSync(helper).mode & 0o111).toBe(0o111);
+  });
+
+  it("tak menulis dan tak berisik bila helper sudah executable", () => {
+    const { resolve } = fakePtyTree();
+    ensureSpawnHelper(resolve);
+    const seen: string[] = [];
+    expect(ensureSpawnHelper(resolve, (m) => seen.push(m))).toEqual([]);
+    expect(seen).toEqual([]);
+  });
+});
+
+describe("spawnWithHelperRecovery", () => {
+  const posix = () => Object.assign(new Error("posix_spawnp failed."), {});
+
+  it("jalur normal: perbaiki dulu, spawn sekali, hasil dikembalikan", () => {
+    const order: string[] = [];
+    const r = spawnWithHelperRecovery(() => { order.push("spawn"); return "ok"; }, () => { order.push("repair"); return []; });
+    expect(r).toBe("ok");
+    expect(order).toEqual(["repair", "spawn"]);
+  });
+
+  it("posix_spawnp lalu perbaikan mengubah sesuatu → ulangi SEKALI dan berhasil", () => {
+    let spawns = 0; let repairs = 0;
+    const r = spawnWithHelperRecovery(
+      () => { spawns += 1; if (spawns === 1) throw posix(); return "pulih"; },
+      () => { repairs += 1; return repairs === 2 ? ["/x/spawn-helper"] : []; },
+    );
+    expect(r).toBe("pulih");
+    expect(spawns).toBe(2);
+  });
+
+  it("posix_spawnp tetapi tak ada yang bisa diperbaiki → galat asli dilempar, tanpa ulang", () => {
+    let spawns = 0;
+    expect(() => spawnWithHelperRecovery(() => { spawns += 1; throw posix(); }, () => [])).toThrow("posix_spawnp");
+    expect(spawns).toBe(1);
+  });
+
+  it("percobaan ulang gagal lagi → dilempar, tidak berputar", () => {
+    let spawns = 0;
+    expect(() => spawnWithHelperRecovery(() => { spawns += 1; throw posix(); }, () => ["/x"])).toThrow("posix_spawnp");
+    expect(spawns).toBe(2);
+  });
+
+  it("galat lain tak disentuh dan tak diulang", () => {
+    let spawns = 0;
+    expect(() => spawnWithHelperRecovery(() => { spawns += 1; throw new Error("ENOENT tmux"); }, () => ["/x"])).toThrow("ENOENT");
+    expect(spawns).toBe(1);
   });
 });

@@ -7,7 +7,7 @@ import { stat } from "node:fs/promises";
 import { dirname, resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
 import {
-  goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelperOnce,
+  goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelper, spawnWithHelperRecovery,
   renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook, withPhaseDelegation,
   writeSubagentStatusline, agentContractOf, type AgentContractFile, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
@@ -1741,18 +1741,24 @@ export function detachAll(): void {
 // sudah up-to-date — jadi terjemahkan errornya alih-alih membiarkan orang menebak.
 //
 // SPEC-403 (lanjutan, 2026-08-14) · penawarnya dipasang DI SINI, bukan di jalur boot mana pun.
-// `ensureSpawnHelperOnce` sebelumnya hanya dipanggil `hanoman start`; deployment yang menjalankan
+// `ensureSpawnHelper` sebelumnya hanya dipanggil `hanoman start`; deployment yang menjalankan
 // `node dist/server.js` langsung melewatinya, jadi setiap `npm i -g hanoman` mengembalikan
 // terminal ke blank hitam sementara REST, tmux, dan WebSocket-nya semua sehat. `spawnPty` adalah
 // satu-satunya tempat proses ini meng-exec node-pty: memasangnya di sini berarti tak ada jalur
-// masuk yang bisa terlewat. Biayanya beberapa `stat` sekali seumur proses (memoized).
+// masuk yang bisa terlewat.
+//
+// Diperiksa ULANG pada setiap spawn (bukan sekali per proses): server berumur panjang yang dibiarkan
+// hidup melewati `npm i -g hanoman` melihat `spawn-helper` kembali 0644 di bawah kakinya. Biayanya
+// beberapa `stat` per sesi lahir; lihat `runner/src/spawn-helper.ts`. Bila spawn tetap gagal dengan
+// `posix_spawnp`, perbaiki sekali lagi dan ulangi sebelum menyerah.
 function spawnPty(...args: string[]): IPty {
-  ensureSpawnHelperOnce(createRequire(import.meta.url).resolve, (m) => process.stdout.write(m));
+  const resolve = createRequire(import.meta.url).resolve;
+  const repair = () => ensureSpawnHelper(resolve, (m) => process.stdout.write(m));
   try {
-    return spawn("tmux", ["-L", socket(), "-f", "/dev/null", ...args], {
+    return spawnWithHelperRecovery(() => spawn("tmux", ["-L", socket(), "-f", "/dev/null", ...args], {
       name: "xterm-256color", cols: 80, rows: 24,
       env: process.env as Record<string, string>,
-    });
+    }), repair);
   } catch (e) {
     const msg = (e as Error).message;
     if (!msg.includes("posix_spawnp")) throw e;

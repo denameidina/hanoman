@@ -76,24 +76,43 @@ export function repairSpawnHelper(
     mode: (p) => statSync(p).mode,
     chmod: (p, m) => chmodSync(p, m),
   });
-  if (fixed.length) notify?.("hanoman · memperbaiki izin `spawn-helper` node-pty (sekali per instalasi)\n");
+  if (fixed.length) notify?.("hanoman · memperbaiki izin `spawn-helper` node-pty (hilang setelah pemasangan/pembaruan paket)\n");
   return fixed;
 }
 
-let repaired = false;
-
 /**
- * Versi sekali-jalan untuk dipasang di jalur panas (`spawnPty`): pemeriksaannya beberapa `stat`,
- * murah, tapi tak ada gunanya diulang tiap sesi lahir. Di-reset hanya oleh test.
+ * Dipasang di jalur panas (`spawnPty`): memeriksa ULANG setiap kali sebuah sesi di-spawn.
+ *
+ * Dulu ini "sekali per proses" (memoized). Itu salah untuk server yang berumur panjang: `npm i -g
+ * hanoman` (atau `hanoman update`) menimpa berkas node-pty DI BAWAH proses yang sedang hidup dan
+ * mengembalikan `spawn-helper` ke 0644, tetapi proses itu sudah menandai dirinya "beres" pada
+ * spawn pertamanya dan tak pernah melihat lagi → setiap sesi baru lahir dengan layar kosong dan
+ * klien terjebak di "menyambung ulang…" (terukur: server hidup 2 hari, helper 0644 setelah update).
+ *
+ * Biayanya sepele dan tak perlu di-cache: satu `resolve`, satu `readdir`, dan `stat` pada beberapa
+ * helper — mikrodetik, dan hanya saat sebuah sesi lahir. `notify` hanya dipanggil bila ada yang
+ * benar-benar diperbaiki, jadi pemanggilan berulang tak menambah derau.
  */
-export function ensureSpawnHelperOnce(
+export function ensureSpawnHelper(
   resolve: (id: string) => string,
   notify?: (msg: string) => void,
 ): string[] {
-  if (repaired) return [];
-  repaired = true;
   return repairSpawnHelper(resolve, notify);
 }
 
-/** Hanya untuk test. */
-export function resetSpawnHelperMemo(): void { repaired = false; }
+/**
+ * Spawn dengan pemulihan: periksa/perbaiki helper dulu, spawn, dan bila spawn gagal dengan
+ * `posix_spawnp` (EACCES pada `spawn-helper`) coba perbaiki SEKALI lagi lalu ulangi. Bila perbaikan
+ * kedua tak mengubah apa pun, penyebabnya bukan izin yang bisa kita betulkan, jadi galat aslinya
+ * dilempar apa adanya. Sengaja hanya satu percobaan ulang: kegagalan kedua tak boleh berputar.
+ */
+export function spawnWithHelperRecovery<T>(doSpawn: () => T, repair: () => string[]): T {
+  repair();
+  try {
+    return doSpawn();
+  } catch (e) {
+    if (!String((e as Error)?.message ?? e).includes("posix_spawnp")) throw e;
+    if (repair().length === 0) throw e;
+    return doSpawn();
+  }
+}

@@ -2,7 +2,9 @@
 // server: instance yang me-`npm i` dirinya sendiri lalu keluar akan memutus sesi tmux yang sedang
 // berjalan tanpa peringatan (ADR-0048 tetap read-only di sisi server).
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { compareSemver } from "@hanoman/shared";
+import { repairSpawnHelper } from "@hanoman/runner";
 import type { Ctx } from "../router";
 import { currentVersion } from "../router";
 
@@ -51,6 +53,11 @@ export default async function update(argv: string[], ctx: Ctx): Promise<number> 
   if (check) { ctx.stdout(`jalankan: npm ${INSTALL_ARGS.join(" ")}\n`); return 0; }
   try { execFileSync("npm", [...INSTALL_ARGS], { stdio: "inherit" }); }
   catch { ctx.stderr("npm i -g gagal — jalankan manual (mungkin butuh sudo)\n"); return 1; }
+  // `npm i -g` mengembalikan `spawn-helper` node-pty ke 0644. Server yang masih hidup (terutama versi
+  // lama yang menandai dirinya "beres" sekali per proses) akan melahirkan sesi dengan layar kosong dan
+  // klien terjebak di "menyambung ulang…". Perbaiki SEKARANG, di instalasi yang baru saja ditulis,
+  // supaya instance yang berjalan tetap sehat sebelum operator sempat me-restart-nya.
+  repairSpawnHelper(createRequire(import.meta.url).resolve, ctx.stdout);   // tak pernah melempar
   ctx.stdout(`terpasang hanoman ${plan.latest} · restart instance yang berjalan\n`);
   return 0;
 }

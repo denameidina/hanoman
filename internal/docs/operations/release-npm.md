@@ -167,9 +167,21 @@ ada di runner, jadi ia akan exit 1 karena alasan yang tak relevan dengan kesehat
   total padahal pane tmux berisi belasan KB teks dan REST-nya 200. Sejak `0.1.34` implementasinya
   hidup di `runner/src/spawn-helper.ts` dan dipasang di **`spawnPty` (`server/src/services/pty.ts`)** —
   satu-satunya tempat proses ini meng-exec node-pty, jadi tak ada jalur boot yang bisa melewatinya;
-  hasilnya di-memo (`ensureSpawnHelperOnce`) supaya tetap beberapa `stat` sekali seumur proses.
   `hanoman start` tetap memanggilnya lebih awal, hanya agar operator melihat laporannya sebelum
   server lahir. **Jangan** memindahkannya kembali ke jalur perintah tertentu.
+  **Kambuh 2026-10-12 pada server berumur panjang, diperbaiki lagi:** hasilnya sempat di-memo
+  ("sekali per proses", `ensureSpawnHelperOnce`). Server yang hidup 2 hari dibiarkan melewati
+  `hanoman update` (`npm i -g`), yang menimpa berkas node-pty DI BAWAH proses itu dan mengembalikan
+  `spawn-helper` ke `-rw-------`; proses itu sudah menandai dirinya "beres" pada spawn pertamanya dan
+  tak pernah memeriksa lagi → sesi baru berlayar kosong dan klien terjebak "menyambung ulang… (1/12)".
+  Sekarang ada tiga lapis: (1) **`ensureSpawnHelper` memeriksa ulang pada SETIAP spawn** (satu `resolve`,
+  satu `readdir`, beberapa `stat`: mikrodetik, tak perlu di-memo); (2) **`spawnWithHelperRecovery`**:
+  bila spawn tetap gagal `posix_spawnp`, perbaiki sekali lagi lalu ulangi SEKALI, dan bila perbaikan
+  tak mengubah apa pun galat aslinya dilempar; (3) **`hanoman update` memperbaiki izin segera setelah
+  `npm i -g`** (`cli/src/commands/update.ts`), sehingga instance LAMA yang masih hidup (yang belum punya
+  lapis 1–2) pun tertolong. Regresi dikunci di `runner/src/spawn-helper.test.ts` ("memeriksa ULANG tiap
+  panggilan", terbukti gagal bila perilaku memo dipulihkan) dan `cli/test/update-cmd.test.ts`.
+  Server lama yang sudah hidup tetap perlu `chmod +x` manual bila ia diperbarui dengan CLI lama.
 - **`npm token create` tak bisa membuat GAT di npm 11.6.2** (hanya token klasik
   `--read-only`/`--cidr`), dan `npm i -g npm@latest` menolak jalan di node `v24.11.1` (menuntut
   `^24.15.0`). Sampai node dinaikkan, GAT harus dibuat dari npmjs.com.
