@@ -24,9 +24,9 @@ const screenWith = (backlog: Spec[], extra: Record<string, unknown> = {}) =>
 describe("prioritas: satu helper label untuk daftar dan papan", () => {
   it("'tinggi' tampil sebagai titik dengan nama aksesibel 'Prioritas Tinggi', di daftar maupun papan", () => {
     screenWith([spec({ priority: "tinggi" })]);
-    expect(screen.getByTitle("Prioritas Tinggi")).toBeInTheDocument();
+    expect(screen.getByTitle(/^Prioritas Tinggi/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Papan" }));
-    expect(screen.getByTitle("Prioritas Tinggi")).toBeInTheDocument();
+    expect(screen.getByTitle(/^Prioritas Tinggi/)).toBeInTheDocument();
   });
 });
 

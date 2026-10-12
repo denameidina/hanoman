@@ -127,11 +127,16 @@ function BlockedBadge({ spec }: { spec: SpecListItem }) {
 
 // Titik prioritas: bentuk (penuh / berisi / berlubang) + teks tersembunyi, jadi maknanya tetap
 // terbaca tanpa warna. Label lengkapnya ada di detail.
-function PrioDot({ priority }: { priority: string }) {
+// Dengan `stage`, titik membawa DUA sinyal: bentuk/ukuran = prioritas, warna = status (selesai hijau,
+// berjalan brass, antre brass muda, belum mulai abu). Tanpa `stage` warnanya netral.
+function PrioDot({ priority, stage }: { priority: string; stage?: string }) {
   const p = prioMeta(priority);
+  const status = stage ? STAGE_STATUS[stage] ?? "idle" : undefined;
+  const statusLabel = stage ? groupLabelOf(stage) : null;
   return (
-    <span className={`hn-bl-prio hn-bl-prio-${p.level}`} title={`Prioritas ${p.label}`}>
-      <span className="hn-sr-only">Prioritas {p.label}</span>
+    <span className={`hn-bl-prio hn-bl-prio-${p.level}`} data-status={status}
+      title={statusLabel ? `Prioritas ${p.label} · Status ${statusLabel}` : `Prioritas ${p.label}`}>
+      <span className="hn-sr-only">Prioritas {p.label}{statusLabel ? `, status ${statusLabel}` : ""}</span>
     </span>
   );
 }
@@ -770,7 +775,7 @@ function SpecRow({ spec, presenceOn, onOpenDetail, projectName, ...actions }: Ro
   return (
     <DenseRow onClick={onOpenDetail ? () => onOpenDetail(spec) : undefined}
       actions={<SpecActions spec={spec} {...actions} />}>
-      <PrioDot priority={spec.priority} />
+      <PrioDot priority={spec.priority} stage={spec.stage} />
       <span className="hn-bl-row-body">
         <span className="hn-bl-row-title">{spec.title}</span>
         <span className="hn-bl-row-meta">
@@ -829,7 +834,7 @@ function BoardCard({ spec, col, onOpenDetail, presenceOn, projectName, onDragSta
         : "Stage mengikuti fase yang dilaporkan agen — kartu tak bisa dipindah"}
       data-draggable={draggable || undefined}>
       <div className="hn-bl-card-head">
-        <PrioDot priority={spec.priority} />
+        <PrioDot priority={spec.priority} stage={spec.stage} />
         <span className="hn-bl-id">{spec.id}</span>
         <SourceTag source={spec.source} />
       </div>

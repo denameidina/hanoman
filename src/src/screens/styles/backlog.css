@@ -44,15 +44,18 @@
 }
 .hn-bl-pager { margin-top: var(--space-3); border: 1px solid var(--border-hair); border-radius: var(--radius-lg); overflow: hidden; }
 
-/* Titik prioritas: bentuk membawa makna, warna hanya penguat. */
-.hn-bl-prio { display: inline-flex; flex: 0 0 auto; width: 10px; height: 10px; }
+/* Titik: bentuk/ukuran = prioritas (tinggi besar penuh, sedang penuh, rendah berlubang); warna = status
+   bila diberi (data-status). Keduanya juga ada di teks tersembunyi + tooltip. */
+.hn-bl-prio { --dot: var(--ink-400); display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 12px; height: 12px; }
 .hn-bl-prio::before {
-  content: ""; display: block; width: 100%; height: 100%; border-radius: 50%;
-  box-sizing: border-box; border: 1.5px solid var(--ink-400); background: transparent;
+  content: ""; display: block; border-radius: 50%; box-sizing: border-box;
+  width: 9px; height: 9px; border: 1.5px solid var(--dot); background: var(--dot);
 }
-.hn-bl-prio-high::before { background: var(--brass-600); border-color: var(--brass-600); }
-.hn-bl-prio-mid::before { background: var(--ink-400); border-color: var(--ink-400); }
-.hn-bl-prio-low::before { background: transparent; border-color: var(--ink-400); }
+.hn-bl-prio-high::before { width: 12px; height: 12px; }
+.hn-bl-prio-low::before { background: transparent; }
+.hn-bl-prio[data-status="done"] { --dot: var(--leaf-500); }
+.hn-bl-prio[data-status="running"] { --dot: var(--brass-600); }
+.hn-bl-prio[data-status="queued"] { --dot: var(--brass-400, var(--brass-500)); }
 .hn-bl-prio-text { display: inline-flex; align-items: center; gap: var(--space-2); font: var(--weight-medium) var(--text-sm)/1 var(--font-ui); color: var(--text-strong); }
 
 .hn-bl-stage-pill { flex: 0 0 auto; }
