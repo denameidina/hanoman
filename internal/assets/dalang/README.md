@@ -1,7 +1,6 @@
-# Aset dalang — figur orkestrator (dulu untuk DalangStage)
+# Aset dalang — figur orkestrator
 
-Tiga aset transparan yang dulu dipakai panel `DalangStage` di Overview. Panel itu sudah dihapus di Fase 2E
-(`src/src/screens/DalangStage.tsx`); tak ada kode yang mengimpor aset ini lagi, dan berkasnya dibiarkan:
+Dipakai layar Dalang Hanoman (`src/src/screens/DalangHanomanScreen.tsx`, sinematik kembali sejak ADR-0219). Yang diimpor kode sekarang: **rig hero** (badan + empat lengan), **blencong**, dan **empat varian wayang** (`wayangFor`). Yang TIDAK diimpor kode lagi (dulu `DalangStage` di Overview, dihapus di Fase 2E): `hnm-dalang-six-arms`, `hnm-wayang-project`, `hnm-hero-cinematic`, dan `hnm-logo-head`. Berkasnya dibiarkan:
 
 | berkas (display, dibundel) | master (tidak dibundel) | dipakai sebagai |
 |---|---|---|

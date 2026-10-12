@@ -1075,34 +1075,6 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   100% { opacity: 0; transform: translateY(-26px) scale(0.9); }
 }
 
-/* ---- Dalang Hanoman (layar penuh). Gaya isinya ada di screens/styles/dalang.css (papan senyap, Fase 3B);
-   di sini hanya kerangka takeover dan tombol keluar yang dipakai bersama. ---- */
-/* Takeover layar penuh (cermin fullscreen Terminal, z 100 > header 90 > pet 80):
-   masuk menu = layar memenuhi viewport; keluar lewat tombol ✕ atau Esc. */
-.hn-dlg {
-  position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain;
-  background: linear-gradient(180deg, var(--term-bg), #0d0b07 60%);
-  padding: 20px 26px 12px; color: var(--term-fg);
-  padding-bottom: max(12px, var(--safe-bottom, 0px));
-}
-.hn-dlg-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.hn-dlg-title { font-family: var(--font-display); font-size: 21px; font-weight: 600; color: var(--term-fg); margin: 0; }
-.hn-dlg-exit {
-  appearance: none; font: inherit; cursor: pointer; width: 34px; height: 34px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--term-line); border-radius: var(--radius-md);
-  background: rgba(255,253,248,0.03); color: var(--term-dim);
-  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
-}
-.hn-dlg-exit:hover { color: var(--term-fg); border-color: var(--brass-700); }
-.hn-dlg-exit:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-/* Tombol keluar Dalang selalu tampil (di semua tier). 44×44 pada pointer kasar dan di ponsel. */
-@media (pointer: coarse), (max-width: 767px) {
-  .hn-dlg-exit { width: var(--touch-target); height: var(--touch-target); }
-}
-.hn-dlg-empty { position: relative; text-align: center; padding: 26px 0 30px; color: var(--term-dim); font-size: 12.5px; line-height: 1.7; }
-.hn-dlg-rt { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; color: var(--brass-300); margin-bottom: 9px; }
-.hn-dlg-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--term-line); flex: none; margin-top: 4px; }
 
 /* ============================================================
    Primitif layout & daftar (Audit UI/UX 2026-10 · Fase 2A)

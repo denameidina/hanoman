@@ -1,76 +1,89 @@
-/* Dalang Hanoman sebagai papan status senyap (Audit UI/UX 2026-10 · Fase 3B). Dimuat dari
-   DalangHanomanScreen.tsx. Pengecualian gelap yang terdokumentasi: satu-satunya layar gelap penuh, karena
-   seluruh layarnya adalah kerja aktif. Tanpa animasi dan tanpa timer; pet tetap satu-satunya elemen yang
-   bergerak. Warna hanya dari token terminal (--term-*) dan aksen brass/amber. Aturan di app.css milik
-   bersama; yang ditimpa di sini cukup ditulis ulang dengan kelas yang sama. */
+/* Dalang Hanoman (layar penuh): panggung orkestrasi sinematik, dipulihkan dari 8380d3fa atas keputusan
+   pemilik (ADR-0219, mengamandemen ADR-0208). Dimuat dari DalangHanomanScreen.tsx. Satu-satunya layar gelap
+   penuh (pengecualian ADR-0208: seluruh layar adalah kerja aktif).
+   Warna lewat token. Teks hanya memakai --term-fg, --term-dim, --brass-300, --brass-400, dan --amber-500,
+   yang lolos 4,5:1 di --term-bg (diuji ui-audit-tokens.test.ts). Warna ikon dan titik status adalah grafis,
+   jadi cukup 3:1 (WCAG 1.4.11), dan diberikan lewat stroke atau background, bukan lewat color.
+   Ukuran teks minimum 11px. Animasi dimatikan di sini (reduced-motion) dan juga di app.css; ticker dan
+   hitungan naik ikut dimatikan di JS. */
 
+/* ---- Takeover layar penuh (z 100 > header 90 > pet 80). Keluar lewat tombol atau Esc. ---- */
 .hn-dlg {
-  position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain;
-  background: var(--term-bg); color: var(--term-fg);
-  padding: calc(var(--space-5) + var(--safe-top)) var(--space-6) calc(var(--space-4) + var(--safe-bottom));
+  position: fixed; inset: 0; z-index: 100; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  /* Latar padat (ADR-0208 § 3): gradien membuat axe tak bisa menentukan latar teks (color-contrast incomplete). */
+  background: var(--term-bg);
+  color: var(--term-fg);
+  padding: max(20px, var(--safe-top, 0px)) 26px max(12px, var(--safe-bottom, 0px));
+}
+@media (max-width: 767px) {
+  .hn-dlg { padding-inline: var(--space-4); }
 }
 
-/* ---- Kepala: judul, ringkasan satu baris, status koneksi; tombol di kanan. ---- */
-.hn-dlg-top {
-  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
-  gap: var(--space-3) var(--space-4);
-}
-.hn-dlg-head { flex: 1 1 260px; min-width: 0; }
+/* ---- Kepala: merek (blencong + judul + ticker + ringkasan + status), lalu jam dan tombol keluar. ---- */
+.hn-dlg-top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 16px; }
+.hn-dlg-brand { display: flex; align-items: center; gap: 14px; flex: 1 1 260px; min-width: 0; }
+.hn-dlg-blencong { height: 44px; width: auto; flex: 0 0 auto; }
+.hn-dlg-blencong[data-lit] { filter: drop-shadow(0 0 12px color-mix(in srgb, var(--brass-400) 65%, transparent)); }
+.hn-dlg-head { min-width: 0; flex: 1 1 auto; }
 .hn-dlg-title {
-  margin: 0; font-family: var(--font-display); font-size: var(--text-2xl); font-weight: var(--weight-semibold);
+  margin: 0; font-family: var(--font-display); font-size: 21px; font-weight: var(--weight-semibold);
   line-height: var(--leading-tight); color: var(--term-fg);
 }
+/* Ticker: satu baris mono, mengetik. Caret berkedip lewat ::after (dimatikan reduced-motion). */
+.hn-dlg-boot {
+  margin: 4px 0 0; min-height: 15px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; color: var(--brass-300);
+}
+.hn-dlg-boot::after { content: "▍"; color: var(--brass-400); margin-left: 2px; animation: hn-dlg-blink 1s steps(1) infinite; }
+@keyframes hn-dlg-blink { 50% { opacity: 0; } }
 .hn-dlg-summary { margin: var(--space-1) 0 0; font-size: var(--text-md); color: var(--term-fg); }
 .hn-dlg-link {
   display: inline-flex; align-items: center; gap: var(--space-2); margin: var(--space-1) 0 0;
   font-size: var(--text-xs); color: var(--term-dim);
 }
-.hn-dlg-dot { flex: none; width: 7px; height: 7px; margin: 0; border-radius: 50%; background: var(--term-dim); }
+.hn-dlg-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--term-dim); }
 .hn-dlg-link--ok .hn-dlg-dot { background: var(--leaf-500); }
 .hn-dlg-link--err .hn-dlg-dot { background: var(--clay-500); }
+.hn-dlg-link--idle .hn-dlg-dot { background: var(--amber-600); }
 
-.hn-dlg-actions { display: flex; align-items: center; gap: var(--space-2); flex: 0 0 auto; }
-.hn-dlg-btn {
-  appearance: none; min-height: var(--touch-target); padding: 0 var(--space-4);
-  display: inline-flex; align-items: center;
-  border: 1px solid var(--term-line); border-radius: var(--radius-md); background: none;
-  color: var(--brass-300); font: var(--weight-medium) var(--text-sm)/1 var(--font-ui); cursor: pointer;
+.hn-dlg-bar { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.hn-dlg-clock { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.hn-dlg-chip {
+  display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; white-space: nowrap;
+  border: 1px solid var(--term-line); border-radius: var(--radius-md);
+  background: transparent;
+  font-family: var(--font-mono); font-size: 12px; color: var(--brass-300); font-variant-numeric: tabular-nums;
 }
-.hn-dlg-btn:hover { border-color: var(--brass-700); }
 
-/* Jalan keluar selalu 44×44 (sentuh), di semua ukuran layar. */
+/* Jalan keluar selalu 44×44 (sentuh) di semua ukuran layar. Tak ada display:none di jalur ini. */
 .hn-dlg-exit {
   appearance: none; flex: none; width: var(--touch-target); height: var(--touch-target); padding: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--term-line); border-radius: var(--radius-md); background: none;
-  color: var(--term-dim); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  border: 1px solid var(--term-line); border-radius: var(--radius-md);
+  background: transparent; color: var(--term-dim);
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 .hn-dlg-exit:hover { color: var(--term-fg); border-color: var(--brass-700); }
-
-.hn-dlg-btn:focus-visible,
 .hn-dlg-exit:focus-visible,
-.hn-dlg-row:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.hn-dlg-prj:focus-visible,
+.hn-dlg-row:focus-visible,
+.hn-dlg-cmd:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
-/* ---- Seksi: judul kecil mono, daftar berbaris dengan garis tipis. ---- */
-.hn-dlg-section { margin-top: var(--space-6); min-width: 0; }
+/* ---- Menunggu jawabanmu: ringkas, di atas. Satu baris per sesi, tombol Jawab di kanan. ---- */
+.hn-dlg-section { margin-top: var(--space-5); min-width: 0; }
 .hn-dlg-rt {
-  margin: 0 0 var(--space-2); font-family: var(--font-mono); font-size: var(--text-2xs);
-  font-weight: var(--weight-medium); letter-spacing: var(--tracking-caps); text-transform: uppercase;
-  color: var(--brass-300);
+  margin: 0 0 var(--space-2); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; font-weight: var(--weight-medium); color: var(--brass-300);
 }
 .hn-dlg-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--term-line); }
 .hn-dlg-list > li { border-bottom: 1px solid var(--term-line); }
-
-/* Baris = satu <button>; seluruh baris membuka tujuannya, label aksi terlihat di kanan. */
 .hn-dlg-row {
   appearance: none; width: 100%; min-height: var(--touch-target); margin: 0;
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3);
-  padding: var(--space-2) var(--space-2); border: 0; background: none;
+  padding: var(--space-2); border: 0; background: none;
   color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
 .hn-dlg-row:hover { background: color-mix(in srgb, var(--term-fg) 4%, transparent); }
-
-/* Wayang sebagai ikon kecil (24px tinggi), warnanya ikut keadaan baris. */
 .hn-dlg-glyph { flex: 0 0 24px; display: inline-flex; justify-content: center; }
 .hn-dlg-name {
   flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -80,22 +93,256 @@
 .hn-dlg-sesi { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--term-dim); }
 .hn-dlg-aksi {
   margin-left: auto; font-size: var(--text-xs); font-weight: var(--weight-medium);
-  color: var(--brass-300); white-space: nowrap;
+  color: var(--amber-500); white-space: nowrap;
+}
+@media (max-width: 767px) {
+  .hn-dlg-aksi { margin-left: 0; }
 }
 
-/* Menunggu jawabanmu: aksi amber (teks amber-500 lolos di atas --term-bg; warna wayang diberi lewat prop). */
-.hn-dlg-row--wait .hn-dlg-aksi { color: var(--amber-500); }
+/* ---- Empat KPI: ikon bernada (grafis), angka naik sekali. ---- */
+.hn-dlg-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.hn-dlg-kpi {
+  display: flex; gap: 11px; align-items: flex-start; min-width: 0; padding: 12px 14px;
+  border: 1px solid var(--term-line); border-radius: var(--radius-md);
+  background: transparent;
+}
+.hn-dlg-kpi-body { min-width: 0; }
+.hn-dlg-kpi-ic {
+  --tone: var(--brass-400);
+  width: 34px; height: 34px; flex: none; border-radius: var(--radius-sm);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--tone) 18%, transparent);
+}
+.hn-dlg-kpi-ic svg { stroke: var(--tone); }
+.hn-dlg-tone-proyek { --tone: var(--wind-500); }
+.hn-dlg-tone-hari { --tone: var(--leaf-500); }
+.hn-dlg-tone-sesi { --tone: var(--brass-400); }
+.hn-dlg-tone-tunggu { --tone: var(--amber-500); }
+.hn-dlg-kpi-l { display: block; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; color: var(--term-dim); }
+.hn-dlg-kpi-v {
+  display: block; font-family: var(--font-display); font-size: 25px; font-weight: 700; line-height: 1.15;
+  color: var(--term-fg); font-variant-numeric: tabular-nums;
+}
+.hn-dlg-kpi-s { display: block; font-size: 11px; color: var(--term-dim); margin-top: 1px; }
 
-/* Project tanpa sesi hidup: redup, tetap terbaca. */
-.hn-dlg-row--off .hn-dlg-name,
-.hn-dlg-row--off .hn-dlg-fase,
-.hn-dlg-row--off .hn-dlg-aksi { color: var(--term-dim); }
+/* ---- Grid: panggung di kiri, rel (aktivitas, donut, grafik) di kanan. ---- */
+.hn-dlg-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; align-items: start; margin-top: 14px; }
+.hn-dlg-main { min-width: 0; }
 
-/* Panggung sunyi (belum ada project). */
-.hn-dlg-empty { margin-top: var(--space-6); font-size: var(--text-md); color: var(--term-fg); }
+/* Panggung: HUD berputar, benang, pindai, rig, dan kartu wayang. */
+.hn-dlg-hero {
+  position: relative; overflow: hidden; border: 1px solid var(--term-line); border-radius: var(--radius-lg);
+  background: radial-gradient(ellipse 75% 95% at 50% 0%, color-mix(in srgb, var(--brass-400) 20%, transparent), transparent 62%);
+  padding: 16px 16px 0;
+}
+.hn-dlg-hud {
+  position: absolute; left: 50%; top: 128px; transform: translate(-50%, -50%); width: 300px; height: 300px;
+  pointer-events: none; opacity: 0.5;
+}
+.hn-dlg-hud circle { fill: none; stroke: var(--brass-700); stroke-width: 1; }
+.hn-dlg-hud-a, .hn-dlg-hud-b { transform-origin: 50% 50%; }
+.hn-dlg-hud-a { animation: hn-dlg-rot 26s linear infinite; }
+.hn-dlg-hud-b { animation: hn-dlg-rotr 40s linear infinite; }
+@keyframes hn-dlg-rot { to { transform: rotate(360deg); } }
+@keyframes hn-dlg-rotr { to { transform: rotate(-360deg); } }
+
+/* Benang gapit: energi mengalir dari tangan dalang ke tiap wayang hidup; yang diam kendur redup. */
+.hn-dlg-threads { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.hn-dlg-threads path {
+  fill: none; stroke: var(--brass-500); stroke-width: 1.4; stroke-linecap: round;
+  stroke-dasharray: 4 8; opacity: 0.8; animation: hn-dlg-flow 1.5s linear infinite;
+  animation-delay: var(--d, 0s);
+}
+.hn-dlg-threads path.hn-dlg-thread--slack {
+  stroke: var(--brass-700); stroke-dasharray: none; opacity: 0.3; animation: none;
+}
+@keyframes hn-dlg-flow { to { stroke-dashoffset: -28; } }
+
+.hn-dlg-scan {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, transparent 0%,
+    color-mix(in srgb, var(--brass-400) 5%, transparent) 48%,
+    color-mix(in srgb, var(--brass-300) 9%, transparent) 50%,
+    color-mix(in srgb, var(--brass-400) 5%, transparent) 52%, transparent 100%);
+  background-size: 100% 240px; background-repeat: no-repeat; background-position: 0 -240px;
+  animation: hn-dlg-scan 7s linear infinite;
+}
+@keyframes hn-dlg-scan { 0% { background-position: 0 -240px; } 60% { background-position: 0 460px; } 100% { background-position: 0 460px; } }
+
+/* Rig hero ber-sendi: kanvas komposisi 1003x757 unit sheet; badan + 4 lengan absolut, tiap lengan berputar
+   pada cakram pivot bahunya (koordinat diukur dari aset; lihat internal/assets/dalang/README.md).
+   Geometri dari internal/scripts/dalang/rigbuild.py (ARM_SCALE=0.78, skala murni CSS, aset tak disentuh). */
+.hn-dlg-hero-art {
+  position: relative; width: min(540px, 94%); aspect-ratio: 835 / 582;
+  margin: 0 auto; animation: hn-dlg-float 6s ease-in-out infinite;
+}
+.hn-dlg-hero-art img {
+  position: absolute; display: block; height: auto;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--brass-400) 35%, transparent));
+}
+.hn-dlg-rig-body { left: 25.88%; top: 16.32%; width: 48.73%; z-index: 2; }
+.hn-dlg-rig-arm { z-index: 1; will-change: transform; }
+.hn-dlg-rig-arm--ul { left: 5.48%;  top: 0.39%;  width: 32.03%; transform-origin: 85.5% 86.8%; animation: hn-dlg-arm-a 5s   ease-in-out infinite; }
+.hn-dlg-rig-arm--ur { left: 61.65%; top: 0%;     width: 30.82%; transform-origin: 15.1% 87.1%; animation: hn-dlg-arm-b 5.6s ease-in-out infinite; }
+.hn-dlg-rig-arm--ml { left: 0%;     top: 58.84%; width: 37.36%; transform-origin: 89.2% 24.2%; animation: hn-dlg-arm-b 6.4s ease-in-out infinite; }
+.hn-dlg-rig-arm--mr { left: 61.80%; top: 58.32%; width: 38.20%; transform-origin: 11.1% 24.3%; animation: hn-dlg-arm-a 7s   ease-in-out infinite; }
+@keyframes hn-dlg-arm-a { 0%, 100% { transform: rotate(-2.5deg); } 50% { transform: rotate(3deg); } }
+@keyframes hn-dlg-arm-b { 0%, 100% { transform: rotate(2.5deg); } 50% { transform: rotate(-3deg); } }
+.hn-dlg-hand { position: absolute; width: 2px; height: 2px; pointer-events: none; }
+.hn-dlg-hand[data-hand="ul"] { left: 15.5%; top: 9.9%; }
+.hn-dlg-hand[data-hand="ur"] { left: 82.7%; top: 9.6%; }
+.hn-dlg-hand[data-hand="ml"] { left: 10.2%; top: 76.1%; }
+.hn-dlg-hand[data-hand="mr"] { left: 89.5%; top: 75.5%; }
+@keyframes hn-dlg-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@media (max-width: 767px) {
+  .hn-dlg-hero-art { width: min(360px, 100%); }
+}
+
+.hn-dlg-empty { position: relative; text-align: center; padding: 26px 0 30px; color: var(--term-dim); font-size: 12.5px; line-height: 1.7; }
 .hn-dlg-empty-hint { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--term-dim); }
 
+/* Kartu wayang: satu per sesi hidup (ber-benang emas), satu per project tanpa sesi (redup). */
+.hn-dlg-cards {
+  position: relative; list-style: none; margin: 0; padding: 18px 0 16px;
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; justify-content: center;
+}
+.hn-dlg-cards > li { display: flex; min-width: 0; }
+.hn-dlg-prj {
+  appearance: none; font: inherit; text-align: left; cursor: pointer; width: 168px; max-width: 100%;
+  background: color-mix(in srgb, var(--term-bg) 85%, black); border: 1px solid color-mix(in srgb, var(--brass-500) 45%, transparent);
+  border-radius: var(--radius-md); padding: 8px 12px 10px; color: var(--term-fg);
+  box-shadow: 0 0 16px 0 color-mix(in srgb, var(--brass-500) 22%, transparent);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+.hn-dlg-prj:hover { transform: translateY(-3px); box-shadow: 0 0 24px 0 color-mix(in srgb, var(--brass-500) 40%, transparent); }
+.hn-dlg-prj[data-waiting] { border-color: var(--amber-600); box-shadow: 0 0 16px 0 color-mix(in srgb, var(--amber-500) 30%, transparent); }
+.hn-dlg-prj--off { border-color: var(--term-line); box-shadow: none; }
+.hn-dlg-prj--off:hover { box-shadow: 0 0 14px 0 color-mix(in srgb, var(--brass-500) 14%, transparent); }
+.hn-dlg-prj--off .hn-dlg-puppet img { filter: grayscale(0.85) brightness(0.55); }
+.hn-dlg-prj--off .hn-dlg-prj-name { color: var(--term-dim); }
+.hn-dlg-puppet {
+  display: block; width: fit-content; margin: 0 auto 6px; transform-origin: 50% 0%;
+  animation: hn-dlg-sway 3.6s var(--ease-inout) infinite alternate; animation-delay: var(--d, 0s);
+}
+.hn-dlg-puppet--still { animation: none; transform: rotate(-3deg); }
+.hn-dlg-puppet img {
+  display: block; height: 108px; width: auto;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--brass-300) 50%, transparent));
+}
+.hn-dlg-prj--off .hn-dlg-puppet img { height: 88px; }
+@keyframes hn-dlg-sway { from { transform: rotate(-2.5deg); } to { transform: rotate(2.5deg); } }
+.hn-dlg-prj-name {
+  display: block; font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-dlg-prj-sub {
+  display: block; font-family: var(--font-mono); font-size: 11px; color: var(--brass-400); margin-top: 3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-dlg-prj-sub--amber { color: var(--amber-500); }
+.hn-dlg-prj-sub--off { color: var(--term-dim); }
+
+/* Perintah dalang: baris lebar di bawah panggung; membuka Terminal. */
+.hn-dlg-cmd {
+  appearance: none; font: inherit; cursor: pointer; width: 100%; margin-top: 12px;
+  display: flex; align-items: center; gap: 12px; padding: 11px 15px; text-align: left;
+  border: 1px solid var(--brass-700); border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--brass-400) 12%, transparent), color-mix(in srgb, var(--brass-400) 3%, transparent));
+  color: var(--term-fg);
+  transition: border-color var(--dur-base) var(--ease-out);
+}
+.hn-dlg-cmd:hover { border-color: var(--brass-500); }
+.hn-dlg-mic { position: relative; width: 11px; height: 11px; border-radius: 50%; background: var(--brass-500); flex: none; }
+.hn-dlg-mic::before {
+  content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 1px solid var(--brass-500);
+  opacity: 0; animation: hn-dlg-ping 1.8s ease-out infinite;
+}
+@keyframes hn-dlg-ping { 0% { transform: scale(0.85); opacity: 0.8; } 70% { transform: scale(1.4); opacity: 0; } 100% { opacity: 0; } }
+.hn-dlg-cmd-t {
+  font-family: var(--font-mono); font-size: 12px; color: var(--term-dim); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-dlg-cmd-t b { color: var(--brass-300); font-weight: 500; }
+.hn-dlg-cmd-k {
+  margin-left: auto; flex: none; font-family: var(--font-mono); font-size: 11px; color: var(--term-dim);
+  border: 1px solid var(--term-line); border-radius: var(--radius-sm); padding: 2px 8px;
+}
+
+/* ---- Rel kanan: kartu aktivitas, donut, grafik. ---- */
+.hn-dlg-rail { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.hn-dlg-card {
+  border: 1px solid var(--term-line); border-radius: var(--radius-md);
+  background: transparent; padding: 12px 14px;
+}
+.hn-dlg-card .hn-dlg-rt { margin-bottom: 9px; }
+.hn-dlg-mut { font-size: 12px; color: var(--term-dim); }
+.hn-dlg-act {
+  display: flex; gap: 9px; align-items: flex-start; padding: 6px 0;
+  border-bottom: 1px solid var(--term-line); font-size: 11.5px;
+}
+.hn-dlg-act:last-of-type { border-bottom: 0; }
+.hn-dlg-dot2 { width: 7px; height: 7px; border-radius: 50%; background: var(--term-line); flex: none; margin-top: 4px; }
+.hn-dlg-dot2--on { background: var(--brass-500); }
+.hn-dlg-act-x {
+  color: var(--term-dim); line-height: 1.5; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.hn-dlg-act-x b { color: var(--term-fg); font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
+
+.hn-dlg-donut-wrap { display: flex; align-items: center; gap: 12px; }
+/* Cincin donat: conic-gradient dari --donut (diisi per data). Disc tengah berlatar solid, jadi teks di
+   atasnya punya latar yang bisa diukur kontrasnya. */
+.hn-dlg-donut {
+  position: relative; width: 112px; height: 112px; flex: none; border-radius: 50%;
+  background: var(--donut, conic-gradient(var(--term-line) 0% 100%));
+}
+.hn-dlg-donut-c {
+  position: absolute; inset: 13px; border-radius: 50%; background: var(--term-bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.hn-dlg-donut-c b { font-family: var(--font-display); font-size: 23px; color: var(--term-fg); line-height: 1; }
+.hn-dlg-donut-c span { font-size: 11px; color: var(--term-dim); margin-top: 2px; }
+.hn-dlg-leg { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--term-dim); }
+.hn-dlg-leg b { color: var(--term-fg); }
+.hn-dlg-leg i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 7px; }
+.hn-dlg-leg i.hn-dlg-seg--executing { background: var(--wind-500); }
+.hn-dlg-leg i.hn-dlg-seg--done { background: var(--leaf-500); }
+.hn-dlg-leg i.hn-dlg-seg--planned { background: var(--amber-500); }
+.hn-dlg-leg i.hn-dlg-seg--spec { background: var(--brass-400); }
+
+/* Grafik: SVG hanya berisi garis dan titik (tanpa teks). Label sumbu di HTML, di luar kotak SVG, karena
+   axe menganggap svg sebagai gambar dan melaporkan kontras teks yang menumpang di atasnya. */
+.hn-dlg-chart-box { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 4px; }
+.hn-dlg-chart-y { position: relative; grid-column: 1; grid-row: 1; }
+.hn-dlg-chart-y span {
+  position: absolute; left: 0; top: var(--y); transform: translateY(-50%);
+  font-family: var(--font-mono); font-size: 11px; color: var(--term-dim);
+}
+.hn-dlg-chart { grid-column: 2; grid-row: 1; display: block; width: 100%; height: auto; pointer-events: none; }
+.hn-dlg-chart line { stroke: var(--term-line); stroke-width: 0.6; }
+.hn-dlg-chart circle { fill: var(--wind-500); }
+.hn-dlg-trend { fill: none; stroke: var(--wind-500); stroke-width: 1.6; }
+.hn-dlg-chart-x { position: relative; grid-column: 2; grid-row: 2; height: 16px; }
+.hn-dlg-chart-x span {
+  position: absolute; top: 2px; left: var(--x); white-space: nowrap;
+  font-family: var(--font-mono); font-size: 11px; color: var(--term-dim);
+}
+
+/* ---- Footer slogan: teks terbaca (term-dim, 4,77:1 di term-bg). ---- */
+.hn-dlg-foot {
+  text-align: center; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.28em;
+  color: var(--term-dim); padding: 12px 0 4px;
+}
+
+@media (max-width: 1199px) {
+  .hn-dlg-grid { grid-template-columns: 1fr; }
+}
 @media (max-width: 767px) {
-  .hn-dlg { padding-inline: var(--page-gutter-x, var(--space-4)); }
-  .hn-dlg-aksi { margin-left: 0; }
+  .hn-dlg-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Reduced-motion: semua animasi CSS di layar ini padam. Blok global di app.css juga berlaku; ini eksplisit. */
+@media (prefers-reduced-motion: reduce) {
+  .hn-dlg-hud-a, .hn-dlg-hud-b, .hn-dlg-scan, .hn-dlg-hero-art, .hn-dlg-rig-arm,
+  .hn-dlg-puppet, .hn-dlg-threads path, .hn-dlg-boot::after, .hn-dlg-mic::before { animation: none; }
 }

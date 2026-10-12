@@ -207,15 +207,16 @@ describe("kontrak CSS dan HTML hasil audit", () => {
     expect(dalang).not.toMatch(/\.hn-dlg-exit[^{]*\{[^}]*display:\s*none/);
   });
 
-  it("Dalang: tombol keluar 44×44 di pointer kasar dan di ponsel", () => {
-    expect(css).toMatch(
-      /@media \(pointer: coarse\), \(max-width: 767px\) \{\s*\.hn-dlg-exit \{ width: var\(--touch-target\); height: var\(--touch-target\); \}/,
-    );
+  it("Dalang: tombol keluar 44×44 di semua ukuran layar (dalang.css, bukan app.css)", () => {
+    const dalang = stripComments(read("../src/screens/styles/dalang.css"));
+    expect(dalang).toMatch(/\.hn-dlg-exit \{[^}]*width: var\(--touch-target\); height: var\(--touch-target\);/);
+    expect(css).not.toMatch(/\.hn-dlg-/);
   });
 
   it("Dalang: tak ada teks di bawah 11px", () => {
+    const dalangCss = stripComments(read("../src/screens/styles/dalang.css"));
     const sizes: number[] = [];
-    for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    for (const [, selector, body] of dalangCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!selector!.includes(".hn-dlg-")) continue;
       for (const m of body!.matchAll(/font-size:\s*([\d.]+)px/g)) sizes.push(Number(m[1]));
     }

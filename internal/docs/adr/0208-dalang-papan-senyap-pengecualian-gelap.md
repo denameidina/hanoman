@@ -1,6 +1,6 @@
 # ADR-0208 — Dalang sebagai papan senyap, dengan satu pengecualian gelap
 
-- Status: Diterima
+- Status: Diterima · **Digantikan sebagian oleh [0219](0219-dalang-sinematik-dipulihkan.md)**: keputusan 1 (papan senyap) dan 4 (komponen lama dicabut) diganti; § 2 (jalan keluar), § 3 (pengecualian gelap), dan § 5 (jalan masuk) tetap berlaku
 - Tanggal: 2026-10-11
 - SPEC: Audit UI/UX 2026-10 · Fase 3B (tanpa nomor SPEC; keputusan dari audit)
 - Terkait: **0205** (Dalang keluar dari sidebar; dibuka lewat palet "Buka panggung"), **0206** (pet tak punya slot di layar tanpa Shell), **0160** (rute `/dalang` tetap), **0202** (tak ada API baru, jadi tak ada keputusan MCP). Aturan token di [design-system § Kontras](../design-system/design-system.md) dan § Navigasi hub.

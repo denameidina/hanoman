@@ -1,6 +1,6 @@
 # Design system — hanoman
 
-Estetika **editorial instrument-panel**: bone paper hangat, ink text, satu aksen **brass** (gold-leaf wayang). Font IBM Plex (Serif display, Sans UI, Mono data/label). Hairline 1px, radius kontrol 5px / kartu 12px. Semantik earthy (leaf/amber/clay). Dua permukaan gelap: terminal log dan panel Dalang ([ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md)), keduanya memakai token `--term-*`.
+Estetika **editorial instrument-panel**: bone paper hangat, ink text, satu aksen **brass** (gold-leaf wayang). Font IBM Plex (Serif display, Sans UI, Mono data/label). Hairline 1px, radius kontrol 5px / kartu 12px. Semantik earthy (leaf/amber/clay). Dua permukaan gelap: terminal log dan panel Dalang ([ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md), dipulihkan sinematik di [ADR-0219](../adr/0219-dalang-sinematik-dipulihkan.md)), keduanya memakai token `--term-*`.
 
 Detail token & komponen ada di paket design system terpisah (Hanoman Design System). Frontend wajib memakai token & komponennya — jangan menciptakan warna/tipografi baru.
 
@@ -163,6 +163,18 @@ Aturan:
    track 40×22 tetap digambar di tengahnya. Input berkas di Help Center disembunyikan (tetap fokusabel) dan
    tombol tampaknya "Pilih berkas" memakai gaya tombol DS (`.hn-public-file-btn`, `portal/portal.css`).
 
+## Permukaan gelap Dalang (ADR-0208 · dipulihkan sinematik ADR-0219)
+
+Dalang adalah satu-satunya layar gelap penuh (tanpa Shell). Pengecualian ini hanya berlaku untuk Dalang; layar lain yang ingin latar gelap butuh keputusan baru. Gaya ada di `screens/styles/dalang.css`.
+
+- **Latar** `var(--term-bg)` padat. Gradien dilarang: axe tak bisa menentukan latar teks di atasnya (`color-contrast` berstatus `incomplete`).
+- **Teks** hanya dari `--term-fg` (13,5:1 di `--term-bg`), `--term-dim` (4,77:1: label, footer, sesi), `--brass-300` (10,9:1), `--brass-400` (7,3:1), dan `--amber-500` (6,4:1). Token lain dilarang sebagai teks di layar ini: `--brass-700` 2,6:1, `--wind-500` 4,0:1, `--leaf-500` 4,1:1.
+- **Grafis** (ikon KPI, titik status, segmen donat) cukup 3:1 (WCAG 1.4.11) dan diberikan lewat `stroke` atau `background`, bukan `color` teks.
+- **Latar kartu tetap `transparent`.** Tint 3% di atas `--term-bg` membuat `--term-dim` 4,47:1 (gagal 4,5:1).
+- **Ukuran teks minimal 11 px** (`ui-audit-tokens.test.ts`). Tombol keluar 44×44 di semua ukuran layar.
+- **Tidak ada teks di atas `svg`.** Axe menganggap setiap `svg` sebagai gambar dan melaporkan kontras teks di atasnya sebagai `incomplete`. Donat dibuat dengan `conic-gradient`, dan label sumbu grafik di HTML di luar kotak SVG.
+- **Gerak:** reduced-motion mematikan animasi CSS (`dalang.css` dan blok global `app.css`) dan ticker serta hitungan naik di JS.
+
 ## Primitif layout (Audit UI/UX 2026-10 · Fase 2A)
 
 Primitif ini menggantikan layout inline yang diaudit (1.416 `style={{` di `screens/`) dengan satu pola.
@@ -279,7 +291,7 @@ Keputusan di [ADR-0205](../adr/0205-navigasi-8-hub-bergrup.md).
 | Angka antrean | Hub menjumlahkan antrean tab-tabnya. Tiap tab menampilkan angkanya sendiri. Nol tak dirender |
 | Crumb | `Hub › Tab` di atas judul, hanya untuk hub bertab banyak. Deskripsi layar tetap di belakangnya |
 | Layar turunan | Detail project tampil di bawah Projects, dan review di bawah Backlog. Keduanya tak pernah jadi tab |
-| Di luar sidebar | Dalang ([ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md)): palet "Buka panggung", `g d`, dan bantuan `?` |
+| Di luar sidebar | Dalang ([ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md), dipulihkan sinematik [ADR-0219](../adr/0219-dalang-sinematik-dipulihkan.md)): palet "Buka panggung", `g d`, dan bantuan `?` |
 
 Aturan:
 

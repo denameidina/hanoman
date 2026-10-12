@@ -10,6 +10,9 @@ Dokumen ini adalah kontrak untuk teks yang tampil ke operator. Kode penegaknya: 
 |---|---|---|---|
 | Perangkat terpasang atau jarak jauh | **Perangkat** | Device, Mesin, Klien, hub | `hub` masih ada di copy sinkronisasi dan konflik (utang Fase 3, lihat di bawah). |
 | Portal pelanggan | **Klien** | Client, Portal | Layar Klien; tab "Portal" di Settings tetap istilah produk. |
+| Layar takeover orkestrasi | **Dalang Hanoman** (judul); **Buka panggung** (aksi palet) | Dalang sinematik, panggung orkestrasi | Layar gelap penuh tanpa Shell (ADR-0208, dipulihkan sinematik ADR-0219). Satu-satunya layar gelap penuh. |
+| Kartu project di Dalang | **Wayang** | Puppet, Avatar | Hidup = sesi berjalan (benang emas). Redup = tanpa sesi, tertulis "tersandar di debog". |
+| Sesi yang menunggu keputusanmu | **Menunggu jawabanmu** (aksi **Jawab**) | Blocked, Perlu input | Tampil di atas layar Dalang dan di Overview. |
 | Satu entri backlog | **Item** | SpecSlim, Spec | `Spec` tetap dipakai untuk `SPEC-nnn` dan untuk tahap spesifikasi. Nama tipe `SpecSlim` di kode bukan teks tampil. |
 | Dokumen project | **Dokumen** | SoT, Docs · SoT | `SoT` (source of truth) tetap istilah internal di docs/ADR, bukan copy layar. |
 | Hapus permanen | **Hapus** | Buang (untuk data) | Selalu lewat `useConfirm` dengan nama objek dan dampaknya. |

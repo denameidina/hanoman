@@ -90,11 +90,11 @@ Per layar:
 
 - **Overview** — state kosong (belum ada project) hanya menampilkan kartu dan CTA "Buat project pertama",
   tanpa KPI strip (`screens/OverviewScreen.tsx:126-137`; `test/overview-screen.test.tsx`).
-- **Dalang** — ticker 26 ms terisolasi di `BootTicker` dan jam 1 dtk di `DalangClock`
-  (`screens/DalangHanomanScreen.tsx:46-104`), sehingga layar induk tak ikut re-render. Teks statis
-  "HANOMAN ONLINE" diganti status koneksi nyata dari `events.connected` (`:172`). Tombol keluar berada di
-  luar `.hn-dlg-chips` dan berukuran 44×44 pada `(pointer: coarse)` atau ≤767px (`app.css:1013-1025`,
-  `--touch-target`). Di desktop tombol tetap 34px. Tes: `test/dalang-hanoman.test.tsx`.
+- **Dalang** — ticker 26 ms terisolasi di `BootTicker` dan jam 1 dtk di `DalangClock`, keduanya `React.memo`
+  dengan state sendiri, sehingga layar induk tak ikut re-render (ADR-0219). "HANOMAN ONLINE" hanya tampil saat
+  socket terhubung, dari `useEventsStatus` (`screens/DalangHanomanScreen.tsx`). Tombol keluar berada di
+  `.hn-dlg-bar` dan berukuran 44×44 di semua ukuran layar (`screens/styles/dalang.css`, `--touch-target`).
+  Tes: `test/dalang-hanoman.test.tsx`.
 - **Backlog** — hapus spec lewat `useConfirm` (`screens/BacklogScreen.tsx:1082-1096`). Kartu menampilkan
   satu aksi utama sadar-stage; sisanya di `OverflowActions` ⋯ (`:600-638`). `TaskModal` tak bisa ditutup
   saat menyimpan (`screens/TaskModal.tsx:125`), dan hapus tugas berkonfirmasi (`:102-105`). Tes:
@@ -592,6 +592,9 @@ strip dan tanpa hero:
 - Tanpa project: kartu "Selamat datang" dengan "Buat project pertama"; ilustrasi kecil PST-001 hanya di sini.
 - Judul seksi `<h3>` (judul `Card` DS adalah div). Layout lewat kelas `hn-ov-*`, tanpa inline grid.
 - `DalangStage` tak lagi dirender Overview.
+
+> **Digantikan sebagian oleh ADR-0219** (§ Dalang sinematik dipulihkan di bawah). Uraian berikut menggambarkan papan
+> senyap ADR-0208.
 
 **Dalang Hanoman** (`screens/DalangHanomanScreen.tsx`, `screens/styles/dalang.css`) — dipangkas jadi papan
 status senyap. Gelap tetap dipertahankan sebagai **pengecualian terdokumentasi**: satu-satunya layar gelap
@@ -1878,8 +1881,8 @@ navigasi klik, kontrak token warna).
 
 ## Dalang Hanoman — layar panggung orkestrasi sinematik
 
-> **Fase 3B:** layar ini sudah dipangkas jadi papan status senyap (lihat § Fase 3B di atas). Uraian di bawah
-> menggambarkan panggung sinematik sebelum Fase 3B.
+> **ADR-0219:** layar ini dipulihkan sinematik (lihat § Dalang sinematik dipulihkan di bawah). Uraian di bawah
+> kembali berlaku, dengan perbaikan aman dari audit; sebagian rincian (pola `DalangStage`) bersifat sejarah.
 
 Menu `dalang` ("Dalang Hanoman", ikon `drama`) membuka
 `src/src/screens/DalangHanomanScreen.tsx` — implementasi layar dari konsep Claude Design
@@ -3523,3 +3526,22 @@ Batas verifikasi: sesi agen Claude tak tersedia di QA, jadi strip fase (`PhaseSt
 dengan strip itu output diperkirakan ±52%, di bawah 55%. Tidak ada sesi non-berjalan yang tampil di fixture, jadi baris
 "Aktivitas terbaru" berisi proyek berjalan hanya dibuktikan lewat tes unit. VoiceOver/NVDA tak diuji; tooltip rail
 memakai `title` (native), yang tak muncul di perangkat sentuh, dan label terlihat menggantikannya.
+
+## Dalang sinematik dipulihkan (ADR-0219)
+
+Keputusan pemilik membalik pemangkasan Fase 3B untuk layar Dalang. Tampilan sinematik dari `8380d3fa` kembali,
+dengan perbaikan aman yang dipertahankan: [ADR-0219](../adr/0219-dalang-sinematik-dipulihkan.md), mengamandemen
+[ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md).
+
+- **Berkas.** `screens/DalangHanomanScreen.tsx` memuat `BootTicker`, `DalangClock`, `Kpi` (ketiganya `React.memo`
+  dengan state sendiri), `WaitRow`, dan `isToday`. Gaya seluruhnya di `screens/styles/dalang.css`; blok `.hn-dlg*`
+  di `app.css` dicabut tanpa menambah `!important`. `App.tsx` tak berubah: prop `previous`, rute `/dalang`, palet.
+- **Data dan API.** Hanya `sessions` (WS), `projects`, `backlog`, dan `useEventsStatus`. Nol fetch dan nol API baru,
+  jadi tak ada keputusan MCP (ADR-0202).
+- **Tidak dipulihkan.** `DalangStage.tsx` (hero Overview) tetap dicabut. Kontrak Overview dikunci
+  `test/overview-screen.test.tsx`.
+- **Tes.** `test/dalang-hanoman.test.tsx` mengunci jalan keluar (`previous`, Esc), status jujur, reduced-motion,
+  isolasi render (penghitung render induk tetap saat ketikan ticker dan jam berjalan), dan tanpa warna literal atau
+  inline style statis. `test/ui-audit-tokens.test.ts` mengunci kontras teks `dalang.css` ≥ 4,5:1 dan ukuran ≥ 11 px.
+- **Gotcha.** Axe menganggap setiap `svg` sebagai gambar. Teks di atasnya atau latar gradien membuat `color-contrast`
+  `incomplete`; aturan kontrasnya ada di [design-system § Permukaan gelap Dalang](../design-system/design-system.md).
