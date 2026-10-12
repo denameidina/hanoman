@@ -764,9 +764,9 @@ function TitleButton({ spec, onOpenDetail, className = "hn-bl-title" }:
    Satu baris per item: titik prioritas, judul, lalu id, tahap, dan lencana status. Aksi primer dan
    ⋯ di luar elemen klik (DenseRow), jadi tak ada tombol di dalam tombol. */
 type RowProps = ItemActions & {
-  spec: SpecListItem; presenceOn?: string[]; onOpenDetail?: (s: SpecSlim) => void;
+  spec: SpecListItem; presenceOn?: string[]; onOpenDetail?: (s: SpecSlim) => void; projectName?: string;
 };
-function SpecRow({ spec, presenceOn, onOpenDetail, ...actions }: RowProps) {
+function SpecRow({ spec, presenceOn, onOpenDetail, projectName, ...actions }: RowProps) {
   return (
     <DenseRow onClick={onOpenDetail ? () => onOpenDetail(spec) : undefined}
       actions={<SpecActions spec={spec} {...actions} />}>
@@ -775,6 +775,7 @@ function SpecRow({ spec, presenceOn, onOpenDetail, ...actions }: RowProps) {
         <span className="hn-bl-row-title">{spec.title}</span>
         <span className="hn-bl-row-meta">
           <span className="hn-bl-id">{spec.id}</span>
+          {projectName && <span className="hn-bl-proj" title={`Project: ${projectName}`}>{projectName}</span>}
           <SourceTag source={spec.source} />
           <StagePill stage={spec.stage} />
           <BlockedBadge spec={spec} />
@@ -814,9 +815,9 @@ export function specColumn(spec: SpecListItem, hasSession?: boolean): string {
 export const canDrop = (from: string, to: string): boolean =>
   from === BACKLOG_COL && to === FIRST_STAGE;
 
-function BoardCard({ spec, col, onOpenDetail, presenceOn, onDragStart, onDragEnd, dragging, ...actions }:
+function BoardCard({ spec, col, onOpenDetail, presenceOn, projectName, onDragStart, onDragEnd, dragging, ...actions }:
   ItemActions & {
-    spec: SpecListItem; col: string; onOpenDetail?: (s: SpecSlim) => void; presenceOn?: string[];
+    spec: SpecListItem; col: string; projectName?: string; onOpenDetail?: (s: SpecSlim) => void; presenceOn?: string[];
     onDragStart: () => void; onDragEnd: () => void; dragging: boolean
   }) {
   const draggable = col === BACKLOG_COL;
@@ -833,6 +834,7 @@ function BoardCard({ spec, col, onOpenDetail, presenceOn, onDragStart, onDragEnd
         <SourceTag source={spec.source} />
       </div>
       <TitleButton spec={spec} onOpenDetail={onOpenDetail} />
+      {projectName && <span className="hn-bl-proj" title={`Project: ${projectName}`}>{projectName}</span>}
       {(spec.blockedBy ?? []).length > 0 || presenceOn?.length ? (
         <div className="hn-bl-card-badges">
           <BlockedBadge spec={spec} />
@@ -847,8 +849,9 @@ function BoardCard({ spec, col, onOpenDetail, presenceOn, onDragStart, onDragEnd
   );
 }
 
-function Board({ specs, activeSpecs, presenceBySpec, onOpenDetail, ...actions }:
+function Board({ specs, activeSpecs, presenceBySpec, onOpenDetail, projectNameOf, ...actions }:
   ItemActions & {
+    projectNameOf?: (projectId: string) => string | undefined;
     specs: SpecListItem[]; activeSpecs?: Set<string>; presenceBySpec?: Map<string, string[]>;
     onOpenDetail?: (s: SpecSlim) => void;
   }) {
@@ -888,6 +891,7 @@ function Board({ specs, activeSpecs, presenceBySpec, onOpenDetail, ...actions }:
             <div className="hn-bl-col-body">
               {items.map((s) => (
                 <BoardCard key={s.id} spec={s} col={c.key} onOpenDetail={onOpenDetail}
+                  projectName={projectNameOf?.(s.projectId)}
                   presenceOn={presenceBySpec?.get(s.id)} {...actions}
                   dragging={drag?.spec.id === s.id}
                   running={activeSpecs?.has(s.id)}
@@ -993,6 +997,8 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   const [detailId, setDetailId] = usePersistedState<string | null>("backlog", "detailId", null, nullableStr);
   // SPEC-293 · deep-link: buka SpecDetail untuk id yang diberikan App (dari hash #spec=).
   React.useEffect(() => { if (initialDetailId) setDetailId(initialDetailId); }, [initialDetailId]);
+  const projectNameOf = React.useCallback(
+    (id: string) => (projects ?? []).find((p) => p.id === id)?.name, [projects]);
   const projOptions = projects || [...new Set(backlog.map((s) => s.projectId))].map((id) => ({ id, name: id }));
   // Himpunan terfilter penuh dari server (tanpa page/limit). Segmen tahap dikelompokkan di klien,
   // karena server hanya menyaring SATU nilai `stage` persis; paginasi pun dipegang klien.
@@ -1245,14 +1251,14 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
             Seret kartu dari kolom Backlog ke Brainstorm untuk memulai sesi. Tombol di kartu melakukan hal yang sama.
           </p>
           <Board specs={visible} activeSpecs={activeSpecs} presenceBySpec={presenceBySpec}
-            onOpenDetail={openDetail} {...sharedActions} />
+            projectNameOf={projectNameOf} onOpenDetail={openDetail} {...sharedActions} />
         </div>
       ) : (
         <div className="hn-bl-body">
           <div ref={listRef} data-testid="backlog-scroll" aria-busy={refreshing || undefined} className="hn-bl-list-scroll">
             <RowList label="Daftar backlog">
               {pageItems.map((s) => (
-                <SpecRow key={s.id} spec={s} presenceOn={presenceBySpec?.get(s.id)}
+                <SpecRow key={s.id} spec={s} presenceOn={presenceBySpec?.get(s.id)} projectName={projectNameOf(s.projectId)}
                   running={activeSpecs?.has(s.id)} onOpenDetail={openDetail} {...sharedActions} />
               ))}
             </RowList>

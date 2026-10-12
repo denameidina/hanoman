@@ -187,3 +187,8 @@
 .hn-tl-note {
   flex: 0 0 auto; margin-top: 8px; font-size: var(--text-xs); color: var(--status-warn);
 }
+.hn-tm-project {
+  display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: var(--weight-regular, 400) var(--text-xs)/1.2 var(--font-ui); color: var(--text-muted);
+}
+.hn-tm-project[data-empty] { font-style: italic; }

@@ -200,3 +200,8 @@
   .hn-bl-card-foot { justify-content: stretch; }
   .hn-bl-card-foot .hn-bl-actions { width: 100%; justify-content: space-between; }
 }
+.hn-bl-proj {
+  font: var(--weight-regular, 400) var(--text-xs)/1.2 var(--font-ui); color: var(--text-muted);
+  max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-bl-card > .hn-bl-proj { display: block; max-width: 100%; }

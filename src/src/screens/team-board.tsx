@@ -104,6 +104,7 @@ function TaskCard({ task, members, projectName, dragging, onDragStart, onDragEnd
         <PrioDot priority={task.priority} />
         <button type="button" className="hn-tm-title" onClick={() => onOpen(task)}>{task.title}</button>
       </div>
+      <span className="hn-tm-project" data-empty={task.projectId === null || undefined}>{project}</span>
       <div className="hn-tm-card-foot">
         <span className="hn-tm-assignee-wrap">
           <Avatar name={assignee} />
