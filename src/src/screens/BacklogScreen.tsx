@@ -738,7 +738,9 @@ function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, onMarkD
   return (
     <div className="hn-bl-actions">
       {primary && (
-        <Button size="sm" variant="primary" leftIcon={primary.icon} onClick={primary.run}>{primary.label}</Button>
+        /* Review = meninjau hasil, bukan menjalankan sesuatu: outlined, supaya tak terbaca sama dengan Mulai. */
+        <Button size="sm" variant={primary.label === "Review perubahan" ? "secondary" : "primary"}
+          leftIcon={primary.icon} onClick={primary.run}>{primary.label}</Button>
       )}
       <OverflowActions label={`Aksi lain ${spec.id}`} items={items} />
       {markDone && onMarkDone && (
