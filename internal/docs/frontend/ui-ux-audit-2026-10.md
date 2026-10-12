@@ -257,7 +257,9 @@ Diverifikasi terhadap kode (commit `cfabc308`, diff terhadap basis `8380d3fa`, y
 - **Fase 1: selesai.** P0 dan quick win 1A–1K ada di kode. Tindak lanjut Fase 1 masih terbuka di butir 3, 7, 11, dan 15 (lihat § Tindak lanjut Fase 1).
 - **Fase 2: selesai (gelombang 4).** Tombol "Jawab" ada di toast dan notifikasi; layout inline dipindah ke kelas (`style={{` di screens 1.416 → 81, sisanya CSS-var dinamis); varian `danger` baru ada di Button/OverflowActions (ProgressBar, Radio, Field, Callout tetap sisa).
 - **Fase 3: semua layar 3A–3P sudah dikerjakan.** Tidak ada layar yang belum dikerjakan. Sisa per layar ditulis di bawah dan di daftar keputusan terbuka.
-- **Verifikasi visual di Chrome:** tiga commit perbaikan hasil QA Chrome setelah redesign (`56eb30cd`, `82b5dee4`, `cfabc308`) menyentuh shell, pet, Terminal, IDE, Review, Portal, Skills, QA, Tim, dan Settings. Brief menyebut empat putaran; git mencatat tiga commit perbaikan dan dokumen tidak menyebut "putaran", jadi angka empat belum bisa dicocokkan. Uji layout 320/390/768/1024 px per layar tidak tercatat di dokumen.
+- **Gelombang 5–6 (terakhir):** varian `danger` di Callout/ProgressBar/Radio/Field; `!important` di `app.css` 32 → 8 (7 deklarasi, tiap sisa beralasan); Review membalas 200 `{empty, reason}` + `DELETE /specs/:id/worktree` + tool MCP (ADR-0213); filter "Ber-worktree" di Backlog; ADR-0214 (setup dua langkah, nomor "2/2" jujur); lalu 19 perbaikan hasil QA Chrome gelombang 4–5.
+- **QA Chrome gelombang 6 (HEAD `70db0895`):** 16 dari 19 butir lolos terukur (5 viewport × 21 rute, 0 overflow horizontal, 0 galat konsol); #14 (pil ref IDE terpotong di 390) dan target "Perubahan belum di-commit" diperbaiki setelahnya di CSS `ide.css` dan **belum diverifikasi ulang di browser**. #9 (Jawab ke sesi mati) terbukti untuk toast, tetapi "tidak memfokus sesi lain" belum diuji dengan dua sesi hidup.
+- **Verifikasi visual di Chrome (riwayat):** tiga commit perbaikan hasil QA Chrome setelah redesign (`56eb30cd`, `82b5dee4`, `cfabc308`) menyentuh shell, pet, Terminal, IDE, Review, Portal, Skills, QA, Tim, dan Settings. Brief menyebut empat putaran; git mencatat tiga commit perbaikan dan dokumen tidak menyebut "putaran", jadi angka empat belum bisa dicocokkan. Uji layout 320/390/768/1024 px per layar tidak tercatat di dokumen.
 
 ### Fase 1 — quick win (selesai)
 
@@ -292,7 +294,8 @@ di Terminal; persist Settings yang jujur; label ramah Portal.
 - [x] **2G backend tindak lanjut (ADR-0204).** Requeue untuk baris `failed` (butuh `sessions:spawn`), `POST /notifications/:id/read` dengan tool `hanoman_notification_mark_read`, `serverTimeZone` di state dan config scheduler, dan tes `setupTokenPath`.
 - [x] **Hapus layout inline.** Gelombang 4: 81 sisa (CSS-var dinamis dan nilai runtime) dari 1.416.
 - (catatan lama)  `style={{` di `src/src/screens/`: 1.416 di basis, 1.546 pada Fase 2 (sebelum redesign Fase 3), dan 561 sekarang. Sisa 561 belum dipindah ke kelas `hn-*` dan dicatat sebagai utang bertahap (frontend-implementation § Fase 2E). Selektor `[style*=` sudah tidak ada di `app.css`.
-- [ ] **Varian `danger` (sisa).** Sudah ada di `Button` (`ds/components/forms.tsx`) dan `OverflowActions` (`tone="danger"`, `ds/components/ui.tsx`). Belum ada di `ProgressBar`, `Radio`, `Field` (`ds/kit.tsx`), dan `Callout`.
+- [x] **Varian `danger`** (gelombang 5; dulu sisa).
+- (catatan lama)  Sudah ada di `Button` (`ds/components/forms.tsx`) dan `OverflowActions` (`tone="danger"`, `ds/components/ui.tsx`). Belum ada di `ProgressBar`, `Radio`, `Field` (`ds/kit.tsx`), dan `Callout`.
 
 ### Fase 3 — redesign per layar (selesai per layar)
 
@@ -323,13 +326,13 @@ Sebelum = basis `8380d3fa`. Sesudah = `cfabc308`. Hitungan memakai `grep` dan `g
 |---|---|---|---|
 | `style={{` di `src/src/screens/` | 1.416 | 81 | Puncak 1.546 pada Fase 2 (`b5995b97`, `f8acf77f`); 706 pada `e5d44eac`; 561 sejak `c81413cb`. Plan sebelumnya menulis 1.545. |
 | `fontSize` literal (angka atau string px) di `src/src/` | 496 | 229 | Regex `fontSize: <angka>`. Semua pemakaian `fontSize`, termasuk token: 634 → 312. |
-| `!important` di `app.css` (deklarasi) | 48 | 30 | Teks mentah 49 → 32; dua di komentar sekarang, satu di komentar di basis. |
+| `!important` di `app.css` (deklarasi) | 48 | 7 | Teks mentah 49 → 32; dua di komentar sekarang, satu di komentar di basis. |
 | Selektor `[style*=` di `app.css` | 1 | 0 | Satu sisa di komentar (`app.css:1035`). |
 | Menu nav sidebar | 17 | 8 | `HN_NAV` 17 entri di basis; sekarang 8 hub di 3 grup (`nav-hubs.ts`). |
 | `SettingsScreen.tsx` (baris) | 1.540 | 207 | Basis 99 KB, sesuai audit. Angka 1.727 di brief tidak bisa direproduksi dari basis. |
 | `app.css` (byte) | 54.592 | 54.105 | Turun ke 43.102 pada `c81413cb` (2E), lalu naik lagi karena tiga commit QA Chrome. Puncak 64.956 pada `f8acf77f`. |
-| Berkas test (`*.test.ts(x)` di `src/`) | 249 | 316 | Hitung berkas. |
-| Test | baseline 7 gagal / 6 berkas | 3.035 hijau (316 berkas, dijalankan ulang di gelombang 4) | Angka 2.916 dilaporkan dari run terakhir dan tidak dijalankan ulang untuk dokumen ini. Baseline dari plan § Baseline. |
+| Berkas test (`*.test.ts(x)` di `src/`) | 249 | 320 | Hitung berkas. |
+| Test | baseline 7 gagal / 6 berkas | 3.084 hijau (320 berkas, dijalankan ulang di gelombang 4) | Angka 2.916 dilaporkan dari run terakhir dan tidak dijalankan ulang untuk dokumen ini. Baseline dari plan § Baseline. |
 
 ### Tindak lanjut Fase 1 (status per butir)
 
@@ -345,11 +348,11 @@ Sebelum = basis `8380d3fa`. Sesudah = `cfabc308`. Hitungan memakai `grep` dan `g
 | 8 | Token tak terdefinisi | Selesai | Nol pemakaian `--brass-50`, `--brass-200`, `--bone-50`, `--clay-700`, `--ink-100`, `--text`, `--text-primary`, dan `--rule` di kode non-test. |
 | 9 | `.catch(() => {})` kosong | Selesai | Nol pola kosong di kode non-test. Satu sebutan ada di komentar `lib/report-error.ts`. |
 | 10 | "Hapus sel" tanpa konfirmasi | Selesai | Dialog konfirmasi di `screens/TerminalPane.tsx` (judul "Hapus sel"). |
-| 11 | Review: aksi Merge dan Buang | Belum | Lihat keputusan terbuka nomor 9. |
+| 11 | Review: aksi Merge dan Buang | Selesai | Integrasikan, Kembalikan, dan Hapus worktree (endpoint per-spec, ADR-0213) di bar keputusan. |
 | 12 | Galat setup status 400 | Selesai | Pesan galat menyebut bidang dari `fieldErrors` (`screens/AuthScreen.tsx`); tidak lagi memuat pesan password untuk semua galat. |
 | 13 | Font `@import` memblokir render | Selesai | `ds/tokens/fonts.css` tanpa `@import`; `index.html` memakai preload dan swap, dengan `<noscript>`. |
 | 14 | `screenReaderMode` xterm | Selesai (opsional) | Toggle "Mode pembaca layar" di popover Tampilan terminal, default mati, tersimpan di `hn.ui.v1.terminal.sr`. Opsi xterm 6 `screenReaderMode` berpindah di tempat (`TerminalPane.tsx`). Tab tetap dikirim ke sesi dan fokus bisa pindah; Ctrl+Shift+Esc tetap melepas fokus, dan hint menjelaskannya. **Uji nyata dengan VoiceOver/NVDA belum dilakukan.** |
-| 15 | Verifikasi visual di 320/390/768/1024 px | Sebagian | Tiga commit perbaikan hasil QA Chrome tercatat di git. Uji per ukuran layar tidak tercatat di dokumen. |
+| 15 | Verifikasi visual di 320/390/768/1024 px | Selesai | QA Chrome gelombang 6 mengukur 21 rute di 320/390/768/1024/1280: 0 overflow horizontal, 0 target sentuh <44px di 320/390/768. Tangkapan: `/private/tmp/claude-501/visual-qa/shots/`. |
 
 ### Keputusan terbuka dan ditunda
 
@@ -358,18 +361,18 @@ Daftar ini butuh keputusan pemilik produk atau pekerjaan lintas-tim (server, MCP
 **Produk dan UX**
 
 1. **Tab "Tanya & ide" di portal dan probe 404.** Tab hanya tampil bila chat diaktifkan (frontend-implementation § 3M). Selesai (ADR-0211): flag `chatEnabled` pada proyeksi project (ADR-0110 butir 5); tab tak lagi memicu probe 404.
-2. **Segmen "Review" di Backlog.** Tidak dibuat, karena `Spec.stage` tak punya tahap review. Tinjauan adalah aksi "Review perubahan" pada item (frontend-implementation § 3D). Menambahkannya butuh keputusan produk dan tahap atau penanda di server.
+2. **Segmen "Review" di Backlog.** Tidak dibuat (diganti filter "Ber-worktree" berdasar `baseSha`; "Perlu ditinjau" butuh set sesi menunggu keputusan dari `App.tsx`), karena `Spec.stage` tak punya tahap review. Tinjauan adalah aksi "Review perubahan" pada item (frontend-implementation § 3D). Menambahkannya butuh keputusan produk dan tahap atau penanda di server.
 3. **Pet: chip tanpa lencana di viewport pendek.** Diterapkan: chip hanya tombol bangkitkan, tanpa sprite dan tanpa lencana, di desktop dengan tinggi ≤760 px ([ADR-0206](../adr/0206-pet-footer-sidebar-default-per-tier.md) § 3). Keputusan produk asalnya (dari brief) tak tercatat di dokumen.
 4. **Pengecualian gelap Dalang di design system.** Panel Dalang gelap hanya disebut sebagai konteks kontras di `design-system.md` (tabel `--border-focus`). Diputuskan di [ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md).
 5. **Takeover sinematik Dalang dan pet fixed dihapus.** Perubahan sudah ada di kode (3B; pet tak lagi `position: fixed`, frontend-implementation baris 1740), ADR-0205 tidak mencakupnya; keputusannya di [ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md) (Dalang) dan [ADR-0206](../adr/0206-pet-footer-sidebar-default-per-tier.md) (pet).
 6. **ADR IA Pengaturan (empat niat).** Ditulis: [ADR-0207](../adr/0207-pengaturan-empat-niat-satu-aturan-simpan.md).
-7. **Toolbar IDE membalik SPEC-879.** Keputusan 3H (frontend-implementation § 3H). `design-system.md` baris 34 dan 44 masih menyatakan aturan SPEC-879, jadi dokumen DS perlu diperbarui atau keputusan dicabut.
-8. **Akun pertama di AuthScreen vs wizard satu layar.** Setup sudah satu layar; langkah "2/2" hanya tampil bila wizard tampil (frontend-implementation § 3N). Apakah akun digabung ke wizard perlu ditinjau terhadap ADR-0139.
+7. **Toolbar IDE membalik SPEC-879.** Selesai: `design-system.md` diperbarui (gelombang 5). Catatan lama:  Keputusan 3H (frontend-implementation § 3H). `design-system.md` baris 34 dan 44 masih menyatakan aturan SPEC-879, jadi dokumen DS perlu diperbarui atau keputusan dicabut.
+8. **Akun pertama di AuthScreen vs wizard satu layar.** Diputuskan di [ADR-0214](../adr/0214-setup-awal-dua-langkah-nomor-jujur.md): tetap dua langkah dengan nomor jujur. Catatan lama:  Setup sudah satu layar; langkah "2/2" hanya tampil bila wizard tampil (frontend-implementation § 3N). Apakah akun digabung ke wizard perlu ditinjau terhadap ADR-0139.
 
 **Server, API, dan kontrak**
 
-9. **Merge dan Buang di layar Review.** Belum ada. Review hanya navigasi. Butuh endpoint baru dan keputusan MCP (ADR-0202).
-10. **Review: 409 dan keadaan kosong.** `ReviewScreen` memetakan 409 ke keadaan kosong (frontend-implementation, bagian Review). Server membalas 200 untuk keadaan kosong. Menyamakan keduanya butuh kontrak API; bila endpoint berubah, perlu keputusan MCP (ADR-0202).
+9. **Merge dan Buang di layar Review.** Selesai (ADR-0213): `DELETE /specs/:id/worktree` + tool MCP `hanoman_backlog_worktree_delete`; Integrasikan memakai alur merge yang ada.
+10. **Review: 409 dan keadaan kosong.** Selesai untuk `GET /specs/:id/review` (200 `{empty, reason: no-worktree|no-commit}`, ADR-0213). Jalur sesi `GET /terminal/sessions/:id/review` tetap 409 dan layar masih memetakannya. Catatan lama:  `ReviewScreen` memetakan 409 ke keadaan kosong (frontend-implementation, bagian Review). Server membalas 200 untuk keadaan kosong. Menyamakan keduanya butuh kontrak API; bila endpoint berubah, perlu keputusan MCP (ADR-0202).
 11. **Grant per perangkat remote.** Selektor tingkat memetakan ke `PUT /remote-control` yang ada (frontend-implementation § 3G). Dari brief: API hanya menerima perangkat lokal, sehingga grant per perangkat remote belum bisa diatur dari UI. Batasan selektor dicatat di [ADR-0210](../adr/0210-perangkat-tingkat-akses-lihat-kerja-tulis.md); keputusan per perangkat remote tetap terbuka.
 12. **Skor kepatuhan VPS di daftar.** Selesai (ADR-0211): `VpsView.scoreTotal` dari snapshot audit tersimpan (frontend-implementation § 3G/3J).
 13. **Preview cron zona server.** `nextRunFor` tak punya parameter zona. Perlu `nextRunFor(expr, after, tz)` di `shared/`, yaitu keputusan terpisah (frontend-implementation § 3I, baris 724–727).
@@ -380,7 +383,17 @@ Daftar ini butuh keputusan pemilik produk atau pekerjaan lintas-tim (server, MCP
 15. **`screenReaderMode` xterm.** Ada sebagai opsi (default mati, `TerminalScreen.tsx` § Tampilan terminal). Uji nyata dengan VoiceOver/NVDA belum dilakukan (tindak lanjut 14); sampai uji itu, mode ini tak diklaim sebagai dukungan pembaca layar yang terverifikasi.
 16. **Menu ARIA penuh pada `OverflowActions`.** Selesai (Z5): item ber-`role="menuitem"` di dalam `role="menu"`, roving tabindex, panah/Home/End/huruf, Tab dan Esc menutup dengan fokus kembali ke pemicu. Panel tetap `Modal` (dialog) sebagai pembungkus. Lihat design-system.md § Layout primitif. Berkas test pemakai sudah dimigrasi ke `getByRole("menuitem")`.
 17. **Inline style tersisa (81 di screens).** Hampir semuanya CSS-var/nilai runtime (lebar, kedalaman, lane). Tidak lagi utang layout.
-18. **`!important` tersisa (30).** Dicatat per penyebab di frontend-implementation § Fase 2E.
-19. **Varian `danger` di ProgressBar, Radio, Field, dan Callout.** Sisa Fase 2.
+18. **`!important` tersisa (8 baris di `app.css`, 7 deklarasi).** Dicatat per penyebab di frontend-implementation § Fase 2E.
+19. **Varian `danger` di ProgressBar, Radio, Field, dan Callout.** Selesai (gelombang 5).
 20. **Utang copy Fase 3.** Tercatat di `glossary.md` (§ Utang copy untuk Fase 3): `LogsPanel` "Device", `PhasePlanPreview`, `SyncButton` "hub", `WebhookDocs` "Retry", dan peta lokal `MODE_LABEL`, `KIND_LABEL`, `GROUP_LABEL`, `RELAY_LABEL`.
 21. **Verifikasi yang belum tercatat.** Uji layout 320/390/768/1024 px per layar, verifikasi ulang 3I di Chrome, profiling React saat snapshot WS masuk, dan apakah `putBinding` memvalidasi path (lihat § Verifikasi yang masih diperlukan).
+
+### Yang tetap terbuka setelah gelombang 6 (butuh manusia atau keputusan)
+
+1. **Uji pembaca layar nyata** (VoiceOver/NVDA) untuk toggle "Mode pembaca layar" xterm.
+2. **Grant per perangkat remote.** API hanya menerima perangkat lokal; mengubahnya adalah perubahan kontrak keamanan (ADR-0210 mencatat batasannya).
+3. **Segmen "Perlu ditinjau" di Backlog** dan 409 pada jalur review sesi: butuh set sesi menunggu keputusan di `App.tsx` / keputusan kontrak.
+4. **Verifikasi ulang #14 dan #9 (fokus dua sesi) di browser**, serta strip gulir tanpa petunjuk (kunci terminal terbuka di 320, tab Tim di 320).
+5. **Mata manusia** pada Overview, Terminal ponsel, sidebar + pet, dan graf IDE sebelum merge: semua verifikasi visual dilakukan agen Haiku dari tangkapan layar dan pengukuran DOM.
+6. **Merge `ui-ux-audit` ke `main`** menunggu persetujuan pemilik.
+7. Tes server `vps-ssh` gagal di `main` juga (dipicu `SSH_ASKPASS` di lingkungan), `structured-launch-admission` dan `spec-attachment-launch` gagal di `main`; bukan bagian pekerjaan ini.

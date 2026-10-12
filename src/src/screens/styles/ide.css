@@ -308,6 +308,7 @@
   flex: 1 1 0%; border: 0; padding: 0; background: transparent; text-align: left; cursor: pointer;
   font-size: 12.5px; font-style: italic; color: var(--text-muted);
 }
+.hn-git-uncommitted { min-height: 24px; display: flex; align-items: center; }
 .hn-git-uncommitted--static { cursor: default; }
 
 .hn-git-more {
@@ -411,7 +412,7 @@
 .hn-git-main > button.hn-git-tag {
   position: relative; display: inline-flex; align-items: center; box-sizing: border-box;
   min-width: 0; min-height: 0; height: 16px; max-width: min(100%, 168px); padding: 0 6px;
-  line-height: 14px; flex: 0 1 auto;
+  line-height: 14px; flex: 0 0 auto; /* tak menyusut di bawah teksnya: yang menyusut adalah subject (QA #14) */
 }
 .hn-git-main > button.hn-git-ref::after,
 .hn-git-main > button.hn-git-tag::after {
