@@ -56,7 +56,7 @@
   font-size: 12px; font-family: var(--font-ui); white-space: nowrap; color: var(--text-muted);
 }
 .hn-notif-open--primary {
-  background: var(--accent); color: var(--accent-on); border-radius: var(--radius-sm);
+  background: var(--action-bg); color: var(--action-on); border-radius: var(--radius-sm);
   padding: 4px 10px; font-weight: 600;
 }
 .hn-notif-open--ticket { color: var(--brass-600); }

@@ -50,8 +50,34 @@ describe("kontras teks: WCAG AA 1.4.3 (>= 4,5:1) di setiap permukaan terang", ()
     expect(contrast(color("--status-warn"), color("--status-warn-tint"))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it("teks tombol primer (--accent-on) lolos di atas --accent", () => {
-    expect(contrast(color("--accent-on"), color("--accent"))).toBeGreaterThanOrEqual(4.5);
+  // Permukaan solid bertekst (tombol primer, checkbox tercentang, badge hitung, bar aksi) memakai pasangan
+  // --action-*: brass-600 + teks terang. Brass-500 (--accent) tak lagi di bawah teks (putih 3,2:1).
+  it("teks tombol primer (--action-on) lolos di atas --action-bg (normal) dan --action-bg-hover (hover/pressed)", () => {
+    expect(contrast(color("--action-on"), color("--action-bg"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color("--action-on"), color("--action-bg-hover"))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // Keadaan disabled (opacity 0,5 pada seluruh tombol) dihitung dengan mengomposisikan teks dan latar ke
+  // latar halaman. WCAG 1.4.3 membebaskan komponen nonaktif; batas di sini hanya memastikan masih terbaca.
+  it("teks tombol primer disabled (opacity 0,5) tetap terbaca di page, kartu, dan panel", () => {
+    const mix = (a: string, b: string, t: number) => {
+      const [A, B] = [a, b].map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+      return "#" + A!.map((v, i) => Math.round(v * t + B![i]! * (1 - t)).toString(16).padStart(2, "0")).join("");
+    };
+    for (const surface of SURFACES) {
+      const page = color(surface);
+      const fg = mix(color("--action-on"), page, 0.5);
+      const bg = mix(color("--action-bg"), page, 0.5);
+      expect(contrast(fg, bg), `disabled di ${surface}`).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("cincin fokus tombol (--border-focus, outline 2px, offset 2px) tergambar di luar tombol, bukan di atas --action-bg", () => {
+    const appCss = stripComments(read("../src/app.css"));
+    expect(appCss).toMatch(/:focus-visible\s*\{\s*outline:\s*2px solid var\(--border-focus\);\s*outline-offset:\s*2px;?\s*\}/);
+    for (const surface of SURFACES) {
+      expect(contrast(color("--border-focus"), color(surface)), surface).toBeGreaterThanOrEqual(3);
+    }
   });
 
   // Kontrol negatif: nilai lama yang dikirim sebelum audit. Tanpa ini, lolosnya test di atas bisa
@@ -59,6 +85,7 @@ describe("kontras teks: WCAG AA 1.4.3 (>= 4,5:1) di setiap permukaan terang", ()
   it("nilai lama memang gagal gerbang yang sama", () => {
     expect(contrast("#90826c", color("--surface-card"))).toBeLessThan(4.5);   // ink-400 sebagai teks
     expect(contrast(color("--amber-600"), color("--surface-card"))).toBeLessThan(4.5);
+    expect(contrast("#ffffff", color("--accent"))).toBeLessThan(4.5);         // putih di atas brass-500: 3,2:1
   });
 });
 
@@ -197,8 +224,39 @@ describe("kontrak CSS dan HTML hasil audit", () => {
     expect(css).not.toMatch(/input\[type="checkbox"\], input\[type="radio"\] \{ min-width: 24px; min-height: 24px; \}/);
   });
 
-  it("tombol primer tak lagi di-override putih (danger memberi #fff sendiri di inline style)", () => {
-    expect(css).not.toMatch(/--accent-on:\s*#fff/);
+  it("pasangan warna tombol primer hanya diputuskan di colors.css: app.css tak meng-override --action-* atau --accent-on", () => {
+    expect(css).not.toMatch(/--action-(on|bg|bg-hover):\s*/);
+    expect(css).not.toMatch(/--accent-on:\s*/);
+    expect(read("../src/ds/tokens/colors.css")).toMatch(/--action-on:\s*var\(--bone-000\);/);
+  });
+
+  it("permukaan solid bertekst memakai --action-*, bukan --accent (tombol, checkbox, badge, bar, tombol kirim)", () => {
+    const forms = read("../src/ds/components/forms.tsx");
+    expect(forms).toMatch(/case "primary": default: return \{ background: "var\(--action-bg\)", color: "var\(--action-on\)"/);
+    expect(forms).toMatch(/variant === "solid" \? \{ background: "var\(--action-bg\)", color: "var\(--action-on\)"/);
+    expect(forms).toMatch(/background: on \? "var\(--action-bg\)" : "var\(--surface-card\)"/);
+    expect(forms).toMatch(/name: "check", size: 13, stroke: 3, color: "var\(--action-on\)"/);
+    expect(forms).not.toMatch(/brightness\(0\.95\)/);
+    // Checkbox native: tanda centang putih (#fffdf8 = bone-000) di atas brass-600.
+    expect(css).toMatch(/stroke='%23fffdf8'/);
+    expect(css).toMatch(/input\[type="checkbox"\]:checked \{\s*background-image:[\s\S]*?linear-gradient\(var\(--action-bg\), var\(--action-bg\)\)/);
+    const pet = read("../src/screens/HanomanPet.tsx");
+    expect(pet.match(/color: "var\(--action-on\)", background: "var\(--action-bg\)"/g)?.length).toBe(2);
+    expect(stripComments(read("../src/notifications/notifications.css"))).toMatch(/\.hn-notif-open--primary \{[^}]*background: var\(--action-bg\)/);
+    expect(stripComments(read("../src/screens/styles/clients.css"))).toMatch(/\.kl-banner \{[^}]*background: var\(--action-bg\); color: var\(--action-on\)/);
+    expect(stripComments(read("../src/screens/styles/terminal.css"))).toMatch(/\.hn-terminal-send \{[^}]*color: var\(--action-on\);\s*background: var\(--action-bg\)/);
+  });
+
+  it("kontras tiap pasangan permukaan solid yang dipakai (kelas CSS) lolos 4,5:1", () => {
+    const notif = stripComments(read("../src/notifications/notifications.css"));
+    const clients = stripComments(read("../src/screens/styles/clients.css"));
+    const terminal = stripComments(read("../src/screens/styles/terminal.css"));
+    for (const [css, sel] of [[notif, ".hn-notif-open--primary"], [clients, ".kl-banner"], [terminal, ".hn-terminal-send"]] as const) {
+      const body = ruleBody(css, sel);
+      const text = color(tokenOf(body, "color"));
+      const bg = color(tokenOf(body, "background"));
+      expect(contrast(text, bg), sel).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("Dalang: tombol keluar tak pernah disembunyikan (dalang.css), termasuk di ponsel", () => {

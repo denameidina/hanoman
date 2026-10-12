@@ -96,7 +96,16 @@
   --accent-hover: var(--brass-600);
   --accent-press: var(--brass-700);
   --accent-tint:  var(--brass-100);
-  --accent-on:    var(--ink-900);
+
+  /* Permukaan SOLID yang memuat teks atau ikon (tombol primer, checkbox tercentang, badge hitung, bar
+     aksi). `--accent` (brass-500) tak dipakai di sana: teks putih di atasnya hanya 3,2:1 (gagal AA), dan
+     teks gelap di atasnya (dulu `--accent-on`, dihapus) terlihat lemah. Latarnya digelapkan ke brass-600
+     dan teksnya dibuat terang. Rasio dihitung dari hex: --action-on di --action-bg 4,83:1; di
+     --action-bg-hover 6,65:1. Hover dan pressed memakai brass-700. Non-teks (fokus, link, border, tint,
+     garis aktif, titik radio) tetap `--accent*`. */
+  --action-bg:       var(--brass-600);
+  --action-bg-hover: var(--brass-700);
+  --action-on:       var(--bone-000);
 
   --info:      var(--wind-600);
   --info-tint: var(--wind-100);

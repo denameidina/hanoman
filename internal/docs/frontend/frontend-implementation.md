@@ -3545,3 +3545,17 @@ dengan perbaikan aman yang dipertahankan: [ADR-0219](../adr/0219-dalang-sinemati
   inline style statis. `test/ui-audit-tokens.test.ts` mengunci kontras teks `dalang.css` ≥ 4,5:1 dan ukuran ≥ 11 px.
 - **Gotcha.** Axe menganggap setiap `svg` sebagai gambar. Teks di atasnya atau latar gradien membuat `color-contrast`
   `incomplete`; aturan kontrasnya ada di [design-system § Permukaan gelap Dalang](../design-system/design-system.md).
+
+## Warna tombol primer: permukaan solid (Audit UI/UX 2026-10 · keputusan pemilik)
+
+- Tombol primer, `IconButton` `solid`, checkbox tercentang, badge hitung pet, aksi "Jawab" notifikasi, bar `.kl-banner`,
+  dan tombol Kirim ponsel memakai `--action-bg` (brass-600) dengan `--action-on` (teks putih). Hover dan pressed memakai
+  `--action-bg-hover` (brass-700), menggantikan `filter: brightness(0.95)`. `--accent-on` dihapus karena tak ada lagi
+  konsumennya. `--accent`/`--accent-hover` tak diubah: fokus, link, border, tint, dan radio tetap memakainya.
+- Angka dan alasan: [design-system](../design-system/design-system.md) § Warna tombol primer dan permukaan solid.
+- Tes: `ui-audit-tokens` (pasangan `--action-*`, keadaan disabled, cincin fokus, daftar permukaan), `terminal-css-contract`,
+  `responsive-chrome-css`, `hanoman-pet`.
+- Verifikasi Chrome (server QA, headless): Sesi baru di Terminal 1280 dan 390 (normal, hover, fokus keyboard, modal),
+  "Aktifkan" di Scheduler, "Mulai" dan "Lanjutkan" di Backlog, "Jalankan" di detail item, dan checkbox dependensi
+  tercentang. axe-core 4.13 (WCAG 2.2 A/AA + best-practice) pada enam rute utama: 0 pelanggaran di 1280 dan 390.
+  Batas: Safari dan Firefox tak diuji; keterbacaan disabled (sekitar 2:1) tak diubah.

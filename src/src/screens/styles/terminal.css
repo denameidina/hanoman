@@ -349,7 +349,7 @@
   .hn-terminal-open-compact { min-width: var(--touch-target); min-height: var(--touch-target); }
 }
 
-/* Kirim di kanan kolom ketik ponsel. Warnanya token aksen (`--accent-on` di atas `--accent`). */
+/* Kirim di kanan kolom ketik ponsel. Warnanya permukaan solid (`--action-on` di atas `--action-bg`, 4,83:1). */
 .hn-terminal-send {
   flex: 0 0 auto;
   min-height: 36px;
@@ -357,9 +357,9 @@
   font: inherit;
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  color: var(--accent-on);
-  background: var(--accent);
-  border: 1px solid var(--accent);
+  color: var(--action-on);
+  background: var(--action-bg);
+  border: 1px solid var(--action-bg);
   border-radius: var(--radius-sm);
   cursor: pointer;
   white-space: nowrap;

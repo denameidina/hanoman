@@ -545,13 +545,14 @@ input[type="radio"] {
   cursor: pointer;
 }
 input[type="radio"] { border-radius: 50%; }
-/* Terpilih: isi brass (token --accent), ring --accent-hover, dan tanda centang/titik di atasnya.
-   Warna tanda (ink-900 = --accent-on) ditulis langsung karena SVG di data-URI tak membaca variabel CSS. */
+/* Terpilih: isi --action-bg (brass-600), ring --action-bg-hover, dan tanda centang putih (--action-on) di
+   atasnya. Warna tanda ditulis langsung (#fffdf8 = bone-000) karena SVG di data-URI tak membaca variabel CSS.
+   Radio tak diubah: titiknya tak memuat teks atau ikon di atas permukaan solid. */
 input[type="checkbox"]:checked {
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.6 2.6L12 5.6' fill='none' stroke='%2317130c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
-    linear-gradient(var(--accent), var(--accent)),
-    linear-gradient(var(--accent-hover), var(--accent-hover));
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.6 2.6L12 5.6' fill='none' stroke='%23fffdf8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
+    linear-gradient(var(--action-bg), var(--action-bg)),
+    linear-gradient(var(--action-bg-hover), var(--action-bg-hover));
   background-size: 100% 100%, calc(100% - 3px) calc(100% - 3px), 100% 100%;
 }
 input[type="radio"]:checked {
@@ -944,8 +945,9 @@ input[type="file"] { min-height: 24px; }
   }
 }
 
-/* Teks + ikon tombol primer memakai `--accent-on` (ink-900 di atas brass-500, 5,74:1). Dulu di-override
-   putih di sini: #fff di atas brass-500 hanya 3,2:1. Tombol danger memberi #fff sendiri lewat inline
+/* Teks + ikon tombol primer memakai `--action-on` (putih di atas `--action-bg` brass-600, 4,83:1; hover
+   brass-700, 6,65:1). Putih di atas brass-500 (`--accent`) hanya 3,2:1, jadi latarnya yang digelapkan, bukan
+   teksnya diganti gelap. Tombol danger memberi #fff sendiri lewat inline
    style (ds/components/forms.tsx), jadi tak bergantung pada aturan ini. */
 
 a { color: var(--text-link); text-decoration: none; }

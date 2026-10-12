@@ -266,6 +266,8 @@ Diverifikasi terhadap kode (commit `cfabc308`, diff terhadap basis `8380d3fa`, y
 - [x] 1. Token kontras: `--text-subtle` `#776853`, `--amber-700` untuk teks warning (`--status-warn`),
   `--border-strong` = ink-400, `--border-focus` = brass-600, tombol primer `--accent-on` tanpa override
   putih, alias `--brass`/`--danger`/`--line` (`ds/tokens/colors.css`, `app.css:756`).
+  Keputusan lanjutan pemilik: teks gelap di atas brass-500 dianggap lemah. `--accent-on` dihapus; tombol primer
+  kini teks putih di atas `--action-bg` (brass-600). Lihat [design-system](../design-system/design-system.md) § Warna tombol primer.
 - [x] 2. `useConfirm` untuk daftar P0 destruktif (satu sisa, lihat tindak lanjut); nol `window.confirm`,
   `window.prompt`, dan `window.alert` di layar.
 - [x] 3. Guard dirty di Docs, IDE, Skills, dan QA; simpan memakai try/catch dan galat inline.

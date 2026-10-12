@@ -335,8 +335,9 @@ describe("HanomanPet — pet jujur & lengkap (SPEC-897)", () => {
     expect(badge).toHaveStyle({ pointerEvents: "none" });
     // Angkanya punya satuan di kalimat status — satu sumber, lencananya sendiri aria-hidden.
     expect(screen.getByTestId("pet-status").textContent).toContain("2 sesi menunggu jawabanmu");
-    // Warna lencana hanya token DS.
-    expect(styleOf(badge)).toContain("var(--accent)");
+    // Warna lencana hanya token DS: teks putih di atas --action-bg (brass-600), bukan --accent.
+    expect(styleOf(badge)).toContain("var(--action-bg)");
+    expect(styleOf(badge)).toContain("var(--action-on)");
     expect(styleOf(badge)).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(/i);
   });
 

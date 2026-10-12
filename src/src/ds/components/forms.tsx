@@ -58,8 +58,9 @@ function variantStyle(variant: string): React.CSSProperties {
     case "ghost": return { background: "transparent", color: "var(--text-body)", border: "1px solid transparent" };
     // Dua varian danger memakai warna dari forms.css (`.hn-btn-danger*`): hover dan fokus butuh pseudo-class.
     case "danger": case "danger-outline": return {};
-    case "primary": default: return { background: "var(--accent)", color: "var(--accent-on)",
-      border: "1px solid var(--accent)", boxShadow: "var(--shadow-xs)" };
+    // Teks putih di atas --action-bg (brass-600), bukan teks gelap di atas brass-500: lihat colors.css.
+    case "primary": default: return { background: "var(--action-bg)", color: "var(--action-on)",
+      border: "1px solid var(--action-bg)", boxShadow: "var(--shadow-xs)" };
   }
 }
 // Audit 2026-10 · varian danger resmi. `danger` = solid, untuk aksi merusak utama (konfirmasi hapus).
@@ -84,7 +85,8 @@ export function Button({ children, variant = "primary", size = "md", leftIcon, r
   // Hover danger ada di forms.css; inline-nya kosong.
   const hoverOverlay: React.CSSProperties = isDanger ? {} : variant === "ghost" ? { background: "var(--bone-200)" }
     : variant === "secondary" ? { background: "var(--bone-100)", borderColor: "var(--ink-300)" }
-    : { filter: "brightness(0.95)" };
+    // Hover & pressed primer: brass-700 (--action-bg-hover), teks putih tetap ≥4,5:1 (6,65:1).
+    : { background: "var(--action-bg-hover)", border: "1px solid var(--action-bg-hover)" };
   const isAnchor = asTag === "a";
   // `type`/`disabled` bukan atribut sah pada <a>; padanannya aria-disabled. Dipisah ke variabel
   // ber-tipe longgar karena spread kondisional di dalam argumen createElement membuat TS
@@ -123,10 +125,10 @@ type IconButtonProps = { icon: string; label?: string; variant?: "solid" | "outl
 export function IconButton({ icon, label, variant = "ghost", size = "md", disabled = false, className = "", style = {}, ...rest }: IconButtonProps) {
   const s = IB_SIZES[size] || IB_SIZES.md!;
   const [hover, setHover] = React.useState(false);
-  const base: React.CSSProperties = variant === "solid" ? { background: "var(--accent)", color: "var(--accent-on)", border: "1px solid var(--accent)" }
+  const base: React.CSSProperties = variant === "solid" ? { background: "var(--action-bg)", color: "var(--action-on)", border: "1px solid var(--action-bg)" }
     : variant === "outline" ? { background: "var(--surface-card)", color: "var(--text-body)", border: "1px solid var(--border-strong)" }
     : { background: "transparent", color: "var(--text-muted)", border: "1px solid transparent" };
-  const hoverOverlay: React.CSSProperties = variant === "solid" ? { filter: "brightness(0.95)" }
+  const hoverOverlay: React.CSSProperties = variant === "solid" ? { background: "var(--action-bg-hover)", border: "1px solid var(--action-bg-hover)" }
     : variant === "outline" ? { background: "var(--bone-100)", borderColor: "var(--ink-300)", color: "var(--text-strong)" }
     : { background: "var(--bone-200)", color: "var(--text-strong)" };
   return React.createElement("button", _extends({
@@ -255,10 +257,10 @@ export function Checkbox({ checked, defaultChecked, onChange, label, description
       style: { display: "inline-grid", placeItems: "center", width: 24, height: 24,
         marginTop: description ? -1 : 0, flex: "0 0 auto" },
     }, React.createElement("span", { style: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18,
-      borderRadius: "var(--radius-xs)", background: on ? "var(--accent)" : "var(--surface-card)",
-      border: `1.5px solid ${on ? "var(--accent)" : "var(--border-strong)"}`,
+      borderRadius: "var(--radius-xs)", background: on ? "var(--action-bg)" : "var(--surface-card)",
+      border: `1.5px solid ${on ? "var(--action-bg)" : "var(--border-strong)"}`,
       boxShadow: on ? "none" : "var(--shadow-inset)", transition: "var(--transition-fast)" } },
-    on && React.createElement(Icon, { name: "check", size: 13, stroke: 3, color: "var(--accent-on)" }))),
+    on && React.createElement(Icon, { name: "check", size: 13, stroke: 3, color: "var(--action-on)" }))),
     (label || description) && React.createElement("span", { id: textId, onClick: toggle, style: { userSelect: "none" } },
       label && React.createElement("span", { style: { display: "block", fontSize: "var(--text-md)",
         color: "var(--text-strong)", lineHeight: 1.4 } }, label),
