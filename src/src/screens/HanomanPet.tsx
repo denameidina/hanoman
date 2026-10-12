@@ -598,7 +598,7 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
                   {c.count > 1 && (
                     <span data-testid="pet-condition-count" title={`${c.count} ${KIND_NOUN[c.kind]}`} style={{
                       flex: "0 0 auto", padding: "2px 6px", fontFamily: "var(--font-ui)", fontSize: 11,
-                      fontWeight: 700, lineHeight: 1, color: "var(--accent-on)", background: "var(--accent)",
+                      fontWeight: 700, lineHeight: 1, color: "var(--action-on)", background: "var(--action-bg)",
                       border: "1px solid var(--border-hair)", borderRadius: "var(--radius-pill)",
                     }}>{c.count}</span>
                   )}
@@ -716,7 +716,7 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
                 minWidth: 18, height: 18, padding: "0 5px", boxSizing: "border-box",
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
                 fontFamily: "var(--font-ui)", fontSize: 11, fontWeight: 700, lineHeight: 1,
-                color: "var(--accent-on)", background: "var(--accent)",
+                color: "var(--action-on)", background: "var(--action-bg)",
                 border: "1px solid var(--border-hair)", borderRadius: "var(--radius-pill)",
                 boxShadow: "var(--shadow-sm)",
               }}>{view.count}</span>

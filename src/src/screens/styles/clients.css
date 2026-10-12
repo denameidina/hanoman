@@ -76,7 +76,7 @@
   position: sticky; top: 0; z-index: 3;
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3);
   padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4);
-  background: var(--accent); color: var(--accent-on);
+  background: var(--action-bg); color: var(--action-on);
   border-radius: var(--radius-md); font-size: var(--text-sm); line-height: 1.4;
 }
 .kl-banner-text { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }

@@ -129,7 +129,10 @@ menetapkan aturan perilaku yang dulu dilanggar diam-diam. Nilai token dibaca dar
 | `--amber-600` | `#b3771a` (tak berubah) | Hanya **fill** (titik, border). 3,7:1 di kartu; komentar `colors.css` melarangnya sebagai teks. |
 | `--border-strong` | `var(--ink-400)` (dulu `bone-400`) | Batas kontrol (input, checkbox, tombol secondary). `bone-400` 1,51:1 di kartu; `ink-400` 3,69:1 kartu, 3,48:1 page, 3,16:1 panel. WCAG 1.4.11 minimal 3:1. |
 | `--border-focus` | `var(--brass-600)` (dulu `brass-500`) | `brass-500` 2,99:1 di page. `brass-600` 4,83:1 kartu, 4,55:1 page, 4,14:1 panel, 3,60:1 di `--term-bg` (fokus di panel Dalang gelap). |
-| `--accent-on` | `var(--ink-900)` | Teks dan ikon tombol primer di atas `--accent` (brass-500): 5,74:1. Override putih di `app.css` (≈3,2:1) dihapus. Tombol danger tetap `#fff` lewat inline style di `ds/components/forms.tsx`. |
+| `--action-bg` | `var(--brass-600)` (baru) | Latar permukaan solid yang memuat teks atau ikon: tombol primer, checkbox tercentang, badge hitung, bar aksi, tombol Kirim ponsel. Lihat § Warna tombol primer di bawah. |
+| `--action-bg-hover` | `var(--brass-700)` (baru) | Hover dan pressed tombol primer. Teks putih di atasnya 6,65:1. |
+| `--action-on` | `var(--bone-000)` (baru) | Teks dan ikon di atas `--action-bg`: 4,83:1. Putih di atas brass-500 (`--accent`) hanya 3,2:1 (gagal AA), jadi latarnya yang digelapkan. |
+| `--accent-on` | (dihapus) | Teks gelap di atas `--accent` (brass-500): 5,74:1, tetapi terlihat lemah sebagai tombol primer (keputusan pemilik). Tak ada konsumen lagi. Tombol danger tetap `#fff` lewat inline style di `ds/components/forms.tsx`. |
 
 Alias untuk nama yang dipakai TSX tetapi dulu tak terdefinisi (jatuh diam-diam ke `currentColor`):
 `--brass` → `brass-600`, `--danger` → `clay-600`, `--line` → `--border-hair`.
@@ -162,6 +165,41 @@ Aturan:
    Switch (`role=switch`, `ds/components/forms.css`) punya area 24 px tinggi di desktop dan 44 px di pointer kasar;
    track 40×22 tetap digambar di tengahnya. Input berkas di Help Center disembunyikan (tetap fokusabel) dan
    tombol tampaknya "Pilih berkas" memakai gaya tombol DS (`.hn-public-file-btn`, `portal/portal.css`).
+
+## Warna tombol primer dan permukaan solid (Audit UI/UX 2026-10 · keputusan pemilik)
+
+Tombol primer ("Sesi baru", "Jalankan", "Aktifkan", "Mulai") memakai **teks putih di atas brass-600**, bukan teks
+gelap di atas brass-500. Teks gelap di atas brass-500 terlihat lemah (keputusan pemilik). Putih di atas brass-500
+hanya 3,2:1 (gagal AA), jadi yang digelapkan adalah **latarnya**, bukan teksnya. Token di
+`src/src/ds/tokens/colors.css`: `--action-bg`, `--action-bg-hover`, `--action-on`. Rasio dihitung dari hex dan
+diukur ulang di Chrome.
+
+| keadaan | latar | teks/ikon | rasio | catatan |
+|---|---|---|---|---|
+| normal (`variant="primary"`, `IconButton` `solid`) | `--action-bg` brass-600 `#97671f` | `--action-on` bone-000 `#fffdf8` | 4,83:1 | Lolos AA untuk teks kecil. `#fff` murni 4,91:1; bone dipakai agar sejalan dengan kertas. |
+| hover dan pressed | `--action-bg-hover` brass-700 `#7a5417` | sama | 6,65:1 | Menggantikan `filter: brightness(0.95)`, yang tak punya nilai token. |
+| disabled (opacity 0,5) | sama, dikomposisikan ke latar | sama | 2,01–2,05:1 di page, kartu, panel | WCAG 1.4.3 membebaskan komponen nonaktif. Pasangan lama memberi 2,06:1, jadi keterbacaannya tak memburuk. Lihat "Terbuka". |
+| fokus (`:focus-visible`) | cincin `--border-focus` 2 px, offset 2 px | — | 4,55 page, 4,83 kartu, 4,14 panel | Cincin berada di luar tombol (offset 2 px), jadi tak tenggelam di atas brass-600. |
+
+Permukaan yang kini memakai `--action-*` (solid dengan teks atau ikon di atasnya):
+
+- tombol primer dan `IconButton` `solid` (`ds/components/forms.tsx`);
+- checkbox tercentang (`ds/components/forms.tsx`) dan checkbox native (`app.css`, tanda centang `#fffdf8` di data-URI SVG);
+- badge hitung pet (`screens/HanomanPet.tsx`, dua tempat);
+- aksi "Jawab" notifikasi (`notifications/notifications.css`, `.hn-notif-open--primary`);
+- bar `.kl-banner` (`screens/styles/clients.css`) dan tombol Kirim ponsel `.hn-terminal-send` (`screens/styles/terminal.css`).
+
+Tetap `--accent` (brass-500) karena bukan permukaan bertekst: radio tercentang dan titiknya, toggle aktif, progres,
+garis tab dan baris terpilih, tint dropzone, dan titik notifikasi. Logo tile (`.hn-wordmark-mark`,
+`.hn-portal-mark`) juga tetap: brand dekoratif, dan ink-900 di atas brass-500 pada wordmark (5,74:1) sudah lolos.
+Varian `secondary`, `ghost`, dan `danger` tidak berubah. Di `app.css` tak ada `!important` baru (tetap 8).
+
+Tes: `src/test/ui-audit-tokens.test.ts` mengunci pasangan `--action-*` (normal, hover, disabled, cincin fokus),
+kontrol negatif (putih di brass-500 di bawah 4,5:1), dan daftar permukaan di atas. `terminal-css-contract`,
+`responsive-chrome-css`, dan `hanoman-pet` mengikuti token baru.
+
+Terbuka: keterbacaan disabled tetap sekitar 2:1 (sama seperti sebelumnya). Bila pemilik ingin disabled lebih
+terbaca, perlu token disabled khusus (mis. latar bone-300, teks ink-500); itu keputusan terpisah.
 
 ## Primitif layout (Audit UI/UX 2026-10 · Fase 2A)
 

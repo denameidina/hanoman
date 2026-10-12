@@ -3523,3 +3523,17 @@ Batas verifikasi: sesi agen Claude tak tersedia di QA, jadi strip fase (`PhaseSt
 dengan strip itu output diperkirakan ±52%, di bawah 55%. Tidak ada sesi non-berjalan yang tampil di fixture, jadi baris
 "Aktivitas terbaru" berisi proyek berjalan hanya dibuktikan lewat tes unit. VoiceOver/NVDA tak diuji; tooltip rail
 memakai `title` (native), yang tak muncul di perangkat sentuh, dan label terlihat menggantikannya.
+
+## Warna tombol primer: permukaan solid (Audit UI/UX 2026-10 · keputusan pemilik)
+
+- Tombol primer, `IconButton` `solid`, checkbox tercentang, badge hitung pet, aksi "Jawab" notifikasi, bar `.kl-banner`,
+  dan tombol Kirim ponsel memakai `--action-bg` (brass-600) dengan `--action-on` (teks putih). Hover dan pressed memakai
+  `--action-bg-hover` (brass-700), menggantikan `filter: brightness(0.95)`. `--accent-on` dihapus karena tak ada lagi
+  konsumennya. `--accent`/`--accent-hover` tak diubah: fokus, link, border, tint, dan radio tetap memakainya.
+- Angka dan alasan: [design-system](../design-system/design-system.md) § Warna tombol primer dan permukaan solid.
+- Tes: `ui-audit-tokens` (pasangan `--action-*`, keadaan disabled, cincin fokus, daftar permukaan), `terminal-css-contract`,
+  `responsive-chrome-css`, `hanoman-pet`.
+- Verifikasi Chrome (server QA, headless): Sesi baru di Terminal 1280 dan 390 (normal, hover, fokus keyboard, modal),
+  "Aktifkan" di Scheduler, "Mulai" dan "Lanjutkan" di Backlog, "Jalankan" di detail item, dan checkbox dependensi
+  tercentang. axe-core 4.13 (WCAG 2.2 A/AA + best-practice) pada enam rute utama: 0 pelanggaran di 1280 dan 390.
+  Batas: Safari dan Firefox tak diuji; keterbacaan disabled (sekitar 2:1) tak diubah.

@@ -129,9 +129,10 @@ describe("checkbox dan radio mentah: kotak 16 px, area klik 24 px (desktop) dan 
     expect(base).toMatch(/background-color:\s*transparent/);
   });
 
-  it("terpilih: isi --accent dengan tanda centang/titik, bukan warna baru", () => {
+  it("terpilih: checkbox memakai --action-bg dengan tanda centang; radio tetap --accent (titiknya tanpa teks)", () => {
     expect(css).toMatch(/input\[type="checkbox"\]:checked \{\s*background-image:/);
     expect(css).toMatch(/input\[type="radio"\]:checked \{\s*background-image:/);
+    expect(css).toMatch(/linear-gradient\(var\(--action-bg\), var\(--action-bg\)\)/);
     expect(css).toMatch(/linear-gradient\(var\(--accent\), var\(--accent\)\)/);
   });
 

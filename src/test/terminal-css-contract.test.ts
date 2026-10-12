@@ -74,9 +74,9 @@ describe("terminal.css · dock ringkas di ponsel", () => {
     expect(mobileBlock).toMatch(/\.hn-terminal-keys-toggle,\s*\.hn-terminal-send\s*\{\s*min-height:\s*var\(--touch-target\)/);
   });
 
-  it("warna tombol Kirim memakai token aksen, bukan warna baru", () => {
-    expect(code).toMatch(/\.hn-terminal-send\s*\{[^}]*color:\s*var\(--accent-on\)/);
-    expect(code).toMatch(/\.hn-terminal-send\s*\{[^}]*background:\s*var\(--accent\)/);
+  it("warna tombol Kirim memakai pasangan solid --action-* (teks putih di atas brass-600), bukan warna baru", () => {
+    expect(code).toMatch(/\.hn-terminal-send\s*\{[^}]*color:\s*var\(--action-on\)/);
+    expect(code).toMatch(/\.hn-terminal-send\s*\{[^}]*background:\s*var\(--action-bg\)/);
   });
 });
 
