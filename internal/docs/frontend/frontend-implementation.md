@@ -3466,3 +3466,5 @@ Diukur di Chrome headless pada fixture build (CSS dan komponen repo yang sama, t
 - **Overview (P3-4).** Satu frasa untuk "tanpa sesi": "Tidak ada sesi berjalan" di seksi "Sesi berjalan". Ringkasan header hanya menyebut sesi bila ada. Tes: `overview-screen`.
 - **Komentar (P3-5).** Komentar lantai graf di ide.css dan GitGraph.tsx diperbaiki (GRAPH_ROW_MIN 460; lantai 160 px hanya berlaku di desktop).
 - **!important.** `app.css` tetap 8. Tak ada inline style atau `!important` baru.
+
+- Graf IDE ≤640px (penutup): pil ref/tag dibatasi `max-width: 72px` (elipsis) supaya subjek commit tetap lapang saat satu commit punya beberapa pil; nama penuh ada di `title` dan `aria-label`. Item menu "Hapus project…" 40px yang sempat terbaca satu probe tidak punya penyebab di CSS (`.hn-overflow-item` memakai `min-height: var(--touch-target)` = 44px di semua pointer) dan dicatat sebagai probe keliru.

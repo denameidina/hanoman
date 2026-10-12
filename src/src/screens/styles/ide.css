@@ -451,6 +451,12 @@
   min-width: 0; min-height: 0; height: 16px; max-width: min(100%, 168px); padding: 0 6px;
   line-height: 14px; flex: 0 0 auto; /* tak menyusut di bawah teksnya: yang menyusut adalah subject (QA #14) */
 }
+/* Di ≤640px beberapa pil pada satu commit (main, origin/main, tag) memakan subjek hingga ±97 px. Batasi tiap pil
+   ke 72 px (elipsis; teks penuh ada di title/aria-label) agar subjek tetap ≥140 px dengan dua pil. */
+@media (max-width: 640px) {
+  .hn-git-main > button.hn-git-ref,
+  .hn-git-main > button.hn-git-tag { max-width: 72px; }
+}
 .hn-git-main > button.hn-git-ref::after,
 .hn-git-main > button.hn-git-tag::after {
   content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 24px; transform: translateY(-50%);

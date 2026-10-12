@@ -662,7 +662,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                   <RowSvg row={r} edges={allEdges[i] ?? []} maxLanes={maxLanes} style={style} palette={palette} height={graphRowHeight} />
                   <div className="hn-git-main">
                     {c.refs.map((ref) => (
-                      <button type="button" key={ref} title={isHead && ref === current ? "branch aktif (HEAD) — pilih untuk aksi" : "branch — pilih untuk aksi"}
+                      <button type="button" key={ref} title={isHead && ref === current ? `${ref} · branch aktif (HEAD) — pilih untuk aksi` : `${ref} · branch — pilih untuk aksi`}
                         aria-label={`Aksi branch ${ref}`}
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
                         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
@@ -672,7 +672,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                     ))}
                     {/* SPEC-233 · tag = pill terpisah (warna leaf, ikon tag); klik-kanan → menu tag */}
                     {c.tags.map((t) => (
-                      <button type="button" key={`tag:${t}`} title="tag — pilih untuk aksi" aria-label={`Aksi tag ${t}`}
+                      <button type="button" key={`tag:${t}`} title={`${t} · tag — pilih untuk aksi`} aria-label={`Aksi tag ${t}`}
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
                         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
                         className="hn-git-tag"><span className="hn-git-ref-text">⌂{t}</span></button>
