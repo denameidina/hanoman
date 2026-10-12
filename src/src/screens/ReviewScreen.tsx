@@ -57,8 +57,7 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
   const [review, setReview] = React.useState<SpecReview | null>(null);
   const [state, setState] = React.useState<"loading" | "ready" | "error" | "empty">("loading");
   const [errMsg, setErrMsg] = React.useState("");
-  // ADR-0213/0215 · alasan keadaan kosong dari server (`no-worktree` | `no-commit`). Undefined = keadaan
-  // kosong yang datang sebagai 409 (hanya jalur spec, repoDir belum diatur) — `data-reason` memakai "409".
+  // ADR-0213/0215 · alasan keadaan kosong dari server (`no-worktree` | `no-commit`).
   const [emptyReason, setEmptyReason] = React.useState<SpecReview["reason"]>();
   const [selected, setSelected] = React.useState("");
   const [file, setFile] = React.useState<ReviewFile | null>(null);
@@ -87,14 +86,10 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
       setSelected(r.changed[0]?.path ?? r.files[0] ?? "");
     }).catch((e) => {
       if (!alive) return;
-      // ADR-0215 · jalur sesi tak lagi memetakan 409 ke keadaan kosong: keadaan kosongnya 200 `empty`,
-      // sehingga 409 di sana berarti galat (repoDir belum diatur) dan tampil sebagai galat.
-      // Jalur spec tetap memetakan 409 (repoDir belum diatur) ke keadaan kosong seperti sebelumnya.
-      // Pesan teknisnya tak ditampilkan: ia hanya di atribut data-detail dan di console untuk penelusuran.
-      if (kind === "spec" && e?.status === 409) {
-        setEmptyReason(undefined); setState("empty"); setErrMsg(String(e?.message ?? ""));
-        console.debug("review: belum ada worktree", e?.message);
-      } else setState("error");
+      // ADR-0213/0215 · keadaan kosong kini selalu 200 `empty` (jalur spec dan sesi). 409 yang tersisa berarti
+      // galat sungguhan (project belum punya repoDir), jadi tampil sebagai galat yang bisa dicoba ulang.
+      console.debug("review: gagal memuat", e?.message);
+      setState("error");
     });
     return () => { alive = false; };
   }, [specId, tries]);

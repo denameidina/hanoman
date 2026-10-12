@@ -41,12 +41,12 @@ describe("ReviewScreen · keadaan kosong (ADR-0213)", () => {
     expect(container.querySelector('[data-review-state="empty"]')?.getAttribute("data-reason")).toBe("no-worktree");
   });
 
-  it("409 pada jalur spec (repoDir belum diatur) tetap keadaan kosong, tanpa galat merah", async () => {
+  it("409 pada jalur spec (repoDir belum diatur) adalah galat yang bisa dicoba ulang (ADR-0215)", async () => {
     mockReview({ error: "project belum punya repoDir" }, 409);
     const { container } = screenFor();
-    expect(await screen.findByText(EMPTY_TITLE)).toBeTruthy();
-    expect(container.querySelector('[data-review-state="empty"]')?.getAttribute("data-reason")).toBe("409");
-    expect(screen.queryByText("Gagal memuat review")).toBeNull();
+    expect(await screen.findByText("Gagal memuat review")).toBeTruthy();
+    expect(container.querySelector('[data-review-state="empty"]')).toBeNull();
+    expect(screen.queryByText(EMPTY_TITLE)).toBeNull();
   });
 
   it("200 empty pada jalur sesi (no-worktree): keadaan kosong, bukan galat", async () => {

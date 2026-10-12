@@ -394,8 +394,8 @@ Sudah selesai di gelombang 7: filter "Perlu ditinjau" (sesi menunggu jawaban), r
 
 1. **Uji pembaca layar nyata** (VoiceOver/NVDA) untuk "Mode pembaca layar" xterm. Proksi pohon aksesibilitas Chrome: region terminal terbaca (`list`/`listitem`), tetapi ini bukan uji pembaca layar; live region `aria-live=assertive` xterm belum dinilai dampaknya.
 2. **Grant per perangkat remote dari hub.** Ditinjau dan DITOLAK sebagai implementasi sepihak: tingkat akses ditegakkan di perangkat itu sendiri dan ADR-0165 menolak sinkronisasi grant dari hub; opsi A (relay PUT, ditolak), B (pembatas hub), C (permintaan hub disetujui operator lokal), D (tampil baca-saja, DITERAPKAN). Memilih B atau C adalah keputusan pemilik: [ADR-0216](../adr/0216-grant-per-perangkat-remote-diusulkan.md).
-3. **Item `done` yang belum ditinjau** tak punya sinyal jujur di klien (`baseSha` hanya berarti pernah ada worktree); butuh penanda tinjauan di server bila diinginkan.
-4. **Seragamkan 409 `repoDir` belum diatur** pada jalur spec (masih dipetakan ke keadaan kosong di layar) menjadi galat: keputusan kontrak terpisah.
+3. **Item `done` yang belum ditinjau** tak punya sinyal jujur di klien (`baseSha` hanya berarti pernah ada worktree); menambah penanda tinjauan butuh perubahan skema (migration + ADR, dilarang tanpa keputusan pemilik) — ditunda sengaja.
+4. ~~Seragamkan 409 `repoDir`~~ Selesai: jalur spec kini menampilkan 409 sebagai galat yang bisa dicoba ulang (keadaan kosong hanya lewat 200 `empty`, ADR-0213/0215).
 5. **Mata manusia** pada Overview, Terminal ponsel, sidebar + pet, dan graf IDE sebelum merge: seluruh verifikasi visual dilakukan agen Haiku dari tangkapan layar dan pengukuran DOM.
 6. **Merge `ui-ux-audit` ke `main`** menunggu persetujuan pemilik.
 7. Tes server `vps-ssh` (dipicu `SSH_ASKPASS` di lingkungan), `structured-launch-admission`, dan `spec-attachment-launch` gagal di `main` juga; dua tes merge konflik (`ide.route`, `specs.route`) kadang gagal hanya saat beban host tinggi (gerbang beban), lulus bila diulang.
