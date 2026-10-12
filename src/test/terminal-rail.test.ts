@@ -30,7 +30,9 @@ describe("railStatus", () => {
 
   it("plan tuntas di pane hidup = Selesai; selain itu Berjalan", () => {
     expect(railStatus(s("a"), true)).toEqual({ tone: "done", label: "Selesai" });
-    expect(railStatus(s("a"), false)).toEqual({ tone: "running", label: "Berjalan" });
+    expect(railStatus(s("a", { specId: "SPEC-1" }), false)).toEqual({ tone: "running", label: "Berjalan" });
+    // Sesi bebas (tanpa spec) tidak diklaim "Berjalan": ia hanya terbuka.
+    expect(railStatus(s("a"), false)).toEqual({ tone: "open", label: "Terbuka" });
   });
 });
 

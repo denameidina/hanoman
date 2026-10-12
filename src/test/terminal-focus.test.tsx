@@ -98,7 +98,7 @@ describe("TerminalScreen · mode Fokus (Fase 3E)", () => {
     expect(railOrder()).toEqual(["att111", "run222", "fail33", "done44"]);
     const labels = railRows().map((b) => b.querySelector(".hn-terminal-rail-meta")?.textContent ?? "");
     expect(labels[0]).toContain("Menunggu keputusan");
-    expect(labels[1]).toContain("Berjalan");
+    expect(labels[1]).toContain("Terbuka");
     expect(labels[2]).toContain("Gagal · exit 1");
     expect(labels[3]).toContain("Selesai");
   });

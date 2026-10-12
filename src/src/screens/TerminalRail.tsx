@@ -15,8 +15,8 @@ export type RailItem = {
 };
 
 // Lencana status memakai kosakata StatusPill DS yang sama dengan Cell grid.
-export const RAIL_PILL: Record<RailTone, "awaiting" | "running" | "failed" | "done"> = {
-  attention: "awaiting", running: "running", failed: "failed", done: "done",
+export const RAIL_PILL: Record<RailTone, "awaiting" | "running" | "idle" | "failed" | "done"> = {
+  attention: "awaiting", running: "running", open: "idle", failed: "failed", done: "done",
 };
 
 // Waktu relatif di rail perlu bergeser pelan tanpa me-render ulang seluruh layar.

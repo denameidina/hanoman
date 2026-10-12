@@ -9,10 +9,10 @@ export type TerminalView = "focus" | "grid";
 export const isTerminalView = oneOf<TerminalView>("focus", "grid");
 
 // Keadaan yang dipakai rail. Urutan tampil: butuh keputusan → berjalan → gagal → selesai.
-export type RailTone = "attention" | "running" | "failed" | "done";
+export type RailTone = "attention" | "running" | "open" | "failed" | "done";
 export type RailStatus = { tone: RailTone; label: string };
 
-export const RAIL_RANK: Record<RailTone, number> = { attention: 0, running: 1, failed: 2, done: 3 };
+export const RAIL_RANK: Record<RailTone, number> = { attention: 0, running: 1, open: 1, failed: 2, done: 3 };
 
 // Sumber kebenaran status = bit yang sama dengan Cell grid: `exited`/`exitCode` (SPEC-402),
 // `decision`/`deciding` (ADR-0143 · keadaan turunan server), dan `finished` (verdict plan dari pane).
@@ -27,7 +27,9 @@ export function railStatus(s: TerminalSession, finished: boolean): RailStatus {
   if (s.deciding) return { tone: "attention", label: "Lead memutuskan" };
   if (s.decision) return { tone: "attention", label: "Menunggu keputusan" };
   if (finished) return { tone: "done", label: "Selesai" };
-  return { tone: "running", label: "Berjalan" };
+  // "Berjalan" hanya untuk sesi yang mengerjakan spec. Sesi bebas (tanpa spec) cuma terbuka; memakai
+  // kata yang sama membuat operator mengira ia sedang mengerjakan sesuatu.
+  return s.specId ? { tone: "running", label: "Berjalan" } : { tone: "open", label: "Terbuka" };
 }
 
 // Waktu mulai sesi (ms epoch). Server mengirim `startedAt` dalam detik epoch dari tmux
