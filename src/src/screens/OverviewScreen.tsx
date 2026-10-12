@@ -164,9 +164,10 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
   const qaN = backlog.filter((s) => s.source === "qa").length;
   const hiPrio = backlog.filter((s) => s.priority === "tinggi").length;
 
-  // Satu kalimat status. Angkanya sama dengan seksi di bawahnya (satu hitungan, bukan dua).
+  // Satu kalimat status. Angkanya sama dengan seksi di bawahnya (satu hitungan, bukan dua). Keadaan
+  // "tanpa sesi" tak disebut di sini: seksi "Sesi berjalan" sudah menyatakannya (satu pesan, bukan dua).
   const summary = [
-    live.length === 0 ? "Tidak ada sesi berjalan" : `${live.length} sesi berjalan`,
+    live.length > 0 ? `${live.length} sesi berjalan` : null,
     waiting.length > 0 ? `${waiting.length} menunggu jawabanmu` : null,
     attention.length > 0 ? `${attention.length} perlu perhatian` : null,
   ].filter(Boolean).join(" · ");
@@ -194,7 +195,7 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
         {live.length === 0
           ? <p className="hn-ov-empty">
               <Icon name="terminal" size={14} />
-              <span>Tidak ada sesi aktif</span>
+              <span>Tidak ada sesi berjalan</span>
               <span className="hn-ov-meta">Mulai sebuah backlog item untuk membuka sesi Claude Code interaktif.</span>
             </p>
           : <RowList label="Sesi berjalan">

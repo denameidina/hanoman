@@ -249,7 +249,7 @@ export function CabangPanel({ projectId }: { projectId: string }) {
           value={q} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value)} style={{ width: 180 }} />
         <Select size="sm" data-testid="status" aria-label="Status branch" value={status}
           onChange={(e) => setStatus(e.target.value as Status)} options={STATUSES} />
-        <Button size="sm" variant="ghost" aria-expanded={showOpts} aria-controls="cabang-opsi"
+        <Button size="sm" variant="ghost" aria-expanded={showOpts} aria-controls={showOpts ? "cabang-opsi" : undefined}
           onClick={() => setShowOpts((v) => !v)}>Opsi</Button>
         <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={load}>Muat ulang</Button>
         <Button size="sm" variant="primary" leftIcon="trash-2" data-testid="bulk-delete"

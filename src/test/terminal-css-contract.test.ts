@@ -163,6 +163,46 @@ describe("terminal.css · deklarasi yang dipindah dari inline (Z1)", () => {
   });
 });
 
+// P2-2 · papan kunci di 320 px: tujuh kunci ≥44 px tak muat satu baris ("Enter" terpotong). ≤420 px kunci
+// MEMBUNGKUS, tanpa gulir mendatar; di atasnya tetap satu baris yang bisa digeser, dengan fade. Aturannya ada di
+// app.css (bukan terminal.css), jadi dibaca dari sana. Terukur di Chrome headless (fixture build, 320×640):
+// sebelum 1 baris, kunci 349 px dalam kotak 320 px; sesudah 2 baris, Enter 2–59 px, dock 208 px, komposer terlihat.
+describe("app.css · papan kunci terminal membungkus di ≤420 px", () => {
+  const app = readFileSync(join(SRC, "app.css"), "utf8");
+  const appCode = app.replace(/\/\*[\s\S]*?\*\//g, "");
+  const keysWrap = /@media \(max-width: 420px\)\s*\{\s*\.hn-terminal-keys\s*\{([^}]*)\}\s*\}/.exec(appCode);
+
+  it("≤420 px: kunci membungkus (flex-wrap) dan overflow visible, jadi tak ada gulir mendatar", () => {
+    expect(keysWrap?.[1] ?? "").toMatch(/flex-wrap:\s*wrap/);
+    expect(keysWrap?.[1] ?? "").toMatch(/overflow:\s*visible/);
+  });
+
+  it("aturan membungkus ditulis SESUDAH aturan dasar .hn-terminal-keys (urutan = menang atas overflow-x: auto)", () => {
+    const base = appCode.indexOf(".hn-terminal-keys {");
+    expect(base).toBeGreaterThan(-1);
+    expect(keysWrap?.index ?? -1).toBeGreaterThan(base);
+  });
+
+  it("di atas 420 px papan tetap satu baris yang bisa digeser (aturan dasar overflow-x: auto, fade tetap)", () => {
+    expect(ruleOfApp(".hn-terminal-keys")).toMatch(/overflow-x:\s*auto/);
+    expect(appCode).toMatch(/\.hn-terminal-keys\[data-fade-end="true"\]\s*\{\s*--hn-fade-r:\s*24px;?\s*\}/);
+  });
+
+  it("target sentuh kunci tetap 44 px di pointer kasar atau ≤767 px", () => {
+    expect(appCode).toMatch(/@media \(pointer: coarse\), \(max-width: 767px\)\s*\{\s*\.hn-graph-action,\s*\.hn-terminal-action,\s*\.hn-terminal-key,/);
+  });
+
+  it("tak ada !important baru di app.css (jumlah tetap ≤ 8)", () => {
+    expect((app.match(/!important/g) ?? []).length).toBeLessThanOrEqual(8);
+  });
+});
+
+function ruleOfApp(selector: string): string {
+  const code = readFileSync(join(SRC, "app.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const start = code.indexOf(`${selector} {`);
+  return start < 0 ? "" : code.slice(start, code.indexOf("}", start) + 1);
+}
+
 describe("inline style yang tersisa (Z1)", () => {
   // Hanya nilai dinamis yang boleh tetap inline, dan itu harus berupa CSS variable (`"--x"`).
   // Dihitung dari literal `style={{` di sumbernya, sama dengan metrik audit.

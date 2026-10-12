@@ -75,10 +75,12 @@ const LANE_W = 14, ROW_H = 30, DOT = 4;
 // SPEC-879 · lebar minimum region baris: subject 238 + author 88 + tanggal 40 + aksi ⋮ 44 + gap &
 // padding 50. Di bawah ini kolom subject yang `flex: 1` runtuh ke 0px dan pill ref (yang
 // `flex: 0 0 auto`) meluber menimpa kolom author — terukur 200 tombol subject `0×44` di 390px.
-// Di ≤640px ide.css mengurangi lantai ini: kolom penulis dan "working tree" disembunyikan di sana.
+// Di ≤640px ide.css mengurangi lantai ini sebesar 148px: penulis dan kolom tanggal samping dilepas (tanggal
+// pindah ke baris kecil di bawah subjek, `.hn-git-text`).
 const GRAPH_ROW_MIN = 460;
-// Lantai lebar kolom subject (160px) ada di `.hn-git-subject` (ide.css): pill ref `flex: 0 0 auto`
-// memakan kolom fleksibel lebih dulu, dan lantai itu mencegah subject memeras ke 24px.
+// Lantai lebar kolom subject (160px) ada di `.hn-git-subject` (ide.css) dan hanya berlaku di desktop: di
+// pointer kasar atau ≤767px aturan `button:not(...)` app.css (0,1,1) menimpanya ke 44px. Pill ref `flex: 0 0 auto`
+// memakan kolom fleksibel lebih dulu, jadi di ponsel lebar subjek = sisa setelah pill (lihat ide.css).
 // SPEC-245 · kadens live-refresh git graph. SPEC-908 · tinggal kadens FALLBACK; jalur
 // normalnya langganan berparameter di `/events/ws`.
 const POLL_MS = 4000;
@@ -577,7 +579,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
           {/* SPEC-879 · `input` telanjang direntangkan aturan mobile `input { min-height:
               var(--touch-target) }` jadi kotak biru 44×44; `Checkbox` DS menaruh kotak 18×18 di
               DALAM area sentuh itu. */}
-          <Button size="sm" variant="ghost" leftIcon="eye" aria-expanded={showView} aria-controls="ide-graph-view"
+          <Button size="sm" variant="ghost" leftIcon="eye" aria-expanded={showView} aria-controls={showView ? "ide-graph-view" : undefined}
             onClick={() => setShowView((v) => !v)}>Tampilan</Button>
           <LiveConnectionBadge />
         </div>
@@ -649,6 +651,8 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
               // jadi baris biasa tak membawa latar inline yang menimpanya.
               // Latar hanya untuk keadaan terpilih/ditemukan (prioritas sama seperti sebelumnya: terpilih > aktif > ditemukan).
               const rowState = sel ? "is-sel" : activeHit ? "is-active" : hit ? "is-hit" : "";
+              // Teks subjek yang tampil; juga `title` bila subjek terpotong (ellipsis di kolomnya).
+              const subject = msgOpts.emoji ? emojify(c.subject) : c.subject;
               return (
                 <div key={c.sha} ref={(el) => { if (el) rowRefs.current.set(c.sha, el); }} role="listitem"
                   className={rowState ? `hn-ide-graph-row ${rowState}` : "hn-ide-graph-row"}
@@ -675,10 +679,17 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                     ))}
                     {/* Merge dinyatakan TEKS, bukan hanya redup warnanya (audit a11y). */}
                     {c.parents.length > 1 && <span className="hn-git-merge">merge</span>}
-                    <button type="button" aria-label={`Buka commit ${c.sha}`} onClick={(event) => { event.stopPropagation(); onRowClick(event, c.sha); }}
-                      className={muted && c.parents.length > 1 ? "hn-git-subject hn-git-subject--muted" : "hn-git-subject"}>
-                      {msgOpts.emoji ? emojify(c.subject) : c.subject}
-                    </button>
+                    {/* P2-3 · di ≤640 subjek dan tanggal berbagi satu kolom teks: tanggal turun ke baris kecil
+                        di bawah subjek (`.hn-git-date-under`), dan kolom tanggal samping dilepas. Di atas 640
+                        `.hn-git-text` tak membuat kotak (display: contents), jadi susunannya tetap seperti dulu. */}
+                    <span className="hn-git-text">
+                      <button type="button" aria-label={`Buka commit ${c.sha}`} title={subject}
+                        onClick={(event) => { event.stopPropagation(); onRowClick(event, c.sha); }}
+                        className={muted && c.parents.length > 1 ? "hn-git-subject hn-git-subject--muted" : "hn-git-subject"}>
+                        {subject}
+                      </button>
+                      <span className="hn-git-date-under">{rel(c.at)}</span>
+                    </span>
                   </div>
                   <button type="button" className="hn-graph-action" aria-label={`Aksi commit ${c.sha}`}
                     onClick={(e) => { e.stopPropagation(); openMenu(e, c); }}>⋮</button>

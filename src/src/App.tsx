@@ -1722,7 +1722,7 @@ function AppInner() {
           : <TerminalScreen userId={me.id} projects={projectsView} backlog={backlog} focusSession={focusSession}
               sessions={sessions} setSessions={setSessions}
               startedSession={terminalStartedSession} onStartedSessionHandled={clearTerminalStartedSession}
-              onStartBacklog={startTerminalBacklog}
+              onStartBacklog={startTerminalBacklog} onOpenProject={goProject}
               onOpenReview={openReviewSpecId} onOpenSessionReview={openSessionReview}
               titleOf={(id) => backlog.find((s) => s.id === id)?.title}
               onIntegrate={integrateSpec} onIntegrateSession={integrateSession}

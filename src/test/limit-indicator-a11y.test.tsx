@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import type { LimitsDTO } from "@hanoman/shared";
 
@@ -38,6 +38,20 @@ describe("LimitBadge · nama aksesibel (Audit 1G)", () => {
     render(<LimitBadge />);
     const btn = screen.getByRole("button", { name: /data lama/ });
     expect(btn.textContent).toContain("lama");
+  });
+});
+
+// P3-3 · pil limit: aria-controls menunjuk panel hanya saat terbuka (tertutup = tak ada referensi menggantung).
+describe("LimitBadge · aria-controls (P3-3)", () => {
+  it("tertutup tanpa aria-controls; terbuka menunjuk id panel yang benar-benar ada", () => {
+    hookDto = dto;
+    render(<LimitBadge />);
+    const btn = screen.getByRole("button", { name: /Limit Claude/ });
+    expect(btn).not.toHaveAttribute("aria-controls");
+    fireEvent.click(btn);
+    const target = btn.getAttribute("aria-controls");
+    expect(target).toBeTruthy();
+    expect(document.getElementById(target ?? "")).not.toBeNull();
   });
 });
 

@@ -31,6 +31,15 @@ describe("AccountMenu", () => {
     expect(screen.getByLabelText("Akun")).toHaveClass("hn-touch-target");
   });
 
+  // P3-3 · aria-controls hanya menunjuk panel yang ADA: tertutup = tanpa referensi menggantung.
+  it("aria-controls menunjuk panel hanya saat popover terbuka", () => {
+    render(<Harness user={me} />);
+    const trigger = screen.getByLabelText("Akun");
+    expect(trigger).not.toHaveAttribute("aria-controls");
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-controls", screen.getByRole("menu").id);
+  });
+
   it("klik akun → popover email; Keluar meminta konfirmasi lalu memanggil logout", async () => {
     const logout = vi.fn().mockResolvedValue(undefined);
     render(<Harness user={me} logout={logout} />);

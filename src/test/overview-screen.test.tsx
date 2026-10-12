@@ -130,8 +130,10 @@ describe("Overview · sesi berjalan", () => {
   it("tanpa sesi, tampil keadaan kosong (bukan daftar)", () => {
     render(<OverviewScreen projects={[project({ id: "a", name: "alpha" })]} backlog={[]} sessions={[]}
       onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
-    expect(screen.getByText("Tidak ada sesi aktif")).toBeTruthy();
+    expect(screen.getByText("Tidak ada sesi berjalan")).toBeTruthy();
     expect(screen.queryByRole("list", { name: "Sesi berjalan" })).toBeNull();
+    // P3-4 · satu pesan untuk "tanpa sesi": ringkasan header tak lagi mengulangnya.
+    expect(screen.getAllByText(/Tidak ada sesi/)).toHaveLength(1);
   });
 
   it("tanpa sesi, keadaan kosong satu baris ringkas (bukan kartu StateBlock tinggi)", () => {
@@ -140,7 +142,7 @@ describe("Overview · sesi berjalan", () => {
     const empty = container.querySelector(".hn-ov-empty");
     expect(empty).not.toBeNull();
     expect(empty!.tagName).toBe("P");
-    expect(within(screen.getByRole("region", { name: "Sesi berjalan" })).queryByText("Tidak ada sesi aktif")).not.toBeNull();
+    expect(within(screen.getByRole("region", { name: "Sesi berjalan" })).queryByText("Tidak ada sesi berjalan")).not.toBeNull();
   });
 });
 

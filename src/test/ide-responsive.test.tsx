@@ -161,14 +161,18 @@ describe("Audit UI/UX 2026-10 · Graf IDE sempit: pintasan, kolom penulis, dan p
     expect(ideCss).toMatch(/@media \(pointer: coarse\), \(max-width: 640px\)\s*\{\s*\.hn-git-find-hint\s*\{\s*display:\s*none/);
   });
 
-  it("di ≤640px kolom penulis dan 'working tree' disembunyikan; kolom tanggal tetap", () => {
+  it("di ≤640px kolom penulis dan 'working tree' disembunyikan; tanggal pindah ke baris kecil di bawah subjek", () => {
     const body = narrowGraphBlock();
-    expect(body).toMatch(/\.hn-git-author,\s*\.hn-git-wt,\s*\.hn-git-wt-gap\s*\{\s*display:\s*none/);
-    expect(body).not.toMatch(/\.hn-git-date/);
+    expect(body).toMatch(/\.hn-git-author,\s*\.hn-git-wt,\s*\.hn-git-wt-gap,\s*\.hn-git-date\s*\{\s*display:\s*none/);
+    // P2-3 · tanggal tetap terlihat (bukan dibuang): baris kecil di kolom teks subjek.
+    expect(body).toMatch(/\.hn-git-date-under\s*\{\s*display:\s*block/);
+    expect(body).toMatch(/\.hn-git-text\s*\{\s*display:\s*flex/);
+    expect(ideCss).toMatch(/\.hn-git-text\s*\{\s*display:\s*contents/);
+    expect(ideCss).toMatch(/\.hn-git-date-under\s*\{\s*display:\s*none/);
   });
 
   it("lantai lebar baris turun di ≤640px, dan daftar commit memakai kelas petunjuk gulir", async () => {
-    expect(narrowGraphBlock()).toMatch(/\.hn-git-rows\s*\{\s*min-width:\s*max\(0px,\s*calc\(var\(--graph-min-w, 0px\) - 176px\)\)/);
+    expect(narrowGraphBlock()).toMatch(/\.hn-git-rows\s*\{\s*min-width:\s*max\(0px,\s*calc\(var\(--graph-min-w, 0px\) - 148px\)\)/);
     expect(ideCss).toMatch(/\.hn-git-scroll\s*\{[^}]*\blocal\b/);
     renderGraph();
     await waitFor(() => expect(screen.getByTestId("ide-graph-rows")).toHaveClass("hn-git-scroll"));

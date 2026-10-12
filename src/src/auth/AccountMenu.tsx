@@ -44,7 +44,7 @@ export function AccountMenu() {
     <div ref={ref} className="hn-account">
       {/* hn-touch-target: pada pointer kasar/mobile trigger dipaksa ≥44×44 (app.css), 34 px hanya di desktop. */}
       <button ref={popover.triggerRef} className="hn-touch-target hn-account-trigger" aria-label="Akun" aria-haspopup="menu"
-        aria-controls={popover.panelId} aria-expanded={open} title={user.email} onClick={() => setOpen((v) => !v)}>
+        aria-controls={open ? popover.panelId : undefined} aria-expanded={open} title={user.email} onClick={() => setOpen((v) => !v)}>
         <span className="hn-account-avatar">{initial}</span>
       </button>
       {open && (

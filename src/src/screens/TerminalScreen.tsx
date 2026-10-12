@@ -31,13 +31,25 @@ import "./styles/terminal.css";
 // Default prop bernilai literal `[]` baru tiap render akan mematahkan memo `Cell`.
 const NO_BACKLOG: SpecSlim[] = [];
 
+// Project yang punya checkout di mesin ini: binding per-mesin menang atas repoDir (SPEC-213), cermin
+// `p.binding ?? p.repoDir` di MissingRepoCard. Dipakai hanya untuk MEMILIH default; server tetap yang
+// memutuskan saat sesi dibuka (400 {needsBind}).
+type TerminalProject = { id: string; name: string; binding?: string | null; repoDir?: string | null };
+const hasCheckout = (p: TerminalProject) => !!(p.binding ?? p.repoDir);
+const defaultProjectId = (ps: TerminalProject[]) => (ps.find(hasCheckout) ?? ps[0])?.id ?? "";
+// Galat "belum di-bind" dari POST /api/terminal/sessions: 400 dengan `needsBind: true` di body.
+const isNeedsBind = (e: unknown) => e instanceof ApiError && e.status === 400
+  && typeof e.detail === "object" && e.detail !== null && (e.detail as { needsBind?: unknown }).needsBind === true;
+
 // Dialog per sesi (dokumen, integrasi) dipegang layar, bukan sel: rail, pane fokus, dan sel grid
 // memakai satu menu yang sama (Audit UI/UX 2026-10 · Fase 3E).
 type SessionDialogKind = "docs" | "integrate" | "sessIntegrate";
 
-export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BACKLOG, focusSession, startedSession, onStartedSessionHandled, onStartBacklog, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, sessions: sessionsProp, setSessions: setSessionsProp }: {
+export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BACKLOG, focusSession, startedSession, onStartedSessionHandled, onStartBacklog, onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, sessions: sessionsProp, setSessions: setSessionsProp, onOpenProject }: {
   userId?: string;
-  projects: { id: string; name: string }[]; backlog?: SpecSlim[]; focusSession?: string | null;
+  projects: TerminalProject[]; backlog?: SpecSlim[]; focusSession?: string | null;
+  // Tujuan aksi "Buka project" di toast galat "belum terhubung": kartu checkout ada di layar project.
+  onOpenProject?: (projectId: string) => void;
   // SPEC-252/0164 · App owns the shared StartSessionModal so Terminal and Backlog use one picker.
   onStartBacklog?: (spec: SpecSlim) => void;
   // Keep the just-created session visible immediately; the WS snapshot remains authoritative.
@@ -70,7 +82,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
     refresh: refreshWorkspace,
   } = workspaceController;
   // Project pemilih sesi baru tetap presentasional dan lokal; hanya mapping grid yang kanonik.
-  const [project, setProject] = usePersistedState("terminal", "project", projects[0]?.id ?? "", isStr);
+  // Default = project pertama yang sudah punya checkout di mesin ini; bila tak ada, project pertama.
+  const [project, setProject] = usePersistedState("terminal", "project", defaultProjectId(projects), isStr);
   // SPEC-800 · ukuran font & papan tombol adalah state TAMPILAN (SPEC-740 · ADR-0115): lokal per
   // browser, bukan bagian payload workspace kanonik per-user (SPEC-786 · ADR-0118).
   const coarse = useCoarsePointer();
@@ -301,7 +314,21 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // openNew, tapi memanggil createShell — server men-spawn $SHELL, bukan claude.
   async function openShell() {
     if (!project) return;
-    const { id } = await api.createShell(project);
+    let id: string;
+    try {
+      ({ id } = await api.createShell(project));
+    } catch (e) {
+      // Project tanpa checkout di mesin ini: server menjawab 400 {needsBind}. Diberi jalan keluar
+      // (aksi menuju project, tempat kartu "Belum ada checkout" menawarkan clone/pilih folder),
+      // bukan dibiarkan diam.
+      if (isNeedsBind(e)) {
+        showToast(`Project ${nameOf(project)} belum terhubung ke folder repo — hubungkan dulu.`, "err", "folder-git-2",
+          onOpenProject ? { action: { label: "Buka project", onAction: () => onOpenProject(project) } } : undefined);
+      } else {
+        showToast(failureMessage("membuka terminal biasa", e), "err", "x-circle");
+      }
+      return;
+    }
     setSessions((s) => [...s, { id, projectId: project, cwd: "", exited: false }]);
     void mutateWorkspace((current) => W.placeFirstEmptyInActive(current, id));
     openSession(id);

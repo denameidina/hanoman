@@ -318,12 +318,28 @@
   flex: 0 0 auto; width: 88px; text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle);
 }
 .hn-git-wt-gap { flex: 0 0 auto; width: 40px; }
-/* Layar sempit (≤640px): kolom penulis dan "working tree" tak muat di samping subjek, jadi disembunyikan. Kolom
-   tanggal tetap. Lantai lebar baris turun sebesar yang hilang: 88px penulis + 10px jarak + 78px selisih lantai
-   subjek (238 di GRAPH_ROW_MIN, 160 di .hn-git-subject), supaya tanggal dan ⋮ tetap terlihat di 390px. */
+/* Layar sempit (≤640px): kolom penulis dan "working tree" tak muat di samping subjek, jadi disembunyikan.
+   Tanggal TIDAK dibuang: ia turun ke baris kecil di bawah subjek, dalam kolom teks yang sama (`.hn-git-text`),
+   sehingga subjek mendapat lebar kolom kedua itu. Terukur di 390 px dengan satu pil ref: subjek 103 px
+   → 153 px (lihat `.hn-git-text` di bawah). Baris ≤767 px ber-tinggi 44 (GitGraph.tsx `graphRowHeight`), jadi
+   subjek ≥24 px ditambah tanggal muat tanpa memotong ⋮. Lantai lebar baris turun sebesar yang hilang dari
+   baris: penulis 88 + jarak 10 + kolom tanggal 40 + jarak 10 = 148 px dari `--graph-min-w` (yang memuat
+   GRAPH_ROW_MIN 460 di GitGraph.tsx). */
+.hn-git-text { display: contents; }
+.hn-git-date-under { display: none; }
 @media (max-width: 640px) {
-  .hn-git-author, .hn-git-wt, .hn-git-wt-gap { display: none; }
-  .hn-git-rows { min-width: max(0px, calc(var(--graph-min-w, 0px) - 176px)); }
+  .hn-git-author, .hn-git-wt, .hn-git-wt-gap, .hn-git-date { display: none; }
+  .hn-git-rows { min-width: max(0px, calc(var(--graph-min-w, 0px) - 148px)); }
+  .hn-git-text { display: flex; flex: 1 1 0%; min-width: 0; flex-direction: column; justify-content: center; }
+  .hn-git-date-under {
+    display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: var(--font-mono); font-size: 10.5px; line-height: 14px; color: var(--text-subtle);
+  }
+  /* Lebar subjek = lebar kolom teks. `min-width: 0` menggantikan lantai 160 px dari `.hn-git-subject`,
+     yang di sini memang kalah oleh `button:not(...)` app.css (0,1,1) sejak dulu. Tinggi 24 (bukan 44 dari
+     aturan kasar di atas): dengan tanggal di bawahnya, 44 tak muat di baris 44. Seluruh baris tetap bisa
+     diketuk (`onRowClick`), jadi area sentuh subjek tak sendirian memikul target. */
+  .hn-git-main > .hn-git-text > button.hn-git-subject { min-width: 0; min-height: 24px; }
 }
 .hn-git-uncommitted {
   flex: 1 1 0%; border: 0; padding: 0; background: transparent; text-align: left; cursor: pointer;
@@ -441,11 +457,11 @@
 }
 .hn-git-ref-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* "Buka commit" (subject): ≥24 px di pointer halus. Tingginya tak memakai ::after karena subject ber-overflow hidden. */
-.hn-git-main > button.hn-git-subject { min-height: 24px; }
+.hn-git-main .hn-git-subject { min-height: 24px; }
 @media (pointer: coarse), (max-width: 767px) {
   .hn-git-main > button.hn-git-ref::after,
   .hn-git-main > button.hn-git-tag::after { height: var(--touch-target); }
-  .hn-git-main > button.hn-git-subject { min-height: var(--touch-target); }
+  .hn-git-main .hn-git-subject { min-height: var(--touch-target); }
 }
 
 /* Toggle List | Tree di Perubahan IDE (23 px): area klik ≥24 px di desktop. Ikon 14 px tetap. Toggle Review

@@ -118,7 +118,7 @@ function LimitPill({ title, dto, square = false, emptyHint, eyebrow, footnote }:
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-controls={popover.panelId}
+        aria-controls={open ? popover.panelId : undefined}
         aria-label={`${title}, ${state}`}
         title={title}
         className={coarse ? "hn-lim-pill hn-lim-pill-touch" : "hn-lim-pill"}

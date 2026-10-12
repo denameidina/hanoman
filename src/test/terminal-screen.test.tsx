@@ -294,6 +294,42 @@ describe("TerminalScreen (grid)", () => {
     await waitFor(() => expect(createShell).toHaveBeenCalledWith("p1"));
   });
 
+  // P2-1 · server menjawab 400 {needsBind} bila project belum punya checkout di mesin ini. Layar
+  // dulu diam di sini; kini ada toast dengan aksi menuju project (kartu "Belum ada checkout").
+  it("terminal biasa: galat needsBind memberi toast dengan aksi 'Buka project', bukan diam", async () => {
+    listTerminals.mockResolvedValue([]);
+    createShell.mockRejectedValue(new ApiError(400, "POST → 400", { error: "belum di-bind", needsBind: true }));
+    const onOpenProject = vi.fn();
+    render(<TerminalScreen projects={projects} onOpenProject={onOpenProject} />);
+    await screen.findByText("Belum ada sesi terminal");
+    await openBuka("Terminal biasa");
+    expect(await screen.findByText(/belum terhubung ke folder repo — hubungkan dulu/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Buka project" }));
+    expect(onOpenProject).toHaveBeenCalledWith("p1");
+  });
+
+  it("terminal biasa: galat lain ditampilkan sebagai 'Gagal membuka terminal biasa: …'", async () => {
+    listTerminals.mockResolvedValue([]);
+    createShell.mockRejectedValue(new Error("jaringan putus"));
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByText("Belum ada sesi terminal");
+    await openBuka("Terminal biasa");
+    expect(await screen.findByText("Gagal membuka terminal biasa: jaringan putus")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Buka project" })).toBeNull();
+  });
+
+  it("project awal = yang sudah punya checkout di mesin ini, bukan sekadar projects[0] (P2-1)", async () => {
+    listTerminals.mockResolvedValue([]);
+    createShell.mockResolvedValue({ id: "shell-abc123" });
+    render(<TerminalScreen projects={[
+      { id: "p1", name: "tanpa checkout", binding: null, repoDir: null },
+      { id: "p2", name: "ada checkout", binding: null, repoDir: "/repo/ada" },
+    ]} />);
+    await screen.findByText("Belum ada sesi terminal");
+    await openBuka("Terminal biasa");
+    await waitFor(() => expect(createShell).toHaveBeenCalledWith("p2"));
+  });
+
   // Chip tray menjanjikan "sel kosong PERTAMA". `mutate` menempuh round-trip server, jadi efek
   // `requestedSession` sempat membaca `ws` yang belum ter-update dan mengantre place KEDUA —
   // yang menemukan sel kosong pertama BERIKUTNYA dan menggeser sesi ke sana.

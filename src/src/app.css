@@ -781,6 +781,15 @@ input[type="file"] { min-height: 24px; }
 .hn-terminal-keys[data-fade-start="true"] { --hn-fade-l: 24px; }
 .hn-terminal-keys[data-fade-end="true"] { --hn-fade-r: 24px; }
 
+/* Papan kunci terminal di ≤420 px (320 × 640 terukur): tujuh kunci ≥44 px tak muat satu baris dan
+   "Enter" terpotong di tepi. Di layar sesempit itu kunci MEMBUNGKUS ke dua baris, tanpa gulir mendatar.
+   Fade tepi ikut mati karena tak ada yang tersembunyi: `readEdges` (ds/components/ui.tsx) membaca overflow
+   `visible` sebagai "tanpa gulir". Blok ini sengaja di bawah aturan dasar di atas (urutan = menang).
+   Di atas 420 px papan tetap satu baris yang bisa digeser, dengan fade. */
+@media (max-width: 420px) {
+  .hn-terminal-keys { flex-wrap: wrap; overflow: visible; scroll-snap-type: none; }
+}
+
 /* SPEC-882 · kolom ketik perangkat sentuh: satu baris, penanda kejujuran pengiriman di kanannya.
    Basis flex dinyatakan (bukan `auto`) karena `flex-wrap` memutus baris SEBELUM menyusut — pelajaran
    SPEC-879: basis `auto` berarti lebar isi, jadi bentuk barisnya ditentukan isinya, bukan layout-nya. */
