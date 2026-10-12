@@ -419,3 +419,5 @@ Sudah selesai di gelombang 7: filter "Perlu ditinjau" (sesi menunggu jawaban), r
 - Graf IDE (Riwayat): label ref berupa pil rapi, simpul merge berongga, baris terpilih terlihat.
 - Review: bar keputusan, dialog Integrasikan (tombol bukan merah), Hapus worktree.
 - Perangkat: baris "Tingkat akses … Diatur di perangkat itu", tombol "Minta tingkat…" dan kartu persetujuan di perangkat tujuan.
+
+**Keputusan pemilik (2026-10-12):** uji VoiceOver/NVDA dan tinjauan visual dikerjakan sendiri oleh pemilik dengan panduan di atas; agen tidak menyalakan VoiceOver. Hasilnya, bila ada temuan, dicatat di sini dan diperbaiki sebagai tindak lanjut terpisah. Mode pembaca layar tetap opsional dan default mati sampai uji ini selesai.
