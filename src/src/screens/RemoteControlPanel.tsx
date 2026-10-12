@@ -1,13 +1,14 @@
 import React from "react";
-import type { LogLane, RelayLinkState, RemoteControlView } from "@hanoman/shared";
-import { Badge, Card, Radio, RadioGroup, StateBlock, Switch, useConfirm, type ShowToast } from "../ds";
-import { api } from "../api/client";
+import type { AccessRequestView, LogLane, RelayLinkState, RemoteControl, RemoteControlView } from "@hanoman/shared";
+import { Badge, Button, Card, Radio, RadioGroup, StateBlock, Switch, useConfirm, type ShowToast } from "../ds";
+import { ApiError, api } from "../api/client";
 import { failureMessage } from "../lib/report-error";
 import { relativeTime } from "../lib/time-format";
 import {
   ACCESS_TIERS, GRANT_IMPACT, GRANT_LABEL, RISKY_GRANTS, TIER_DESC, TIER_GRANTS, TIER_LABEL,
-  customGrantLabels, grantDiff, needsConfirm, tierOf, type AccessTier,
+  customGrantLabels, grantDiff, isRiskyTier, needsConfirm, tierOf, type AccessTier,
 } from "./remote-access-tier";
+import { hostOf } from "./access-request";
 
 // SPEC-1215 · ADR-0165 §4 · K7 transparansi: operator perangkat INI menentukan apa yang boleh dilakukan
 // server pusat dan membaca riwayat perintah yang sudah diterima. Berkas sendiri (pola ClientAccessPanel):
@@ -126,6 +127,109 @@ export function RemoteAccessSection({ view, onView, onToast }:
   );
 }
 
+/** Teks 409 saat menyetujui: pesan server bila ada (mis. kendali mati), selain itu "permintaan berubah". */
+function conflictText(e: ApiError): string {
+  const msg = (e.detail as { error?: unknown } | null)?.error;
+  return typeof msg === "string" ? msg : "Permintaan berubah, periksa lagi";
+}
+
+/** ADR-0217 · kartu persetujuan: permintaan tingkat yang masuk dari server pusat lewat relay. Hanya operator
+    LOKAL yang bisa menyetujui. Menyetujui menerapkan tingkat yang diminta lewat jalur PUT yang sama (dengan
+    konfirmasi dan dampaknya); menolak tak mengubah apa pun. Tak ada permintaan yang berlaku sendiri. */
+export function AccessRequestsApproval({ control, onApplied, onToast }:
+  { control: RemoteControl; onApplied: () => void; onToast?: ShowToast }) {
+  const [items, setItems] = React.useState<AccessRequestView[]>([]);
+  const [busy, setBusy] = React.useState(false);
+  const { confirm, dialog } = useConfirm();
+  const load = React.useCallback(() => {
+    Promise.resolve().then(() => api.listRemoteAccessRequests())
+      .then((r) => setItems(r.items))
+      .catch(() => setItems([]));
+  }, []);
+  // Permintaan bisa datang kapan saja dari hub. Muat ulang saat jendela kembali fokus, bukan polling (ADR-0039).
+  React.useEffect(() => {
+    load();
+    window.addEventListener("focus", load);
+    return () => window.removeEventListener("focus", load);
+  }, [load]);
+
+  const pending = items.filter((i) => i.status === "pending");
+  if (pending.length === 0) return null;
+
+  const approve = (r: AccessRequestView) => {
+    const target = TIER_GRANTS[r.tier];
+    const label = TIER_LABEL[r.tier];
+    void confirm({
+      title: `Izinkan ${hostOf(r.from)} tingkat ${label}?`,
+      message: TIER_DESC[r.tier],
+      impact: [
+        ...target.map((c) => GRANT_IMPACT[c]),
+        "Menggantikan izin kendali jarak jauh yang berlaku sekarang dengan tingkat ini.",
+      ],
+      confirmLabel: `Izinkan ${label}`,
+      tone: isRiskyTier(r.tier) ? "danger" : "default",
+      icon: isRiskyTier(r.tier) ? "shield" : "info",
+      run: async () => {
+        setBusy(true);
+        try {
+          // Tingkat & hub dari kartu ini yang dikirim: server hanya menerapkan bila masih itu permintaannya.
+          await api.decideRemoteAccessRequest(r.id, "approve", { tier: r.tier, from: r.from });
+          onToast?.(`Tingkat ${label} diizinkan untuk ${hostOf(r.from)}`, "ok", "check");
+          onApplied();
+        } catch (e) {
+          // 409 = kartu sudah basi (permintaan berganti/diputuskan, atau kendali mati). Daftar dimuat ulang di
+          // `finally`; pesan server dipakai bila ada, selain itu pesan baku.
+          onToast?.(
+            e instanceof ApiError && e.status === 409 ? conflictText(e) : failureMessage("menyetujui permintaan tingkat", e),
+            "err", "x-circle",
+          );
+        } finally {
+          setBusy(false);
+          load();
+        }
+      },
+    });
+  };
+
+  const reject = async (r: AccessRequestView) => {
+    setBusy(true);
+    try {
+      await api.decideRemoteAccessRequest(r.id, "reject");
+      onToast?.(`Permintaan tingkat ${TIER_LABEL[r.tier]} ditolak`, "ok", "check");
+    } catch (e) {
+      onToast?.(failureMessage("menolak permintaan tingkat", e), "err", "x-circle");
+    } finally {
+      setBusy(false);
+      load();
+    }
+  };
+
+  return (
+    <div className="kl-access-requests" data-testid="access-requests">
+      <div className="kl-tier-head">Permintaan dari server pusat</div>
+      {pending.map((r) => (
+        <div key={r.id} className="kl-row kl-row-last" data-testid={`access-request-${r.id}`}>
+          <div className="kl-row-text">
+            <div className="kl-row-title">Perangkat {hostOf(r.from)} meminta tingkat {TIER_LABEL[r.tier]}</div>
+            <div className="kl-row-desc">
+              {TIER_DESC[r.tier]} Diminta oleh {r.requestedBy}{" "}
+              {relativeTime(r.requestedAt, Date.now()) || "baru saja"}; berlaku sampai {relativeTime(r.expiresAt, Date.now()) || "—"}.
+            </div>
+            {!control.enabled && (
+              <div className="kl-tier-hint">Nyalakan kendali jarak jauh dulu untuk bisa menyetujui.</div>
+            )}
+          </div>
+          <div className="kl-request-actions">
+            <Button size="sm" variant="secondary" disabled={busy} onClick={() => void reject(r)}>Tolak</Button>
+            <Button size="sm" variant="primary" disabled={busy || !control.enabled} onClick={() => approve(r)}>Setujui</Button>
+          </div>
+        </div>
+      ))}
+      {dialog}
+    </div>
+  );
+}
+
 /** Kartu Perangkat: izin server pusat untuk perangkat yang sedang dibuka ini. Memuat izinnya sendiri. */
 export function RemoteAccessCard({ onToast }: { onToast?: ShowToast }) {
   const [view, setView] = React.useState<RemoteControlView | null>(null);
@@ -138,7 +242,12 @@ export function RemoteAccessCard({ onToast }: { onToast?: ShowToast }) {
   return (
     <Card eyebrow="akses" title="Izin server pusat untuk perangkat ini">
       {view
-        ? <RemoteAccessSection view={view} onView={setView} onToast={onToast} />
+        ? (
+          <>
+            <RemoteAccessSection view={view} onView={setView} onToast={onToast} />
+            <AccessRequestsApproval control={view.control} onApplied={load} onToast={onToast} />
+          </>
+        )
         : failed
           ? <StateBlock kind="error" compact title="Gagal memuat izin perangkat ini"
               hint="Periksa koneksi ke server ini, lalu coba lagi." action={load} />

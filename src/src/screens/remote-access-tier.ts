@@ -1,4 +1,4 @@
-import type { RemoteCapability } from "@hanoman/shared";
+import { REQUEST_TIER_GRANTS, type RemoteCapability } from "@hanoman/shared";
 
 /* Audit UI/UX 2026-10 · Fase 3G · pemetaan tingkat akses ↔ grant kendali jarak jauh.
 
@@ -13,13 +13,9 @@ import type { RemoteCapability } from "@hanoman/shared";
 export type AccessTier = "lihat" | "kerja" | "tulis";
 export const ACCESS_TIERS: readonly AccessTier[] = ["lihat", "kerja", "tulis"];
 
-const READ: RemoteCapability[] = ["sessions:read", "backlog:read", "ide:read"];
-const WORK: RemoteCapability[] = [...READ, "backlog:write", "sessions:spawn"];
-const WRITE: RemoteCapability[] = [...WORK, "sessions:write"];
-
-export const TIER_GRANTS: Readonly<Record<AccessTier, readonly RemoteCapability[]>> = {
-  lihat: READ, kerja: WORK, tulis: WRITE,
-};
+/* ADR-0217 · satu sumber untuk pemetaan tingkat: `shared` (`REQUEST_TIER_GRANTS`), dipakai juga oleh server
+   saat menerapkan permintaan tingkat dari hub. Layar dan server tak boleh berbeda isi grant-nya. */
+export const TIER_GRANTS: Readonly<Record<AccessTier, readonly RemoteCapability[]>> = REQUEST_TIER_GRANTS;
 
 export const TIER_LABEL: Readonly<Record<AccessTier, string>> = { lihat: "Lihat", kerja: "Kerja", tulis: "Tulis" };
 

@@ -989,8 +989,9 @@ function AppInner() {
   const activeSpecs = React.useMemo(
     () => new Set(sessions.filter((s) => s.specId && !s.exited).map((s) => s.specId as string)),
     [sessions]);
-  // Filter "Perlu ditinjau" di Backlog (gelombang 7): item yang sesinya menunggu jawaban manusia.
-  const reviewSpecIds = React.useMemo(() => reviewSpecIdsOf(sessions), [sessions]);
+  // Filter "Perlu ditinjau" di Backlog (gelombang 7, diperluas ADR-0218): item yang sesinya menunggu
+  // jawaban manusia, atau item selesai yang belum ditandai sudah ditinjau.
+  const reviewSpecIds = React.useMemo(() => reviewSpecIdsOf(sessions, backlog), [sessions, backlog]);
 
   const presenceMap = React.useMemo(() => presenceIndex(presence), [presence]);
   const specTitles = React.useMemo(
@@ -1495,6 +1496,15 @@ function AppInner() {
     }
   }
 
+  // ADR-0218 · tandai/batalkan "sudah ditinjau" pada item selesai. Dipanggil dari bar Review dan dari menu
+  // item Backlog. Galat DILEMPAR: pemanggil yang menampilkannya. State item diganti hanya dari balasan server.
+  async function markSpecReviewed(spec: SpecSlim, reviewed: boolean) {
+    const updated = await api.markSpecReviewed(spec.id, reviewed);
+    setBacklog((b) => b.map((s) => (s.id === updated.id ? { ...s, reviewedAt: updated.reviewedAt } : s)));
+    showToast(spec.id + (reviewed ? " ditandai sudah ditinjau" : " tanda ditinjau dibatalkan"), "ok",
+      reviewed ? "circle-check" : "rotate-ccw");
+  }
+
   // Audit UI/UX 2026-10 · P0 aksi destruktif. Satu-satunya jalur hapus spec di App ini ialah
   // `onDelete` BacklogScreen, dan konfirmasi (useConfirm, ADR-0127) dipasang DI SANA — fungsi ini
   // hanya boleh dipanggil setelah pengguna menyetujui. Jangan mengirimkannya ke layar lain tanpa dialog.
@@ -1654,7 +1664,7 @@ function AppInner() {
           onDelete={deleteSpec}
           onOpenRun={(spec) => openTerminal(sessions.find((s) => s.specId === spec.id && !s.exited)?.id)}
           onOpenReview={openReview}
-          onEditBranch={editBranch} onRevertStage={revertStage} onMarkDone={markSpecDone} onIntegrate={integrateSpec} onEditSpec={editSpec} onEditDeps={editDeps} onEditAutoMerge={editAutoMerge}
+          onEditBranch={editBranch} onRevertStage={revertStage} onMarkDone={markSpecDone} onMarkReviewed={(s, reviewed) => markSpecReviewed(s, reviewed).catch(() => showToast(s.id + " gagal diperbarui", "warn", "x-circle"))} onIntegrate={integrateSpec} onEditSpec={editSpec} onEditDeps={editDeps} onEditAutoMerge={editAutoMerge}
           onChangeSource={changeSourceOfSpec}
           onPromoteToQa={promoteToQa} onPromoteToBrief={promoteToBrief} onPromoteToPrd={promoteToPrd}
           onToast={showToast} initialDetailId={openSpecId}
@@ -1807,6 +1817,9 @@ function AppInner() {
                   const res = await revertStage(reviewSpec, "executing", confirmDelete);
                   return res && "pending" in res ? res : undefined;
                 },
+                // ADR-0218 · penanda "sudah ditinjau" di bar keputusan. Galat dilempar ke bar.
+                reviewed: Boolean(reviewSpec.reviewedAt),
+                onMarkReviewed: (_id: string, reviewed: boolean) => markSpecReviewed(reviewSpec, reviewed),
               } : {})}
               {...(reviewSpec && reviewSpec.stage !== "done" ? { onDiscard: () => discardReviewWorktree(reviewSpec) } : {})} />
           : <StateBlock kind="empty" icon="git-compare" title="Pilih item untuk di-review"

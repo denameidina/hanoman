@@ -155,6 +155,10 @@ const RELAY_ROUTES: readonly (readonly [string, RegExp])[] = [
   ["GET", /^\/projects\/[^/]+\/commit\/[^/]+(?:\/file)?$/],
   ["POST", /^\/specs\/[^/]+\/done$/],
   ["GET", /^\/events\/ws$/],
+  // ADR-0217 · satu-satunya pesan baru: hub MEMINTA tingkat akses ke perangkat ini. Permintaan
+  // hanya mengantre; grant baru berlaku bila operator LOKAL menyetujui di kartu Perangkat.
+  ["POST", /^\/remote-control\/access-requests$/],
+  ["GET", /^\/remote-control\/access-requests$/],
 ];
 const REVIEW_SEGMENT = /\/review(?:\/|$)/;
 const UNSAFE_SEGMENT = /(^|\/)\.\.?(\/|$)|%2e|%2f|%5c|\\/i;
@@ -203,6 +207,56 @@ export const zRemoteControlPut = z.object({
   logs: z.object({ event: z.boolean(), server: z.boolean(), transcript: z.boolean() }).strict().optional(),
 }).strict();
 export type RemoteControlPut = z.infer<typeof zRemoteControlPut>;
+
+// ── permintaan tingkat akses (ADR-0217 · opsi C dari ADR-0216) ───────────────────────────────
+// Hub MEMINTA tingkat; perangkat tujuan TIDAK PERNAH menerapkannya sendiri. Tingkat ini memetakan
+// ke grant lokal yang sama dengan selektor di layar Perangkat (`src/src/screens/remote-access-tier.ts`
+// memakai konstanta ini, supaya dua sisi tak bisa berbeda).
+
+export const REQUEST_TIERS = ["lihat", "kerja", "tulis"] as const;
+export const zRequestTier = z.enum(REQUEST_TIERS);
+export type RequestTier = (typeof REQUEST_TIERS)[number];
+
+export const REQUEST_TIER_GRANTS: Readonly<Record<RequestTier, readonly RemoteCapability[]>> = (() => {
+  const read: RemoteCapability[] = ["sessions:read", "backlog:read", "ide:read"];
+  const work: RemoteCapability[] = [...read, "backlog:write", "sessions:spawn"];
+  const write: RemoteCapability[] = [...work, "sessions:write"];
+  return { lihat: read, kerja: work, tulis: write };
+})();
+
+/** Permintaan tertunda kedaluwarsa setelah 10 menit tanpa keputusan lokal. */
+export const ACCESS_REQUEST_TTL_MS = 10 * 60_000;
+/** Maksimum permintaan yang DITERIMA per jendela. Permintaan ke-4 dalam 10 menit → 429. */
+export const ACCESS_REQUEST_MAX_PER_WINDOW = 3;
+export const ACCESS_REQUEST_WINDOW_MS = 10 * 60_000;
+/** Riwayat permintaan yang disimpan di memori perangkat (lama dibuang lebih dulu). */
+export const ACCESS_REQUEST_HISTORY_MAX = 10;
+
+export const zAccessRequestCreate = z.object({ tier: zRequestTier }).strict();
+export type AccessRequestCreate = z.infer<typeof zAccessRequestCreate>;
+/** Persetujuan (ADR-0217 §2): tingkat dan hub (`from`, ≤ batas `zRelayActor.hubOrigin`) yang DILIHAT operator
+    di kartu. Server mencocokkannya dengan permintaan tertunda; tak cocok → 409. */
+export const zAccessRequestApprove = z.object({ tier: zRequestTier, from: z.string().min(1).max(200) }).strict();
+export type AccessRequestApprove = z.infer<typeof zAccessRequestApprove>;
+
+export type AccessRequestStatus = "pending" | "approved" | "rejected" | "expired";
+/** Bentuk satu permintaan di mata operator. `from` = hub peminta (klaim relay), `requestedBy` = email aktor (klaim). */
+export type AccessRequestView = {
+  id: string; tier: RequestTier; status: AccessRequestStatus;
+  requestedAt: string; expiresAt: string; decidedAt: string | null;
+  from: string; requestedBy: string;
+};
+
+/** Pesan permintaan tingkat tak diizinkan allowlist: tanda perangkat yang belum memuat ADR-0217 (versi lama). */
+export const ACCESS_REQUEST_UNSUPPORTED_MESSAGE = "relay route not allowed";
+
+/** Permintaan tingkat dijawab TANPA memeriksa grant (ia tak mengubah apa pun). Hanya rute di allowlist
+    yang sampai ke sini — `relayRouteAllowed` tetap menjadi penjaga pertama. */
+export function isAccessRequestRoute(method: string, url: string): boolean {
+  const q = url.indexOf("?");
+  const path = q < 0 ? url : url.slice(0, q);
+  return path === "/api/remote-control/access-requests" && (method.toUpperCase() === "POST" || method.toUpperCase() === "GET");
+}
 
 export type RelayLinkState = "off" | "connecting" | "open" | "backoff" | "unsupported" | "rejected";
 export type RelayLinkStatus = {

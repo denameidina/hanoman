@@ -5,13 +5,14 @@
    `DELETE /specs/:id/worktree` (ADR-0213) dan integrasi tidak menyentuh `baseSha`. Item yang selesai
    sebelum ADR-0030 atau dikerjakan di checkout lain tetap `null` walau pernah dikerjakan.
 
-   "Perlu ditinjau": item yang sesinya SEDANG menunggu jawaban manusia. Kondisinya sama dengan
-   "Menunggu jawabanmu" di Overview dan pet (`sessionKind` = "waiting", sesi hidup). Layar Backlog tak
-   menerima daftar sesi, jadi himpunan id-nya dihitung di App.tsx (`reviewSpecIds`).
-   Klausa "stage done + baseSha" sengaja TIDAK dipakai: `baseSha` tak berarti worktree masih ada (lihat
-   di atas), dan status tinjau/integrasi tak tercatat di server. Item selesai akan tampil "perlu
-   ditinjau" padahal sudah diintegrasikan atau worktree-nya sudah dihapus. Tinjauan diff tetap lewat
-   aksi "Review perubahan" pada item. */
+   "Perlu ditinjau" (ADR-0218 memperluasnya) = DUA kondisi, digabung OR:
+   (a) item yang sesinya SEDANG menunggu jawaban manusia. Sama dengan "Menunggu jawabanmu" di Overview
+       dan pet (`sessionKind` = "waiting", sesi hidup);
+   (b) item SELESAI yang pernah dikerjakan sesi (`baseSha` terisi) dan BELUM ditandai "sudah ditinjau"
+       (`reviewedAt` null). Penanda itu ditulis operator lewat "Tandai ditinjau", bukan dirangkai dari
+       status server. Integrasi tidak menandainya otomatis. `baseSha` dipakai sebagai syarat karena item
+       selesai tanpa sesi (ditandai manual) tak punya diff untuk ditinjau.
+   Layar Backlog tak menerima daftar sesi, jadi himpunan id-nya dihitung di App.tsx (`reviewSpecIds`). */
 import type { TerminalSession } from "../api/client";
 import { REVIEW_SCOPE_LABEL, WORKTREE_SCOPE_LABEL } from "../lib/labels";
 import { sessionKind } from "./pet-state";
@@ -41,13 +42,24 @@ export const REVIEW_SCOPE_OPTS: readonly { value: ReviewScope; label: string }[]
 
 const NO_DONE_SPECS: ReadonlySet<string> = new Set<string>();
 
-/** Id item yang sesinya menunggu jawaban manusia. Memakai `sessionKind` (klasifikasi tunggal pet-state,
- *  juga dipakai sel Terminal). Sesi yang sudah berakhir dan sesi yang sedang diputuskan lead tidak ikut.
- *  `NO_DONE_SPECS` tak mengubah hasil untuk "waiting": cabang itu diuji sebelum status item selesai. */
-export function reviewSpecIdsOf(sessions: readonly TerminalSession[]): ReadonlySet<string> {
+/** Bagian item backlog yang dibutuhkan predikat "Perlu ditinjau" (cermin SpecSlim, tanpa field lain). */
+export type ReviewableSpec = { id: string; stage: string; baseSha?: string | null; reviewedAt?: string | null };
+
+/** Id item yang perlu ditinjau: sesinya menunggu jawaban manusia (klausa a), atau item selesai yang
+ *  pernah dikerjakan dan belum ditandai sudah ditinjau (klausa b, ADR-0218). Klausa (a) memakai
+ *  `sessionKind` (klasifikasi tunggal pet-state, juga dipakai sel Terminal). Sesi yang sudah berakhir dan
+ *  sesi yang sedang diputuskan lead tidak ikut. `NO_DONE_SPECS` tak mengubah hasil untuk "waiting":
+ *  cabang itu diuji sebelum status item selesai. `specs` default kosong: tanpa daftar item, hanya
+ *  klausa (a) yang berlaku. */
+export function reviewSpecIdsOf(
+  sessions: readonly TerminalSession[], specs: readonly ReviewableSpec[] = [],
+): ReadonlySet<string> {
   const ids = new Set<string>();
   for (const s of sessions) {
     if (s.specId && sessionKind(s, NO_DONE_SPECS) === "waiting") ids.add(s.specId);
+  }
+  for (const s of specs) {
+    if (s.stage === "done" && s.baseSha && !s.reviewedAt) ids.add(s.id);
   }
   return ids;
 }

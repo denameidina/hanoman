@@ -228,6 +228,26 @@ const LIFECYCLE_AND_MORE: readonly McpToolDef[] = [
     shape: (raw) => raw,
   },
   {
+    name: "hanoman_backlog_mark_reviewed",
+    title: "Tandai backlog sudah ditinjau",
+    description:
+      "Menandai backlog item SELESAI sebagai sudah ditinjau, sehingga keluar dari filter 'Perlu ditinjau' di Backlog. Balasannya Spec dengan `reviewedAt` terisi. Hanya untuk item stage `done` (409 bila belum selesai). `reviewed: false` membatalkan tanda. Tidak mengubah stage, diff, atau berkas.",
+    inputSchema: obj({
+      properties: {
+        spec: str(ID_HINT),
+        reviewed: bool("false = batalkan tanda; kosong atau true = tandai."),
+      },
+      required: ["spec"],
+    }),
+    mode: "write", capability: "backlog:write",
+    samplePath: "/specs/SPEC-1/reviewed", sampleMethod: "POST",
+    build: (a) => ({
+      method: "POST", path: `/specs/${enc(String(a.spec))}/reviewed`,
+      body: { reviewed: a.reviewed !== false },
+    }),
+    shape: (raw) => raw,
+  },
+  {
     name: "hanoman_backlog_attachments_list",
     title: "Daftar lampiran backlog",
     description:

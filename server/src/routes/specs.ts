@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
-import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, grantsCapability, type Stage } from "@hanoman/shared";
+import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, zMarkSpecReviewed, grantsCapability, type Stage } from "@hanoman/shared";
 import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { integrate, sourceBranch } from "../services/integrate";
 import { deleteProjectWorktrees } from "../services/worktree-delete";
@@ -24,6 +24,7 @@ import { recordSourceChange } from "../services/notifications";
 import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
 import { completeSpecManually } from "../services/spec-complete";
+import { markSpecReviewed } from "../services/spec-reviewed";
 import { presenceView } from "../services/presence/view";
 import { remoteSessionVerdict } from "../services/presence/remote-session";
 import { recentlyOffline } from "../services/presence/registry";
@@ -256,12 +257,14 @@ export default async function (app: FastifyInstance) {
         return reply.send({ pending: true, stage, wouldDelete });
       for (const rel of wouldDelete) await deleteDoc(spec.projectId, rel).catch(() => { });
     }
-    const data: { branchFrom?: string | null; stage?: string; title?: string; priority?: string; objective?: string; payload?: any; dependsOn?: string[]; autoMerge?: any } = {};
+    const data: { branchFrom?: string | null; stage?: string; title?: string; priority?: string; objective?: string; payload?: any; dependsOn?: string[]; autoMerge?: any; reviewedAt?: null } = {};
     if (branchFrom !== undefined) data.branchFrom = branchFrom;
     if (depIds !== undefined) data.dependsOn = depIds;   // SPEC-447 · ADR-0093
     // SPEC-486 · Prisma `Json?` menolak `null` polos — `Prisma.DbNull` yang mengosongkan kolomnya.
     if ("autoMerge" in parsed.data) data.autoMerge = autoMerge === null ? Prisma.DbNull : autoMerge;
-    if (stage !== undefined) data.stage = stage;
+    // ADR-0218 · stage hanya mundur (422 di atas), jadi setiap penulisan stage di sini meninggalkan
+    // `done` bila ia dulu `done`. Tanda "sudah ditinjau" lama tak berlaku untuk penyelesaian berikutnya.
+    if (stage !== undefined) { data.stage = stage; data.reviewedAt = null; }
     if (editingContent) {
       const effPayload = payload ?? spec.payload;
       const { priority, objective } = deriveSpecFields(spec.source, effPayload, newPriority ?? spec.priority);
@@ -335,7 +338,8 @@ export default async function (app: FastifyInstance) {
         // penanda RESUME, dan `PATCH /specs/:id` sebagai kunci edit konten SPEC-186.
         // Meninggalkannya berarti item "yang sudah kembali ke brainstorming" tetap melanjutkan
         // worktree lama dan tetap tak bisa diedit isinya — reset yang cuma kelihatan.
-        ...(plan ? { stage: "brainstorming", baseSha: null, headSha: null, startedAt: null } : {}),
+        // ADR-0218 · reset ini juga mengembalikan item dari `done`, jadi tanda ditinjau ikut dibuang.
+        ...(plan ? { stage: "brainstorming", baseSha: null, headSha: null, startedAt: null, reviewedAt: null } : {}),
       },
     });
     await recordSourceChange(spec.id, spec.projectId, spec.title, spec.source, to, history.length);
@@ -385,6 +389,21 @@ export default async function (app: FastifyInstance) {
     });
     // count 0 = sesi/overlay menyelesaikannya di bawah kita antara findUnique dan CAS.
     if (!res.ok) return reply.code(409).send({ error: "backlog item sudah selesai" });
+    return res.spec;
+  });
+
+  // ADR-0218 · tandai/batalkan "sudah ditinjau" pada item selesai (tombol "Tandai ditinjau" di Review
+  // dan di menu item Backlog). Operasi khusus, bukan field PATCH: ia tak mengubah stage, diff, atau
+  // berkas apa pun. Idempoten (lihat services/spec-reviewed.ts). Capability-nya jatuh ke
+  // `rw("backlog")` → `backlog:write`, cermin `POST /specs/:id/done`.
+  app.post("/specs/:id/reviewed", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = zMarkSpecReviewed.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const res = await markSpecReviewed(id, parsed.data.reviewed !== false);
+    if (!res.ok) return res.reason === "not-found"
+      ? reply.code(404).send({ error: "not found" })
+      : reply.code(409).send({ error: "backlog item belum selesai" });
     return res.spec;
   });
 

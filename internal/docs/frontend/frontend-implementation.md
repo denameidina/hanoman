@@ -839,19 +839,30 @@ Tes:
 
 Fase 3G (Klien) dan 3J (VPS) dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md).
 Aturan layar mengikuti [audit § Klien dan VPS](ui-ux-audit-2026-10.md#2-per-layar) dan
-[glosarium](glossary.md). Tidak ada API baru: selektor tingkat memetakan ke grant `PUT /remote-control` yang sudah ada. Keputusan selektor
-dicatat di [ADR-0210](../adr/0210-perangkat-tingkat-akses-lihat-kerja-tulis.md). Grant per perangkat remote belum ada di UI; analisis di [ADR-0216](../adr/0216-grant-per-perangkat-remote-diusulkan.md) (Diusulkan).
+[glosarium](glossary.md). Selektor tingkat memetakan ke grant `PUT /remote-control` yang sudah ada (keputusan di
+[ADR-0210](../adr/0210-perangkat-tingkat-akses-lihat-kerja-tulis.md)). Grant per perangkat remote: opsi D (tingkat yang
+dilaporkan, baca-saja) dan opsi C (**permintaan tingkat dengan persetujuan lokal**, [ADR-0217](../adr/0217-permintaan-tingkat-akses-perangkat-remote-disetujui-lokal.md),
+dari keputusan [ADR-0216](../adr/0216-grant-per-perangkat-remote-diusulkan.md)). Pemetaan tingkat ↔ grant kini satu sumber: `REQUEST_TIER_GRANTS` di `shared`.
 
 Berkas:
 
-- `src/src/screens/remote-access-tier.ts` — murni: tingkat Lihat/Kerja/Tulis ↔ grant (`TIER_GRANTS`), `tierOf`
-  (termasuk `khusus` dan `kosong`), `grantDiff`, `needsConfirm`, dan kalimat dampak per grant.
+- `src/src/screens/remote-access-tier.ts` — murni: tingkat Lihat/Kerja/Tulis ↔ grant (`TIER_GRANTS`, diambil dari
+  `REQUEST_TIER_GRANTS` di `shared`), `tierOf` (termasuk `khusus` dan `kosong`), `grantDiff`, `needsConfirm`, dan kalimat dampak per grant.
+- `src/src/screens/access-request.ts` — murni (ADR-0217): `requestBlockReason` (alasan "Minta tingkat…" mati: offline,
+  protokol tak cocok, kendali belum diizinkan), `hostOf` (host dari origin hub), `REQUEST_STATUS_LABEL`.
 - `src/src/screens/RemoteControlPanel.tsx` — `RemoteAccessSection` (master + selektor tingkat, konfirmasi naik
-  dan turun), `RemoteAccessCard` (kartu izin di tab Perangkat), `RemoteControlPanel` (panel Pengaturan: log,
-  status relay dan riwayat diringkas, rinciannya di `<details>`).
+  dan turun), `AccessRequestsApproval` (ADR-0217: bagian "Permintaan dari server pusat" di dalam `RemoteAccessCard`;
+  hanya permintaan `pending`; Setujui lewat `useConfirm` yang menyebut dampak tiap grant dan nonaktif bila master
+  mati; Setujui mengirim `{tier, from}` dari kartu, dan 409 (kartu basi) memuat ulang daftar dengan pesan
+  "Permintaan berubah, periksa lagi"; Tolak langsung; dimuat ulang saat jendela fokus, tanpa polling), `RemoteAccessCard` (kartu izin di tab
+  Perangkat), `RemoteControlPanel` (panel Pengaturan: log, status relay dan riwayat diringkas, rinciannya di `<details>`).
 - `src/src/screens/ClientsScreen.tsx` — tab **Perangkat · Akun · Log**. Baris Perangkat = `DenseRow`: nama,
   online/offline (`StatusPill` dot), "N sesi berjalan" / "Tidak ada sesi berjalan", terakhir terlihat, dan satu
-  aksi "Lihat (baca saja)". Sesi tanpa SPEC hanya teks. Prop `onToast` opsional.
+  aksi "Lihat (baca saja)". Sesi tanpa SPEC hanya teks. Prop `onToast` opsional. Perangkat remote juga punya
+  tombol **Minta tingkat…** (ADR-0217, `AccessRequestPanel`): pilih Lihat/Kerja/Tulis, kirim, lalu status
+  permintaan (menunggu persetujuan di perangkat itu · disetujui · ditolak · kedaluwarsa). Tombol mati dengan alasan
+  saat offline, protokol tak cocok, atau kendali belum diizinkan. Galat hub (mis. 409 perangkat belum mendukung) tampil `role="alert"`.
+  Baris "Tingkat akses" (opsi D, baca-saja) tetap ada.
 - `src/src/screens/ClientAccessPanel.tsx` — tab Akun: baris akun = `DenseRow`. Aksi: Nonaktifkan/Aktifkan,
   **Cabut akses** (dikonfirmasi; mengosongkan `projects`), dan **Hapus akun** di menu ⋯ (dikonfirmasi).
 - `src/src/screens/RemoteBanner.tsx` — bar brass solid yang menempel (`.kl-banner`): "Nama · Baca-saja · vX ·
@@ -3387,7 +3398,7 @@ navigasi yang sudah ada. UI tidak menyediakan akses ke data fitur yang dihapus.
 ## Audit UI/UX 2026-10 — gelombang 5: filter Ber-worktree dan setup (ADR-0214)
 
 - **Backlog, filter "Ber-worktree"** (`screens/backlog-worktree.ts`): field "Worktree" di popover Filter (`Select` aria "Filter worktree"), chip "Ber-worktree" saat aktif, ikut Reset filter. Predikatnya `baseSha` terisi, yaitu "hanoman pernah membuatkan worktree" (kolom sejak ADR-0030). Worktree yang sudah dibersihkan tetap terhitung; pekerjaan di luar hanoman dan item yang selesai sebelum ADR-0030 tidak. Angka segmen tahap ikut himpunan yang disaring. Label di `lib/labels.ts` (`WORKTREE_SCOPE_LABEL`). Tes: `test/backlog-worktree-filter.test.tsx`.
-- **Backlog, mengapa tidak "Perlu ditinjau"**: stage `done` sudah segmen "Selesai"; status tinjau dan integrasi tidak ada di `SpecSlim`; keputusan sesi "menunggu manusia" (`SessionDTO.decision`) tidak sampai ke Backlog, yang hanya menerima `activeSpecs`. Predikat itu baru jujur bila `App` meneruskan himpunan sesi yang menunggu keputusan; sampai itu, filter ini tidak menjanjikan "belum ditinjau".
+- **Backlog, mengapa tidak "Perlu ditinjau"**: stage `done` sudah segmen "Selesai"; status tinjau dan integrasi tidak ada di `SpecSlim` (status tinjau kini ada sejak ADR-0218 sebagai `reviewedAt`; integrasi tetap tidak); keputusan sesi "menunggu manusia" (`SessionDTO.decision`) tidak sampai ke Backlog, yang hanya menerima `activeSpecs`. Predikat itu baru jujur bila `App` meneruskan himpunan sesi yang menunggu keputusan; sampai itu, filter ini tidak menjanjikan "belum ditinjau".
 - **Setup, dua langkah dengan nomor jujur** (ADR-0214): wizard "setup 1/2" dan akun "setup 2/2" tetap. Nomor "2/2" hanya tampil bila wizard dijawab di sesi itu. Penerapannya, `setupStep={setupDone ? 2 : undefined}` pada `AuthScreen` di `App.tsx`, menunggu pemilik `App.tsx`.
 
 ## Audit UI/UX 2026-10 — Review tanpa 409 dan hapus worktree item (ADR-0213)
@@ -3410,8 +3421,17 @@ navigasi yang sudah ada. UI tidak menyediakan akses ke data fitur yang dihapus.
 - **Predikat** (`screens/backlog-worktree.ts`, `reviewSpecIdsOf`): item yang sesinya hidup dan `sessionKind` = `waiting` (`decision && !deciding`). Kondisinya sama dengan "Menunggu jawabanmu" di Overview dan pet. Tes `test/backlog-review-filter.test.tsx` mengunci kesamaannya dengan `waitingSessions`.
 - **Data**: `App.tsx` menghitung `reviewSpecIds` dari daftar sesi dan meneruskannya ke `BacklogScreen` sebagai prop opsional. Tanpa prop, filter ini menghasilkan daftar kosong. Layar Backlog tetap tak menerima daftar sesi.
 - **Tampilan**: field "Tinjauan" di popover Filter, berdampingan dengan "Worktree"; chip "Perlu ditinjau" saat aktif; ikut Reset filter; digabung AND dengan "Ber-worktree". Angka segmen tahap mengikuti himpunan yang disaring. Daftar yang kosong karena filter kini dijawab "Tidak ada spec untuk filter ini" dengan Reset, bukan "Tidak ada spec di tahap …".
-- **Klausa `stage` done + `baseSha` tidak dipakai.** `baseSha` tidak berarti worktree masih ada: `DELETE /specs/:id/worktree` (ADR-0213) dan integrasi tidak menulisnya. Yang meng-nullkannya hanya `POST /specs/:id/source` dengan rencana reset. Status tinjau tak tercatat di server. Klausa itu akan menandai item yang sudah diintegrasikan atau worktree-nya sudah dihapus.
-- **Batas**: tinjauan item selesai belum punya sinyal jujur (audit § Yang tetap terbuka, butir 3). Label "Perlu ditinjau" dan "Menunggu jawabanmu" untuk kondisi yang sama masih keputusan terbuka di `glossary.md`.
+- **Klausa `stage` done + `baseSha` (semula tidak dipakai; kini diamandemen ADR-0218).** Alasan lama: status tinjau tak tercatat di server, dan `baseSha` tak berarti worktree masih ada. Status tinjau kini tercatat di `Spec.reviewedAt`, jadi klausa itu masuk sebagai (b) `stage = done` **dan** `baseSha` terisi **dan** `reviewedAt` null. Lihat gelombang 8 di bawah.
+- **Batas (diperbarui ADR-0218)**: tinjauan item selesai kini punya sinyal jujur, yaitu penanda yang ditulis operator. Label "Perlu ditinjau" dan "Menunggu jawabanmu" untuk kondisi yang sama masih keputusan terbuka di `glossary.md`.
+
+## Audit UI/UX 2026-10 — gelombang 8: penanda "sudah ditinjau" (ADR-0218)
+
+- **Data**: `Spec.reviewedAt` (zod `zSpec`/`zSpecSlim`, `.nullable().default(null)`), ikut `GET /specs` lewat projection `live-specs`. Klien versi lama tetap parse.
+- **Predikat**: `reviewSpecIdsOf(sessions, specs)` (ADR-0218 §7). Klausa sesi tak berubah. `App.tsx` meneruskan `backlog` sebagai argumen kedua dan memakainya sebagai dependensi memo.
+- **Tombol "Tandai ditinjau" / "Batalkan tanda ditinjau"** di dua tempat, keduanya untuk item `done`. (1) Bar keputusan ReviewScreen: prop `reviewed` dan `onMarkReviewed`, di layar sempit pindah ke menu ⋯. Galat dari server tampil di bar. (2) Menu ⋯ item Backlog (`SpecActions`) di semua tampilan (daftar, kartu, papan). Yang kedua wajib: item yang worktree-nya sudah dihapus menampilkan keadaan kosong di Review, tanpa bar.
+- **Hint filter** "Tinjauan" menyebut kedua kondisi. Tes `test/backlog-reviewed.test.tsx` mengunci predikat klausa baru dan aksi menu. `test/review-screen-reviewed.test.tsx` mengunci tombol bar, pembalikan, galat, dan letaknya di layar sempit.
+- **Tanpa dialog konfirmasi**: aksinya bisa dibalik dengan tombol yang sama dan tak membuang apa pun.
+- **Batas yang tersisa**: integrasi tidak menandai otomatis (ADR-0218 §5). Item yang sudah diintegrasikan tetap tampil di filter sampai operator menandainya.
 
 ## Audit UI/UX 2026-10 — Perangkat: tingkat yang dilaporkan dan alasan "Lihat (baca saja)" (ADR-0216 opsi D)
 

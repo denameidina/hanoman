@@ -96,6 +96,9 @@ export const zSpec = z.object({
   // SPEC-804 · ADR-0120 · terisi hanya bila item ditandai selesai manual; null = selesai lewat
   // sesi atau belum selesai. `.nullable().default(null)` menjaga respons/klien versi lama parse.
   manualDone: zManualDone.nullable().default(null),
+  // ADR-0218 · kapan operator menandai item selesai ini sudah ditinjau (ISO di wire). null = belum
+  // ditinjau, atau item belum selesai. `.nullable().default(null)` menjaga klien versi lama parse.
+  reviewedAt: z.string().nullable().default(null),
 });
 export type Spec = z.infer<typeof zSpec>;
 

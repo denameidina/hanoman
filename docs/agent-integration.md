@@ -267,6 +267,8 @@ Tool MCP-nya (semua tulis bermode `danger`, hanya tampil dengan `--danger`):
 | `hanoman_remote_control_get` | baca | `remote:read` |
 | `hanoman_remote_control_set` | danger | `remote:control` |
 | `hanoman_device_relay` | danger | `relay:exec` |
+| `hanoman_device_access_request` | danger | `relay:exec` |
+| `hanoman_device_access_requests` | danger | `relay:exec` |
 | `hanoman_logs_search`, `hanoman_log_transcript`, `hanoman_logs_retention_get` | baca | `logs:read` |
 | `hanoman_logs_retention_set` | danger | `logs:write` |
 | `hanoman_presence_get` | baca | `presence:read` |
@@ -285,6 +287,7 @@ Tool MCP-nya (semua tulis bermode `danger`, hanya tampil dengan `--danger`):
 | `POST /api/specs` | `backlog:write` | buat backlog item — bentuk payload di §7. |
 | `PATCH /api/specs/:id` | `backlog:write` | ubah item; konten hanya selagi belum dimulai. |
 | `POST /api/specs/:id/done` | `backlog:write` | tandai item **selesai** tanpa menjalankan sesi — untuk pekerjaan yang beres di luar hanoman. Body `{ reason?: string (≤280), confirm?: boolean }`, keduanya opsional; balasannya `Spec` yang sudah `stage:"done"`. Tak menjalankan maupun menghentikan sesi apa pun. |
+| `POST /api/specs/:id/reviewed` | `backlog:write` | tandai atau batalkan **sudah ditinjau** pada item yang sudah **selesai** (tool `hanoman_backlog_mark_reviewed`, ADR-0218). Body `{ reviewed?: boolean }`, default `true`; `false` membatalkan. Idempoten: menandai ulang tak mengubah stempelnya. Balasannya `Spec` dengan `reviewedAt`. 409 bila item belum selesai. Tak mengubah stage, diff, atau berkas. |
 | `GET /api/specs/:id/attachments` | `backlog:read` | lampiran backlog item — gambar & dokumen yang dilampirkan manusia sebagai konteks kerja. |
 | `POST /api/specs/:id/attachments` | `backlog:write` | unggah lampiran (`multipart/form-data`, beberapa berkas per request). Berkas yang ditolak **tak** menggagalkan yang lain — periksa `rejected[]`. |
 | `GET /api/specs/:id/attachments/:attId` | `backlog:read` | byte satu lampiran. |

@@ -29,7 +29,8 @@ Dokumen ini adalah kontrak untuk teks yang tampil ke operator. Kode penegaknya: 
 | Obrolan klien | **Tanya & ide** (tab di Klien) | Obrolan, Chat | Sesi chat milik project, bukan milik satu keluhan. |
 | Pemilik konflik sinkron | **server pusat** | hub, Instance, Pusat | Diputuskan di Fase 3L. Dipakai di copy konflik dan sinkronisasi. |
 | Item yang pernah punya worktree | **Ber-worktree** (filter Backlog) | Belum ditinjau | Predikat `baseSha` terisi: hanoman pernah membuatkan worktree. Bukan status tinjau, dan worktree yang sudah dihapus tetap terhitung (ADR-0214). |
-| Item yang menunggu jawabanmu | **Perlu ditinjau** (filter Backlog) | Belum ditinjau, Menunggu review | Predikat sesi: item yang sesinya menunggu jawaban manusia, kondisi yang sama dengan "Menunggu jawabanmu" di Overview. Bukan status tinjau diff; item selesai tidak ikut (gelombang 7, `screens/backlog-worktree.ts`). |
+| Item yang menunggu jawabanmu, atau item selesai yang belum kamu tandai | **Perlu ditinjau** (filter Backlog) | Belum ditinjau, Menunggu review | Predikat gabungan (gelombang 7 dan ADR-0218): (a) sesi item menunggu jawaban manusia, kondisi yang sama dengan "Menunggu jawabanmu" di Overview; (b) item selesai yang pernah dikerjakan dan belum punya penanda "Sudah ditinjau". Bukan status tinjau diff (`screens/backlog-worktree.ts`). |
+| Item selesai yang sudah diperiksa | **Sudah ditinjau** (penanda; tombol **Tandai ditinjau** / **Batalkan tanda ditinjau**) | Disetujui, Lulus review, Approved | Penanda yang ditulis operator (`Spec.reviewedAt`, ADR-0218). Bukan persetujuan dan bukan hasil integrasi; integrasi tidak menandainya. Tombol ada di bar Review dan di menu item Backlog. |
 
 ## Aturan voice
 

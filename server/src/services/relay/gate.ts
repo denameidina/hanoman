@@ -1,6 +1,6 @@
 import type { FastifyRequest } from "fastify";
 import {
-  RELAY_ACTOR_HEADER, RELAY_HEADER, RELAY_MODE_HEADER, grantsCapability, relayRouteAllowed, remoteCapabilityFor,
+  RELAY_ACTOR_HEADER, RELAY_HEADER, RELAY_MODE_HEADER, grantsCapability, isAccessRequestRoute, relayRouteAllowed, remoteCapabilityFor,
   zRelayActor, type RelayActor, type RemoteCapability, type RemoteControl,
 } from "@hanoman/shared";
 import { getSetting } from "../settings";
@@ -36,10 +36,20 @@ export async function admitRemoteRequest(
   const actor = decodeRelayActor(req.headers[RELAY_ACTOR_HEADER]);
   if (!actor) return UNAUTHORIZED;
   const grant = await readGrant();
-  if (!grant.enabled) return UNAUTHORIZED;
+  // ADR-0217 · dua rute permintaan tingkat dijawab 403 saat master mati, BUKAN 401: hub meneruskan 401 ke
+  // klien, dan layar membacanya sebagai sesi operator habis (melempar ke Login).
+  if (!grant.enabled)
+    return isAccessRequestRoute(req.method, req.url)
+      ? { ok: false, status: 403, body: { error: "kendali jarak jauh mati" } }
+      : UNAUTHORIZED;
   if (!relayRouteAllowed(req.method, req.url)) return { ok: false, status: 403, body: { error: "relay route not allowed" } };
   const path = req.url.split("?")[0] ?? req.url;
   const mode = req.headers[RELAY_MODE_HEADER] === "read" ? "read" : "write";
+  // ADR-0217 · permintaan tingkat akses TIDAK menuntut capability grant: ia hanya mengantre, dan
+  // grant baru berlaku bila operator lokal menyetujuinya (route persetujuannya COOKIE_ONLY dan tak
+  // ada di allowlist). Hub yang grant-nya kosong pun tetap bisa meminta Lihat.
+  if (isAccessRequestRoute(req.method, req.url))
+    return { ok: true, remote: { actor, capabilities: grant.capabilities, mode } };
   const override = remoteCapabilityFor(req.method, path, mode);
   if (override) {
     if (!grantsCapability(grant.capabilities, override))

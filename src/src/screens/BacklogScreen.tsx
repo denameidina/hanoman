@@ -209,6 +209,7 @@ type ItemActions = {
   onStart?: (s: SpecSlim) => void; onDelete?: (s: SpecSlim) => void; onOpenRun?: (s: SpecSlim) => void;
   onOpenReview?: (s: SpecSlim) => void;
   onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+  onMarkReviewed?: (s: SpecSlim, reviewed: boolean) => Promise<void>;   // ADR-0218
   running?: boolean;
 };
 
@@ -703,7 +704,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
 /* Aksi per-item. Dipakai baris, kartu, dan papan. Satu aksi primer sadar-tahap (Mulai / Lanjutkan /
    Buka sesi / Review perubahan untuk item selesai); sisanya di menu ⋯. Dialognya hidup DI LUAR menu:
    menu menutup dirinya lebih dulu, lalu aksinya membuka dialog ini. */
-function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, onMarkDone, running }:
+function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, onMarkDone, onMarkReviewed, running }:
   { spec: SpecListItem } & ItemActions) {
   const [docs, setDocs] = React.useState(false);
   const [markDone, setMarkDone] = React.useState(false);
@@ -720,6 +721,13 @@ function SpecActions({ spec, onStart, onDelete, onOpenRun, onOpenReview, onMarkD
     ...(!open && onStart ? [{ key: "rerun", label: "Jalankan lagi", icon: "play", onSelect: () => onStart(spec) }] : []),
     // SPEC-804 · ADR-0120 · maju ke `done` tanpa sesi — untuk item yang beres di luar hanoman.
     ...(open && onMarkDone ? [{ key: "done", label: "Tandai selesai", icon: "circle-check", onSelect: () => setMarkDone(true) }] : []),
+    // ADR-0218 · penanda "sudah ditinjau" untuk item selesai. Jalan keluar dari "Perlu ditinjau" bagi item
+    // yang worktree-nya sudah dihapus: layar Review berkeadaan kosong dan tak punya bar keputusan.
+    ...(!open && onMarkReviewed ? [{
+      key: "reviewed", label: spec.reviewedAt ? "Batalkan tanda ditinjau" : "Tandai ditinjau",
+      icon: spec.reviewedAt ? "rotate-ccw" : "circle-check",
+      onSelect: () => void onMarkReviewed(spec, !spec.reviewedAt),
+    }] : []),
     ...(onDelete ? [{ key: "delete", label: "Hapus spec", icon: "trash-2", tone: "danger" as const, onSelect: () => onDelete(spec) }] : []),
   ];
   return (
@@ -919,7 +927,7 @@ const LOADING_ROWS = 5;
 // Nilai bawaan `reviewSpecIds`: himpunan kosong yang sama identitasnya tiap render (memo stabil).
 const NO_REVIEW_SPECS: ReadonlySet<string> = new Set<string>();
 
-export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, presenceBySpec, reviewSpecIds = NO_REVIEW_SPECS, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onMarkDone, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onChangeSource, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
+export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, presenceBySpec, reviewSpecIds = NO_REVIEW_SPECS, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onMarkDone, onMarkReviewed, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onChangeSource, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
   {
     backlog: SpecSlim[]; projects: ProjectVM[]; pageSize?: number;
     onStart?: (s: SpecSlim) => void; activeSpecs?: Set<string>; presenceBySpec?: Map<string, string[]>;
@@ -932,6 +940,8 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     // SPEC-804 · ADR-0120 · tandai selesai manual; `needConfirm` = server minta konfirmasi karena
     // ada sesi hidup untuk item ini.
     onMarkDone?: (s: SpecSlim, reason: string, confirm: boolean) => Promise<MarkDoneResult>;
+    // ADR-0218 · tandai/batalkan "sudah ditinjau" pada item selesai. Galat dari App sudah ditangani di sana.
+    onMarkReviewed?: (s: SpecSlim, reviewed: boolean) => Promise<void>;
     onIntegrate?: (s: SpecSlim, op: "merge" | "rebase", target: string) => void;
     onEditSpec?: (s: SpecSlim, patch: { title?: string; priority?: string; payload?: unknown }) => void;
     // SPEC-447 · ADR-0093 · ubah dependency item (di luar gerbang edit SPEC-186).
@@ -1151,9 +1161,10 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
         <Select size="sm" aria-label="Filter worktree" value={wt} onChange={(e) => setWt(e.target.value as WorktreeScope)}
           options={WORKTREE_SCOPE_OPTS.map((o) => ({ value: o.value, label: o.label }))} />
       </Field>
-      {/* Gelombang 7 · "Perlu ditinjau" berdampingan dengan Worktree. Yang disaring hanya sesi yang sedang
-          menunggu jawaban; tinjauan diff tidak tercatat di server dan tetap lewat "Review perubahan" per item. */}
-      <Field label="Tinjauan" hint="Item yang sesinya sedang menunggu jawabanmu. Tinjauan diff tidak tercatat di sini; buka Review perubahan per item.">
+      {/* Gelombang 7 · "Perlu ditinjau" berdampingan dengan Worktree. ADR-0218 memperluasnya: item selesai
+          yang belum ditandai "sudah ditinjau" ikut tersaring. Penanda itu ditulis operator, bukan diturunkan
+          dari diff; tinjauan diff tetap lewat "Review perubahan" per item. */}
+      <Field label="Tinjauan" hint="Item yang sesinya menunggu jawabanmu, dan item selesai yang belum kamu tandai sudah ditinjau. Tandai lewat menu item atau di Review perubahan.">
         <Select size="sm" aria-label="Filter perlu ditinjau" value={review} onChange={(e) => setReview(e.target.value as ReviewScope)}
           options={REVIEW_SCOPE_OPTS.map((o) => ({ value: o.value, label: o.label }))} />
       </Field>
@@ -1174,7 +1185,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   );
   const firstLoad = !loaded && items.length === 0 && refreshing;
   const sharedActions: ItemActions = {
-    onStart, onDelete: requestDelete, onOpenRun, onOpenReview, onMarkDone,
+    onStart, onDelete: requestDelete, onOpenRun, onOpenReview, onMarkDone, onMarkReviewed,
   };
   const openDetail = (s: SpecSlim) => setDetailId(s.id);
   const stageLabel = STAGE_GROUPS.find((g) => g.key === stage)?.label ?? "";

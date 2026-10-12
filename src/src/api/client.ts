@@ -5,7 +5,7 @@ import { paths, type Paginated, type ProjectView, type Spec, type SpecListItem, 
   type SetupStatus, type SetupApplyResult, type PhaseOverrides,
   type TaskView, type MemberView, type CreateTaskInput, type EscalateTaskInput, type PatchTaskInput,
   type CreateMemberInput, type PatchMemberInput,
-  type RemoteControlView, type RemoteControlPut,
+  type RemoteControlView, type RemoteControlPut, type AccessRequestView, type AccessRequestApprove, type RequestTier,
   type LogEntryView, type LogRetention,
   type SkillEntry, type SkillLibraryView, type SkillTreeView, type SkillFileView,
   type SpecReview, type ReviewFile, type ChangedFile } from "@hanoman/shared";
@@ -315,6 +315,9 @@ export function createApi(o: { base?: string } = {}) {
   // `session`) = ada sesi hidup; kirim ulang dengan `confirm: true`.
   markSpecDone: (id: string, b: { reason?: string; confirm?: boolean }) =>
     j<Spec>(paths.specDone(id), { method: "POST", ...body(b) }),
+  // ADR-0218 · tandai/batalkan "sudah ditinjau" pada item selesai. 409 = item belum selesai.
+  markSpecReviewed: (id: string, reviewed: boolean) =>
+    j<Spec>(paths.specReviewed(id), { method: "POST", ...body({ reviewed }) }),
   // SPEC-171 · all files + file changed dari worktree backlog item.
   specReview: (id: string) => j<SpecReview>(paths.specReview(id)),
   specReviewFile: (id: string, path: string) => j<ReviewFile>(paths.specReviewFile(id, path)),
@@ -611,6 +614,18 @@ export function createApi(o: { base?: string } = {}) {
   // SPEC-1215 · ADR-0165 · grant kendali jarak jauh (LOCAL-only, cookie-only).
   getRemoteControl: () => j<RemoteControlView>(paths.remoteControl),
   putRemoteControl: (b: RemoteControlPut) => j<RemoteControlView>(paths.remoteControl, { method: "PUT", ...body(b) }),
+  // ADR-0217 · permintaan tingkat akses. Di perangkat INI: daftar & keputusan lokal (cookie-only). Untuk
+  // perangkat REMOTE: kirim & status lewat hub (relay:exec di sisi agen; sesi cookie di sini).
+  listRemoteAccessRequests: () => j<{ items: AccessRequestView[] }>(paths.remoteAccessRequests),
+  // Persetujuan membawa tingkat & hub yang dilihat operator di kartu (ADR-0217 §2): server menolak 409 bila
+  // permintaan tertunda sudah berganti. Tolak tak butuh body.
+  decideRemoteAccessRequest: (id: string, action: "approve" | "reject", seen?: AccessRequestApprove) =>
+    j<{ request: AccessRequestView }>(paths.remoteAccessRequestDecide(id, action), {
+      method: "POST", ...(seen ? body(seen) : {}),
+    }),
+  requestDeviceAccess: (deviceId: string, tier: RequestTier) =>
+    j<{ request: AccessRequestView }>(paths.deviceAccessRequests(deviceId), { method: "POST", ...body({ tier }) }),
+  listDeviceAccessRequests: (deviceId: string) => j<{ items: AccessRequestView[] }>(paths.deviceAccessRequests(deviceId)),
   // SPEC-1217 · ADR-0166 · log terpusat — pencarian (kursor, tanpa `total`), transkrip remote, retensi.
   logs, logTranscript, logRetention, putLogRetention,
   // SPEC-257 · agent token (kelola cookie-only) — token plaintext hanya balik di create (sekali).

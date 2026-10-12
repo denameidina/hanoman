@@ -87,6 +87,11 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   }
   if (top === "agent-tokens") return rw("tokens");
   if (top === "device-tokens") return rw("devices");
+  // ADR-0217 · permintaan & persetujuan tingkat akses per perangkat = COOKIE_ONLY. Persetujuan adalah
+  // gerbang keputusan manusia di perangkat INI: agen tak boleh menyetujui grant-nya sendiri, dan relay
+  // (principal `remote`) pun tak boleh (rute persetujuan di luar allowlist). Rute yang dipakai hub
+  // (POST/GET) dijawab cabang grant-free di services/relay/gate.ts, bukan lewat peta ini.
+  if (top === "remote-control" && seg[1] === "access-requests") return "COOKIE_ONLY";
   if (top === "remote-control") return read ? "remote:read" : "remote:control";
   // Relay menjalankan aksi di MESIN LAIN: satu capability untuk SEMUA method (baca isi sesi mesin
   // lain pun sensitif), dipisah dari `remote:control` (grant mesin INI).
@@ -177,6 +182,8 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     if (method === "DELETE" && seg.length === 3 && seg[2] === "worktree") return "ide:git";
     if (method === "DELETE" && seg.length === 2) return "backlog:lifecycle";
     if (seg[2] === "integrate") return "backlog:lifecycle";
+    // ADR-0218 · `POST /specs/:id/reviewed` (penanda "sudah ditinjau") jatuh ke `rw("backlog")` →
+    // `backlog:write`: tak mengubah stage, diff, atau berkas — cermin `POST /specs/:id/done`.
     return rw("backlog");
   }
   if (top === "notifications") return rw("notifications");

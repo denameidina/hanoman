@@ -142,6 +142,12 @@ export const zMarkSpecDone = z.object({
   confirm: z.boolean().optional(),
 });
 export type MarkSpecDone = z.infer<typeof zMarkSpecDone>;
+// ADR-0218 · tandai/batalkan "sudah ditinjau" pada item selesai. Tanpa body = tandai (`true`).
+// `false` = batalkan. Hanya bermakna untuk stage `done` saat menandai; server menolak selain itu.
+export const zMarkSpecReviewed = z.object({
+  reviewed: z.boolean().optional(),
+});
+export type MarkSpecReviewed = z.infer<typeof zMarkSpecReviewed>;
 // SPEC-175 · rebase/merge branch hasil done spec. target = "local:<b>" | "origin:<b>".
 export const zIntegrate = z.object({
   op: z.enum(["merge", "rebase"]),

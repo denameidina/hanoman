@@ -17,6 +17,7 @@ snapshot sesi hidupnya di atas socket yang sama.
 > `/vps*`) berikut `integrate`, `DELETE /specs/:id`, dan `PATCH /specs/:id {stage}` sengaja **tak
 > punya tool**. SPEC-804/ADR-0120 menambah `POST /specs/:id/done` (memindahkan stage) — ia **juga
 > tak punya tool MCP**, alasan yang sama; agen memakainya lewat REST dengan `backlog:write`.
+> ADR-0218 · `POST /specs/:id/reviewed` **punya** tool `hanoman_backlog_mark_reviewed` (mode `write`).
 
 > **Host matrix (SPEC-761, ADR-0117):** host di `HANOMAN_PUBLIC_ORIGINS` hanya melayani static UI,
 > `GET /health`, dan `/help/**`; request API lain ditolak sebelum auth. Host di
@@ -373,6 +374,22 @@ POST /specs/:id/done      { reason?: string(≤280), confirm?: boolean }   -> Sp
 #   (activity log ADR-0047, author = pemanggil), `notifySynced`, webhook `spec.stage_changed`.
 #   Sweep auto-merge (ADR-0103) MELEWATI item ber-`manualDone`: "beres di luar sesi" berarti tak ada
 #   yang perlu di-merge, dan branch sesi lama yang ditinggalkan tak boleh ter-merge setengah jadi.
+POST /specs/:id/reviewed  { reviewed?: boolean(default true) }   -> Spec
+#   ADR-0218 · tandai/batalkan "sudah ditinjau" pada item SELESAI (penanda untuk filter "Perlu ditinjau",
+#   tombol "Tandai ditinjau" di Review dan menu item Backlog). Operasi khusus, bukan field PATCH: tak
+#   mengubah stage, baseSha/headSha, diff, atau berkas. Capability `backlog:write` (turunan prefix /specs
+#   per method). Tool MCP `hanoman_backlog_mark_reviewed` (mode write, bukan danger: bisa dibalik).
+#   IDEMPOTEN: menandai ulang tak menggeser `reviewedAt` (tinjauan pertama yang dicatat); membatalkan
+#   yang sudah kosong tak menulis apa-apa.
+#   200 = Spec sesudah penulisan (`reviewedAt` ISO atau null).
+#   400 = `reviewed` bukan boolean.
+#   404 = spec tak ada.
+#   409 { error:"backlog item belum selesai" } = menandai item yang stage-nya bukan `done`. Membatalkan
+#         (`reviewed:false`) tak pernah 409.
+#   Efek samping: `notifySynced` (antre sync). TIDAK memancarkan webhook (`reviewedAt` tak ada di allowlist
+#   `WEBHOOK_ENTITIES`). `reviewedAt` di-reset ke null oleh PATCH stage mundur dan POST /specs/:id/source
+#   yang mereset ke brainstorming (ADR-0218 keputusan 5); TIDAK oleh integrasi, dan TIDAK oleh
+#   `recordCompletion` (reconcile memanggilnya ulang untuk item selesai).
 DELETE /specs/:id
 #   SPEC-447 · ADR-0093 · id yang dihapus juga DICABUT dari `dependsOn` seluruh spec lain di project
 #   yang sama (+ antre sync per baris yang berubah). Tanpa itu, dependent-nya terkunci selamanya
@@ -1451,6 +1468,10 @@ POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bu
 > `GET /logs`, `GET /logs/:id/transcript`, `GET|PUT /logs/retention` (semua COOKIE_ONLY), dan
 > `GET|PUT /remote-control` kini membawa `logs:{event,server,transcript}` (toggle lajur pengiriman
 > shipper klien, dipasang/dicabut tanpa restart — D4/AC-S3).
+> **Dilayani sejak ADR-0217 (opsi C dari ADR-0216):** permintaan tingkat akses. Hub hanya MEMINTA
+> tingkat lewat relay (`POST /remote-control/access-requests`, allowlist diperluas dua entri); grant
+> baru berlaku bila operator LOKAL perangkat itu menyetujui (`…/approve`, COOKIE_ONLY). Tanpa skema,
+> tanpa perubahan frame hello. Antrean di memori: 1 tertunda, 3 per 10 menit, kedaluwarsa 10 menit.
 
 ```
 # ── HUB ──────────────────────────────────────────────────────────────────────────────────────────
@@ -1469,6 +1490,15 @@ GET|POST|PUT|PATCH|DELETE /devices/:deviceId/relay/*    # COOKIE_ONLY. Diteruska
                                          # · 502 protocol · 504 timeout (30 dtk; 120 dtk POST …/terminal/sessions)
 GET    /devices/:deviceId/relay/{terminal/sessions/:id/ws | events/ws}   # WS, tiket relay:<deviceId>:<target>
 POST   /ws-tickets { target:"relay:<deviceId>:events" | "relay:<deviceId>:terminal:<id>" }  # hanya cookie
+POST   /devices/:deviceId/access-requests   # ADR-0217 · { tier:"lihat"|"kerja"|"tulis" } (.strict()) → diteruskan lewat relay ke
+                                         # /api/remote-control/access-requests perangkat itu. Principal cookie atau agen ber-relay:exec
+                                         # (danger; tool hanoman_device_access_request). 201 { request } · 400 tingkat asing ·
+                                         # 409 relay "unsupported-message" (perangkat belum memuat ADR-0217) · 409 "pending" dari perangkat
+                                         # (tanpa `request` bila milik hub lain) · 409 kendali mati di perangkat → lihat 403 di bawah ·
+                                         # 502 "device-unauthorized" bila perangkat menjawab 401 (dulu diteruskan dan dibaca klien sebagai sesi habis) ·
+                                         # 429 · 404 unknown-device · 503 offline · 504 timeout. Hanya PERMINTAAN: tak mengubah grant.
+GET    /devices/:deviceId/access-requests   # ADR-0217 · status: GET relay ke perangkat itu → { items: AccessRequestView[] }
+                                         # status pending|approved|rejected|expired. Galat sama seperti POST. Tool hanoman_device_access_requests (danger).
 GET    /presence                         # + devices[].control {state,protocol,version,capabilities,since}|null
                                          #   + devices[].capacity LaunchStatus|null (frame naik `capacity` di /sync/ws)
 POST   /sync/logs                        # Bearer device. { lane:"event"|"server"|"transcript",
@@ -1489,7 +1519,21 @@ GET|PUT /remote-control                  # GET remote:read · PUT remote:control
                                          #   logs:{event,server,transcript} } + status relay/pengiriman + audit 50 terbaru.
                                          # PUT /settings TAK menulis remoteControl/logShipping/logRetention.
                                          # Grant hanya untuk mesin INI. Tak ada `PUT /remote-control/devices/:id` — grant per
-                                         #   perangkat remote belum ada (ADR-0216, Diusulkan; relay PUT ini ditolak ADR-0165 §4).
+                                         #   perangkat remote lewat PUT tak ada; permintaan tingkat lewat POST /remote-control/access-requests
+                                         #   (ADR-0217, opsi C dari ADR-0216). Relay PUT ini tetap ditolak (ADR-0165 §4).
+GET    /remote-control/access-requests   # ADR-0217 · cookie lokal → { items: AccessRequestView[] } (semua, terbaru dulu, ≤10).
+                                         # Relay (principal remote) → hanya permintaan dari hub-nya. Agen → 403 (COOKIE_ONLY).
+POST   /remote-control/access-requests   # ADR-0217 · HANYA dari relay (principal remote, rute di allowlist). { tier } .strict().
+                                         # 201 { request } · 400 · 403 bila bukan relay · 409 masih ada yang menunggu (`request` hanya bila milik
+                                         # hub ini) · 429 + retry-after (>3 per 10 menit) · 403 "kendali jarak jauh mati" bila master mati (BUKAN 401:
+                                         # hub meneruskan 401 dan klien mengiranya sesi habis). TIDAK memeriksa grant: tak mengubah apa pun.
+POST   /remote-control/access-requests/:id/approve   # ADR-0217 · COOKIE_ONLY (sesi cookie lokal; relay & agen ditolak). Body WAJIB
+                                         #   { tier, from } (.strict()) = tingkat & hub yang dilihat operator di kartu; tanpa body/field lain → 400.
+                                         # Id acak (randomUUID). Menerapkan tingkat lewat updateRemoteControl (validasi zod PUT yang sama) → 200 { request }.
+                                         # 409 "Permintaan berubah, periksa lagi" bila id/tingkat/hub tak cocok dengan permintaan tertunda
+                                         #   (mis. kartu basi setelah restart) — grant tak disentuh. 409 sudah diputuskan / kedaluwarsa /
+                                         #   kendali jarak jauh mati (permintaan kembali pending). 404 tak dipakai untuk approve.
+POST   /remote-control/access-requests/:id/reject    # ADR-0217 · COOKIE_ONLY · 200 { request }; tak mengubah grant. 404 · 409.
 POST   /terminal/sessions                # BERUBAH: `force` dari principal remote → 403; body +confirmRemote?;
                                          # 409 { error:"remote-session"|"confirm-required", remoteSession } (gerbang presence di hub)
 POST   /specs/:id/done                   # BERUBAH: 409 confirm-required juga saat presence menunjukkan sesi di device lain

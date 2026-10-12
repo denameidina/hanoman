@@ -61,6 +61,7 @@ import setupRoutes from "./routes/setup";
 import agentTokens from "./routes/agent-tokens";
 import remoteControl from "./routes/remote-control";
 import devicesRelay from "./routes/devices-relay";
+import deviceAccessRequests from "./routes/device-access-requests"; // ADR-0217 · permintaan tingkat ke perangkat remote lewat relay
 import logs from "./routes/logs";
 import { COOKIE_NAME, lookupSession } from "./services/auth";
 import { agentTokenFromReq, authenticateAgent } from "./services/agent-auth";
@@ -275,6 +276,7 @@ export function buildApp(
     await api.register(agentTokens);   // SPEC-257 · kelola agent token (cookie-only)
     await api.register(remoteControl); // SPEC-1215 · ADR-0165 · grant kendali jarak jauh (cookie-only)
     await api.register(devicesRelay, wsOptions);  // SPEC-1216/1218 · ADR-0165 §4/§6 · aksi sesi klien lewat relay (cookie-only)
+await api.register(deviceAccessRequests); // ADR-0217 · opsi C (ADR-0216): POST/GET /devices/:id/access-requests
     await api.register(logs);   // SPEC-1217 · GET /logs, /logs/:id/transcript, GET|PUT /logs/retention (COOKIE_ONLY)
     await api.register(bindings);
     await api.register(sync);

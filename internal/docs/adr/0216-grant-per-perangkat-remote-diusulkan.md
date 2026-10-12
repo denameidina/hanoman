@@ -1,6 +1,6 @@
 # ADR-0216 — Grant per perangkat remote: analisis, batas, dan opsi
 
-- Status: **Diusulkan** — opsi D sudah diterapkan di UI (§ Penerapan opsi D). Opsi B dan C belum diwujudkan dan menunggu keputusan pemilik repo (§ Keputusan yang diminta)
+- Status: **Diterima — opsi C** (keputusan pemilik repo 2026-10-12; diwujudkan di [ADR-0217](0217-permintaan-tingkat-akses-perangkat-remote-disetujui-lokal.md)). Opsi D sudah diterapkan di UI (§ Penerapan opsi D). Opsi B tidak diambil.
 - Tanggal: 2026-10-12
 - SPEC: — (Audit UI/UX 2026-10, keputusan terbuka nomor 11)
 - Terkait: **melanjutkan** [ADR-0210](0210-perangkat-tingkat-akses-lihat-kerja-tulis.md) §5 (batas "bukan grant per perangkat remote"). Bersandar pada [ADR-0165](0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) §3/§4/§5/§7, [ADR-0197](0197-mcp-kendali-jarak-jauh-relay-log-presence.md), [ADR-0202](0202-keputusan-mcp-wajib-untuk-setiap-api-baru.md), [ADR-0117](0117-boundary-deployment-publik-otoritas-efektif-sandbox-sesi.md) (approval peluncuran), dan [ADR-0147](0147-kanal-presence-di-socket-sync.md) (presence).

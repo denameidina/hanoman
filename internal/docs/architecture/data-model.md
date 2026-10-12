@@ -216,6 +216,13 @@ tiap berkas.
   `WEBHOOK_ENTITIES.fields`: penerima harus bisa membedakan "selesai lewat sesi" dari "ditandai
   manusia" tanpa mendiff dua amplop. Dibaca gerbang sweep auto-merge ADR-0103 — item ber-`manualDone`
   dilewati, karena "beres di luar sesi" berarti tak ada yang perlu di-merge.
+- `reviewedAt` (DateTime?, [ADR-0218](../adr/0218-penanda-sudah-ditinjau-item-selesai.md)) — **kapan operator
+  menandai item selesai ini sudah ditinjau**. `null` = belum ditinjau, atau item belum selesai. Ditulis
+  HANYA lewat `POST /specs/:id/reviewed` (idempoten; stempel pertama dipertahankan). Di-reset ke `null` saat
+  stage dimundurkan dari `done` (PATCH stage, atau reset ke brainstorming oleh POST source), **bukan** oleh
+  `recordCompletion` (reconcile memanggilnya ulang untuk item selesai) dan **bukan** oleh integrasi. Baris
+  `done` pra-migrasi di-backfill dengan `updatedAt`: penanda hanya berlaku untuk penyelesaian setelah
+  migrasi. Ikut `FIELDS.spec` dan `DATE_FIELDS` sync (cermin `doneAt`); **tidak** masuk allowlist webhook.
 - `dependsOn` (Json?, SPEC-447/[ADR-0093](../adr/0093-dependency-antar-backlog.md)) — **array id spec**
   yang harus **selesai (`stage=done`) DAN commit-nya sudah ada di branch basis item ini** sebelum
   sesinya boleh diluncurkan. `null`/`[]` = berdiri sendiri; pembaca menormalkannya (`dependsOnOf`,

@@ -38,7 +38,7 @@ export type ReviewKind = "spec" | "session";
 
 // SPEC-171/230 · review worktree. kind="spec" (backlog item) atau "session" (sesi project-level
 // PRD, tanpa Spec) memilih endpoint yang dipakai — bentuk data & UI identik.
-export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onIntegrate, integrateTarget, onRevert, onDiscard }:
+export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onIntegrate, integrateTarget, onRevert, onDiscard, reviewed = false, onMarkReviewed }:
   { specId: string; title: string; onBack: () => void; kind?: ReviewKind;
     /** Pindah ke layar lain (Backlog, Terminal, IDE). Tanpa ini setiap tombol jadi tautan ke `routePath`. */
     onGoto?: (to: Route) => void;
@@ -51,7 +51,11 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
      *  memuat daftar dokumen yang akan dihapus; layar meminta konfirmasi lalu memanggil lagi dengan `true`. */
     onRevert?: (specId: string, confirmDelete?: boolean) => Promise<RevertPending | void>;
     /** Hapus worktree item: direktorinya dipindah ke tempat sampah repo, branch dan commit tetap. Galat dilempar. */
-    onDiscard?: (specId: string) => Promise<void>; }) {
+    onDiscard?: (specId: string) => Promise<void>;
+    /** ADR-0218 · item selesai sudah ditandai "sudah ditinjau" (penanda dari server, `reviewedAt` terisi). */
+    reviewed?: boolean;
+    /** ADR-0218 · tandai/batalkan "sudah ditinjau" (`reviewed` = nilai yang diminta). Galat dilempar ke bar. */
+    onMarkReviewed?: (specId: string, reviewed: boolean) => Promise<void>; }) {
   const fetchReview = kind === "session" ? api.sessionReview : api.specReview;
   const fetchFile = kind === "session" ? api.sessionReviewFile : api.specReviewFile;
   const [review, setReview] = React.useState<SpecReview | null>(null);
@@ -116,7 +120,7 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
 
   const backLabel = kind === "session" ? "Kembali ke terminal" : "Kembali ke backlog";
   // "Ada keputusan" = Integrasikan atau Kembalikan. Hapus worktree bukan keputusan, ia aksi lain di ⋯.
-  const hasDecision = !!(onIntegrate || onRevert);
+  const hasDecision = !!(onIntegrate || onRevert || onMarkReviewed);
   const branch = `hanoman/${specId.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`;
   const hint = hasDecision
     ? onIntegrate
@@ -191,6 +195,14 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
       });
     } catch (e) { setActionErr(failureMessage("menghapus worktree", e)); }
   }
+  // ADR-0218 · tandai/batalkan "sudah ditinjau". Tanpa dialog: aksinya bisa dibalik dengan tombol yang sama,
+  // dan ia tak membuang apa pun. Galat tampil di bar seperti aksi keputusan lain.
+  async function toggleReviewed() {
+    const mark = onMarkReviewed;
+    if (!mark) return;
+    setActionErr("");
+    try { await mark(specId, !reviewed); } catch (e) { setActionErr(failureMessage("menandai ditinjau", e)); }
+  }
   // Menu ⋯ "Aksi lain". Navigasi hanya ada bila layar induk memberi `onGoto` (item menu tak bisa jadi tautan).
   // Tujuan yang sudah berupa tombol di bar tak diulang, kecuali di layar sempit: di sana semuanya ada di menu.
   const itemBacklog: OverflowItem = { key: "backlog", label: "Buka di Backlog", icon: "list-checks", onSelect: () => go(goBacklog) };
@@ -205,6 +217,8 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
   const decisionMenu: OverflowItem[] = narrow ? [
     ...(onIntegrate ? [{ key: "integrate", label: "Integrasikan", icon: "git-merge", onSelect: () => void askIntegrate() }] : []),
     ...(onRevert ? [{ key: "revert", label: "Kembalikan ke Dikerjakan", icon: "rotate-ccw", onSelect: () => void askRevert() }] : []),
+    ...(onMarkReviewed ? [{ key: "reviewed", label: reviewed ? "Batalkan tanda ditinjau" : "Tandai ditinjau",
+      icon: reviewed ? "rotate-ccw" : "circle-check", onSelect: () => void toggleReviewed() }] : []),
   ] : [];
   const moreItems: OverflowItem[] = [
     ...decisionMenu,
@@ -306,10 +320,11 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
       {actionErr && <Callout tone="err" className="hn-review-decide-err">{actionErr}</Callout>}
       <p className="hn-review-decide-hint">{hint}</p>
       <div className="hn-review-decide-actions">
-        {/* Tombol berlabel di bar (lebar ≥400px). Dengan keputusan: Kembalikan, Integrasikan, lalu Terminal. */}
+        {/* Tombol berlabel di bar (lebar ≥400px). Dengan keputusan: Kembalikan, Tandai ditinjau, Integrasikan, lalu Terminal. */}
         {!narrow && (hasDecision ? (
           <>
             {onRevert && <Button size="sm" variant="secondary" leftIcon="rotate-ccw" onClick={() => void askRevert()}>Kembalikan ke Dikerjakan</Button>}
+            {onMarkReviewed && <Button size="sm" variant="secondary" leftIcon={reviewed ? "rotate-ccw" : "circle-check"} onClick={() => void toggleReviewed()}>{reviewed ? "Batalkan tanda ditinjau" : "Tandai ditinjau"}</Button>}
             {onIntegrate && <Button size="sm" variant="primary" leftIcon="git-merge" onClick={() => void askIntegrate()}>Integrasikan</Button>}
             {goButton(goTerminal, "Buka di Terminal", "terminal", "secondary")}
           </>
