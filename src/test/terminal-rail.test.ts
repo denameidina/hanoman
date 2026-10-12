@@ -24,6 +24,11 @@ describe("railStatus", () => {
       .toEqual({ tone: "attention", label: "Lead memutuskan" });
   });
 
+  it("finished menang atas decision/deciding (sisa marker tak membangkitkan 'menunggu' setelah selesai)", () => {
+    expect(railStatus(s("a", { decision: true }), true)).toEqual({ tone: "done", label: "Selesai" });
+    expect(railStatus(s("a", { decision: true, deciding: true }), true).tone).toBe("done");
+  });
+
   it("exited menang atas decision (sesi yang sudah beku tak lagi menunggu)", () => {
     expect(railStatus(s("a", { exited: true, decision: true, exitCode: 0 }), false).tone).toBe("done");
   });

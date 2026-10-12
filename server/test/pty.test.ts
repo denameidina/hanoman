@@ -12,7 +12,7 @@ import {
   sessionPhases, sessionFinished, markerFilled, promptFilePath, armGoalInTui, goalGatePath,
   sessionKind, registerSessionHooks, rootBypassEnv, noTtyPromptEnv, askpassDenyPath, hanomanDbInheritUnsets,
   sendToPane, shellBin, listSessionsAsync, liveDecisions,
-  MAX_SCROLLBACK, SCROLLBACK_SLACK, trimScrollback, PANE_QUIET_MS, paneQuiet, decisionOnset,
+  MAX_SCROLLBACK, SCROLLBACK_SLACK, trimScrollback, PANE_QUIET_MS, paneQuiet, decisionOnset, markerCurrent, MARKER_STALE_SLACK_S,
   type SessionBirth, type SessionDeath,
 } from "../src/services/pty";
 import { phaseFilePath, type Phase } from "../src/services/session-phases";
@@ -765,6 +765,18 @@ describe("pty service", () => {
     expect(paneQuiet((now - 300_000) / 1000, now)).toBe(true);
   });
 
+  it("markerCurrent: onset jauh lebih tua dari keluaran pane = usang", () => {
+    const f = join(repoDir, "marker-stale");
+    const onset = 1_787_400_000;
+    writeFileSync(f, String(onset));
+    expect(markerCurrent(f, onset)).toBe(true);
+    expect(markerCurrent(f, onset + MARKER_STALE_SLACK_S)).toBe(true);
+    expect(markerCurrent(f, onset + MARKER_STALE_SLACK_S + 1)).toBe(false);
+    expect(markerCurrent(f, 0)).toBe(true);
+    writeFileSync(f, "waiting");
+    expect(markerCurrent(f, onset + 9_999)).toBe(true);
+  });
+
   // SPEC-903 · ADR-0143 · satu episode marker bisa memuat beberapa episode menunggu (dijawab di TUI
   // → agen bekerja 20 menit → diam lagi). Onset di marker hanya menandai yang PERTAMA; kalau ia
   // dipakai apa adanya, PET_URGENT_MS (10 menit) menjerit untuk tunggu yang baru berumur semenit.
@@ -865,7 +877,7 @@ describe("pty service", () => {
     try {
       expect(find().decisionAt).toBeUndefined();          // marker kosong
 
-      writeFileSync(decisionFile, "1755840000\n");        // onset jauh lebih tua dari pane ini
+      writeFileSync(decisionFile, `${Math.floor(Date.now() / 1000)}\n`);  // onset episode ini (onset lama = usang)
       await waitFor(() => find().decision === true, 15_000);
       const at = Date.parse(find().decisionAt!);
       expect(at).toBeGreaterThan(1755840000_000);

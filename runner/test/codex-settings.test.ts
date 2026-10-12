@@ -43,9 +43,9 @@ describe("codexHookArgs", () => {
   });
 
   // SPEC-898 · ADR-0141 · cermin guardSettings: Stop menulis stempel sekali, bukan menumpuk baris.
-  it("Stop menulis epoch hanya saat marker kosong", () => {
+  it("Stop mencap ulang epoch tiap turn berakhir", () => {
     const stop = codexHookArgs({ decisionFile: "/tmp/d1" }).find((a) => a.startsWith("hooks.Stop="))!;
-    expect(stop).toContain("[ -s '/tmp/d1' ]");
+    expect(stop).not.toContain("[ -s '/tmp/d1' ]");
     expect(stop).toContain("date +%s > '/tmp/d1'");
     expect(stop).not.toContain("echo waiting");
   });

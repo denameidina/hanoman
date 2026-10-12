@@ -24,9 +24,11 @@ export function railStatus(s: TerminalSession, finished: boolean): RailStatus {
       ? { tone: "failed", label: `Gagal · exit ${s.exitCode}` }
       : { tone: "done", label: "Selesai" };
   }
+  // Plan tuntas membungkam marker keputusan (sama dengan Cell): agen yang sudah selesai lalu idle
+  // tak boleh kembali menjadi "Menunggu keputusan" karena sisa marker.
+  if (finished) return { tone: "done", label: "Selesai" };
   if (s.deciding) return { tone: "attention", label: "Lead memutuskan" };
   if (s.decision) return { tone: "attention", label: "Menunggu keputusan" };
-  if (finished) return { tone: "done", label: "Selesai" };
   // "Berjalan" hanya untuk sesi yang mengerjakan spec. Sesi bebas (tanpa spec) cuma terbuka; memakai
   // kata yang sama membuat operator mengira ia sedang mengerjakan sesuatu.
   return s.specId ? { tone: "running", label: "Berjalan" } : { tone: "open", label: "Terbuka" };

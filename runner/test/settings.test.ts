@@ -11,9 +11,9 @@ describe("guardSettings", () => {
   });
   // SPEC-898 · ADR-0141 · hook menulis STEMPEL, dan hanya bila marker masih kosong. `echo waiting >>`
   // yang lama mencap ulang mtime tiap notifikasi idle, jadi umur "menunggu" tak pernah tumbuh.
-  it("Notification menulis epoch sekali saja; marker terisi tak ditimpa", () => {
+  it("Notification mencap ulang epoch (ADR-0143 amandemen: pertanyaan kedua memajukan onset)", () => {
     const cmd = (guardSettings("/tmp/dec") as any).hooks.Notification[0].hooks[0].command as string;
-    expect(cmd).toContain("[ -s '/tmp/dec' ]");
+    expect(cmd).not.toContain("[ -s '/tmp/dec' ]");
     expect(cmd).toContain("date +%s > '/tmp/dec'");
     expect(cmd).not.toContain("echo waiting");
   });

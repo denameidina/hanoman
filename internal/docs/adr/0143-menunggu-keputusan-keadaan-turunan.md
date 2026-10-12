@@ -139,3 +139,18 @@ panel pet SPEC-899, mesin agen ketiga).
   hidup di frontend **di atas** bit ini dan tetap berlaku apa adanya.
 - Sesi yang sudah berjalan ikut terperbaiki tanpa dilahirkan ulang: tak ada satu pun hook agen yang
   berubah.
+
+## Amandemen (2026-10-13) — marker usang & "selesai" membungkam pil
+
+Gejala: pil "Menunggu keputusan" berkedip di tengah kerja (jeda keluaran > 3 dtk) dan menyala lagi
+setelah agen selesai, karena marker lama tetap terisi.
+
+- **Hook mencap ulang onset** tiap Notification claude yang cocok / Stop codex (sebelumnya "sekali").
+  Aman untuk "menunggu sejak": `decisionOnset` sudah `max(onset, aktivitas pane)`.
+- **`markerCurrent`** (`server/src/services/pty.ts`): `decision` baru benar bila keluaran terakhir pane
+  ≤ onset + `MARKER_STALE_SLACK_S` (10 dtk). Marker lebih tua dari itu = sisa episode lama. Onset tak
+  terbaca / `activityAt` 0 → fail-open (§3.4 tak berubah).
+- **Rail**: `finished` (plan tuntas) menang atas `decision`/`deciding`, sama dengan Cell.
+- **Fokus**: `TerminalScreen` mengunci `focusId` ke sesi yang tampil agar urutan rail tak memindahkannya.
+- Konsekuensi: sesi yang lahir SEBELUM amandemen masih membawa hook lama (cap sekali), jadi pertanyaan
+  kedua di sesi itu bisa tersembunyi sampai sesi di-spawn ulang.

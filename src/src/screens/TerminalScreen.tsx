@@ -182,6 +182,10 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // ke baris pertama rail, jadi tak perlu efek pembersihan.
   const ordered = React.useMemo(() => sortRail(sessions, finishedIds), [sessions, finishedIds]);
   const focused = resolveFocus(ordered, focusId);
+  // Kunci fokus ke sesi yang sedang tampil: tanpa ini fallback "baris pertama rail" ikut berpindah
+  // tiap urutan rail berubah (mis. sesi masuk/keluar "Menunggu keputusan").
+  const focusedId = focused?.id ?? null;
+  React.useEffect(() => { if (focusedId && focusedId !== focusId) setFocusId(focusedId); }, [focusedId, focusId]);
 
   const [sessionsLoaded, setSessionsLoaded] = React.useState(false);
   // Gagal memuat daftar tampil sebagai galat ber-"Coba lagi", bukan daftar kosong yang menyamar

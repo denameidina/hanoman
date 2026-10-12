@@ -93,6 +93,10 @@ export const PANE_QUIET_MS = 3_000;
 export const paneQuiet = (activityAt: number, now: number = Date.now()): boolean =>
   !(activityAt > 0) || now - activityAt * 1000 >= PANE_QUIET_MS;
 
+// Keluaran pane yang melewati onset marker lebih dari ini (detik) = agen sudah lanjut bekerja sesudah
+// episode itu; Notification berikutnya mencap ulang onset (hook), jadi episode baru tetap terbaca.
+export const MARKER_STALE_SLACK_S = 10;
+
 // SPEC-898 · ADR-0141 · isi marker = detik epoch ONSET episode menunggu (ditulis sekali oleh hook,
 // lihat runner/src/settings.ts). Marker sesi yang lahir sebelum ADR-0141 berisi "waiting" — tak bisa
 // diparse, dan 0 di sana adalah jawaban yang benar: markernya sendiri tak tahu sejak kapan.
@@ -112,6 +116,14 @@ const markerOnset = (f: string): number => {
 // PET_URGENT_MS menjerit palsu. Detik terakhir pane mengeluarkan sesuatu ADALAH awal episode yang
 // sekarang. `max`, bukan "pakai aktivitas saja", supaya kasus langka hook-menembak-sesudah-keluaran-
 // terakhir tetap memberi angka yang lebih benar.
+// Marker usang = onset jauh lebih tua dari keluaran terakhir pane: agen menjawab-lalu-bekerja-lagi dan
+// diamnya pane kini berarti idle/selesai. Tanpa ini pil menyala saat agen selesai. Onset tak terbaca
+// (0 / "waiting" pra-ADR-0141) atau activityAt tak diketahui → true (fail-open, ADR-0143 §3.4).
+export const markerCurrent = (f: string, activityAt: number): boolean => {
+  const onset = markerOnset(f);
+  return onset === 0 || !(activityAt > 0) || activityAt <= onset + MARKER_STALE_SLACK_S;
+};
+
 export const decisionOnset = (f: string, activityAt: number): string | undefined => {
   const secs = Math.max(markerOnset(f), activityAt > 0 ? Math.floor(activityAt) : 0);
   return secs > 0 ? new Date(secs * 1000).toISOString() : undefined;
@@ -534,7 +546,8 @@ export function parsePanes(out: string): Pane[] {
       // `UserPromptSubmit`, jadi ia tetap terisi sepanjang agen bekerja sesudah pertanyaannya
       // dijawab lewat jalur lain (dialog di TUI, route SPEC-899, Esc, codex yang melanjutkan
       // sendiri). Pane yang masih mengeluarkan sesuatu berarti agen sudah lanjut bekerja.
-      decision: !exited && !!decisionFile && markerFilled(decisionFile) && paneQuiet(activityAt),
+      decision: !exited && !!decisionFile && markerFilled(decisionFile) && paneQuiet(activityAt)
+        && markerCurrent(decisionFile, activityAt),
       // SPEC-338 · sesi yang lahir sebelum ADR-0074 tak punya opsi ini → claude.
       agent: (agent === "codex" ? "codex" : "claude") as Agent,
       altScreen: alternate === "1",

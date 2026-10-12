@@ -38,8 +38,8 @@ export function codexHookArgs(o: { decisionFile?: string; goalGate?: string; eve
   // SPEC-184 · marker keputusan. Berbeda dari claude, tak ada teks notifikasi untuk di-grep:
   // Stop SELALU berarti turn berakhir, jadi marker langsung ditulis.
   if (o.decisionFile) {
-    // SPEC-898 · ADR-0141 · stempel onset, ditulis sekali (lihat runner/src/settings.ts).
-    stop.push(`[ -s ${shq(o.decisionFile)} ] || date +%s > ${shq(o.decisionFile)}`);
+    // SPEC-898 · ADR-0141 · stempel onset, dicap ulang tiap Stop (ADR-0143 amandemen; lihat runner/src/settings.ts).
+    stop.push(`date +%s > ${shq(o.decisionFile)}`);
     submit.push(`: > ${shq(o.decisionFile)}`);
   }
   // SPEC-909 · ADR-0146 · padanan hook `AskUserQuestion` untuk codex. Codex tak punya tool itu;

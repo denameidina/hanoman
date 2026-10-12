@@ -66,14 +66,16 @@ export const guardSettings = (
   // (bagian variabel hanya <sessionId> = [a-z0-9_-]); naikkan bila repoDir bisa memuat "'".
   if (decisionFile) {
     const f = `'${decisionFile.split("'").join("'\\''")}'`;
-    // SPEC-898 · ADR-0141 · isi marker = detik epoch ONSET episode ini, ditulis SEKALI. Notification
-    // berulang (Claude idle lagi) tak boleh mencapnya ulang: kalau ia mencap ulang, "menunggu sejak"
-    // selalu terbaca lebih muda dari satu putaran idle dan gerbang urgensi tak pernah menyala.
+    // SPEC-898 · ADR-0141 · isi marker = detik epoch ONSET episode ini. SPEC-903 · ADR-0143 (amandemen)
+    // · DICAP ULANG tiap Notification yang cocok: server menganggap marker usang bila pane masih
+    // mengeluarkan keluaran >10 dtk SESUDAH onset (agen sudah lanjut kerja), jadi pertanyaan kedua
+    // dalam sesi yang sama harus memajukan onset. "Menunggu sejak" tetap benar karena
+    // `decisionOnset` mengambil max(onset, aktivitas pane).
     // `size > 0` tetap satu-satunya arti marker (SPEC-184) — markerFilled tak berubah. SPEC-903 ·
     // ADR-0143 · artinya kini "pernah minta masukan", bukan "sedang menunggu": server menggerbanginya
     // dengan keadaan pane. Hook di sini sengaja TIDAK ikut berubah.
     hooks.Notification = [{ hooks: [{ type: "command",
-      command: `grep -qiE 'idle|permission|waiting for|needs.?input' && { [ -s ${f} ] || date +%s > ${f}; } || true` }] }];
+      command: `grep -qiE 'idle|permission|waiting for|needs.?input' && date +%s > ${f} || true` }] }];
     hooks.UserPromptSubmit = [{ hooks: [{ type: "command", command: `: > ${f}` }] }];
   }
   // SPEC-909 · ADR-0146 · pintu deteksi lead tak lagi memindai; ia menunggu event ini. Matcher
@@ -101,7 +103,7 @@ export const guardSettings = (
       const f = `'${decisionFile.split("'").join("'\\''")}'`;
       (hooks.Stop ??= []).push({ hooks: [{ type: "command", command: `${busySnapshotCommand(sub)}; exit 0` }] });
       hooks.Notification = [{ hooks: [{ type: "command",
-        command: `m=$(cat); if [ -s ${sub} ]; then echo "$m" | grep -qiE 'permission|needs.?input'; else echo "$m" | grep -qiE 'idle|permission|waiting for|needs.?input'; fi && { [ -s ${f} ] || date +%s > ${f}; } || true` }] }];
+        command: `m=$(cat); if [ -s ${sub} ]; then echo "$m" | grep -qiE 'permission|needs.?input'; else echo "$m" | grep -qiE 'idle|permission|waiting for|needs.?input'; fi && date +%s > ${f} || true` }] }];
       hooks.UserPromptSubmit = [{ hooks: [{ type: "command", command: `: > ${f}; : > ${sub}` }] }];
     }
   }
