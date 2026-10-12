@@ -36,7 +36,7 @@ describe("topbar · versi terpasang (SPEC-906)", () => {
     render(<Shell active="overview" title="Overview">isi</Shell>);
     await act(async () => { emit(frame({})); });
 
-    const pill = screen.getByRole("button", { name: /versi terpasang/i });
+    const pill = screen.getByRole("button", { name: /versi hanoman/i });
     expect(pill.textContent).toContain("v0.1.56");
     fireEvent.click(pill);
     expect(screen.getByText(/terpasang 0\.1\.56 · tersedia 0\.1\.56/)).toBeTruthy();
@@ -49,7 +49,7 @@ describe("topbar · versi terpasang (SPEC-906)", () => {
       emit(frame({ latestVersion: "0.2.0", updateAvailable: true, command: "npm i -g hanoman@latest" }));
     });
 
-    expect(screen.queryByRole("button", { name: /versi terpasang/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /versi hanoman/i })).toBeNull();
     expect(screen.getByRole("button", { name: /update tersedia/i }).textContent).toContain("Update · 0.2.0");
   });
 });

@@ -407,8 +407,21 @@
     gap: 0;
   }
 
+  /* Ponsel: layar mengisi sisa `.hn-shell-content` (flex, min-height 100%), jadi pane fokus dan output xterm mengambil
+     ruang yang tersisa. Padding bawah konten (32px) dikembalikan lewat margin negatif: dock composer jatuh ke dasar
+     viewport (di atas safe-area), bukan 32px di atasnya. Jarak antar-baris 4px (bukan 12px). Output tetap dominan
+     (≥ 55% tinggi di 320×640). */
   .hn-terminal-screen:not(.is-maxed) {
     min-height: 0;
+    gap: var(--space-1);
+    margin-bottom: -32px;
+  }
+
+  /* Kepala sesi di ponsel: satu baris setinggi 44px (tombol ⋯ sendiri), tanpa padding vertikal. */
+  .hn-terminal-focus-head {
+    padding-top: 0;
+    padding-bottom: 0;
+    min-height: var(--touch-target);
   }
 
   .hn-terminal-rail {

@@ -212,7 +212,7 @@ describe("Overview · perlu perhatian dan project", () => {
     expect(onGoto).toHaveBeenCalledWith("backlog");
   });
 
-  it("aktivitas terbaru: keadaan tampil sekali dengan label manusia; 'idle' dan 'running · flow' tak tampil mentah", () => {
+  it("aktivitas terbaru: hanya proyek yang berjalan; keadaan tampil dengan label manusia, tak tampil mentah", () => {
     render(<OverviewScreen
       projects={[
         project({ id: "a", name: "alpha", activity: "idle" }),
@@ -221,25 +221,46 @@ describe("Overview · perlu perhatian dan project", () => {
       ]}
       backlog={[]} sessions={[session({ id: "s1", projectId: "b" })]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
     const rows = within(screen.getByRole("list", { name: "Aktivitas terbaru" })).getAllByRole("listitem");
+    // alpha (idle) tak punya aktivitas yang berbeda dari daftar Project: tak diulang di sini.
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.textContent).toContain("beta");
     expect(rows[0]!.textContent).toContain("Berjalan");
     expect(rows[0]!.textContent).toContain("Fitur");          // nama flow dari FLOW_LABEL, bukan "running · feature"
-    expect(rows[1]!.textContent).toContain("Diam");
-    expect(rows[1]!.textContent).not.toMatch(/idle/);
     expect(rows[0]!.textContent).not.toMatch(/running ·/);
     expect(screen.queryByText("idle")).toBeNull();
+    expect(screen.queryByText("Diam")).toBeNull();
   });
 
   it("aktivitas terbaru: maksimal lima baris, dan klik membuka project", () => {
     const onOpenProject = vi.fn();
     const many = Array.from({ length: 7 }, (_, i) => project({ id: `p${i}`, name: `proj${i}` }));
-    render(<OverviewScreen projects={many} backlog={[]} sessions={[session({ id: "s1", projectId: "p6" })]}
+    render(<OverviewScreen projects={many} backlog={[]}
+      sessions={many.map((p) => session({ id: `s-${p.id}`, projectId: p.id }))}
       onOpenProject={onOpenProject} onGoto={noop} onOpenSession={noop} />);
     const rows = within(screen.getByRole("list", { name: "Aktivitas terbaru" })).getAllByRole("listitem");
     expect(rows).toHaveLength(5);
     expect(rows[0]!.textContent).toContain("Berjalan");
-    expect(rows[0]!.textContent).toContain("proj6");   // yang hidup naik ke atas
     fireEvent.click(within(rows[0]!).getByRole("button"));
-    expect(onOpenProject).toHaveBeenCalledWith(many[6]);
+    expect(onOpenProject).toHaveBeenCalledWith(many[0]);
+  });
+
+  it("proyek di 'Perlu perhatian' tak diulang di 'Aktivitas terbaru': satu proyek, satu baris", () => {
+    const alpha = project({ id: "a", name: "alpha", docStatus: "broken", coverage: 20 });
+    render(<OverviewScreen projects={[alpha, project({ id: "c", name: "gamma" })]} backlog={[]}
+      sessions={[session({ id: "s-a", projectId: "a" }), session({ id: "s-c", projectId: "c" })]}
+      onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    const act = within(screen.getByRole("list", { name: "Aktivitas terbaru" })).getAllByRole("listitem");
+    expect(act).toHaveLength(1);
+    expect(act[0]!.textContent).toContain("gamma");
+    expect(within(screen.getByRole("list", { name: "Perlu perhatian" })).getByRole("button", { name: /alpha/ })).toBeTruthy();
+  });
+
+  it("tanpa proyek yang berjalan, 'Aktivitas terbaru' tak tampil sama sekali (tak ada keadaan kosong yang mengulang)", () => {
+    render(<OverviewScreen projects={[project({ id: "a", name: "alpha" }), project({ id: "b", name: "beta", docStatus: "broken", coverage: 10 })]}
+      backlog={[]} sessions={[]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    expect(screen.queryByRole("list", { name: "Aktivitas terbaru" })).toBeNull();
+    expect(screen.queryByText("Aktivitas terbaru")).toBeNull();
+    expect(screen.getByRole("list", { name: "Project" })).toBeTruthy();
   });
 });
 

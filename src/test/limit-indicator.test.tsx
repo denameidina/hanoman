@@ -58,6 +58,6 @@ describe("LimitBadge", () => {
   it("shows an em dash when unavailable", () => {
     hookDto = { status: "unavailable", windows: [], fetchedAt: null };
     render(<LimitBadge />);
-    expect(screen.getByTitle("Limit Claude").textContent).toContain("—");
+    expect(screen.getByTitle("Limit Claude").textContent).toBe("Limit —");
   });
 });

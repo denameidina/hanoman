@@ -45,6 +45,26 @@ describe("terminal.css · tinggi pane ponsel (320×640: composer tanpa gulir)", 
   });
 });
 
+describe("terminal.css · ponsel 320×640: output dominan (≥ 55%), chrome di atasnya dipadatkan", () => {
+  it("layar ponsel mengisi sisa ruang konten: margin bawah -32px mengembalikan padding bawah .hn-shell-content", () => {
+    expect(mobileBlock).toMatch(/\.hn-terminal-screen:not\(\.is-maxed\)\s*\{[^}]*margin-bottom:\s*-32px/);
+    const appCss = readFileSync(join(SRC, "app.css"), "utf8");
+    expect(appCss).toMatch(/\.hn-shell-content \{[^}]*padding:\s*var\(--page-gutter-y\) var\(--page-gutter-x\) calc\(32px/);
+  });
+
+  it("jarak antar-baris ponsel 4px (--space-1), bukan 12px", () => {
+    expect(mobileBlock).toMatch(/\.hn-terminal-screen:not\(\.is-maxed\)\s*\{[^}]*gap:\s*var\(--space-1\)/);
+  });
+
+  it("kepala sesi ponsel satu baris setinggi tinggi sentuh, tanpa padding vertikal", () => {
+    expect(mobileBlock).toMatch(/\.hn-terminal-focus-head\s*\{[^}]*padding-top:\s*0[^}]*padding-bottom:\s*0[^}]*min-height:\s*var\(--touch-target\)/);
+  });
+
+  it("tak ada tinggi layar yang dihitung dari viewport di ponsel (overflow 47px dulu dari calc 100dvh)", () => {
+    expect(mobileBlock).not.toMatch(/\.hn-terminal-screen:not\(\.is-maxed\)\s*\{[^}]*100dvh/);
+  });
+});
+
 describe("terminal.css · dock ringkas di ponsel", () => {
   it("composer satu baris di ponsel", () => {
     expect(mobileBlock).toMatch(/\.hn-terminal-dock \.hn-terminal-composer\s*\{\s*flex-wrap:\s*nowrap/);

@@ -68,6 +68,37 @@ describe("rail tablet: ikon nav tak menyusut, badge absolut di pojok ikon", () =
   });
 });
 
+describe("rail tablet: nama hub tampil di bawah ikon, item hub tanpa inline style", () => {
+  const rail = css.slice(css.indexOf("@media (min-width: 768px) and (max-width: 1199px) {"));
+
+  it("label hub tampil (block, teks kecil) di rail, bukan display:none", () => {
+    expect(rail).toMatch(/\.hn-shell-sidebar \.hn-nav-label \{\s*display: block;/);
+    expect(rail).not.toMatch(/\.hn-shell-sidebar \.hn-nav-label,\s*\.hn-shell-sidebar \.hn-nav-group-label/);
+  });
+
+  it("ikon di atas label; tinggi 44px tetap dari kelas dasar; lebar rail tetap dari --sidebar-w", () => {
+    expect(rail).toMatch(/\.hn-shell-sidebar \.hn-nav-item \{ flex-direction: column;/);
+    expect(css).toMatch(/\.hn-nav-item \{[^}]*min-height: 44px;/);
+    expect(rail).toMatch(/\.hn-shell-sidebar \{ width: var\(--sidebar-w\);/);
+  });
+
+  it("hover lewat :hover dan tak menimpa item aktif (aria-current menang)", () => {
+    expect(css).toMatch(/\.hn-nav-item\[data-interactive="true"\]:not\(\[aria-current="page"\]\):hover/);
+    expect(css).toMatch(/\.hn-nav-item\[aria-current="page"\] \{[^}]*background: var\(--brass-100\)/);
+  });
+
+  it("HnHubItem tanpa inline style dan tanpa state hover React", () => {
+    const shell = readFileSync(resolve(import.meta.dirname, "../src/ds/shell.tsx"), "utf8");
+    const start = shell.indexOf("function HnHubItem(");
+    const end = shell.indexOf("\n}\n", start);
+    const fn = shell.slice(start, end);
+    expect(start).toBeGreaterThan(0);
+    expect(fn).not.toMatch(/style=\{/);
+    expect(fn).not.toMatch(/useState/);
+    expect(fn).toMatch(/data-interactive=/);
+  });
+});
+
 describe("fokus palet: satu indikator (pembungkus), tanpa outline ganda", () => {
   it("outline input di dalam kotak cari dimatikan dengan spesifisitas yang mengalahkan aturan global", () => {
     expect(palette).toMatch(/\.hn-palette-search input:focus-visible,\s*\.hn-palette-input:focus-visible \{ outline: none; \}/);

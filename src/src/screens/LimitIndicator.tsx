@@ -107,8 +107,9 @@ function LimitPill({ title, dto, square = false, emptyHint, eyebrow, footnote }:
   const state = !known || !worst
     ? "belum terbaca"
     : `${worst.usedPct}% terpakai, ${severityWord(worst.severity)}${stale ? ", data lama" : ""}`;
+  // Belum terbaca: kata "Limit" ikut tampil, supaya strip sendirian tak dibaca sebagai angka yang rusak.
   const visible = !known || !worst
-    ? "—"
+    ? "Limit —"
     : `${worst.usedPct}% · ${severityWord(worst.severity)}${stale ? " · lama" : ""}`;
   return (
     <div className="hn-lim-pill-wrap">

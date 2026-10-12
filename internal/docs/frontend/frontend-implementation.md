@@ -3484,3 +3484,42 @@ Diukur di Chrome headless terhadap server QA (fixture repo-a, 390 sentuh dan 128
 - **Trade-off.** Area sentuh efektif pil (uji `elementFromPoint`) di 390: 44–45 px → 25 px. Pil kini di bawah baris subjek, jadi area sentuhnya dibatasi baris itu; 25 px memenuhi 24 px WCAG 2.5.8 AA. 44 px berarti area pil menimpa subjek di atasnya.
 - **1280 tak berubah:** subjek 206.3 / 160 / 175.8 / 160 px, pil 25 px, baris 30 px. `scrollWidth` = `clientWidth` (390) di semua keadaan.
 - **Tes:** `ide-hit-area-pills`, `ide-responsive`, `ds-css-contract`.
+
+## Audit UI/UX 2026-10 — sisa temuan tinjauan desain segar (topbar, rail, Overview, Terminal 320)
+
+Empat temuan dari tinjauan desain segar, path relatif `src/src`. Tanpa `!important` baru (`app.css` tetap 8) dan tanpa
+style inline baru; inline style di `HnHubItem` justru dihapus. Angka dari Chrome headless terhadap server QA (fixture
+repo-a, sesi shell uji), sebelum → sesudah.
+
+- **Topbar desktop.** Pil versi hanya tampil untuk versi semver nyata (`isRealVersion` di `api/update.ts`: `X.Y.Z`,
+  bukan `0.0.0`). Tanpa itu dan tanpa update, `UpdateBadge` tak merender apa pun; keadaan "update tersedia" tak berubah.
+  Nama keadaan versi kini "Versi hanoman" (tooltip, nama aksesibel, judul popover). Pil limit yang belum terbaca
+  (`LimitPill`) berbunyi "Limit —" (sebelumnya "—"); nama aksesibelnya tetap "Limit Claude, belum terbaca".
+  Di 1280: pil `v0.0.0` hilang; pil limit "—" → "Limit —". Topbar 56 px sebelum dan sesudah.
+- **Rail 1024.** `HnHubItem` tak lagi memakai inline style dan state hover React. Susunannya di kelas `.hn-nav-item`
+  (`app.css`), hover lewat `:hover` pada item yang bisa diklik (`data-interactive`), dan `aria-current` menang atas hover.
+  Di rail tablet nama hub tampil kecil (`--text-2xs`, 11 px) di bawah ikon, elipsis bila sempit; nama lengkap tetap di
+  `title` dan `aria-label`. Lebar rail tetap 72 px (`--sidebar-w`); padding samping 8 → 4 px memberi label ruang. Tinggi
+  item tetap 44 px (17 ikon + 2 + label 13 + padding 6+6). Sebelum: delapan ikon tanpa teks, "Otonom" dan "Sesi" ambigu.
+- **Overview.** "Aktivitas terbaru" hanya memuat proyek yang sesinya berjalan dan tak sedang di "Perlu perhatian"
+  (`screens/OverviewScreen.tsx`). Alasannya: `ProjectVM.commit` bukan hash git. Server (`project-view.ts`) mengisinya
+  `→ hanoman/<sesi>` saat berjalan atau `belum ada commit` saat tidak, jadi baris proyek idle tak punya nilai yang
+  berbeda dari daftar Project. Seksi disembunyikan bila kosong, tak ada keadaan kosong yang mengulang. Duplikasi
+  "Perlu perhatian" ↔ "Aktivitas terbaru": 2 → 0 di 390 dan 1280. Judul "Hari ini" (tersembunyi) dan crumb
+  "ringkasan workspace" berbeda dari "Overview" di nav: tegangan dicatat di `glossary.md` § Keputusan terbuka.
+- **Terminal 320×640 (mode Fokus, ponsel).** Layar mengisi sisa konten (`.hn-shell-content`); padding bawah konten
+  32 px dikembalikan dengan margin negatif, jadi dock composer tetap di dasar viewport. Jarak antar-baris 12 → 4 px;
+  kepala sesi 61 → 45 px (satu baris setinggi tinggi sentuh, tanpa padding vertikal). Toolbar sudah satu baris (empat
+  kontrol 248 px dari 292 px) sehingga tak dijadikan ikon: tak ada aksi yang dihapus. Chrome di atas output
+  188 → 164 px; xterm 304 → 361 px (48% → 56% tinggi); composer 505–560 → 537–592 (terlihat sebelum dan sesudah);
+  gulir vertikal dan horizontal 0.
+- **Overflow horizontal di 390.** 0 px di 17 rute, sebelum dan sesudah.
+
+Tes: `overview-screen` (aktivitas hanya proyek berjalan, tanpa duplikasi, seksi disembunyikan), `update-indicator` dan
+`shell-version-pill` (nama "Versi hanoman", versi placeholder), `limit-indicator` ("Limit —"), `responsive-chrome-css`
+(rail: label tampil, item tanpa inline/hover React), `terminal-css-contract` (tinggi ponsel, kepala 45 px, margin -32 px).
+
+Batas verifikasi: sesi agen Claude tak tersedia di QA, jadi strip fase (`PhaseStrip`, ±27 px dari CSS) tak ikut terukur;
+dengan strip itu output diperkirakan ±52%, di bawah 55%. Tidak ada sesi non-berjalan yang tampil di fixture, jadi baris
+"Aktivitas terbaru" berisi proyek berjalan hanya dibuktikan lewat tes unit. VoiceOver/NVDA tak diuji; tooltip rail
+memakai `title` (native), yang tak muncul di perangkat sentuh, dan label terlihat menggantikannya.

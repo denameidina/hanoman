@@ -14,7 +14,7 @@ import { useLimits } from "../api/limits";
 import { useCodexLimits } from "../api/codex-limits";
 import "./styles/overview.css";
 
-/** Batas baris "Aktivitas terbaru" (audit: maks 5). */
+/** Batas baris "Aktivitas terbaru" (audit: maks 5; proyek di "Perlu perhatian" tak ikut). */
 const ACTIVITY_MAX = 5;
 
 // Dokumen rusak perlu tindakan; drift hanya tidak sinkron. Sesi tak punya status "gagal" yang terbaca dari luar.
@@ -106,14 +106,12 @@ function PrjRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void })
 }
 
 // Teks `activity` dari server ("idle", "running · <flow>") hanya mengulang status: yang tampil keadaan
-// (satu label dari lib/labels.ts) dan, bila berjalan, nama flow-nya.
-function ActRow({ p, live, onOpen }: { p: ProjectVM; live: boolean; onOpen: (p: ProjectVM) => void }) {
-  const flow = live && p.session.flow ? labelOf(FLOW_LABEL, p.session.flow) : "";
+// (satu label dari lib/labels.ts) dan nama flow-nya. Hanya untuk proyek yang sesinya berjalan (lihat `activity`).
+function ActRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }) {
+  const flow = p.session.flow ? labelOf(FLOW_LABEL, p.session.flow) : "";
   return (
     <DenseRow onClick={() => onOpen(p)}>
-      <StatusPill status={live ? "running" : "idle"} variant="dot" size="sm">
-        {PROJECT_ACTIVITY_LABEL[live ? "running" : "idle"]}
-      </StatusPill>
+      <StatusPill status="running" variant="dot" size="sm">{PROJECT_ACTIVITY_LABEL.running}</StatusPill>
       <span className="hn-ov-name" title={p.name}>{p.name}</span>
       <span className="hn-ov-activity" title={flow}>{flow}</span>
       <span className="hn-ov-mono" title={p.commit}>{p.commit}</span>
@@ -157,8 +155,10 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
     .sort((a, b) => (attentionOf(a) === "high" ? 0 : 1) - (attentionOf(b) === "high" ? 0 : 1));
   // Proyek yang sudah tampil di "Perlu perhatian" tak diulang di "Project": daftar itu memuat sisanya.
   const others = projects.filter((p) => attentionOf(p) === "none").sort((a, b) => a.coverage - b.coverage);
-  const activity = [...projects]
-    .sort((a, b) => Number(liveProjects.has(b.id)) - Number(liveProjects.has(a.id)))
+  // Hanya proyek yang sesinya berjalan: itu aktivitas nyata. `commit` bukan hash git (server:
+  // project-view.ts) melainkan "→ hanoman/<sesi>" atau "belum ada commit", jadi proyek idle tak punya nilai
+  // yang berbeda dari daftar Project. Proyek bermasalah tampil di "Perlu perhatian", tak diulang di sini.
+  const activity = projects.filter((p) => attentionOf(p) === "none" && liveProjects.has(p.id))
     .slice(0, ACTIVITY_MAX);
   const briefN = backlog.filter((s) => s.source === "brief").length;
   const qaN = backlog.filter((s) => s.source === "qa").length;
@@ -233,11 +233,15 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
         </div>
       </Section>
 
-      <Section id="ov-act" title="Aktivitas terbaru">
-        <RowList label="Aktivitas terbaru" className="hn-ov-act">
-          {activity.map((p) => <ActRow key={p.id} p={p} live={liveProjects.has(p.id)} onOpen={onOpenProject} />)}
-        </RowList>
-      </Section>
+      {/* Tanpa sesi yang berjalan di luar "Perlu perhatian", seksi ini disembunyikan, bukan dibiarkan kosong:
+          "Sesi berjalan" sudah menyatakan keadaan itu, dan keadaan kosong di sini hanya akan mengulangnya. */}
+      {activity.length > 0 && (
+        <Section id="ov-act" title="Aktivitas terbaru">
+          <RowList label="Aktivitas terbaru" className="hn-ov-act">
+            {activity.map((p) => <ActRow key={p.id} p={p} onOpen={onOpenProject} />)}
+          </RowList>
+        </Section>
+      )}
 
       <Section id="ov-limit" title="Limit langganan" meta={limitMeta}>
         {codexOn && (

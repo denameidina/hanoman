@@ -103,35 +103,23 @@ function HnNavBadge({ count }: { count: number }) {
 
 /* ADR-0205 · satu entri sidebar = satu hub. `target` sudah diselesaikan pemanggil (tab terakhir di hub
    itu, atau default), jadi klik cukup meneruskannya ke App seperti sebelumnya. */
+/* Susunan dan keadaan item (aktif, hover) hidup di `.hn-nav-item` (app.css), bukan di inline style: rail tablet
+   mengubahnya jadi ikon di atas label kecil, dan hover lewat `:hover` (tanpa state React per baris). */
 function HnHubItem({ hub, on, target, badge, onNavigate }:
   { hub: NavHub; on: boolean; target: string; badge?: number; onNavigate?: (key: string) => void }) {
-  const [hover, setHover] = React.useState(false);
   const interactive = !!onNavigate;
-  // Angka ikut ke dalam nama yang dibacakan & tooltip: di lebar tablet label-nya disembunyikan CSS,
-  // sehingga tanpa ini pembaca layar hanya mendengar "Triase" untuk tombol yang justru sedang
-  // memberi tahu ada tiga yang menunggu.
+  // Angka ikut ke dalam nama yang dibacakan & tooltip: di lebar tablet label-nya tampil kecil di bawah
+  // ikon, dan badge-nya hanya angka di pojok; tanpa ini pembaca layar tak mendengar tiga yang menunggu.
   const name = badge ? `${hub.label}, ${badge} butuh pengajuan` : hub.label;
   return (
     <button
       type="button"
       className="hn-nav-item"
+      data-interactive={interactive ? "true" : undefined}
       onClick={interactive ? () => onNavigate!(target) : undefined}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
       aria-current={on ? "page" : undefined}
       aria-label={name}
       title={name}
-      style={{
-        display: "flex", alignItems: "center", gap: 10, width: "100%",
-        minHeight: 44, padding: "8px 10px", cursor: interactive ? "pointer" : "default",
-        borderRadius: "var(--radius-sm)", textAlign: "left",
-        border: "none",
-        background: on ? "var(--brass-100)" : (hover && interactive ? "var(--bone-200)" : "transparent"),
-        color: on ? "var(--brass-700)" : "var(--text-body)",
-        fontFamily: "var(--font-ui)", fontSize: "var(--text-md)",
-        fontWeight: on ? "var(--weight-semibold)" : "var(--weight-medium)",
-        transition: "background var(--dur-fast, 120ms) ease",
-      }}
     >
       <Icon name={hub.icon} size={17} color={on ? "var(--accent-hover)" : "var(--text-muted)"} />
       <span className="hn-nav-label">{hub.label}</span>

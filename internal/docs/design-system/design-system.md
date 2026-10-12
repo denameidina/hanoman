@@ -111,6 +111,7 @@ memakainya, dan menggulir mendatar sendiri. Target: ≤ 64 px tanpa baris kedua,
 `wrap` di desktop memindahkan avatar Akun ke baris kedua di /review dan topbar jadi 79 px). Yang menyusut adalah
 crumb/judul dan baris kedua (project, cari, aksi) dengan elipsis; tombol dan lencana alat utuh. Topbar 56 px di
 semua rute. Dikunci `src/test/responsive-chrome-css.test.ts`.
+Pil versi di topbar hanya untuk versi semver nyata (`isRealVersion`, `api/update.ts`; `0.0.0` dan bentuk empat bagian tak tampil), dan pil limit yang belum terbaca berbunyi "Limit —" (Audit UI/UX 2026-10 · tinjauan segar).
 **Daftar hub yang meluap** diberi cue gulir (`data-cue-start/end` di `.hn-shell-nav`, dihitung di `shell.tsx`), dan hub
 aktif digulir ke layar saat pindah layar.
 
@@ -271,7 +272,7 @@ Keputusan di [ADR-0205](../adr/0205-navigasi-8-hub-bergrup.md).
 | Elemen | Aturan |
 |---|---|
 | Sidebar (desktop) | Delapan hub dalam tiga grup berlabel: **Kerja** (Overview, Projects, Backlog, Triase, Sesi) · **Otomasi** (Otonom) · **Sistem** (Skills, Pengaturan). Item aktif = hub yang memuat layar |
-| Rail (tablet) | Ikon saja. Label grup disembunyikan, dan grup dipisah garis tipis. Tak ada gulir |
+| Rail (tablet) | Ikon dengan nama hub kecil di bawahnya (11 px, elipsis bila sempit; nama lengkap di tooltip dan nama aksesibel). Label grup disembunyikan, dan grup dipisah garis tipis. Lebar 72 px, tanpa gulir |
 | Drawer (mobile) | Tiga grup berlabel. Menutup sesudah navigasi |
 | Klik hub | Membuka tab terakhir yang dibuka di hub itu. Tanpa riwayat, tab pertama yang tampil |
 | Bar tab | Di atas konten layar anak hub. `role="tablist"` dengan URL sebagai sumber kebenaran. Tampil bila ada dua tab atau lebih yang tampil |

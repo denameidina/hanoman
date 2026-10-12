@@ -108,6 +108,17 @@ textarea:focus-visible,
 .hn-nav-group { display: flex; flex-direction: column; gap: 2px; }
 .hn-nav-group + .hn-nav-group { margin-top: 14px; }
 .hn-nav-group-label { padding: 0 10px 6px; }
+/* ADR-0205 · item hub. Semula inline + state hover React; kini kelas agar rail tablet bisa menyusunnya ulang.
+   Hover hanya untuk item yang bisa diklik dan tak sedang aktif; `aria-current` menang atas hover. */
+.hn-nav-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 10px;
+  border: none; border-radius: var(--radius-sm); background: transparent; color: var(--text-body);
+  font-family: var(--font-ui); font-size: var(--text-md); font-weight: var(--weight-medium);
+  text-align: left; cursor: default; transition: background var(--dur-fast, 120ms) ease;
+}
+.hn-nav-item[data-interactive="true"] { cursor: pointer; }
+.hn-nav-item[data-interactive="true"]:not([aria-current="page"]):hover { background: var(--bone-200); }
+.hn-nav-item[aria-current="page"] { background: var(--brass-100); color: var(--brass-700); font-weight: var(--weight-semibold); }
 /* ADR-0205 · bar tab hub di atas konten layar anak hub (SectionTabs). */
 /* Bar tab hub: SATU baris yang menggulir mendatar (`.hn-tabs` sudah `overflow-x: auto` dan tab-nya
    `flex: 0 0 auto`); wadahnya tak boleh lebih lebar dari kolom, supaya gulirnya ada di bar, bukan di halaman. */
@@ -228,7 +239,8 @@ textarea:focus-visible,
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
-  .hn-shell-sidebar { width: var(--sidebar-w); padding: 14px 8px; }
+  /* Lebar rail tetap `--sidebar-w` (72px); padding samping 4px memberi item hub ruang 63px untuk label 11px. */
+  .hn-shell-sidebar { width: var(--sidebar-w); padding: 14px 4px; }
   /* Rail: badge hitungan DILEPAS dari aliran flex (absolut di pojok kanan-atas tombol). Sebagai flex item ia
      tadinya ikut membagi lebar dengan ikon, dan ikon Backlog/Triase menyusut dari 17 ke 7 px (C). */
   .hn-shell-sidebar .hn-nav-item { position: relative; }
@@ -236,8 +248,14 @@ textarea:focus-visible,
     position: absolute; top: 3px; right: 5px; margin-left: 0;
     min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px;
   }
-
-  .hn-shell-sidebar .hn-nav-label,
+  /* Rail: ikon di atas label kecil (nama hub tak lagi hanya ikon, jadi "Otonom" dan "Sesi" terbaca). Tinggi
+     tetap 44px: 17 ikon + 2 jarak + label 13 + padding 6+6. Label terpotong elipsis bila sempit; nama
+     lengkapnya ada di title dan aria-label. */
+  .hn-shell-sidebar .hn-nav-item { flex-direction: column; justify-content: center; gap: 2px; padding: 6px 0; }
+  .hn-shell-sidebar .hn-nav-label {
+    display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: var(--text-2xs); line-height: 1.2; text-align: center;
+  }
   .hn-shell-sidebar .hn-nav-group-label,
   .hn-shell-sidebar .hn-shell-wordmark > div > div > span:last-child { display: none; }
   /* Rail: label grup disembunyikan, jadi grup dipisah garis tipis agar tetap terbaca sebagai kelompok. */

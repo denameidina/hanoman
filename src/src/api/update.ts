@@ -49,6 +49,13 @@ export function updateBadgeLabel(u: UpdateStatus): string {
 export function updateBadgeLabelShort(u: UpdateStatus): string {
   return u.latestVersion ?? "Update";
 }
+// Pil versi di topbar hanya untuk versi yang nyata: semver `X.Y.Z` (opsional prerelease/build) dan
+// bukan `0.0.0`. Nilai lain (kosong sebelum di-stamp, `0.0.0` dari paket dev, atau bentuk 4 bagian)
+// adalah placeholder; pil `v0.0.0` telanjang membuat orang mengira ada yang rusak.
+const SEMVER_STRICT = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+export function isRealVersion(v: string): boolean {
+  return SEMVER_STRICT.test(v) && v.split(/[-+]/)[0] !== "0.0.0";
+}
 // Baris kaki popover: versi jalan → versi terbaru. Versi kosong (dev/belum ter-stamp) → "?".
 export function updateVersionLine(u: UpdateStatus): string {
   return `terpasang ${u.currentVersion || "?"} · tersedia ${u.latestVersion ?? "?"}`;

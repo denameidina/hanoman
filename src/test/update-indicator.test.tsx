@@ -35,10 +35,10 @@ describe("UpdateBadge", () => {
   it("up-to-date dengan currentVersion → pil versi + popover ringkas (tanpa perintah/pasang)", () => {
     hook = mk({ currentVersion: "0.1.56", latestVersion: "0.1.56", canApply: true });
     render(<UpdateBadge />);
-    const btn = screen.getByTitle("Versi terpasang");
+    const btn = screen.getByTitle("Versi hanoman");
     expect(btn.textContent).toContain("v0.1.56");
     fireEvent.click(btn);
-    expect(screen.getByRole("dialog", { name: "Versi terpasang" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Versi hanoman" })).toBeInTheDocument();
     expect(screen.getByText(/terpasang 0\.1\.56 · tersedia 0\.1\.56/)).toBeTruthy();
     expect(screen.getByText(/Registry npm/)).toBeTruthy();
     expect(screen.queryByText("Pasang & mulai ulang")).toBeNull();
@@ -49,10 +49,10 @@ describe("UpdateBadge", () => {
   it("aria-controls tak menggantung: tertutup tanpa atribut, terbuka menunjuk dialognya", () => {
     hook = mk({ currentVersion: "0.1.56", latestVersion: "0.1.56" });
     render(<UpdateBadge />);
-    const btn = screen.getByTitle("Versi terpasang");
+    const btn = screen.getByTitle("Versi hanoman");
     expect(btn).not.toHaveAttribute("aria-controls");
     fireEvent.click(btn);
-    const dialog = screen.getByRole("dialog", { name: "Versi terpasang" });
+    const dialog = screen.getByRole("dialog", { name: "Versi hanoman" });
     expect(btn).toHaveAttribute("aria-controls", dialog.id);
     fireEvent.click(btn);
     expect(btn).not.toHaveAttribute("aria-controls");
@@ -62,6 +62,28 @@ describe("UpdateBadge", () => {
     hook = mk({ currentVersion: "", latestVersion: null, registry: { status: "unavailable", checkedAt: null } });
     const { container } = render(<UpdateBadge />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it("versi placeholder (0.0.0, atau bentuk 4 bagian) tanpa update: pil versi tak tampil", () => {
+    for (const currentVersion of ["0.0.0", "0.0.0.0"]) {
+      hook = mk({ currentVersion, latestVersion: currentVersion, registry: { status: "ok", checkedAt: null } });
+      const { container, unmount } = render(<UpdateBadge />);
+      expect(container.firstChild).toBeNull();
+      unmount();
+    }
+  });
+
+  it("versi placeholder TETAP menampilkan pil update bila ada versi baru (indikator pembaruan tak ikut disaring)", () => {
+    hook = avail({ currentVersion: "0.0.0" });
+    render(<UpdateBadge />);
+    expect(screen.getByTitle("Update tersedia")).toBeInTheDocument();
+  });
+
+  it("versi nyata: pil `v…` memakai nama 'Versi hanoman'", () => {
+    hook = mk({ currentVersion: "0.9.20", latestVersion: "0.9.20", registry: { status: "ok", checkedAt: null } });
+    render(<UpdateBadge />);
+    const btn = screen.getByTitle("Versi hanoman");
+    expect(btn.textContent).toContain("v0.9.20");
   });
 
   it("render pill + popover + perintah npm saat versi baru terbit", () => {
@@ -137,7 +159,7 @@ describe("Mulai ulang hanoman (manual)", () => {
     hook = mk({ canApply: true });
     restartSpy.mockResolvedValueOnce({ kind: "accepted", liveSessions: 0, from: "", to: null });
     render(<UpdateBadge />);
-    fireEvent.click(screen.getByTitle("Versi terpasang"));
+    fireEvent.click(screen.getByTitle("Versi hanoman"));
     fireEvent.click(screen.getByText("Mulai ulang hanoman"));
   };
 

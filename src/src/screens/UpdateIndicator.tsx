@@ -4,6 +4,7 @@ import {
   useUpdate, updateHeadline, updateBadgeLabel, updateBadgeLabelShort, updateVersionLine,
   updateRegistryLine, applyUpdate, applyRestart, applyConfirmMessage, type ApplyOutcome,
   useServerRestartedTo, reloadNoticeLabel, reloadNoticeText, reloadPage, waitForServerBack,
+  isRealVersion,
 } from "../api/update";
 import { usePopoverFocus } from "../ds/popover";
 import "./styles/panels.css";
@@ -30,9 +31,10 @@ export function UpdateBadge() {
   const [phase, setPhase] = React.useState<Phase>({ t: "idle" });
   const [rPhase, setRPhase] = React.useState<Phase>({ t: "idle" });
   const popover = usePopoverFocus(open, () => setOpen(false), "dialog");
-  // Versi kosong (dev, atau bundle yang belum ter-stamp) tak punya apa pun untuk disebut: pil `v`
-  // telanjang lebih buruk daripada topbar kosong.
-  if (!u.updateAvailable && !u.currentVersion) return null;
+  // Versi placeholder (kosong, `0.0.0`, dev, atau bundle yang belum ter-stamp) tak punya apa pun untuk
+  // disebut: pil `v0.0.0` telanjang lebih buruk daripada topbar kosong. Hanya keadaan tanpa update yang
+  // disaring; pil update tetap tampil apa pun versi jalannya.
+  if (!u.updateAvailable && !isRealVersion(u.currentVersion)) return null;
   const copy = () => {
     try { void navigator.clipboard?.writeText(u.command); setCopied(true); setTimeout(() => setCopied(false), 1500); }
     catch { /* clipboard tak tersedia */ }
@@ -57,7 +59,8 @@ export function UpdateBadge() {
       });
     } else setRPhase({ t: "failed", message: r.message });
   };
-  const name = u.updateAvailable ? "Update tersedia" : "Versi terpasang";
+  // Keadaan tanpa update diberi nama yang menjelaskan pil `v…` (tooltip, nama aksesibel, judul popover).
+  const name = u.updateAvailable ? "Update tersedia" : "Versi hanoman";
   const label = u.updateAvailable ? updateBadgeLabel(u) : `v${u.currentVersion}`;
   const labelShort = u.updateAvailable ? updateBadgeLabelShort(u) : u.currentVersion;
   return (
