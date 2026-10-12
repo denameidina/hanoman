@@ -401,3 +401,21 @@ Sudah selesai di gelombang 7: filter "Perlu ditinjau" (sesi menunggu jawaban), r
 7. Tes yang gagal di `main` juga dan bukan bagian pekerjaan ini: `vps-ssh` (dipicu `SSH_ASKPASS` di lingkungan), `structured-launch-admission`, dan `spec-attachment-launch` gagal di `main` juga; dua tes merge konflik (`ide.route`, `specs.route`) kadang gagal hanya saat beban host tinggi (gerbang beban), lulus bila diulang.
 
 **Gelombang 8 (terakhir).** Opsi C untuk grant remote (ADR-0217), penanda `reviewedAt` (ADR-0218), dan perbaikan keamanan hasil peninjauan independen: id permintaan acak + pencocokan tier/hub saat approve (409 bila berubah), 403/502 menggantikan 401 yang melempar klien ke Login, kebocoran 409 antar-hub ditutup, penanda tinjauan basi dari peer lama dikosongkan saat sync. Peninjauan tak menemukan jalur bagi relay, agent token, atau perangkat remote untuk menyetujui permintaan atau menaikkan grant. Risiko tersisa yang diterima dan tercatat di ADR-0217: identitas peminta adalah klaim hub; kelelahan persetujuan; persetujuan mengganti seluruh grant (termasuk "Khusus"); jalur relay 403/401→502 hanya teruji lewat inject, bukan dua instance, setelah perbaikan.
+
+### Panduan uji manual (butir yang hanya bisa dikerjakan manusia)
+
+**A. Pembaca layar (VoiceOver di macOS, NVDA di Windows) untuk "Mode pembaca layar" terminal**
+
+1. Jalankan hanoman, buka `/terminal`, mulai satu sesi shell. Buka Tampilan terminal lalu nyalakan "Mode pembaca layar".
+2. Nyalakan VoiceOver (⌘F5) atau NVDA. Pindahkan fokus ke area terminal (Tab, atau klik).
+3. Ketik `echo halo` lalu Enter. Periksa: (a) keluaran dibacakan; (b) tidak ada pembacaan ulang berlebihan akibat `aria-live=assertive`; (c) Tab dikirim ke sesi (bukan memindahkan fokus); (d) Ctrl+Shift+Esc melepas fokus dari terminal.
+4. Catat hasil di § Status pelaksanaan: bila (b) mengganggu, ubah live region ke `polite` atau batasi pembacaan.
+
+**B. Tinjauan visual manusia sebelum rilis** (semua verifikasi otomatis dilakukan agen dari tangkapan layar dan pengukuran DOM)
+
+- Overview "Hari ini" di 390 dan 1280: nama aktivitas terbaca, footer Backlog tidak melewati kartu.
+- Terminal di 320×640: composer terlihat tanpa gulir, kunci terminal bisa digulir dengan petunjuk tepi.
+- Sidebar desktop + pet: pet tidak menutupi kontrol; di tablet/ponsel pet berupa chip.
+- Graf IDE (Riwayat): label ref berupa pil rapi, simpul merge berongga, baris terpilih terlihat.
+- Review: bar keputusan, dialog Integrasikan (tombol bukan merah), Hapus worktree.
+- Perangkat: baris "Tingkat akses … Diatur di perangkat itu", tombol "Minta tingkat…" dan kartu persetujuan di perangkat tujuan.
