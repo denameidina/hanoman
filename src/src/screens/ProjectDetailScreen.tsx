@@ -178,7 +178,8 @@ export function ProjectDetailScreen({ p, onEdit, onGotoDocs, onGotoTerminal, onG
 
         <div className="hn-prj-coverage">
           <span className="hn-eyebrow">Dokumen</span>
-          <ProgressBar value={p.coverage} showLabel tone={COV_TONE(p.docStatus)} size="sm" />
+          <ProgressBar value={p.coverage} showLabel tone={COV_TONE(p.docStatus)} size="sm"
+            aria-label={`Cakupan dokumen ${p.name}`} />
         </div>
       </Card>
 

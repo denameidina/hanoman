@@ -330,6 +330,25 @@
   outline-offset: 2px;
 }
 
+/* Menu "Buka…" saat sempit: ikon folder. Teks "Buka…" ikut dari 641px; di bawahnya hanya ikon (nama aksesibel
+   dan tooltip tetap "Buka…"). Target sentuh 44px di pointer kasar atau ponsel. */
+.hn-terminal-open-compact {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1);
+  min-width: 32px; min-height: 32px; padding: 0 var(--space-2);
+  font: inherit; font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap;
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer;
+}
+.hn-terminal-open-compact:hover,
+.hn-terminal-open-compact[aria-expanded="true"] { background: var(--bone-200); color: var(--text-strong); }
+.hn-terminal-open-compact:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.hn-terminal-open-text { display: none; }
+@media (min-width: 641px) {
+  .hn-terminal-open-text { display: inline; }
+}
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-terminal-open-compact { min-width: var(--touch-target); min-height: var(--touch-target); }
+}
+
 /* Kirim di kanan kolom ketik ponsel. Warnanya token aksen (`--accent-on` di atas `--accent`). */
 .hn-terminal-send {
   flex: 0 0 auto;

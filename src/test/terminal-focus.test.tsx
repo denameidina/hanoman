@@ -6,14 +6,14 @@ import { TerminalScreen } from "../src/screens/TerminalScreen";
 import { mockViewport, resetViewport } from "./viewport";
 
 // Stub menampilkan prop yang kini dikendalikan layar (papan tombol, dock ringkas) supaya tes bisa
-// membaca keputusan layar tanpa xterm. "Tombol khusus" meniru pemicu nyata lewat onToggleKeys.
+// membaca keputusan layar tanpa xterm. "Esc, Tab, panah" meniru pemicu nyata lewat onToggleKeys.
 vi.mock("../src/screens/TerminalPane", () => ({
   TerminalPane: ({ sessionId, showKeys, compact, onToggleKeys }: {
     sessionId: string; showKeys?: boolean; compact?: boolean; onToggleKeys?: () => void;
   }) => (
     <div data-testid="pane" data-keys={String(!!showKeys)} data-compact={String(!!compact)}>
       {sessionId}
-      {onToggleKeys && <button type="button" onClick={onToggleKeys}>Tombol khusus</button>}
+      {onToggleKeys && <button type="button" onClick={onToggleKeys}>Esc, Tab, panah</button>}
     </div>
   ),
 }));
@@ -262,6 +262,8 @@ describe("TerminalScreen · ponsel: toolbar satu baris dan papan tombol khusus (
     expect(within(toolbar).getAllByRole("button")).toHaveLength(4);
     expect(within(toolbar).getByRole("button", { name: "Sesi baru" })).toBeInTheDocument();
     expect(within(toolbar).getByRole("button", { name: "Buka…" })).toBeInTheDocument();
+    // Ikon tanpa teks di layar sempit: tooltip menjelaskan isi menunya (sentuh tak punya hover).
+    expect(within(toolbar).getByRole("button", { name: "Buka…" }).getAttribute("title")).toContain("ambil backlog");
     expect(within(toolbar).getByRole("button", { name: "Sesi · 4" })).toBeInTheDocument();
     expect(within(toolbar).getByRole("button", { name: "Menu terminal" })).toBeInTheDocument();
     expect(within(toolbar).queryByRole("button", { name: "Fokus" })).toBeNull();
@@ -310,7 +312,7 @@ describe("TerminalScreen · ponsel: toolbar satu baris dan papan tombol khusus (
     const first = render(<TerminalScreen projects={projects} />);
     await waitFor(() => expect(screen.getByTestId("pane")).toHaveAttribute("data-compact", "true"));
     expect(screen.getByTestId("pane")).toHaveAttribute("data-keys", "false");
-    fireEvent.click(screen.getByRole("button", { name: "Tombol khusus" }));
+    fireEvent.click(screen.getByRole("button", { name: "Esc, Tab, panah" }));
     expect(screen.getByTestId("pane")).toHaveAttribute("data-keys", "true");
     expect(localStorage.getItem("hn.ui.v1.terminal.keys")).toBe("true");
     first.unmount();

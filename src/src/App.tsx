@@ -10,7 +10,7 @@ import { STAGE_LABEL } from "./lib/labels";
 import { LazyBoundary } from "./ds/LazyBoundary";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
-import { Shell, HN_NAV, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, useToast, ToastHost, StateBlock, useConfirm, useResponsiveTier } from "./ds";
+import { Shell, HN_NAV, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, OverflowActions, useToast, ToastHost, StateBlock, useConfirm, useResponsiveTier } from "./ds";
 import { SectionTabs } from "./ds/section-tabs";
 import { PetDockContext } from "./ds/shell";
 
@@ -1786,9 +1786,13 @@ function AppInner() {
       <Shell active="docs" title="Source of Truth" breadcrumb={proj ? proj.name : "workspace"}
         onNavigate={setSection} wide
         actions={proj && <>
-          <Select size="sm" value={proj.id} onChange={(e) => setProjectId(e.target.value)}
+          <Select size="sm" aria-label="Pilih project" value={proj.id} onChange={(e) => setProjectId(e.target.value)}
             options={projectsView.map((p) => ({ value: p.id, label: p.name }))} />
-          <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={() => deleteProject(proj)}>Hapus project</Button>
+          {/* Hapus bukan tombol berdampingan dengan pemilih: ia di menu ⋯ (tone danger), dan tetap
+              lewat konfirmasi di deleteProject → useConfirm. */}
+          <OverflowActions label={`Aksi untuk project ${proj.name}`} icon="ellipsis" items={[
+            { key: "delete", label: "Hapus project…", icon: "trash-2", tone: "danger", onSelect: () => deleteProject(proj) },
+          ]} />
         </>}>
         {hubTabs}
         {gate(proj

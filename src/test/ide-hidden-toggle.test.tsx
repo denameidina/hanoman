@@ -31,17 +31,17 @@ beforeEach(() => {
   });
 });
 
-// Toggle "tersembunyi" Explorer. Yang dijaga bukan cuma "entri muncul", tapi bahwa mematikannya
+// Toggle "Diabaikan git" Explorer. Yang dijaga bukan cuma "entri muncul", tapi bahwa mematikannya
 // benar-benar KEMBALI ke daftar tanpa entri terabaikan — toggle yang cuma bisa menambah membuat
 // Explorer memanjang sekali lalu tak pernah pulih sampai halaman dimuat ulang.
-describe("Explorer · toggle tersembunyi", () => {
+describe("Explorer · toggle diabaikan git", () => {
   it("mati secara default; menyala → memuat ulang dengan hidden dan menampilkan entri terabaikan", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
     await openBerkas();
     expect(api.ideTree).toHaveBeenCalledWith("p1", "", { hidden: false });
     expect(screen.queryByText("secret.env")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /tersembunyi/i }));
+    fireEvent.click(screen.getByRole("button", { name: /diabaikan git/i }));
     expect(await screen.findByText("secret.env")).toBeInTheDocument();
     expect(api.ideTree).toHaveBeenCalledWith("p1", "", { hidden: true });
   });
@@ -49,7 +49,7 @@ describe("Explorer · toggle tersembunyi", () => {
   it("mematikannya lagi membuang entri terabaikan dari pohon", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
     await openBerkas();
-    const btn = screen.getByRole("button", { name: /tersembunyi/i });
+    const btn = screen.getByRole("button", { name: /diabaikan git/i });
     fireEvent.click(btn);
     await screen.findByText("secret.env");
     fireEvent.click(btn);
@@ -59,7 +59,7 @@ describe("Explorer · toggle tersembunyi", () => {
   it("direktori terabaikan yang diruntuhkan baru memuat isinya saat dibuka", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
     await openBerkas();
-    fireEvent.click(screen.getByRole("button", { name: /tersembunyi/i }));
+    fireEvent.click(screen.getByRole("button", { name: /diabaikan git/i }));
     // `dist` tampil sebagai folder meski tak satu pun berkas di bawahnya terkirim…
     const dir = await screen.findByText("dist/");
     expect(api.ideTree).not.toHaveBeenCalledWith("p1", "", { under: "dist" });
@@ -73,7 +73,7 @@ describe("Explorer · toggle tersembunyi", () => {
   it("togglenya mati saat sedang melihat sebuah ref — commit tak punya berkas terabaikan", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
     await openBerkas();
-    fireEvent.change(screen.getByDisplayValue("· working tree ·"), { target: { value: "main" } });
-    await waitFor(() => expect(screen.getByRole("button", { name: /tersembunyi/i })).toBeDisabled());
+    fireEvent.change(screen.getByDisplayValue("Belum di-commit"), { target: { value: "main" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /diabaikan git/i })).toBeDisabled());
   });
 });

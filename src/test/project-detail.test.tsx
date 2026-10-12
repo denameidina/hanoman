@@ -46,6 +46,15 @@ describe("detail project (SPEC-146)", () => {
     expect(screen.queryByText("Memori")).toBeNull();
   });
 
+  // Audit UI/UX 2026-10 · axe: bar kelengkapan dokumen di detail (showLabel) harus bernama.
+  it("bar cakupan dokumen di detail bernama dengan project-nya", async () => {
+    render(<App />);
+    await act(async () => { await Promise.resolve(); });
+    fireEvent.click(screen.getAllByText("Projects")[0]!);
+    fireEvent.click(screen.getAllByText("arta")[0]!);
+    expect(await screen.findByRole("progressbar", { name: "Cakupan dokumen arta" })).toBeInTheDocument();
+  });
+
   it("edit project bisa menyetel path per-mesin (binding)", async () => {
     const { api } = await import("../src/api/client");
     render(<App />);

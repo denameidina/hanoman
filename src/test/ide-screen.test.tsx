@@ -64,7 +64,7 @@ describe("IdeScreen · toolbar: Checkout di menu ⋯", () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
     await screen.findByRole("tablist", { name: "Bagian IDE" });
     // pilih ref "dev" agar Checkout aktif
-    fireEvent.change(screen.getByDisplayValue("· working tree ·"), { target: { value: "dev" } });
+    fireEvent.change(screen.getByDisplayValue("Belum di-commit"), { target: { value: "dev" } });
     fireEvent.click(screen.getByRole("button", { name: "Aksi lain IDE" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: /checkout dev/i }));
     await waitFor(() => expect(api.ideGit).toHaveBeenCalledWith("p1", { op: "checkout", ref: "dev" }));
@@ -73,7 +73,7 @@ describe("IdeScreen · toolbar: Checkout di menu ⋯", () => {
     vi.spyOn(api, "ideGit").mockRejectedValueOnce(new ApiError(409, "sesi aktif"));
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
     await screen.findByRole("tablist", { name: "Bagian IDE" });
-    fireEvent.change(screen.getByDisplayValue("· working tree ·"), { target: { value: "dev" } });
+    fireEvent.change(screen.getByDisplayValue("Belum di-commit"), { target: { value: "dev" } });
     fireEvent.click(screen.getByRole("button", { name: "Aksi lain IDE" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: /checkout dev/i }));
     expect(await screen.findByRole("button", { name: /paksa/i })).toBeInTheDocument();

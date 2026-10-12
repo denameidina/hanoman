@@ -66,9 +66,9 @@ describe("IDE · tab", () => {
     const toolbar = container.querySelector(".hn-ide-toolbar")!;
     const controls = toolbar.querySelectorAll("button, select, input");
     expect(controls.length).toBeLessThanOrEqual(6);
-    // ref selector, Fetch, Tersembunyi, Muat ulang, ⋯ — dan proyek.
+    // ref selector, Fetch, Diabaikan git, Muat ulang, ⋯ — dan proyek.
     expect(screen.getByRole("button", { name: "Aksi lain IDE" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /tersembunyi/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /diabaikan git/i })).toBeInTheDocument();
   });
 });
 

@@ -67,7 +67,7 @@ export function UpdateBadge() {
           tiga baris (terukur 161–211px = 19–25% viewport 844px). Kontrolnya TIDAK hilang —
           `aria-label` + `title` memikul namanya saat teksnya tak dirender, dan versinya tetap ada di
           popover. Pil versi mengikuti kontrak yang sama: di layar sempit tersisa nomornya saja. */}
-      <button ref={popover.triggerRef} onClick={() => setOpen((v) => !v)} aria-haspopup="dialog" aria-controls={popover.panelId} aria-expanded={open} title={name}
+      <button ref={popover.triggerRef} onClick={() => setOpen((v) => !v)} aria-haspopup="dialog" aria-controls={open ? popover.panelId : undefined} aria-expanded={open} title={name}
         aria-label={`${name} · ${label}`}
         className={`hn-upd-pill ${u.updateAvailable ? "hn-upd-pill--update" : "hn-upd-pill--version"}`}>
         <Icon name={u.updateAvailable ? "arrow-up-circle" : "package"} size={13}

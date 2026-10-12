@@ -95,6 +95,69 @@ describe("teks Dalang (screens/styles/dalang.css) lolos 4,5:1 di atas --term-bg"
   });
 });
 
+// Teks yang dulu gagal 4,5:1 di latar yang benar-benar dipakai (axe). Nilainya dibaca dari ATURAN CSS-nya,
+// bukan dari daftar tetap, jadi bila token di kelas itu diganti, test ikut mengukur token yang baru.
+const ruleBody = (css: string, selector: string): string => {
+  const esc = selector.replace(/[.*+?^${}()|[\]\\"]/g, "\\$&");
+  const m = new RegExp(`(?:^|[}\\s])${esc}\\s*\\{([^}]*)\\}`).exec(css);
+  if (!m) throw new Error(`aturan CSS tak ditemukan: ${selector}`);
+  return m[1]!;
+};
+const tokenOf = (body: string, prop: string): string => {
+  const m = new RegExp(`(?:^|[;\\s])${prop}:\\s*var\\((--[\\w-]+)\\)`).exec(body);
+  if (!m) throw new Error(`properti ${prop} tak memakai var(): ${body.trim()}`);
+  return m[1]!;
+};
+
+describe("teks di latar nyata lolos 4,5:1 (axe, WCAG 1.4.3)", () => {
+  const fileTree = stripComments(read("../src/screens/styles/file-tree.css"));
+  const palette = stripComments(read("../src/palette/palette.css"));
+  const shell = stripComments(read("../src/styles/app-shell.css"));
+  const appCss = stripComments(read("../src/app.css"));
+
+  it("hapus (.hn-ide-del) lolos di atas baris terpilih dan kartu", () => {
+    const body = ruleBody(fileTree, ".hn-ide-del");
+    const text = color(tokenOf(body, "color"));
+    for (const surface of [tokenOf(ruleBody(fileTree, ".hn-ide-sel"), "background"), "--surface-card"]) {
+      expect(contrast(text, color(surface)), surface).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(body).not.toMatch(/!important/);
+  });
+
+  it("status D (.hn-ide-status[data-status=\"D\"]) lolos di baris terpilih", () => {
+    const text = color(tokenOf(ruleBody(fileTree, '.hn-ide-status[data-status="D"]'), "color"));
+    expect(contrast(text, color(tokenOf(ruleBody(fileTree, ".hn-ide-sel"), "background")))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("hint pintasan palet lolos di baris aktif (brass-100) dan di kartu", () => {
+    const text = color(tokenOf(ruleBody(palette, ".hn-palette-option-hint"), "color"));
+    for (const surface of [tokenOf(ruleBody(palette, ".hn-palette-option.is-active"), "background"), "--surface-card"]) {
+      expect(contrast(text, color(surface)), surface).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("teks aksi toast lolos di atas latar toast (surface-inverse)", () => {
+    const text = color(tokenOf(ruleBody(shell, ".hn-toast-action"), "color"));
+    const toastBg = color(tokenOf(ruleBody(shell, ".hn-toast"), "background"));
+    expect(contrast(text, toastBg)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("masuknya toast tak menyentuh opacity, jadi teks aksi tak pernah transparan saat animasi", () => {
+    const anim = /animation:\s*([\w-]+)/.exec(ruleBody(shell, ".hn-toast"))?.[1];
+    expect(anim).toBeTruthy();
+    const frames = new RegExp(`@keyframes ${anim}\\s*\\{([\\s\\S]*?)\\}\\s*\\}`).exec(shell)?.[1] ?? "";
+    expect(frames).toMatch(/transform/);
+    expect(frames).not.toMatch(/opacity/);
+  });
+
+  it("kontrol negatif: nilai lama memang gagal gerbang yang sama, dan keyframe fade lama memang memakai opacity", () => {
+    expect(contrast(color("--clay-500"), color("--brass-100"))).toBeLessThan(4.5);
+    expect(contrast(color("--text-subtle"), color("--brass-100"))).toBeLessThan(4.5);
+    const oldFade = new RegExp(`@keyframes hn-fade-in\\s*\\{([\\s\\S]*?)\\}\\s*\\}`).exec(appCss)?.[1] ?? "";
+    expect(oldFade).toMatch(/opacity/);
+  });
+});
+
 describe("kontrak CSS dan HTML hasil audit", () => {
   const css = stripComments(read("../src/app.css"));
   const html = read("../index.html");

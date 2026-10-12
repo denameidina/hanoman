@@ -148,6 +148,33 @@ describe("SPEC-879 · region baris Git Graph adalah scroller lokal yang HIDUP", 
   });
 });
 
+// Audit UI/UX 2026-10 · Graf IDE di layar sempit (tinjauan segar): pintasan ⌘F/⌘H hanya di perangkat berkursor
+// dan layar lebar; di ≤640px kolom penulis dan "working tree" hilang, tanggal tetap, dan lantai lebar baris
+// turun supaya tanggal dan ⋮ tak keluar layar di 390; daftar punya petunjuk gulir bila masih melebar.
+describe("Audit UI/UX 2026-10 · Graf IDE sempit: pintasan, kolom penulis, dan petunjuk gulir", () => {
+  // Isi blok `@media (max-width: 640px)` yang memuat aturan kolom graf (sesudah `.hn-git-wt-gap`, bukan blok
+  // remote-add di atasnya yang kebetulan ber-breakpoint sama).
+  const narrowGraphBlock = () =>
+    /@media \(max-width: 640px\)\s*\{([\s\S]*?)\n\}/.exec(ideCss.slice(ideCss.indexOf(".hn-git-wt-gap")))?.[1] ?? "";
+
+  it("hint ⌘F/⌘H disembunyikan di pointer kasar dan di layar ≤640px", () => {
+    expect(ideCss).toMatch(/@media \(pointer: coarse\), \(max-width: 640px\)\s*\{\s*\.hn-git-find-hint\s*\{\s*display:\s*none/);
+  });
+
+  it("di ≤640px kolom penulis dan 'working tree' disembunyikan; kolom tanggal tetap", () => {
+    const body = narrowGraphBlock();
+    expect(body).toMatch(/\.hn-git-author,\s*\.hn-git-wt,\s*\.hn-git-wt-gap\s*\{\s*display:\s*none/);
+    expect(body).not.toMatch(/\.hn-git-date/);
+  });
+
+  it("lantai lebar baris turun di ≤640px, dan daftar commit memakai kelas petunjuk gulir", async () => {
+    expect(narrowGraphBlock()).toMatch(/\.hn-git-rows\s*\{\s*min-width:\s*max\(0px,\s*calc\(var\(--graph-min-w, 0px\) - 176px\)\)/);
+    expect(ideCss).toMatch(/\.hn-git-scroll\s*\{[^}]*\blocal\b/);
+    renderGraph();
+    await waitFor(() => expect(screen.getByTestId("ide-graph-rows")).toHaveClass("hn-git-scroll"));
+  });
+});
+
 // Audit UI/UX 2026-10 (3H): branch dan worktree kini satu daftar di CabangPanel.tsx; baris
 // (`CabangRow`) menggantikan dua baris lama BranchesPanel & WorktreesPanel.
 describe("SPEC-879 · baris Cabang membungkus sebelum memotong", () => {

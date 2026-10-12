@@ -64,6 +64,13 @@ describe("ProjectsScreen via API (SPEC-198)", () => {
     expect(onOpen).toHaveBeenCalledOnce();
   });
 
+  // Audit UI/UX 2026-10 · axe: progressbar cakupan per baris harus bernama (memuat nama project).
+  it("bar cakupan dokumen tiap baris bernama dengan project-nya", () => {
+    render(<ProjectsScreen projects={[P({ coverage: 40 })] as never} onOpen={() => {}} />);
+    const bar = screen.getByRole("progressbar", { name: "Cakupan dokumen arta" });
+    expect(bar).toHaveAttribute("aria-valuenow", "40");
+  });
+
   it("daftar memakai RowList (role list), bukan tabel kolom lama", () => {
     render(<ProjectsScreen projects={[P()] as never} onOpen={() => {}} />);
     expect(screen.getByRole("list", { name: "Daftar project" })).toBeInTheDocument();

@@ -64,8 +64,11 @@
   padding: 11px 16px; background: var(--surface-inverse); color: var(--term-fg);
   border-radius: var(--radius-md); box-shadow: var(--shadow-xl);
   font-family: var(--font-sans); font-size: 13.5px; max-width: 100%;
-  animation: hn-fade-in 180ms var(--ease-out, ease-out);
+  /* Masuknya hanya lewat transform. Fade opacity membuat teks aksi transparan sesaat: di tengah
+     animasi brass-300 di atas ink-900 turun ke ~3,7:1 (axe), padahal diam-diam 11,4:1. */
+  animation: hn-toast-in 180ms var(--ease-out, ease-out);
 }
+@keyframes hn-toast-in { from { transform: translateY(6px); } to { transform: none; } }
 .hn-toast--action { padding: 9px 10px 9px 16px; }
 .hn-toast-msg { min-width: 0; flex: 1 1 auto; }
 .hn-toast-action {

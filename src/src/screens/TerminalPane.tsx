@@ -967,7 +967,8 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
             <div className="hn-terminal-dock-bar">
               {onToggleKeys && (
                 <button type="button" className="hn-terminal-keys-toggle" aria-expanded={showKeys}
-                  onClick={onToggleKeys}>Tombol khusus</button>
+                  title="Papan tombol: Esc, Tab, panah, dan Enter"
+                  onClick={onToggleKeys}>Esc, Tab, panah</button>
               )}
               {voice.supported && voice.status === "listening" && voice.interim && (
                 <span className="hn-terminal-voice-interim" data-testid="voice-interim">{voice.interim}</span>

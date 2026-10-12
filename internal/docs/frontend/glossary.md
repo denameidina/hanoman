@@ -31,6 +31,10 @@ Dokumen ini adalah kontrak untuk teks yang tampil ke operator. Kode penegaknya: 
 | Item yang pernah punya worktree | **Ber-worktree** (filter Backlog) | Belum ditinjau | Predikat `baseSha` terisi: hanoman pernah membuatkan worktree. Bukan status tinjau, dan worktree yang sudah dihapus tetap terhitung (ADR-0214). |
 | Item yang menunggu jawabanmu, atau item selesai yang belum kamu tandai | **Perlu ditinjau** (filter Backlog) | Belum ditinjau, Menunggu review | Predikat gabungan (gelombang 7 dan ADR-0218): (a) sesi item menunggu jawaban manusia, kondisi yang sama dengan "Menunggu jawabanmu" di Overview; (b) item selesai yang pernah dikerjakan dan belum punya penanda "Sudah ditinjau". Bukan status tinjau diff (`screens/backlog-worktree.ts`). |
 | Item selesai yang sudah diperiksa | **Sudah ditinjau** (penanda; tombol **Tandai ditinjau** / **Batalkan tanda ditinjau**) | Disetujui, Lulus review, Approved | Penanda yang ditulis operator (`Spec.reviewedAt`, ADR-0218). Bukan persetujuan dan bukan hasil integrasi; integrasi tidak menandainya. Tombol ada di bar Review dan di menu item Backlog. |
+| Ref IDE yang menampilkan berkas di disk (termasuk yang belum di-commit) | **Belum di-commit** (pilihan ref, dengan tooltip) | · working tree · | Pilihan pertama di selector ref IDE. Tooltip menjelaskan isinya. |
+| Toggle berkas dan folder yang `.gitignore` sembunyikan (IDE) | **Diabaikan git** | Tersembunyi, Cabang tersembunyi | Bukan cabang: yang tampil berkas atau folder yang diabaikan git. Tooltip ikut menjelaskan. |
+| Keadaan proyek di "Aktivitas terbaru" (Overview) | **Berjalan**, **Diam** (`PROJECT_ACTIVITY_LABEL`) | idle, `running · <flow>` | Satu label per keadaan. Teks `activity` dari server tak tampil mentah; nama flow ikut di kolom aktivitas. |
+| Papan tombol khusus di dock Terminal | **Esc, Tab, panah** (tooltip menambah Enter) | Tombol khusus | Nama tombol menyebut isi papannya, bukan kata kerja. |
 
 ## Aturan voice
 
@@ -111,3 +115,4 @@ Sisa di luar pemindai (bukan wilayah Fase 2D, tercatat untuk Fase 3):
 - **"Retry".** Pilihan: "Coba lagi" untuk galat, "Kirim ulang" untuk pengiriman webhook.
 - **Istilah "effort".** Dipertahankan sebagai istilah teknis (`Tanpa effort`, nilai effort per runtime). Belum dibahas sebagai copy.
 - **"Perlu ditinjau" vs "Menunggu jawabanmu".** Filter Backlog (gelombang 7) dan Overview memakai kondisi sesi yang sama dan dua kata. Label filter mengikuti permintaan ("Perlu ditinjau"); aturan "nilai yang sama, kata yang sama" menyarankan satu kata. Belum diputuskan pemilik produk.
+- **Label nav "Overview", "Projects", "Settings" (`ds/shell.tsx`, `App.tsx`).** Masih bahasa Inggris. "Overview" bukan istilah baku glosarium, jadi tak diganti tanpa keputusan pemilik produk. Judul "Hari ini" di layar Overview kini disembunyikan secara visual (tinjauan segar), supaya topbar dan layar tak bertumpuk.

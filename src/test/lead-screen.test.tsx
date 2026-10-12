@@ -140,6 +140,17 @@ describe("LeadScreen · jejak keputusan (AC-23/24, US-2)", () => {
     expect(body.indexOf("Menunggu kamu (")).toBeLessThan(body.indexOf("Kendali"));
   });
 
+  // Audit UI/UX 2026-10 · axe (heading-order): judul bagian berlevel 2 di bawah h1 shell, bukan h3 yatim.
+  it("judul bagian Menunggu kamu, Riwayat, dan Kendali berlevel 2", async () => {
+    getLeadStatus.mockResolvedValue(STATUS);
+    getLeadDecisions.mockResolvedValue(DECISIONS);
+    renderScreen();
+    await screen.findByText(/Pakai kolom baru atau turunkan/);
+    expect(screen.getByRole("heading", { level: 2, name: /^Menunggu kamu/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Riwayat" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Kendali" })).toBeInTheDocument();
+  });
+
   // Audit 1G · sesi di "Menunggu kamu" tampil dengan project & spec, bukan ID sesi mentah.
   it("sesi menunggu tampil dengan nama project dan spec dari jejak keputusan", async () => {
     getLeadStatus.mockResolvedValue({ ...STATUS, deciding: [], queued: [], waiting: ["spec-1"] });

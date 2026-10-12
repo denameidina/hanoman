@@ -75,6 +75,7 @@ const LANE_W = 14, ROW_H = 30, DOT = 4;
 // SPEC-879 · lebar minimum region baris: subject 238 + author 88 + tanggal 40 + aksi ⋮ 44 + gap &
 // padding 50. Di bawah ini kolom subject yang `flex: 1` runtuh ke 0px dan pill ref (yang
 // `flex: 0 0 auto`) meluber menimpa kolom author — terukur 200 tombol subject `0×44` di 390px.
+// Di ≤640px ide.css mengurangi lantai ini: kolom penulis dan "working tree" disembunyikan di sana.
 const GRAPH_ROW_MIN = 460;
 // Lantai lebar kolom subject (160px) ada di `.hn-git-subject` (ide.css): pill ref `flex: 0 0 auto`
 // memakan kolom fleksibel lebih dulu, dan lantai itu mencegah subject memeras ke 24px.
@@ -559,6 +560,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             <>
               <Button size="sm" variant="ghost" leftIcon="search" onClick={() => setFindOpen(true)}>Cari</Button>
               <Button size="sm" variant="ghost" leftIcon="crosshair" onClick={centerHead}>HEAD</Button>
+              {/* Pintasan keyboard: disembunyikan lewat CSS di perangkat sentuh dan layar ≤640px (ide.css). */}
               <span className="hn-git-find-hint">⌘F cari · ⌘H ke HEAD</span>
             </>
           )}
@@ -612,7 +614,7 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
             baris penutup sengaja DI LUAR: yang terakhir sentinel IntersectionObserver SPEC-351
             yang menempel pada `<main>` yang menggulir tegak. */}
         {body ?? (<>
-        <LocalOverflow data-testid="ide-graph-rows">
+        <LocalOverflow className="hn-git-scroll" data-testid="ide-graph-rows">
           <div role="list" aria-label="Riwayat commit" className="hn-git-rows"
             style={cssVars({ "--graph-min-w": `${maxLanes * LANE_W + GRAPH_ROW_MIN}px`, "--row-h": `${graphRowHeight}px` })}>
             {/* SPEC-233 · baris uncommitted changes (lingkaran terbuka) di puncak bila working tree kotor */}

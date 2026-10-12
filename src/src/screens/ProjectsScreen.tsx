@@ -63,7 +63,9 @@ function ProjectRow({ p, onOpen, onDelete, presenceOn }:
         <PresenceChip names={presenceOn} />
       </span>
       <span className="hn-prj-docs">
-        <ProgressBar value={p.coverage} showLabel tone={hnCovTone(p.docStatus)} size="sm" />
+        {/* Persen terlihat saja; namanya dari aria-label (label string akan tampil sebagai teks baris). */}
+        <ProgressBar value={p.coverage} showLabel tone={hnCovTone(p.docStatus)} size="sm"
+          aria-label={`Cakupan dokumen ${p.name}`} />
       </span>
       <span className="hn-prj-backlog">
         <span className="hn-prj-num">{p.backlog}</span> terbuka

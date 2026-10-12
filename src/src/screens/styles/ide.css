@@ -241,6 +241,10 @@
 }
 .hn-git-find-count { font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle); }
 .hn-git-find-hint { margin-left: auto; font-size: 11px; color: var(--text-subtle); }
+/* ⌘F dan ⌘H tak berguna di perangkat sentuh atau layar sempit: sembunyikan. Tombol Cari dan HEAD tetap. */
+@media (pointer: coarse), (max-width: 640px) {
+  .hn-git-find-hint { display: none; }
+}
 .hn-git-branch-select {
   font-size: 12px; padding: 3px 6px; border: 1px solid var(--border-hair); border-radius: var(--radius-sm);
   background: var(--surface-card); color: var(--text-body);
@@ -255,6 +259,16 @@
   cursor: pointer; background: var(--bone-200); color: var(--text-muted); flex: 0 0 auto;
 }
 .hn-git-rows { min-width: var(--graph-min-w, 0px); }
+/* Petunjuk gulir daftar commit: bayangan di tepi kiri/kanan hanya terlihat selama masih ada kolom di luar
+   layar. Penutup `local` (padat, selebar 12px) menempel pada isi yang digulir dan menutup bayangan di tepi
+   yang sudah sejajar isi; bayangan `scroll` menempel pada kotak dan tampak hanya di tepi yang terpotong. */
+.hn-git-scroll {
+  background:
+    linear-gradient(var(--surface-card), var(--surface-card)) left / 12px 100% no-repeat local,
+    linear-gradient(var(--surface-card), var(--surface-card)) right / 12px 100% no-repeat local,
+    linear-gradient(to right, color-mix(in srgb, var(--ink-900) 16%, transparent), transparent) left / 10px 100% no-repeat scroll,
+    linear-gradient(to left, color-mix(in srgb, var(--ink-900) 16%, transparent), transparent) right / 10px 100% no-repeat scroll;
+}
 
 /* Baris commit: tinggi dari --row-h (diwarisi dari daftar). State terpilih/ditemukan ditulis setelah
    :hover agar menang atas latar hover, seperti inline background sebelumnya. */
@@ -304,6 +318,13 @@
   flex: 0 0 auto; width: 88px; text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle);
 }
 .hn-git-wt-gap { flex: 0 0 auto; width: 40px; }
+/* Layar sempit (≤640px): kolom penulis dan "working tree" tak muat di samping subjek, jadi disembunyikan. Kolom
+   tanggal tetap. Lantai lebar baris turun sebesar yang hilang: 88px penulis + 10px jarak + 78px selisih lantai
+   subjek (238 di GRAPH_ROW_MIN, 160 di .hn-git-subject), supaya tanggal dan ⋮ tetap terlihat di 390px. */
+@media (max-width: 640px) {
+  .hn-git-author, .hn-git-wt, .hn-git-wt-gap { display: none; }
+  .hn-git-rows { min-width: max(0px, calc(var(--graph-min-w, 0px) - 176px)); }
+}
 .hn-git-uncommitted {
   flex: 1 1 0%; border: 0; padding: 0; background: transparent; text-align: left; cursor: pointer;
   font-size: 12.5px; font-style: italic; color: var(--text-muted);

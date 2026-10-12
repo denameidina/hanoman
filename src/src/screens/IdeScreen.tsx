@@ -302,7 +302,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
 
   // Semua ref: local + origin (prefix "origin/") untuk dilihat/checkout.
   const refOptions = [
-    { value: "", label: "· working tree ·" },
+    { value: "", label: "Belum di-commit" },
     ...branches.branches.map((b) => ({ value: b, label: b })),
     ...branches.remotes.map((b) => ({ value: `origin/${b}`, label: `origin/${b}` })),
   ];
@@ -514,6 +514,7 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
         value={projectId} onChange={(e) => onProject(e.target.value)}
         options={projects.map((p) => ({ value: p.id, label: p.name }))} />
       <Select size="sm" className="hn-ide-ref" aria-label="Ref yang dilihat" value={viewRef}
+        title="Belum di-commit: berkas di disk, termasuk perubahan yang belum di-commit. Pilih branch untuk melihat isinya di sana."
         onChange={(e) => { const next = e.target.value; whenClean(() => setViewRef(next)); }} options={refOptions} />
       {/* SPEC-233 · fetch --all --prune; ref-only → tak digerbang sesi */}
       <Button size="sm" variant="ghost" leftIcon="download-cloud" onClick={() => {
@@ -524,8 +525,8 @@ export function IdeScreen({ projects, projectId, onProject, onToast, onGotoTermi
       {/* Entri terabaikan hanya ada di working tree — togglenya mati saat melihat ref. */}
       <Button size="sm" variant={hidden ? "secondary" : "ghost"} leftIcon={hidden ? "eye" : "eye-off"}
         disabled={!!viewRef} aria-pressed={hidden}
-        title={viewRef ? "Hanya di working tree" : "Tampilkan berkas & folder yang .gitignore sembunyikan"}
-        onClick={() => setHidden(!hidden)}>Tersembunyi</Button>
+        title={viewRef ? "Hanya untuk kondisi belum di-commit" : "Tampilkan berkas & folder yang diabaikan .gitignore"}
+        onClick={() => setHidden(!hidden)}>Diabaikan git</Button>
       <Button size="sm" variant="ghost" leftIcon="rotate-ccw" onClick={afterWrite}>Muat ulang</Button>
       <OverflowActions label="Aksi lain IDE" items={[
         { key: "checkout", label: viewRef ? `Checkout ${viewRef}` : "Checkout", icon: "git-branch",

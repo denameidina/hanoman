@@ -45,6 +45,19 @@ describe("UpdateBadge", () => {
     expect(screen.queryByTitle("Salin perintah")).toBeNull();
   });
 
+  // Audit UI/UX 2026-10 · axe (aria-valid-attr-value): aria-controls hanya menunjuk panel yang ada.
+  it("aria-controls tak menggantung: tertutup tanpa atribut, terbuka menunjuk dialognya", () => {
+    hook = mk({ currentVersion: "0.1.56", latestVersion: "0.1.56" });
+    render(<UpdateBadge />);
+    const btn = screen.getByTitle("Versi terpasang");
+    expect(btn).not.toHaveAttribute("aria-controls");
+    fireEvent.click(btn);
+    const dialog = screen.getByRole("dialog", { name: "Versi terpasang" });
+    expect(btn).toHaveAttribute("aria-controls", dialog.id);
+    fireEvent.click(btn);
+    expect(btn).not.toHaveAttribute("aria-controls");
+  });
+
   it("currentVersion kosong (dev/belum ter-stamp) tak memunculkan pil `v` telanjang", () => {
     hook = mk({ currentVersion: "", latestVersion: null, registry: { status: "unavailable", checkedAt: null } });
     const { container } = render(<UpdateBadge />);

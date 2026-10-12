@@ -142,6 +142,10 @@ export const SESSION_KIND_LABEL = SHARED_SESSION_KIND_LABEL;
 /** Runtime agen. Sumbernya tetap di @hanoman/shared. */
 export const RUNTIME_LABEL: Record<AgentRuntime, string> = AGENT_RUNTIME_LABELS;
 
+/** Keadaan proyek di "Aktivitas terbaru" (Overview). Server mengirim `idle` atau `running · <flow>` sebagai
+ *  teks `activity`; keduanya tak pernah tampil mentah, keadaannya cukup satu label ini. */
+export const PROJECT_ACTIVITY_LABEL: Record<"running" | "idle", string> = { running: "Berjalan", idle: "Diam" };
+
 /** Status chip fase (aria): dibaca di dalam kalimat `Fase X: selesai · …`, jadi huruf kecil. */
 export const PHASE_STATUS_LABEL: Record<"done" | "running" | "pending" | "skipped" | "failed" | "abandoned", string> = {
   done: "selesai", running: "berjalan", pending: "menunggu", skipped: "dilewati", failed: "terputus", abandoned: "ditinggalkan",

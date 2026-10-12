@@ -86,7 +86,10 @@ export function Callout({ children, tone = "info", title, icon, action, role, cl
 
 // `danger` = nama kanonik untuk `err` (token --status-err); keduanya isian yang sama.
 type ProgressProps = { value?: number; max?: number; tone?: "brass" | "ok" | "warn" | "err" | "danger" | "info";
-  size?: "sm" | "md" | "lg"; showLabel?: boolean;
+  size?: "sm" | "md" | "lg";
+  /** Persen terlihat di atas bar. Persen itu TAK memberi nama: pasang `aria-label`, `aria-labelledby`
+   *  (diteruskan ke track), atau `label` string. Tanpa salah satunya track tak bernama (axe). */
+  showLabel?: boolean;
   /** Keterangan yang terlihat di atas bar. Bila string dan tanpa `aria-label`, ia juga nama aksesibelnya. */
   label?: React.ReactNode;
   /** Teks nilai untuk pembaca layar (`aria-valuetext`), mis. "3 dari 8 tahap". */

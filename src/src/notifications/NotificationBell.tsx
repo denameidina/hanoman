@@ -29,7 +29,7 @@ export function NotificationBell() {
 
   return (
     <div ref={ref} className="hn-notif-anchor">
-      <button ref={popover.triggerRef} aria-label="Notifikasi" aria-haspopup="menu" aria-controls={popover.panelId} aria-expanded={open} onClick={toggle}
+      <button ref={popover.triggerRef} aria-label="Notifikasi" aria-haspopup="menu" aria-controls={open ? popover.panelId : undefined} aria-expanded={open} onClick={toggle}
         className={open ? "hn-notif-trigger is-open" : "hn-notif-trigger"}>
         <Icon name="bell" size={18} />
         {unread > 0 && <span className="hn-notif-badge">{unread > 99 ? "99+" : unread}</span>}

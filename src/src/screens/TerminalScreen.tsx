@@ -1518,15 +1518,23 @@ function SessionDialogs({ kind, session, specOf, onIntegrate, onIntegrateSession
 // "Buka…": pemicu untuk cara membuka sesi selain "Sesi baru". Di ruang sempit ia ikon ber-label
 // "Buka…" (nama aksesibelnya sama, tak ada teks yang terpotong). Panelnya Modal DS, sama dengan menu
 // ⋯ lain (fokus, Escape, sheet di mobile).
+// Tooltip menu "Buka…": ikon di layar sempit tak menjelaskan isinya, dan sentuh tak punya hover.
+const OPEN_MENU_HINT = "Buka sesi lain: ambil backlog, riwayat sesi, atau terminal biasa";
+
 function OpenMenu({ items, compact = false }: { items: readonly OverflowItem[]; compact?: boolean }) {
   const [open, setOpen] = React.useState(false);
   return (
     <>
       {compact ? (
-        <IconButton size="sm" icon="folder-open" label="Buka…" aria-haspopup="dialog" aria-expanded={open}
-          onClick={() => setOpen(true)} />
+        // Sempit: ikon folder. Teks "Buka…" ikut tampil dari 641px (`.hn-terminal-open-text`); nama aksesibelnya
+        // tetap "Buka…" di semua lebar.
+        <button type="button" className="hn-terminal-open-compact" aria-label="Buka…" title={OPEN_MENU_HINT}
+          aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+          <Icon name="folder-open" size={16} />
+          <span className="hn-terminal-open-text">Buka…</span>
+        </button>
       ) : (
-        <Button size="sm" variant="ghost" aria-haspopup="dialog" aria-expanded={open}
+        <Button size="sm" variant="ghost" aria-haspopup="dialog" aria-expanded={open} title={OPEN_MENU_HINT}
           onClick={() => setOpen(true)}>Buka…</Button>
       )}
       {open && (

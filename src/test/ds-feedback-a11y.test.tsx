@@ -38,6 +38,21 @@ describe("Badge & StatusPill · varian dot", () => {
 });
 
 describe("ProgressBar · nama aksesibel di elemen progressbar", () => {
+  // Audit UI/UX 2026-10 · axe (progressbar-name): showLabel hanya menampilkan persen, jadi track-nya harus
+  // diberi nama lewat aria-labelledby (elemen konteks yang sudah ada), aria-label, atau label string.
+  it("showLabel tanpa label: aria-labelledby menamai track dari elemen konteks, persen tetap tak dibacakan", () => {
+    render(<><span id="ctx-dok">Dokumen arta</span><ProgressBar value={60} showLabel aria-labelledby="ctx-dok" /></>);
+    const bar = screen.getByRole("progressbar", { name: "Dokumen arta" });
+    expect(bar).toHaveAttribute("aria-valuenow", "60");
+  });
+
+  it("showLabel tanpa nama sama sekali tak lolos diam-diam: track tak punya nama (kontrol negatif)", () => {
+    render(<ProgressBar value={60} showLabel />);
+    const bar = screen.getByRole("progressbar");
+    expect(bar).not.toHaveAttribute("aria-label");
+    expect(bar).not.toHaveAttribute("aria-labelledby");
+  });
+
   it("role progressbar ada di track (bukan pembungkus) dan membawa label string", () => {
     const { container } = render(<ProgressBar value={3} max={8} label="Tahap" valueText="3 dari 8 tahap" />);
     const bar = screen.getByRole("progressbar", { name: "Tahap" });

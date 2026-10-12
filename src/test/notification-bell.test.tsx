@@ -75,4 +75,17 @@ describe("NotificationBell", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
   });
+
+  // Audit UI/UX 2026-10 · axe (aria-valid-attr-value): panel menu hanya ada saat terbuka, jadi
+  // aria-controls hanya boleh menunjuknya saat itu.
+  it("aria-controls tak menggantung: tertutup tanpa atribut, terbuka menunjuk menu-nya", () => {
+    const n = { id: "4", type: "done", specId: "SPEC-4", sessionId: "s4", title: "y", projectId: "p", createdAt: now(), readAt: null };
+    render(<Harness items={[n]} onOpen={() => {}} />);
+    const trigger = screen.getByLabelText("Notifikasi");
+    expect(trigger).not.toHaveAttribute("aria-controls");
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-controls", screen.getByRole("menu").id);
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    expect(trigger).not.toHaveAttribute("aria-controls");
+  });
 });

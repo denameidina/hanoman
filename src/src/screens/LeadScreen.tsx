@@ -555,7 +555,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
       <div className="hn-lead-layout">
         <div className="hn-lead-main">
           <section className="hn-lead-section" aria-labelledby="lead-menunggu-h">
-            <h3 id="lead-menunggu-h" className="hn-lead-h">Menunggu kamu ({waiting.length})</h3>
+            <h2 id="lead-menunggu-h" className="hn-lead-h">Menunggu kamu ({waiting.length})</h2>
             {gate.queued > 0 && (
               <p className="hn-lead-note">
                 Antrean keputusan penuh: {gate.inFlight} dari {gate.capacity} sedang diputuskan, {gate.queued} menunggu giliran.
@@ -579,7 +579,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
           </section>
 
           <section className="hn-lead-section" aria-labelledby="lead-riwayat-h">
-            <h3 id="lead-riwayat-h" className="hn-lead-h">Riwayat</h3>
+            <h2 id="lead-riwayat-h" className="hn-lead-h">Riwayat</h2>
             <div className="hn-lead-chips" role="group" aria-label="Jenis riwayat">
               {KIND_CHIPS.map((c) => (
                 <button key={c.key} type="button" className="hn-lead-chip" aria-pressed={kind === c.key}
@@ -625,7 +625,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
 
         <aside className="hn-lead-side" aria-label="Kendali lead">
           <section className="hn-lead-section" aria-labelledby="lead-kendali-h">
-            <h3 id="lead-kendali-h" className="hn-lead-h">Kendali</h3>
+            <h2 id="lead-kendali-h" className="hn-lead-h">Kendali</h2>
             <div className="hn-lead-mode">
               <RadioGroup label="Mode lead" value={mode} onChange={(v: string) => setMode(v as Mode)}>
                 <Radio value="aktif" label="Aktif" description="Lead memutuskan untuk project yang diurusnya." disabled={busy} />

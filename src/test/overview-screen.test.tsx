@@ -133,6 +133,15 @@ describe("Overview · sesi berjalan", () => {
     expect(screen.getByText("Tidak ada sesi aktif")).toBeTruthy();
     expect(screen.queryByRole("list", { name: "Sesi berjalan" })).toBeNull();
   });
+
+  it("tanpa sesi, keadaan kosong satu baris ringkas (bukan kartu StateBlock tinggi)", () => {
+    const { container } = render(<OverviewScreen projects={[project({ id: "a", name: "alpha" })]} backlog={[]} sessions={[]}
+      onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    const empty = container.querySelector(".hn-ov-empty");
+    expect(empty).not.toBeNull();
+    expect(empty!.tagName).toBe("P");
+    expect(within(screen.getByRole("region", { name: "Sesi berjalan" })).queryByText("Tidak ada sesi aktif")).not.toBeNull();
+  });
 });
 
 describe("Overview · perlu perhatian dan project", () => {
@@ -147,6 +156,34 @@ describe("Overview · perlu perhatian dan project", () => {
     expect(attn[1]!.textContent).toContain("Tidak sinkron");
     fireEvent.click(within(attn[0]!).getByRole("button", { name: /alpha/ }));
     expect(onOpenProject).toHaveBeenCalledWith(alpha);
+  });
+
+  it("proyek yang sudah di 'Perlu perhatian' tak diulang di 'Project'; hitungannya jujur", () => {
+    const alpha = project({ id: "a", name: "alpha", docStatus: "broken", coverage: 20 });
+    const gamma = project({ id: "c", name: "gamma", coverage: 88 });
+    render(<OverviewScreen projects={[alpha, project({ id: "b", name: "beta", docStatus: "drift", coverage: 60 }), gamma]}
+      backlog={[]} sessions={[]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    const rows = within(screen.getByRole("list", { name: "Project" })).getAllByRole("listitem");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.textContent).toContain("gamma");
+    expect(within(screen.getByRole("list", { name: "Project" })).queryByRole("button", { name: /alpha/ })).toBeNull();
+    expect(within(screen.getByRole("list", { name: "Perlu perhatian" })).getByRole("button", { name: /alpha/ })).toBeTruthy();
+    expect(screen.getByText("1 dari 3 · sisanya di atas")).toBeTruthy();
+  });
+
+  it("semua proyek bermasalah: 'Project' tak membuat daftar kosong, tapi menyebut di mana mereka tampil", () => {
+    render(<OverviewScreen projects={[project({ id: "a", name: "alpha", docStatus: "broken", coverage: 20 })]}
+      backlog={[]} sessions={[]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    expect(screen.queryByRole("list", { name: "Project" })).toBeNull();
+    expect(screen.getByText("Semua project ada di Perlu perhatian.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Backlog: 0 dari brief · 0 dari QA · 0 prioritas tinggi" })).toBeTruthy();
+  });
+
+  it("baris 'Perlu perhatian' membawa cakupan, karena bar cakupan hanya ada di daftar Project", () => {
+    render(<OverviewScreen projects={[project({ id: "a", name: "alpha", docStatus: "drift", coverage: 62 })]}
+      backlog={[]} sessions={[]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    const attn = within(screen.getByRole("list", { name: "Perlu perhatian" })).getAllByRole("listitem");
+    expect(attn[0]!.textContent).toContain("cakupan 62%");
   });
 
   it("tanpa masalah dokumen, tampil 'Dokumen sudah sesuai standar'", () => {
@@ -171,6 +208,23 @@ describe("Overview · perlu perhatian dan project", () => {
     expect(onOpenProject).toHaveBeenCalledWith(low);
     fireEvent.click(screen.getByRole("button", { name: "Backlog: 1 dari brief · 1 dari QA · 1 prioritas tinggi" }));
     expect(onGoto).toHaveBeenCalledWith("backlog");
+  });
+
+  it("aktivitas terbaru: keadaan tampil sekali dengan label manusia; 'idle' dan 'running · flow' tak tampil mentah", () => {
+    render(<OverviewScreen
+      projects={[
+        project({ id: "a", name: "alpha", activity: "idle" }),
+        project({ id: "b", name: "beta", activity: "running · feature",
+          session: { status: "running", phase: null, flow: "feature" } as ProjectVM["session"] }),
+      ]}
+      backlog={[]} sessions={[session({ id: "s1", projectId: "b" })]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    const rows = within(screen.getByRole("list", { name: "Aktivitas terbaru" })).getAllByRole("listitem");
+    expect(rows[0]!.textContent).toContain("Berjalan");
+    expect(rows[0]!.textContent).toContain("Fitur");          // nama flow dari FLOW_LABEL, bukan "running · feature"
+    expect(rows[1]!.textContent).toContain("Diam");
+    expect(rows[1]!.textContent).not.toMatch(/idle/);
+    expect(rows[0]!.textContent).not.toMatch(/running ·/);
+    expect(screen.queryByText("idle")).toBeNull();
   });
 
   it("aktivitas terbaru: maksimal lima baris, dan klik membuka project", () => {
@@ -221,5 +275,21 @@ describe("Overview · kontrak layout", () => {
     expect(src).not.toMatch(/gridTemplateColumns/);
     expect(src).not.toMatch(/style=\{\{/);
     expect(src).not.toMatch(/SpotIllustration|DalangStage/);
+  });
+
+  it("judul 'Hari ini' tetap <h2> untuk struktur, tapi disembunyikan lewat CSS: topbar sudah memuat nama layar", () => {
+    render(<OverviewScreen projects={[project({ id: "a", name: "alpha" })]} backlog={[]} sessions={[]}
+      onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    const heading = screen.getByRole("heading", { level: 2, name: "Hari ini" });
+    expect(heading.closest("header")).toHaveClass("hn-ov-pagehead");
+    const css = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/overview.css"), "utf8");
+    expect(css).toMatch(/\.hn-ov-pagehead \.hn-page-title\s*\{[^}]*position:\s*absolute/);
+    expect(css).toMatch(/\.hn-ov-pagehead \.hn-page-title\s*\{[^}]*clip:\s*rect\(0 0 0 0\)/);
+  });
+
+  it("CSS Overview tanpa !important baru (komentar boleh menyebutnya sebagai sejarah)", () => {
+    const css = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/overview.css"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(css).not.toMatch(/!important/);
   });
 });

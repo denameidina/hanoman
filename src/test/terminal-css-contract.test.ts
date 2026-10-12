@@ -50,13 +50,29 @@ describe("terminal.css · dock ringkas di ponsel", () => {
     expect(mobileBlock).toMatch(/\.hn-terminal-dock \.hn-terminal-composer\s*\{\s*flex-wrap:\s*nowrap/);
   });
 
-  it("Tombol khusus dan Kirim punya target sentuh minimal --touch-target di ponsel", () => {
+  it("Esc, Tab, panah dan Kirim punya target sentuh minimal --touch-target di ponsel", () => {
     expect(mobileBlock).toMatch(/\.hn-terminal-keys-toggle,\s*\.hn-terminal-send\s*\{\s*min-height:\s*var\(--touch-target\)/);
   });
 
   it("warna tombol Kirim memakai token aksen, bukan warna baru", () => {
     expect(code).toMatch(/\.hn-terminal-send\s*\{[^}]*color:\s*var\(--accent-on\)/);
     expect(code).toMatch(/\.hn-terminal-send\s*\{[^}]*background:\s*var\(--accent\)/);
+  });
+});
+
+// Audit UI/UX 2026-10 (tinjauan segar) · menu "Buka…" sempit: ikon folder, teks "Buka…" dari 641px.
+describe("terminal.css · menu Buka… sempit: teks hanya dari 641px, target sentuh 44px", () => {
+  it("teks Buka… tersembunyi di bawah 641px dan tampil dari 641px", () => {
+    expect(code).toMatch(/\.hn-terminal-open-text\s*\{\s*display:\s*none;?\s*\}/);
+    expect(code).toMatch(/@media \(min-width: 641px\)\s*\{\s*\.hn-terminal-open-text\s*\{\s*display:\s*inline;?\s*\}/);
+  });
+
+  it("pemicu ikon punya target 44px di pointer kasar atau ponsel", () => {
+    expect(code).toMatch(/@media \(pointer: coarse\), \(max-width: 767px\)\s*\{\s*\.hn-terminal-open-compact\s*\{[^}]*min-height:\s*var\(--touch-target\)/);
+  });
+
+  it("tak ada !important baru di berkas terminal", () => {
+    expect(code).not.toMatch(/!important/);
   });
 });
 

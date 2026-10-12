@@ -46,10 +46,11 @@
 .hn-ide-status { font-family: var(--font-mono); font-size: 12px; font-weight: 700; }
 .hn-ide-status[data-status="A"] { color: var(--leaf-600); }
 .hn-ide-status[data-status="M"] { color: var(--brass-700); }
-.hn-ide-status[data-status="D"] { color: var(--clay-500); }
+/* Merah di atas latar baris terpilih (brass-100): clay-500 hanya 4,03:1, status-err (clay-600) 5,29:1. */
+.hn-ide-status[data-status="D"] { color: var(--status-err); }
 .hn-ide-stat { font-family: var(--font-mono); font-size: 11px; }
 .hn-ide-add { color: var(--leaf-600); }
-.hn-ide-del { color: var(--clay-500); }
+.hn-ide-del { color: var(--status-err); }
 .hn-ide-changed-row {
   display: flex; align-items: center; gap: 8px; width: 100%;
   padding: 5px 10px; border: none; cursor: pointer; text-align: left; background: transparent;

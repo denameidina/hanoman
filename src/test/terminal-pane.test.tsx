@@ -1413,7 +1413,7 @@ describe("TerminalPane · dikte suara", () => {
   });
 });
 
-// Fase 3E+ · dock ringkas (pane fokus di ponsel): composer dengan mic dan Kirim, "Tombol khusus" yang
+// Fase 3E+ · dock ringkas (pane fokus di ponsel): composer dengan mic dan Kirim, "Esc, Tab, panah" yang
 // mengalihkan papan tombol, dan bahasa dikte di ⋯. Dock tablet/desktop (non-compact) tak berubah.
 describe("TerminalPane · dock ringkas ponsel (Fase 3E+)", () => {
   class FakeRecognition {
@@ -1439,22 +1439,22 @@ describe("TerminalPane · dock ringkas ponsel (Fase 3E+)", () => {
 
   afterEach(() => { delete w.SpeechRecognition; FakeRecognition.last = undefined; });
 
-  it("ringkas: kolom ketik dan Kirim tampil; papan tombol tertutup; Tombol khusus memanggil pemilik", async () => {
+  it("ringkas: kolom ketik dan Kirim tampil; papan tombol tertutup; Esc, Tab, panah memanggil pemilik", async () => {
     const onToggleKeys = vi.fn();
     await openCompact({ onToggleKeys });
     expect(screen.getByTestId("terminal-composer")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kirim perintah ke sesi" })).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Tombol terminal" })).toBeNull();
-    const toggle = screen.getByRole("button", { name: "Tombol khusus" });
+    const toggle = screen.getByRole("button", { name: "Esc, Tab, panah" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(toggle);
     expect(onToggleKeys).toHaveBeenCalledTimes(1);
   });
 
-  it("ringkas: papan tombol tampil mengikuti showKeys, dan Tombol khusus mencerminkannya", async () => {
+  it("ringkas: papan tombol tampil mengikuti showKeys, dan Esc, Tab, panah mencerminkannya", async () => {
     await openCompact({ showKeys: true, onToggleKeys: () => { } });
     expect(screen.getByRole("group", { name: "Tombol terminal" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Tombol khusus" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Esc, Tab, panah" })).toHaveAttribute("aria-expanded", "true");
   });
 
   it("ringkas: Kirim mengirim teks yang diketik persis seperti Enter, dan kolom dikosongkan", async () => {
@@ -1484,10 +1484,10 @@ describe("TerminalPane · dock ringkas ponsel (Fase 3E+)", () => {
     expect(within(sheet).getByText(/layanan suara browser Anda/)).toBeInTheDocument();
   });
 
-  it("ringkas pane baca-saja (remote tanpa sessions:write): tak ada kolom, Kirim, atau Tombol khusus", async () => {
+  it("ringkas pane baca-saja (remote tanpa sessions:write): tak ada kolom, Kirim, atau Esc, Tab, panah", async () => {
     await openCompact({ mode: "remote", onToggleKeys: () => { } });
     expect(screen.queryByTestId("terminal-composer")).toBeNull();
     expect(screen.queryByRole("button", { name: "Kirim perintah ke sesi" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Tombol khusus" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Esc, Tab, panah" })).toBeNull();
   });
 });

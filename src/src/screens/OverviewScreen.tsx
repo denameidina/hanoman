@@ -8,7 +8,7 @@ import { Button, DenseRow, Icon, PageHeader, ProgressBar, RowList, StateBlock, S
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, SpecSlim } from "./types";
 import { LimitWindows } from "./LimitIndicator";
-import { DOC_STATUS_LABEL, FLOW_LABEL, STAGE_LABEL, labelOf } from "../lib/labels";
+import { DOC_STATUS_LABEL, FLOW_LABEL, PROJECT_ACTIVITY_LABEL, STAGE_LABEL, labelOf } from "../lib/labels";
 import { relativeTime } from "../lib/time-format";
 import { useLimits } from "../api/limits";
 import { useCodexLimits } from "../api/codex-limits";
@@ -83,7 +83,7 @@ function AttnRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void }
     <DenseRow onClick={() => onOpen(p)}>
       <StatusPill status={p.docStatus} variant="dot" size="sm">{labelOf(DOC_STATUS_LABEL, p.docStatus)}</StatusPill>
       <span className="hn-ov-name" title={p.name}>{p.name}</span>
-      <span className="hn-ov-meta">{ATTENTION_REASON[p.docStatus] ?? ""}</span>
+      <span className="hn-ov-meta">{`${ATTENTION_REASON[p.docStatus] ?? ""} · cakupan ${p.coverage}%`}</span>
     </DenseRow>
   );
 }
@@ -105,12 +105,17 @@ function PrjRow({ p, onOpen }: { p: ProjectVM; onOpen: (p: ProjectVM) => void })
   );
 }
 
+// Teks `activity` dari server ("idle", "running · <flow>") hanya mengulang status: yang tampil keadaan
+// (satu label dari lib/labels.ts) dan, bila berjalan, nama flow-nya.
 function ActRow({ p, live, onOpen }: { p: ProjectVM; live: boolean; onOpen: (p: ProjectVM) => void }) {
+  const flow = live && p.session.flow ? labelOf(FLOW_LABEL, p.session.flow) : "";
   return (
     <DenseRow onClick={() => onOpen(p)}>
-      <StatusPill status={live ? "running" : "idle"} variant="dot" size="sm">{live ? "Berjalan" : "Diam"}</StatusPill>
+      <StatusPill status={live ? "running" : "idle"} variant="dot" size="sm">
+        {PROJECT_ACTIVITY_LABEL[live ? "running" : "idle"]}
+      </StatusPill>
       <span className="hn-ov-name" title={p.name}>{p.name}</span>
-      <span className="hn-ov-activity" title={p.activity}>{p.activity}</span>
+      <span className="hn-ov-activity" title={flow}>{flow}</span>
       <span className="hn-ov-mono" title={p.commit}>{p.commit}</span>
     </DenseRow>
   );
@@ -131,7 +136,7 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
   if (projects.length === 0) {
     return (
       <div className="hn-ov">
-        <PageHeader title="Hari ini" description="Belum ada project di workspace." />
+        <PageHeader className="hn-ov-pagehead" title="Hari ini" description="Belum ada project di workspace." />
         <Section id="ov-start" title="Selamat datang di hanoman" meta="mulai di sini">
           <StateBlock kind="empty" illustration="PST-001" illustrationDecorative
             title="Buat project pertama"
@@ -150,7 +155,8 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
   const nameById = new Map(projects.map((p) => [p.id, p.name] as const));
   const attention = projects.filter((p) => attentionOf(p) !== "none")
     .sort((a, b) => (attentionOf(a) === "high" ? 0 : 1) - (attentionOf(b) === "high" ? 0 : 1));
-  const byCoverage = [...projects].sort((a, b) => a.coverage - b.coverage);
+  // Proyek yang sudah tampil di "Perlu perhatian" tak diulang di "Project": daftar itu memuat sisanya.
+  const others = projects.filter((p) => attentionOf(p) === "none").sort((a, b) => a.coverage - b.coverage);
   const activity = [...projects]
     .sort((a, b) => Number(liveProjects.has(b.id)) - Number(liveProjects.has(a.id)))
     .slice(0, ACTIVITY_MAX);
@@ -180,14 +186,17 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
 
   return (
     <div className="hn-ov">
-      <PageHeader title="Hari ini" description={summary}
+      <PageHeader className="hn-ov-pagehead" title="Hari ini" description={summary}
         actions={<>{primary}<Button variant="ghost" leftIcon="drama" onClick={() => onGoto("dalang")}>Buka panggung</Button></>} />
 
       <Section id="ov-live" title="Sesi berjalan"
         actions={<Button size="sm" variant="ghost" leftIcon="terminal" onClick={() => onGoto("terminal")}>Buka Terminal</Button>}>
         {live.length === 0
-          ? <StateBlock kind="empty" compact icon="terminal" title="Tidak ada sesi aktif"
-              hint="Mulai sebuah backlog item untuk membuka sesi Claude Code interaktif." />
+          ? <p className="hn-ov-empty">
+              <Icon name="terminal" size={14} />
+              <span>Tidak ada sesi aktif</span>
+              <span className="hn-ov-meta">Mulai sebuah backlog item untuk membuka sesi Claude Code interaktif.</span>
+            </p>
           : <RowList label="Sesi berjalan">
               {live.map((s) => (
                 <LiveRow key={s.id} s={s} name={nameById.get(s.projectId) ?? s.projectId}
@@ -206,10 +215,13 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
       </Section>
 
       <Section id="ov-prj" title="Project"
+        meta={attention.length > 0 ? `${others.length} dari ${projects.length} · sisanya di atas` : undefined}
         actions={<Button size="sm" variant="ghost" leftIcon="layout-grid" onClick={() => onGoto("projects")}>Semua project</Button>}>
-        <RowList label="Project" className="hn-ov-prj">
-          {byCoverage.map((p) => <PrjRow key={p.id} p={p} onOpen={onOpenProject} />)}
-        </RowList>
+        {others.length === 0
+          ? <p className="hn-ov-meta hn-ov-none">Semua project ada di Perlu perhatian.</p>
+          : <RowList label="Project" className="hn-ov-prj">
+              {others.map((p) => <PrjRow key={p.id} p={p} onOpen={onOpenProject} />)}
+            </RowList>}
         <div className="hn-ov-foot">
           {/* Angka backlog membuka layarnya (aturan minimalis: tiap KPI membuka layar relevan). Bukan `Button`
               DS: lihat `.hn-ov-foot-link` di overview.css. */}

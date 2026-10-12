@@ -39,6 +39,27 @@
   display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto;
   align-items: center; column-gap: var(--space-3);
 }
+/* Aktivitas terbaru: status | nama | flow | commit. Kolom status lebar tetap, jadi "Berjalan" dan "Diam"
+   berada di garis yang sama di desktop. */
+.hn-ov-act .hn-row-main {
+  display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) minmax(0, 1.5fr) auto;
+  align-items: center; column-gap: var(--space-3);
+}
+
+/* Judul "Hari ini" tetap <h2> (struktur untuk pembaca layar), tetapi tak tampil: topbar sudah memuat nama
+   layar, dan kalimat status di bawahnya menjawab "hari ini". Gaya sama dengan `.hn-sr-only`. */
+.hn-ov-pagehead .hn-page-title {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Sesi berjalan kosong: satu baris, bukan kartu tinggi untuk satu kalimat. */
+.hn-ov-empty {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2);
+  margin: 0; padding: var(--space-1) 0; font-family: var(--font-ui); font-size: var(--text-sm); color: var(--text-body);
+}
+.hn-ov-empty > svg { flex: 0 0 auto; color: var(--text-subtle); }
+.hn-ov-none { margin: 0; padding: var(--space-1) 0; }
 .hn-ov-cov { min-width: 0; display: flex; align-items: center; gap: var(--space-2); }
 .hn-ov-bar { flex: 1 1 auto; min-width: 0; }
 .hn-ov-pct { flex: 0 0 auto; min-width: 3ch; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); text-align: right; }
@@ -83,7 +104,7 @@
   }
   /* Aktivitas terbaru (ponsel): nama dan status di baris pertama, aktivitas di baris sendiri, commit menyusul.
      Baris boleh membungkus; nama tak lagi berebut ruang dengan aktivitas di 320px. */
-  .hn-ov-act .hn-row-main { flex-wrap: wrap; row-gap: var(--space-1); }
+  .hn-ov-act .hn-row-main { display: flex; flex-wrap: wrap; row-gap: var(--space-1); }
   .hn-ov-act .hn-ov-activity { flex: 1 1 100%; white-space: normal; overflow-wrap: anywhere; }
   /* Backlog: tautan memakai lebar penuh dan boleh membungkus, tak melewati tepi kartu. */
   .hn-ov-foot-link { width: 100%; min-height: var(--touch-target); padding-inline: var(--space-2); }
