@@ -6,8 +6,8 @@ import { api } from "../src/api/client";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// jsdom tak memuat CSS: latar terpilih dibaca dari berkas stylesheet-nya.
-const ideCss = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/ide.css"), "utf8");
+// jsdom tak memuat CSS: latar terpilih dibaca dari berkas stylesheet-nya (pohon berkas kini di file-tree.css).
+const treeCss = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/file-tree.css"), "utf8");
 
 // ADR-0121 · folder sebagai TUJUAN operasi berkas.
 describe("TreeRow · folder sebagai target", () => {
@@ -20,7 +20,7 @@ describe("TreeRow · folder sebagai target", () => {
     expect(onSelectDir).toHaveBeenCalledWith("src");
     rerender(<TreeRow node={nodes[0]!} selected="" onSelect={() => {}} dirSelected="src" onSelectDir={onSelectDir} />);
     expect(screen.getByText("src/").closest("button")).toHaveClass("hn-ide-sel");
-    expect(ideCss).toMatch(/\.hn-ide-sel\s*\{\s*background:\s*var\(--brass-100\)/);
+    expect(treeCss).toMatch(/\.hn-ide-sel\s*\{\s*background:\s*var\(--brass-100\)/);
   });
 
   it("tanpa onSelectDir perilaku lama utuh: klik hanya buka-tutup", () => {

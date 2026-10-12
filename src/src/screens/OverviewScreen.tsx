@@ -4,7 +4,7 @@
    sekali di sini; kalimat status dan seksi memakai hitungan yang sama. Pekerjaan yang berjalan adalah sesi
    claude di tmux (SPEC-162), jadi tak ada progress % atau estimasi biaya. Susunan lewat styles/overview.css. */
 import React from "react";
-import { Button, DenseRow, PageHeader, ProgressBar, RowList, StateBlock, StatusPill, Tabs } from "../ds";
+import { Button, DenseRow, Icon, PageHeader, ProgressBar, RowList, StateBlock, StatusPill, Tabs } from "../ds";
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, SpecSlim } from "./types";
 import { LimitWindows } from "./LimitIndicator";
@@ -211,15 +211,17 @@ export function OverviewScreen({ projects, backlog, sessions, onOpenProject, onG
           {byCoverage.map((p) => <PrjRow key={p.id} p={p} onOpen={onOpenProject} />)}
         </RowList>
         <div className="hn-ov-foot">
-          {/* Angka backlog membuka layarnya (aturan minimalis: tiap KPI membuka layar relevan). */}
-          <Button size="sm" variant="ghost" leftIcon="list-checks" onClick={() => onGoto("backlog")}>
-            Backlog: {briefN} dari brief · {qaN} dari QA · {hiPrio} prioritas tinggi
-          </Button>
+          {/* Angka backlog membuka layarnya (aturan minimalis: tiap KPI membuka layar relevan). Bukan `Button`
+              DS: lihat `.hn-ov-foot-link` di overview.css. */}
+          <button type="button" className="hn-ov-foot-link" onClick={() => onGoto("backlog")}>
+            <Icon name="list-checks" size={15} />
+            <span>Backlog: {briefN} dari brief · {qaN} dari QA · {hiPrio} prioritas tinggi</span>
+          </button>
         </div>
       </Section>
 
       <Section id="ov-act" title="Aktivitas terbaru">
-        <RowList label="Aktivitas terbaru">
+        <RowList label="Aktivitas terbaru" className="hn-ov-act">
           {activity.map((p) => <ActRow key={p.id} p={p} live={liveProjects.has(p.id)} onOpen={onOpenProject} />)}
         </RowList>
       </Section>

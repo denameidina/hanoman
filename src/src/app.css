@@ -40,6 +40,9 @@ textarea:focus-visible,
    mematikannya dan tetap berlaku bila aturan global kembali ber-!important. */
 .hn-input-core:focus-visible,
 .hn-textarea-core:focus-visible { outline: none; }
+/* Wrapper Input DS (div.hn-touch-target yang memuat .hn-input-core) hanya menggeser border saat fokus.
+   Cincinnya lewat outline, bukan box-shadow: box-shadow wrapper diset inline (forms.tsx) dan akan menang. */
+.hn-touch-target:focus-within:has(> .hn-input-core) { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 .hn-shell {
   display: flex;
@@ -445,6 +448,11 @@ textarea:focus-visible,
 }
 .hn-tabs[data-fade-start="true"] { --hn-fade-l: 24px; }
 .hn-tabs[data-fade-end="true"] { --hn-fade-r: 24px; }
+/* Scheduler (`.hn-sched`) punya lima tab; di 320 px strip yang digulir menyembunyikan tab aktif di luar layar.
+   Di layar sangat sempit tab membungkus ke baris berikutnya. Hanya strip Scheduler; strip lain tetap menggulir. */
+@media (max-width: 420px) {
+  .hn-sched > .hn-tabs { flex-wrap: wrap; overflow: visible; scroll-snap-type: none; }
+}
 
 /* SPEC-879 · baris kepala IDE = strip tab + toolbar. `flex-wrap` MEMUTUS BARIS SEBELUM MENYUSUT:
    keputusannya memakai hypothetical main size, yaitu `flex-basis`. Dengan basis `auto` itu berarti
@@ -1116,6 +1124,12 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3);
   background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
+}
+/* ≤640 px: anchor memenuhi lebar barisnya, dan popover ter-clamp di antara tepi kirinya dan kanannya.
+   Tanpa ini, `left: 0` dari tombol yang ada di sisi kanan baris meluap ke kanan layar (QA 390 px: x 297–557). */
+@media (max-width: 640px) {
+  .hn-filter-popover-anchor { flex: 1 1 100%; }
+  .hn-filter-popover { right: 0; max-width: min(360px, 100%); }
 }
 .hn-filter-chip:focus-visible,
 .hn-filter-trigger:focus-visible,

@@ -201,7 +201,7 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
       <Card eyebrow="model" title="Agen & model — default global" data-setting-card
         data-search="agen model default effort claude codex agen sesi baru">
         <Prose>
-          Default untuk sesi baru; bisa di-override per sesi saat <b>Start</b>. Di terminal, <code>/model</code>
+          Default untuk sesi baru; bisa di-override per sesi saat <b>Start</b>. Di terminal, <code>/model</code>{" "}
           mengubahnya kapan saja. Dengan orkestrasi aktif, model ini menjadi model <b>orchestrator</b>; model
           &amp; effort tiap fase diatur di bagian <b>Orkestrasi</b> pada Agen &amp; model. Yang benar-benar dipakai adalah blok milik
           agen terpilih di bawah — yang satunya tersimpan, menunggu giliran.

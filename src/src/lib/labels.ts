@@ -173,3 +173,10 @@ export const LEAD_ACTION_LABEL: Record<
 
 /** Tipe percakapan portal (ChatPanel klien). */
 export const PORTAL_CHAT_TYPE_LABEL: Record<"brainstorm" | "tanya", string> = { brainstorm: "Brainstorming", tanya: "Bertanya" };
+
+// ── Notifikasi & sesi yang sudah berakhir ──────────────────────────────────────────────
+
+/** SPEC-184 · notifikasi (atau palet) menunjuk sesi yang sudah tak hidup, atau tak pernah ada. */
+export const SESSION_ENDED_NOTICE = "Sesi itu sudah berakhir.";
+/** Aksi toast bila riwayat sesi itu tercatat. Sama dengan item menu "Riwayat sesi" di Terminal. */
+export const SESSION_HISTORY_ACTION = "Riwayat sesi";

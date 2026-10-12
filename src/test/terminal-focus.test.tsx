@@ -21,6 +21,7 @@ const listTerminals = vi.fn();
 const deleteTerminal = vi.fn();
 const getTerminalWorkspace = vi.fn();
 const putTerminalWorkspace = vi.fn();
+const listSessionHistory = vi.fn();
 vi.mock("../src/api/client", () => ({
   ApiError: class ApiError extends Error {
     constructor(public status: number, msg: string, public detail: unknown = null) { super(msg); }
@@ -37,6 +38,7 @@ vi.mock("../src/api/client", () => ({
     getCodexVersion: vi.fn(async () => ({ version: "0.145.0", minRequired: "0.144.0", ok: true })),
     getTerminalWorkspace: (...a: unknown[]) => getTerminalWorkspace(...a),
     putTerminalWorkspace: (...a: unknown[]) => putTerminalWorkspace(...a),
+    listSessionHistory: (...a: unknown[]) => listSessionHistory(...a),
   },
 }));
 vi.mock("../src/api/events", () => ({
@@ -72,6 +74,7 @@ beforeEach(() => {
   listTerminals.mockReset().mockResolvedValue(SESSIONS.map((s) => ({ ...s })));
   deleteTerminal.mockReset().mockResolvedValue(undefined);
   getTerminalWorkspace.mockReset().mockResolvedValue({ workspace: null, revision: 0, updatedAt: null });
+  listSessionHistory.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 1 });
   putTerminalWorkspace.mockReset().mockImplementation(async (input: { baseRevision: number; workspace: unknown }) => ({
     workspace: input.workspace, revision: input.baseRevision + 1, updatedAt: "2026-10-11T00:00:00.000Z",
   }));
@@ -161,6 +164,36 @@ describe("TerminalScreen · mode Fokus (Fase 3E)", () => {
     render(<TerminalScreen projects={projects} focusSession="run222" />);
     await waitFor(() => expect(screen.getByTestId("pane")).toHaveTextContent("run222"));
     expect(screen.getAllByTestId("pane")).toHaveLength(1);
+  });
+
+  it("deep link ke sesi yang sudah berakhir: tak memfokus sesi lain, dan memberi tahu", async () => {
+    render(<TerminalScreen projects={projects} focusSession="gone999" />);
+    expect(await screen.findByText("Sesi itu sudah berakhir.")).toBeInTheDocument();
+    // Tak ada pane untuk sesi itu, dan pane yang tampil bukan hasil pindah fokus ke sesi lain.
+    expect(listSessionHistory).toHaveBeenCalledWith({ q: "gone999", limit: 1 });
+    expect(screen.queryByRole("button", { name: "Riwayat sesi" })).toBeNull();
+  });
+
+  it("sesi berakhir yang tercatat di riwayat: toast menawarkan aksi Riwayat sesi yang membukanya", async () => {
+    // Hanya panggilan pertama (pemeriksaan riwayat sesi ini) yang melaporkan satu baris.
+    listSessionHistory.mockResolvedValueOnce({ items: [], total: 1, page: 1, pageSize: 1 });
+    render(<TerminalScreen projects={projects} focusSession="gone999" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Riwayat sesi" }));
+    expect(await screen.findByRole("dialog", { name: "Riwayat sesi" })).toBeInTheDocument();
+  });
+
+  it("sesi berakhir tetap diberi tahu bila riwayatnya gagal dimuat (tanpa aksi)", async () => {
+    listSessionHistory.mockRejectedValue(new Error("offline"));
+    render(<TerminalScreen projects={projects} focusSession="gone999" />);
+    expect(await screen.findByText("Sesi itu sudah berakhir.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Riwayat sesi" })).toBeNull();
+  });
+
+  it("sesi target yang masih hidup tetap difokuskan tanpa pemberitahuan", async () => {
+    render(<TerminalScreen projects={projects} focusSession="run222" />);
+    await waitFor(() => expect(screen.getByTestId("pane")).toHaveTextContent("run222"));
+    expect(screen.queryByText("Sesi itu sudah berakhir.")).toBeNull();
+    expect(listSessionHistory).not.toHaveBeenCalled();
   });
 
   it("toggle Grid tersimpan dan dipulihkan saat layar dibuka lagi", async () => {

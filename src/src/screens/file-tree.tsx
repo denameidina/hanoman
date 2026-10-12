@@ -7,6 +7,8 @@
 import React from "react";
 import { Icon } from "../ds";
 import type { ChangedFile } from "../api/client";
+// Gaya pohon & daftar Changed ikut modul ini, bukan dari ide.css (yang hanya termuat bersama layar IDE).
+import "./styles/file-tree.css";
 
 export type FileNode = { name: string; path: string; kids: FileNode[]; leaf: boolean };
 /**

@@ -4,6 +4,7 @@ import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Badge, Stat
   ProductStateIllustration, Tabs, OverflowActions, useResponsiveTier, useCoarsePointer, usePopoverFocus,
   useConfirm, useToast, Toast, type OverflowItem } from "../ds";
 import { failureMessage } from "../lib/report-error";
+import { SESSION_ENDED_NOTICE, SESSION_HISTORY_ACTION } from "../lib/labels";
 import { api, ApiError, type TerminalSession, type Phase, type Flow } from "../api/client";
 import { subscribe } from "../api/events";
 import { flowForSource, sameTerminalWorkspace, type SessionHistoryView, type WorktreeCleanupView } from "@hanoman/shared";
@@ -227,15 +228,31 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // muncul di daftar hidup. SPEC-197 · efek ini jalan tiap `sessions` berubah; tanpa guard, sesi
   // fokus yang sudah tampil bisa "loncat" ke sel-kosong-pertama saat sesi lain exit. Hanya place
   // bila belum ada di grid mana pun (placedIds); kalau sudah, kembalikan w apa adanya (no-op).
+  // Sesi target yang sudah berakhir (atau tak pernah ada) TIDAK memindahkan fokus ke sesi lain:
+  // dulu efek ini diam-diam berhenti, dan pane jatuh ke sesi default. Kini operator diberi tahu,
+  // dan riwayat sesi itu ditawarkan bila tercatat. Sekali per target, supaya frame WS tak mengulang.
+  const endedNoticeFor = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (!focusSession) { handledFocus.current = null; return; }
+    if (!focusSession) { handledFocus.current = null; endedNoticeFor.current = null; return; }
     if (!sessionsLoaded || handledFocus.current === focusSession) return;
-    if (!sessions.some((s) => s.id === focusSession && !s.exited)) return;
+    if (!sessions.some((s) => s.id === focusSession && !s.exited)) {
+      if (endedNoticeFor.current === focusSession) return;
+      endedNoticeFor.current = focusSession;
+      void api.listSessionHistory({ q: focusSession, limit: 1 })
+        .then((r) => showToast(SESSION_ENDED_NOTICE, "warn", "history", r.total > 0
+          ? { action: { label: SESSION_HISTORY_ACTION, onAction: () => setHistoryOpen(true) }, duration: 7000 }
+          : undefined))
+        .catch(() => {
+          // Riwayat yang gagal dimuat tak menggagalkan pemberitahuannya: pesan tetap tampil tanpa aksi.
+          showToast(SESSION_ENDED_NOTICE, "warn", "history");
+        });
+      return;
+    }
     handledFocus.current = focusSession;
     // Notifikasi/palet yang menunjuk sesi = buka sesi itu di fokus (deep link tetap berlaku di kedua mode).
     setFocusId(focusSession);
     setRequestedSession(focusSession);
-  }, [focusSession, sessions, sessionsLoaded]);
+  }, [focusSession, sessions, sessionsLoaded, showToast]);
 
   React.useEffect(() => {
     if (!requestedSession) return;

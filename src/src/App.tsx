@@ -502,7 +502,7 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
         </Button>
       </>}>
       <div className="hn-sheet-block">
-        <Tabs variant="pill" value={f.kind} onChange={(v) => setF((s) => ({ ...s, kind: v }))} tabs={[
+        <Tabs variant="pill" className="hn-sheet-kinds" value={f.kind} onChange={(v) => setF((s) => ({ ...s, kind: v }))} tabs={[
           { value: "brief", label: "Feature brief", icon: "lightbulb" },
           { value: "qa", label: "QA finding", icon: "bug" },
           { value: "audit", label: "Audit", icon: "search" },
@@ -861,6 +861,9 @@ function AppInner() {
   // the successful hand-off here so the session appears in the grid before the next WS snapshot.
   const [terminalStartedSession, setTerminalStartedSession] = React.useState<TerminalSession | null>(null);
   const [startOrigin, setStartOrigin] = React.useState<"backlog" | "terminal" | null>(null);
+  // Target fokus hanya berlaku selama Terminal terbuka; tanpa ini pemasangan Terminal berikutnya
+  // mengulang notifikasi "Sesi itu sudah berakhir" untuk id yang sama.
+  React.useEffect(() => { if (section !== "terminal") setFocusSession(null); }, [section]);
   const openTerminal = React.useCallback((sessionId?: string | null) => {
     setFocusSession(sessionId ?? null);
     setSection("terminal");

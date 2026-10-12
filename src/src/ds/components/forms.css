@@ -60,3 +60,10 @@
    dengan border kontrol invalid (Input/Select/HnTextarea dengan invalid: --status-err). Kontrolnya sendiri
    ditandai lewat tautan Field (aria-invalid), jadi tampilannya identik dengan keadaan invalid. */
 .hn-field[data-tone="danger"] > .hn-field-label { color: var(--status-err); }
+
+/* Select DS (forms.tsx): lebar wrapper mengikuti opsi terpanjang, jadi di layar sempit nama panjang
+   mendorong field keluar viewport lalu terpotong di tengah kata. Dibatasi lebar kontainernya, sisanya elipsis. */
+@media (max-width: 640px) {
+  .hn-select { max-width: 100%; min-width: 0; }
+  .hn-select select { max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

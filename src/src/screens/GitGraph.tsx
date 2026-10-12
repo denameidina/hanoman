@@ -660,14 +660,16 @@ export function GitGraph({ projectId, onRunGit, onMerge, onRebase, onPull, onDro
                         aria-label={`Aksi branch ${ref}`}
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
                         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setBranchMenu({ x: e.clientX, y: e.clientY, ref, anchor: e.currentTarget }); }}
-                        className={isHead && ref === current ? "hn-git-ref hn-git-ref--head" : "hn-git-ref"}>{ref}</button>
+                        className={isHead && ref === current ? "hn-git-ref hn-git-ref--head" : "hn-git-ref"}>
+                        <span className="hn-git-ref-text">{ref}</span>
+                      </button>
                     ))}
                     {/* SPEC-233 · tag = pill terpisah (warna leaf, ikon tag); klik-kanan → menu tag */}
                     {c.tags.map((t) => (
                       <button type="button" key={`tag:${t}`} title="tag — pilih untuk aksi" aria-label={`Aksi tag ${t}`}
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
                         onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setTagMenu({ x: e.clientX, y: e.clientY, tag: t, anchor: e.currentTarget }); }}
-                        className="hn-git-tag">⌂{t}</button>
+                        className="hn-git-tag"><span className="hn-git-ref-text">⌂{t}</span></button>
                     ))}
                     {/* Merge dinyatakan TEKS, bukan hanya redup warnanya (audit a11y). */}
                     {c.parents.length > 1 && <span className="hn-git-merge">merge</span>}

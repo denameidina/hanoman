@@ -16,6 +16,9 @@
 
 /* ---------- App · sheet "Mulai sesi" & "Brief" ---------- */
 .hn-sheet-block { margin-bottom: 16px; }
+/* Pilihan jenis di modal Feature brief: membungkus ke baris berikutnya di layar sempit, tak menyisih ke luar
+   viewport tanpa indikator (QA P3, 320/390). Strip gulir DS dimatikan khusus di sini: semua pilihan terlihat. */
+.hn-tabs.hn-sheet-kinds { flex-wrap: wrap; overflow: visible; max-width: 100%; }
 .hn-sheet-lead { font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5; }
 .hn-sheet-alert {
   font-size: 12.5px; line-height: 1.55; margin-bottom: 12px; padding: 9px 11px; border-radius: 8px;
@@ -43,6 +46,9 @@
   max-height: 132px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
   border: 1px solid var(--border-hair); border-radius: var(--radius-sm); padding: 8px;
 }
+/* Item daftar tak boleh menyusut di bawah tinggi isinya: label multi-baris (320 px) akan tumpang tindih.
+   Daftarnya yang menggulir (overflow-y di atas), bukan itemnya. */
+.hn-dep-list > * { flex-shrink: 0; }
 .hn-grid-split { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
 .hn-grid-even { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 

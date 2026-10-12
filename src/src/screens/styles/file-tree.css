@@ -1,0 +1,72 @@
+/* file-tree — gaya pohon berkas dan daftar "Changed" (dipakai Review, IDE, Git Graph, IdeReadPanel, dan
+   SkillEditor lewat file-tree.tsx). Dipindah dari ide.css (QA Review): ide.css hanya termuat bersama layar
+   IDE, sehingga Review yang chunk-nya terpisah menampilkan tombol bawaan browser dan huruf status yang
+   menempel ke nama berkas. Berkas ini diimpor file-tree.tsx, jadi setiap pemakai pohon membawa gayanya.
+   Nilai hanya dari token. */
+
+.hn-ide-tree-row { position: relative; display: flex; align-items: stretch; min-width: 0; }
+.hn-ide-tree-row > .hn-ide-tree-entry { flex: 1 1 auto; min-width: 0; }
+.hn-ide-row-more {
+  flex: 0 0 auto; width: 28px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: var(--radius-sm); background: transparent; cursor: pointer; opacity: 0.55;
+}
+.hn-ide-tree-row:hover .hn-ide-row-more,
+.hn-ide-tree-row:focus-within .hn-ide-row-more { opacity: 1; }
+.hn-ide-row-more:hover { background: var(--bone-200); }
+
+/* Sentuh: baris pohon dan tombol ⋯ minimal 44px di pointer kasar atau layar sempit (lihat ide.css untuk sisanya). */
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-ide-row-more { width: 44px; height: 44px; opacity: 1; }
+  .hn-ide-tree-row > .hn-ide-tree-entry { min-height: 44px; }
+}
+
+/* Pohon berkas (file-tree): indentasi per kedalaman lewat --depth. */
+.hn-ide-tree-leaf {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 5px 8px; padding-left: calc(22px + var(--depth, 0) * 12px);
+  border: none; cursor: pointer; text-align: left; background: transparent;
+}
+.hn-ide-tree-dir {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 5px 6px; padding-left: calc(6px + var(--depth, 0) * 12px);
+  border: none; background: transparent; cursor: pointer; text-align: left;
+}
+.hn-ide-tree-ignored { opacity: 0.62; }
+.hn-ide-tree-name {
+  flex: 1 1 0%; min-width: 0; font-family: var(--font-mono); font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-body); font-weight: 400;
+}
+.hn-ide-sel .hn-ide-tree-name { color: var(--brass-700); font-weight: 600; }
+.hn-ide-tree-dirname { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-strong); font-weight: 500; }
+.hn-ide-sel .hn-ide-tree-dirname { color: var(--brass-700); font-weight: 700; }
+.hn-ide-tree-empty {
+  padding: 4px 8px; padding-left: calc(28px + var(--depth, 0) * 12px); font-size: 11.5px; color: var(--text-subtle);
+}
+.hn-ide-tree-loading { font-size: 11px; color: var(--text-subtle); }
+.hn-ide-status { font-family: var(--font-mono); font-size: 12px; font-weight: 700; }
+.hn-ide-status[data-status="A"] { color: var(--leaf-600); }
+.hn-ide-status[data-status="M"] { color: var(--brass-700); }
+.hn-ide-status[data-status="D"] { color: var(--clay-500); }
+.hn-ide-stat { font-family: var(--font-mono); font-size: 11px; }
+.hn-ide-add { color: var(--leaf-600); }
+.hn-ide-del { color: var(--clay-500); }
+.hn-ide-changed-row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 5px 10px; border: none; cursor: pointer; text-align: left; background: transparent;
+}
+/* Ditulis SETELAH dasar baris (leaf, dir, changed-row) agar menang dengan spesifisitas sama. */
+.hn-ide-sel { background: var(--brass-100); }
+.hn-ide-changed-path {
+  flex: 1 1 0%; min-width: 0; font-family: var(--font-mono); font-size: 12px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-body);
+}
+.hn-ide-sel .hn-ide-changed-path { color: var(--brass-700); }
+.hn-ide-changed-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px; }
+.hn-ide-view-btn { display: flex; padding: 3px; border: none; cursor: pointer; border-radius: 4px; background: transparent; }
+.hn-ide-view-btn[aria-pressed="true"] { background: var(--brass-100); }
+.hn-ide-empty-pad { padding: 4px 10px; font-size: 12px; color: var(--text-subtle); }
+
+/* Target sentuh ≥24 px di pointer halus (QA Chrome #15): toggle List | Tree dan chip berkas Perubahan
+   (21–23 px). Ikon 14 px tetap. Di sini, bukan di ide.css, karena Review memuat berkas ini tanpa IDE. */
+.hn-ide-view-btn { min-width: 24px; min-height: 24px; box-sizing: border-box; align-items: center; justify-content: center; }
+.hn-ide-changed-row { min-height: 24px; }

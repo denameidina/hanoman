@@ -27,6 +27,13 @@ export function SaveStatusLine({ save }: { save: RowSave }) {
   return <span className={`hn-set-save ${tone}`} role="status" data-testid="save-status">{label}</span>;
 }
 
+/** Penjelasan baris: potongan di antara backtick tampil sebagai `<code>`, bukan backtick mentah. Teks yang
+ *  dicari (`data-search`) tetap string aslinya. */
+export function DescText({ text }: { text: string }) {
+  return <>{text.split(/`([^`]+)`/).map((part, i) =>
+    i % 2 === 1 ? <code key={i} className="hn-set-mono hn-set-codeinline">{part}</code> : part)}</>;
+}
+
 export function SettingRow({ title, desc, children, last, save, search }: {
   title: string;
   desc?: string;
@@ -41,7 +48,7 @@ export function SettingRow({ title, desc, children, last, save, search }: {
       data-setting-row data-search={`${title} ${desc ?? ""} ${search ?? ""}`}>
       <div className="hn-set-row-text">
         <div className="hn-set-row-title">{title}</div>
-        {desc && <div className="hn-set-row-desc">{desc}</div>}
+        {desc && <div className="hn-set-row-desc"><DescText text={desc} /></div>}
         {save && <SaveStatusLine save={save} />}
       </div>
       <div className="hn-setting-control hn-set-row-control">{children}</div>

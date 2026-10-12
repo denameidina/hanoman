@@ -2,11 +2,11 @@
    daftar berkas (changed + tree) dan viewer Diff|Source. Viewer itu read-only.
 
    Audit UI/UX 2026-10 · Fase 3 (3L′) · "Tinjau lalu Putuskan": kepala ringkas (jumlah berkas, +/−),
-   lalu bar keputusan sticky di bawah. Tanpa prop keputusan, bar hanya berisi tiga tujuan navigasi
-   (Backlog, Terminal, IDE). Dengan prop keputusan (`onIntegrate`, `onRevert`, `onDiscard`), bar memuat
-   aksi nyata: satu primer, satu sekunder, dan ⋯ untuk aksi destruktif serta navigasi. Setiap mutasi
-   lewat konfirmasi `useConfirm`; layar ini tak memanggil API mutasi sendiri — layar induk yang
-   menjalankannya dan melempar galat agar ditampilkan di sini. */
+   lalu bar keputusan sticky di bawah. Tanpa keputusan (`onIntegrate`/`onRevert`), bar memuat tiga tujuan
+   navigasi berlabel (Backlog, Terminal, IDE). Dengan keputusan, bar memuat tombol keputusan dan Terminal;
+   sisanya dan Hapus worktree ada di "Aksi lain" (⋯). Di bawah 400px seluruh aksi pindah ke menu.
+   Setiap mutasi lewat konfirmasi `useConfirm`; layar ini tak memanggil API mutasi sendiri — layar induk
+   yang menjalankannya dan melempar galat agar ditampilkan di sini. */
 import React from "react";
 import { Button, Badge, Callout, Icon, Inline, OverflowActions, StateBlock, DocPreviewModal, isMarkdownPath,
   ResponsivePanels, useConfirm, type OverflowItem } from "../ds";
@@ -16,6 +16,23 @@ import { DiffView } from "./diff-view";
 import { routePath, type Route } from "../routes";
 import { failureMessage } from "../lib/report-error";
 import "./styles/review.css";
+
+// Bar keputusan di bawah 400px: satu baris, dan aksinya pindah ke menu ⋯ (QA #13, 320×640).
+const NARROW_BAR_QUERY = "(max-width: 399px)";
+function useNarrowBar(): boolean {
+  const mediaQuery = () => (typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia(NARROW_BAR_QUERY) : null);
+  const [narrow, setNarrow] = React.useState(() => mediaQuery()?.matches ?? false);
+  React.useEffect(() => {
+    const mq = mediaQuery();
+    if (!mq) return;
+    const sync = () => setNarrow(mq.matches);
+    sync();
+    mq.addEventListener?.("change", sync);
+    return () => mq.removeEventListener?.("change", sync);
+  }, []);
+  return narrow;
+}
 
 export type ReviewKind = "spec" | "session";
 
@@ -56,6 +73,7 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
   const [panel, setPanel] = React.useState<"files" | "viewer">("files");
   const { confirm, dialog } = useConfirm();
   const [actionErr, setActionErr] = React.useState("");
+  const narrow = useNarrowBar();
 
   React.useEffect(() => {
     let alive = true;
@@ -99,7 +117,8 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
   const selectFile = (path: string) => { setSelected(path); setPanel("viewer"); };
 
   const backLabel = kind === "session" ? "Kembali ke terminal" : "Kembali ke backlog";
-  const hasDecision = !!(onIntegrate || onRevert || onDiscard);
+  // "Ada keputusan" = Integrasikan atau Kembalikan. Hapus worktree bukan keputusan, ia aksi lain di ⋯.
+  const hasDecision = !!(onIntegrate || onRevert);
   const branch = `hanoman/${specId.toLowerCase().replace(/[^a-z0-9_-]/g, "_")}`;
   const hint = hasDecision
     ? onIntegrate
@@ -128,6 +147,8 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
     try {
       await confirm({
         title: `Integrasikan ${specId}?`, eyebrow: specId, icon: "git-merge", confirmLabel: "Integrasikan",
+        // Merge bukan aksi destruktif: tone netral (brass), bukan merah ConfirmDialog.
+        tone: "default",
         message: "Branch item di-merge ke cabang tujuan. Bila ada konflik, sesi agen membereskannya di Terminal. Rebase tetap di Backlog.",
         impact: [
           `Branch: ${branch}`,
@@ -172,17 +193,26 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
       });
     } catch (e) { setActionErr(failureMessage("menghapus worktree", e)); }
   }
-  // Menu ⋯: aksi destruktif plus navigasi. Navigasi hanya ada bila layar induk memberi `onGoto`,
-  // karena item menu tak bisa menjadi tautan.
+  // Menu ⋯ "Aksi lain". Navigasi hanya ada bila layar induk memberi `onGoto` (item menu tak bisa jadi tautan).
+  // Tujuan yang sudah berupa tombol di bar tak diulang, kecuali di layar sempit: di sana semuanya ada di menu.
+  const itemBacklog: OverflowItem = { key: "backlog", label: "Buka di Backlog", icon: "list-checks", onSelect: () => go(goBacklog) };
+  const itemTerminal: OverflowItem = { key: "terminal", label: "Buka di Terminal", icon: "terminal", onSelect: () => go(goTerminal) };
+  const itemIde: OverflowItem = { key: "ide", label: "Buka di IDE", icon: "code", onSelect: () => go(goIde) };
+  const backlogItems: OverflowItem[] = kind === "spec" ? [itemBacklog] : [];
+  const navMenu: OverflowItem[] = !onGoto ? []
+    : narrow ? [...backlogItems, itemTerminal, itemIde]
+    : hasDecision ? [...backlogItems, itemIde]
+    : [];
+  // Di layar sempit tombol keputusan juga pindah ke menu (bar hanya satu baris).
+  const decisionMenu: OverflowItem[] = narrow ? [
+    ...(onIntegrate ? [{ key: "integrate", label: "Integrasikan", icon: "git-merge", onSelect: () => void askIntegrate() }] : []),
+    ...(onRevert ? [{ key: "revert", label: "Kembalikan ke Dikerjakan", icon: "rotate-ccw", onSelect: () => void askRevert() }] : []),
+  ] : [];
   const moreItems: OverflowItem[] = [
+    ...decisionMenu,
+    ...navMenu,
     ...(onDiscard ? [{ key: "discard", label: "Hapus worktree", icon: "trash-2", tone: "danger" as const,
       onSelect: () => void askDiscard() }] : []),
-    ...(onGoto && kind === "spec" ? [{ key: "backlog", label: "Buka di Backlog", icon: "list-checks",
-      onSelect: () => go(goBacklog) }] : []),
-    ...(onGoto ? [
-      { key: "terminal", label: "Buka di Terminal", icon: "terminal", onSelect: () => go(goTerminal) },
-      { key: "ide", label: "Buka di IDE", icon: "code", onSelect: () => go(goIde) },
-    ] : []),
   ];
 
   if (state === "loading") return <StateBlock kind="loading" title="Memuat review…" hint={specId} />;
@@ -277,21 +307,25 @@ export function ReviewScreen({ specId, title, onBack, kind = "spec", onGoto, onI
     <div className="hn-review-decide" role="region" aria-label="Keputusan">
       {actionErr && <Callout tone="err" className="hn-review-decide-err">{actionErr}</Callout>}
       <p className="hn-review-decide-hint">{hint}</p>
-      {hasDecision ? (
-        <div className="hn-review-decide-actions">
-          {onRevert && <Button size="sm" variant="secondary" leftIcon="rotate-ccw" onClick={() => void askRevert()}>Kembalikan ke Dikerjakan</Button>}
-          {onIntegrate && <Button size="sm" variant="primary" leftIcon="git-merge" onClick={() => void askIntegrate()}>Integrasikan</Button>}
-          {moreItems.length > 0 && <div className="hn-review-more">
-            <OverflowActions label="Aksi lain untuk item ini" items={moreItems} />
-          </div>}
-        </div>
-      ) : (
-        <div className="hn-review-decide-actions">
-          {kind === "spec" && goButton(goBacklog, "Buka di Backlog", "list-checks", "primary")}
-          {goButton(goTerminal, "Buka di Terminal", "terminal", kind === "session" ? "primary" : "secondary")}
-          {goButton(goIde, "Buka di IDE", "code", "secondary")}
-        </div>
-      )}
+      <div className="hn-review-decide-actions">
+        {/* Tombol berlabel di bar (lebar ≥400px). Dengan keputusan: Kembalikan, Integrasikan, lalu Terminal. */}
+        {!narrow && (hasDecision ? (
+          <>
+            {onRevert && <Button size="sm" variant="secondary" leftIcon="rotate-ccw" onClick={() => void askRevert()}>Kembalikan ke Dikerjakan</Button>}
+            {onIntegrate && <Button size="sm" variant="primary" leftIcon="git-merge" onClick={() => void askIntegrate()}>Integrasikan</Button>}
+            {goButton(goTerminal, "Buka di Terminal", "terminal", "secondary")}
+          </>
+        ) : (
+          <>
+            {kind === "spec" && goButton(goBacklog, "Buka di Backlog", "list-checks", "primary")}
+            {goButton(goTerminal, "Buka di Terminal", "terminal", kind === "session" ? "primary" : "secondary")}
+            {goButton(goIde, "Buka di IDE", "code", "secondary")}
+          </>
+        ))}
+        {moreItems.length > 0 && <div className="hn-review-more">
+          <OverflowActions label="Aksi lain" items={moreItems} />
+        </div>}
+      </div>
     </div>
     {dialog}
     {preview && canPreview && (

@@ -266,26 +266,60 @@ describe("ReviewScreen · bar keputusan dengan prop (Fase 3L′)", () => {
     expect(within(bar).getByRole("button", { name: "Buka di IDE" })).toBeInTheDocument();
     expect(within(bar).queryByRole("button", { name: "Integrasikan" })).toBeNull();
     expect(within(bar).queryByRole("button", { name: "Kembalikan ke Dikerjakan" })).toBeNull();
-    expect(within(bar).queryByRole("button", { name: "Aksi lain untuk item ini" })).toBeNull();
+    expect(within(bar).queryByRole("button", { name: "Aksi lain" })).toBeNull();
   });
 
-  it("dengan prop: aksi sekunder, primer, dan ⋯; tujuan navigasi pindah ke ⋯", async () => {
+  it("dengan keputusan: Kembalikan, Integrasikan, dan Terminal berlabel di bar; Backlog dan IDE di Aksi lain", async () => {
     renderReview({ onGoto: vi.fn(), onIntegrate: vi.fn(), onRevert: vi.fn(), onDiscard: vi.fn() });
     const bar = await decideBar();
     expect(within(bar).getByRole("button", { name: "Kembalikan ke Dikerjakan" })).toBeInTheDocument();
     expect(within(bar).getByRole("button", { name: "Integrasikan" })).toBeInTheDocument();
-    expect(within(bar).getByRole("button", { name: "Aksi lain untuk item ini" })).toBeInTheDocument();
-    expect(within(bar).queryByRole("button", { name: "Buka di Terminal" })).toBeNull();
+    expect(within(bar).getByRole("button", { name: "Buka di Terminal" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Aksi lain" })).toBeInTheDocument();
+    expect(within(bar).queryByRole("button", { name: "Buka di IDE" })).toBeNull();
   });
 
-  it("menu ⋯ memuat navigasi dan memanggil onGoto", async () => {
-    const onGoto = vi.fn();
-    renderReview({ onGoto, onDiscard: vi.fn() });
+  it("spec belum done (Hapus worktree saja): tiga tujuan tetap berlabel; Hapus worktree di Aksi lain", async () => {
+    renderReview({ onGoto: vi.fn(), onDiscard: vi.fn() });
     const bar = await decideBar();
-    fireEvent.click(within(bar).getByRole("button", { name: "Aksi lain untuk item ini" }));
+    expect(within(bar).getByRole("button", { name: "Buka di Backlog" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Buka di Terminal" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "Buka di IDE" })).toBeInTheDocument();
+    expect(within(bar).getByText(/Merge dan konflik dikerjakan di Backlog/)).toBeInTheDocument();
+    fireEvent.click(within(bar).getByRole("button", { name: "Aksi lain" }));
+    const menu = await screen.findByRole("dialog");
+    expect(within(menu).getByRole("menuitem", { name: "Hapus worktree" })).toBeInTheDocument();
+  });
+
+  it("menu Aksi lain memuat navigasi yang tak tampil di bar dan memanggil onGoto", async () => {
+    const onGoto = vi.fn();
+    renderReview({ onGoto, onIntegrate: vi.fn(), onDiscard: vi.fn() });
+    const bar = await decideBar();
+    fireEvent.click(within(bar).getByRole("button", { name: "Aksi lain" }));
     const menu = await screen.findByRole("dialog");
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Buka di IDE" }));
     expect(onGoto).toHaveBeenCalledWith({ section: "ide" });
+  });
+
+  it("di bawah 400px tak ada tombol inline: keputusan dan tujuan semuanya di Aksi lain", async () => {
+    mockViewport(390);
+    renderReview({ onGoto: vi.fn(), onIntegrate: vi.fn(), onDiscard: vi.fn() });
+    const bar = await decideBar();
+    expect(within(bar).queryByRole("button", { name: "Integrasikan" })).toBeNull();
+    expect(within(bar).queryByRole("button", { name: "Buka di Terminal" })).toBeNull();
+    fireEvent.click(within(bar).getByRole("button", { name: "Aksi lain" }));
+    const menu = await screen.findByRole("dialog");
+    expect(within(menu).getByRole("menuitem", { name: "Integrasikan" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Buka di Terminal" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Buka di IDE" })).toBeInTheDocument();
+  });
+
+  it("integrasi memakai tone netral: tombol konfirmasinya tidak berwarna danger", async () => {
+    renderReview({ onIntegrate: vi.fn() });
+    const bar = await decideBar();
+    fireEvent.click(within(bar).getByRole("button", { name: "Integrasikan" }));
+    const dlg = await screen.findByRole("dialog");
+    expect(within(dlg).getByRole("button", { name: "Integrasikan" })).not.toHaveClass("hn-btn-danger");
   });
 
   it("integrasi: konfirmasi memuat branch, berkas +/−, dan cabang tujuan; konfirmasi memanggil onIntegrate", async () => {
@@ -357,7 +391,7 @@ describe("ReviewScreen · bar keputusan dengan prop (Fase 3L′)", () => {
     const onDiscard = vi.fn().mockResolvedValue(undefined);
     renderReview({ onDiscard });
     const bar = await decideBar();
-    fireEvent.click(within(bar).getByRole("button", { name: "Aksi lain untuk item ini" }));
+    fireEvent.click(within(bar).getByRole("button", { name: "Aksi lain" }));
     const menu = await screen.findByRole("dialog");
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Hapus worktree" }));
     const dlg = await screen.findByRole("dialog");
@@ -370,7 +404,7 @@ describe("ReviewScreen · bar keputusan dengan prop (Fase 3L′)", () => {
     const onDiscard = vi.fn().mockRejectedValue(new Error("worktree terkunci"));
     renderReview({ onDiscard });
     const bar = await decideBar();
-    fireEvent.click(within(bar).getByRole("button", { name: "Aksi lain untuk item ini" }));
+    fireEvent.click(within(bar).getByRole("button", { name: "Aksi lain" }));
     fireEvent.click(within(await screen.findByRole("dialog")).getByRole("menuitem", { name: "Hapus worktree" }));
     const dlg = await screen.findByRole("dialog");
     fireEvent.click(within(dlg).getByRole("button", { name: "Hapus worktree" }));
@@ -396,5 +430,37 @@ describe("ReviewScreen · kontrak CSS bar keputusan", () => {
     expect(rule).toMatch(/position:\s*sticky/);
     expect(rule).toMatch(/bottom:\s*0/);
     expect(rule).toMatch(/z-index:\s*\d+/);
+  });
+
+  it("di bawah 400px hint bar satu baris dan terpotong, tak bertumpuk di atas aksi", () => {
+    const narrow = /@media \(max-width: 399px\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? "";
+    expect(narrow).toMatch(/\.hn-review-decide-hint\s*\{[^}]*white-space:\s*nowrap/);
+    expect(narrow).toMatch(/\.hn-review-decide-hint\s*\{[^}]*text-overflow:\s*ellipsis/);
+    expect(narrow).toMatch(/\.hn-review-decide-hint\s*\{[^}]*flex:\s*1 1 0/);
+  });
+});
+
+// QA Chrome (#2) · chip "Changed" dan toggle list/tree di Review tampil sebagai tombol bawaan browser,
+// karena kelasnya dulu hanya termuat bersama ide.css (layar IDE). Kini pohon membawa stylesheet-nya sendiri.
+describe("ReviewScreen · gaya daftar berkas termuat tanpa IDE", () => {
+  const treeCss = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/file-tree.css"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  const treeTsx = readFileSync(resolve(import.meta.dirname, "../src/screens/file-tree.tsx"), "utf8");
+  const ideCss = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/ide.css"), "utf8");
+
+  it("file-tree.tsx mengimpor stylesheet-nya, jadi Review tak bergantung pada ide.css", () => {
+    expect(treeTsx).toMatch(/import "\.\/styles\/file-tree\.css";/);
+  });
+
+  it("baris Changed berupa flex (huruf status tak menempel ke nama) dan chip toggle berkelas", () => {
+    expect(treeCss).toMatch(/\.hn-ide-changed-row\s*\{\s*display:\s*flex/);
+    expect(treeCss).toMatch(/\.hn-ide-status\s*\{/);
+    expect(treeCss).toMatch(/\.hn-ide-changed-head\s*\{[^}]*display:\s*flex/);
+    expect(treeCss).toMatch(/\.hn-ide-view-btn\s*\{[^}]*display:\s*flex/);
+  });
+
+  it("blok pohon dan daftar Changed tak lagi ganda di ide.css (satu sumber: file-tree.css)", () => {
+    expect(ideCss).not.toMatch(/\.hn-ide-tree-leaf\s*\{/);
+    expect(ideCss).not.toMatch(/\.hn-ide-changed-head\s*\{/);
   });
 });

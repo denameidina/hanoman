@@ -23,10 +23,20 @@ describe("terminal.css · toolbar tak memotong label", () => {
   });
 });
 
-describe("terminal.css · tinggi pane ponsel", () => {
-  it("kepala + strip + dock dihitung di atas 55% viewport, dengan cadangan vh", () => {
-    expect(mobileBlock).toMatch(/\.hn-terminal-focus-main\s*\{[^}]*min-height:\s*calc\(55vh \+ 168px\)/);
-    expect(mobileBlock).toMatch(/\.hn-terminal-focus-main\s*\{[^}]*min-height:\s*calc\(55dvh \+ 168px\)/);
+describe("terminal.css · tinggi pane ponsel (320×640: composer tanpa gulir)", () => {
+  it("pane mengisi ruang gulir yang tersedia: tak ada lantai 55dvh, dan tak ada overflow hidden yang memotong", () => {
+    expect(mobileBlock).toMatch(/\.hn-terminal-focus-main\s*\{[^}]*min-height:\s*0/);
+    expect(mobileBlock).toMatch(/\.hn-terminal-focus-main\s*\{[^}]*overflow:\s*visible/);
+    expect(mobileBlock).not.toMatch(/calc\(55d?vh \+ 168px\)/);
+  });
+
+  it("layar ponsel tak lagi dipatok 640px; xterm punya lantai 35dvh", () => {
+    expect(code).toMatch(/@media \(max-width: 767px\)[\s\S]*\.hn-terminal-screen:not\(\.is-maxed\)\s*\{\s*min-height:\s*0/);
+    expect(mobileBlock).toMatch(/\.hn-terminal-focus-body\s*\{\s*min-height:\s*35dvh/);
+  });
+
+  it("dock (composer) lengket di dasar gulir bila konten melebihi layar", () => {
+    expect(mobileBlock).toMatch(/\.hn-terminal-dock\s*\{[^}]*position:\s*sticky[^}]*bottom:\s*0/);
   });
 
   it("rail sesi jadi laci di ponsel, dan tombol 'Sesi · N' tak lagi disembunyikan oleh display:none", () => {

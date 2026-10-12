@@ -374,8 +374,10 @@
 }
 
 /* Mobile (<768px): rail jadi laci (Modal), pane memakai seluruh lebar, dan toolbar tetap satu baris.
-   Tinggi pane dijaga berbasis viewport: kepala + strip + dock (composer + bar) dihitung di atas
-   55% tinggi layar, sehingga xterm tak terdesak oleh chrome. `vh` dulu sebagai cadangan. */
+   Tinggi layar TAK dipatok lagi (640px di aturan dasar): ia mengikuti ruang gulir `.hn-shell-main`, dan
+   pane mengisinya. Dulu lantai 55dvh+168px + 640px melewati 640px tinggi (320×640): composer jatuh di bawah
+   lipatan dan terpotong `overflow: hidden`. Kini body xterm menyusut sampai lantainya (35dvh), kepala dan
+   dock tetap utuh, dan dock lengket di dasar gulir bila konten tetap lebih tinggi dari layar. */
 @media (max-width: 767px) {
   .hn-terminal-toolbar {
     flex-wrap: nowrap;
@@ -386,6 +388,10 @@
     gap: 0;
   }
 
+  .hn-terminal-screen:not(.is-maxed) {
+    min-height: 0;
+  }
+
   .hn-terminal-rail {
     display: none;
   }
@@ -394,8 +400,12 @@
     border: 0;
     border-radius: 0;
     background: transparent;
-    min-height: calc(55vh + 168px);
-    min-height: calc(55dvh + 168px);
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .hn-terminal-focus-body {
+    min-height: 35dvh;
   }
 
   .hn-terminal-focus-head {
@@ -406,6 +416,13 @@
 
   .hn-terminal-dock {
     gap: var(--space-1);
+  }
+
+  .hn-terminal-dock {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: var(--surface-page);
   }
 
   .hn-terminal-dock .hn-terminal-composer {
@@ -429,6 +446,11 @@
   .hn-terminal-seg-btn,
   .hn-terminal-rail-main,
   .hn-terminal-rail-toggle {
+    min-height: var(--touch-target);
+  }
+
+  /* Select bahasa dikte: 30 px di app.css, di bawah 44 px pada sentuhan (QA P2, 768×1024). */
+  select.hn-terminal-voice-lang {
     min-height: var(--touch-target);
   }
 }

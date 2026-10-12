@@ -85,11 +85,15 @@
 
 @media (max-width: 767px) {
   .hn-review-decide { padding-bottom: calc(10px + var(--safe-bottom)); }
-  .hn-review-decide-actions { width: 100%; }
-  .hn-review-decide-actions > * { flex: 1 1 auto; justify-content: center; }
-  .hn-review-decide-actions > .hn-review-more { flex: 0 0 auto; }
   .hn-review-viewbar { align-items: stretch; }
   .hn-review-path { flex-basis: 100%; }
+}
+/* Di bawah 400px bar keputusan satu baris: hint terpotong satu baris, dan aksinya ada di ⋯ (useNarrowBar).
+   Sebelumnya hint dan aksi bertumpuk di dua baris, dan bar menutup ~30% layar 320×640. */
+@media (max-width: 399px) {
+  .hn-review-decide-hint {
+    flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 }
 
 /* ---------- Konflik sinkron (ReconcileModal) ---------- */
