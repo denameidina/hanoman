@@ -1,13 +1,14 @@
-import { paths, type Paginated, type ProjectView, type Spec, type SpecListItem, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AgentRuntime, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type AgentMetricsView, type AgentInvocationView, type AgentDisposition, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry, type PresenceView,
+import { paths, type Paginated, type ProjectView, type Spec, type SpecListItem, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerConfigView, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AgentRuntime, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type AgentMetricsView, type AgentInvocationView, type AgentDisposition, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry, type PresenceView,
   type ProvisionComponent, type ComponentProbe, type ComponentId, type ProvisionProfile,
   type ProvisionStep, type ProvisionResult,
   type SessionDialogAnswer, type SessionDialogPayload,
   type SetupStatus, type SetupApplyResult, type PhaseOverrides,
   type TaskView, type MemberView, type CreateTaskInput, type EscalateTaskInput, type PatchTaskInput,
   type CreateMemberInput, type PatchMemberInput,
-  type RemoteControlView, type RemoteControlPut,
+  type RemoteControlView, type RemoteControlPut, type AccessRequestView, type AccessRequestApprove, type RequestTier,
   type LogEntryView, type LogRetention,
-  type SkillEntry, type SkillLibraryView, type SkillTreeView, type SkillFileView } from "@hanoman/shared";
+  type SkillEntry, type SkillLibraryView, type SkillTreeView, type SkillFileView,
+  type SpecReview, type ReviewFile, type ChangedFile } from "@hanoman/shared";
 // SPEC-450 · `detail` = body JSON respons galat (best-effort, null bila bukan JSON). Ditambahkan
 // karena penolakan custom agent membawa informasi yang HARUS sampai ke operator — jalur siklus
 // (`cycle`/`scope`) dan daftar mention tak dikenal (`unknown`); "409" saja tak bisa ditindaklanjuti.
@@ -61,13 +62,9 @@ export type SourceResetPending = {
 // SPEC-170 · dokumen backlog item
 export type DocKind = "audit" | "spec" | "plan" | "objective" | "brainstorm" | "other";
 export type SpecDoc = { kind: DocKind; path: string; name: string };
-// SPEC-171 · review worktree backlog item.
-export type ChangedFile = { path: string; add: number; del: number; status: "A" | "M" | "D"; binary: boolean };
-export type SpecReview = { base: string; files: string[]; changed: ChangedFile[] };
-export type ReviewFile = {
-  path: string; status: "A" | "M" | "D" | null; binary: boolean;
-  truncated: boolean; diff: string | null; content: string | null;
-};
+// SPEC-171 · review worktree backlog item. Kontraknya di shared (ADR-0213); `empty`/`reason` ada
+// di SpecReview bila belum ada worktree maupun commit. Sesi (ADR-0215) memakai bentuk yang sama.
+export type { ChangedFile, SpecReview, ReviewFile } from "@hanoman/shared";
 // SPEC-182 · IDE Visual
 export type RepoFile = { path: string; content: string | null; binary: boolean; truncated: boolean };
 // Pohon berkas Explorer. `dirs` = direktori yang isinya BELUM dimuat (direktori terabaikan yang
@@ -192,7 +189,12 @@ export type SpecListParams = {
   dateField?: "created" | "started"; from?: string; to?: string;
 };
 // SPEC-880 · `handledBy` = deviceId; menjawab "apa saja yang dipegang mesin X" dalam satu klik.
-export type ProjectListParams = { q?: string; handledBy?: string; page?: number; limit?: number };
+// ADR-0212 · `sort=attention` mengurutkan seluruh hasil di server; `attention` (boolean) menyaring ke
+// project yang dokumennya drift/rusak. Keduanya opsional; tanpa keduanya balasannya seperti semula.
+export type ProjectListParams = {
+  q?: string; handledBy?: string; page?: number; limit?: number;
+  sort?: "attention"; attention?: boolean;
+};
 // SPEC-1217 · §S4.8 · GET /api/logs — rentang wajib, kursor opaque, TANPA `total` (ADR-0107 exc. #4).
 export type LogSearchQueryInput = {
   from: string; to: string; deviceId?: string; projectId?: string; specId?: string;
@@ -313,9 +315,15 @@ export function createApi(o: { base?: string } = {}) {
   // `session`) = ada sesi hidup; kirim ulang dengan `confirm: true`.
   markSpecDone: (id: string, b: { reason?: string; confirm?: boolean }) =>
     j<Spec>(paths.specDone(id), { method: "POST", ...body(b) }),
+  // ADR-0218 · tandai/batalkan "sudah ditinjau" pada item selesai. 409 = item belum selesai.
+  markSpecReviewed: (id: string, reviewed: boolean) =>
+    j<Spec>(paths.specReviewed(id), { method: "POST", ...body({ reviewed }) }),
   // SPEC-171 · all files + file changed dari worktree backlog item.
   specReview: (id: string) => j<SpecReview>(paths.specReview(id)),
   specReviewFile: (id: string, path: string) => j<ReviewFile>(paths.specReviewFile(id, path)),
+  // ADR-0213 · hapus worktree satu item (cabang & commit tetap). Selalu 200 bila spec ada; galat
+  // hidup di `ok`/`error`, cermin `deleteWorktrees`.
+  deleteSpecWorktree: (id: string) => j<WorktreeDeleteResult>(paths.specWorktree(id), { method: "DELETE" }),
   getSettings: () => j<Setting>(paths.settings),
   putSettings: (b: unknown) => j<Setting>(paths.settings, { method: "PUT", ...body(b) }),
   getTelegramStatus: () => j<TelegramGatewayStatus>(paths.telegramStatus),
@@ -355,6 +363,8 @@ export function createApi(o: { base?: string } = {}) {
   listNotifications: (p: { page?: number; limit?: number } = {}) =>
     j<Paginated<Notification> & { unread: number }>(paths.notifications + qs(p)),
   markNotificationsRead: () => j<void>(paths.notifications + "/read", { method: "POST" }),
+  // ADR-0204 · tandai SATU notifikasi terbaca. 404 bila id tak ada; yang sudah terbaca tetap 204.
+  markNotificationRead: (id: string) => j<void>(paths.notificationRead(id), { method: "POST" }),
   clearNotifications: () => j<void>(paths.notifications, { method: "DELETE" }),
   getLimits: () => j<LimitsDTO>(paths.limits),
   getDocs: (id: string) => j<{ coverage: number; tree: any[] }>(paths.docs(id)),
@@ -535,7 +545,8 @@ export function createApi(o: { base?: string } = {}) {
   listCleanups: () => j<{ items: WorktreeCleanupView[] }>(paths.terminalCleanups),
   // SPEC-919 · ADR-0147 · muat awal halaman Klien; sesudah itu grup siar `presence` yang mendorong.
   presence: () => j<PresenceView>(paths.presence),
-  // SPEC-230 · review + integrate ber-skop sesi (sesi project-level PRD, tanpa Spec).
+  // SPEC-230 · review + integrate ber-skop sesi (sesi project-level PRD, tanpa Spec). ADR-0215: keadaan
+  // kosong (sesi tanpa worktree / worktree lenyap) datang sebagai 200 `empty`; 409 hanya galat konfigurasi.
   sessionReview: (id: string) => j<SpecReview>(paths.sessionReview(id)),
   sessionReviewFile: (id: string, path: string) => j<ReviewFile>(paths.sessionReviewFile(id, path)),
   sessionIntegrate: (id: string, op: "merge" | "rebase", target: string) =>
@@ -603,6 +614,18 @@ export function createApi(o: { base?: string } = {}) {
   // SPEC-1215 · ADR-0165 · grant kendali jarak jauh (LOCAL-only, cookie-only).
   getRemoteControl: () => j<RemoteControlView>(paths.remoteControl),
   putRemoteControl: (b: RemoteControlPut) => j<RemoteControlView>(paths.remoteControl, { method: "PUT", ...body(b) }),
+  // ADR-0217 · permintaan tingkat akses. Di perangkat INI: daftar & keputusan lokal (cookie-only). Untuk
+  // perangkat REMOTE: kirim & status lewat hub (relay:exec di sisi agen; sesi cookie di sini).
+  listRemoteAccessRequests: () => j<{ items: AccessRequestView[] }>(paths.remoteAccessRequests),
+  // Persetujuan membawa tingkat & hub yang dilihat operator di kartu (ADR-0217 §2): server menolak 409 bila
+  // permintaan tertunda sudah berganti. Tolak tak butuh body.
+  decideRemoteAccessRequest: (id: string, action: "approve" | "reject", seen?: AccessRequestApprove) =>
+    j<{ request: AccessRequestView }>(paths.remoteAccessRequestDecide(id, action), {
+      method: "POST", ...(seen ? body(seen) : {}),
+    }),
+  requestDeviceAccess: (deviceId: string, tier: RequestTier) =>
+    j<{ request: AccessRequestView }>(paths.deviceAccessRequests(deviceId), { method: "POST", ...body({ tier }) }),
+  listDeviceAccessRequests: (deviceId: string) => j<{ items: AccessRequestView[] }>(paths.deviceAccessRequests(deviceId)),
   // SPEC-1217 · ADR-0166 · log terpusat — pencarian (kursor, tanpa `total`), transkrip remote, retensi.
   logs, logTranscript, logRetention, putLogRetention,
   // SPEC-257 · agent token (kelola cookie-only) — token plaintext hanya balik di create (sekali).
@@ -686,7 +709,7 @@ export function createApi(o: { base?: string } = {}) {
   unlinkGithubIssue: (id: string) =>
     j<{ id: string; status: string; specId: string | null }>(paths.githubIssueUnlink(id), { method: "POST", ...body({}) }),
   // SPEC-299 · ADR-0072 · panel scheduler (daun #6) — konsumen read-only fondasi.
-  getSchedulerConfig: () => j<Scheduler>(paths.schedulerConfig),
+  getSchedulerConfig: () => j<SchedulerConfigView>(paths.schedulerConfig),
   putSchedulerConfig: (cfg: Scheduler) => j<Scheduler>(paths.schedulerConfig, { method: "PUT", ...body(cfg) }),
   getSchedulerState: () => j<SchedulerStateView>(paths.schedulerState),
   // SPEC-522 · ADR-0106 · batalkan / antre lagi satu baris antrean. 409 membawa `{ error, status }`

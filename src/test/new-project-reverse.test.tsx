@@ -4,7 +4,7 @@ import { eventsStub } from "./helpers/events-stub";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// SPEC-848 · CTA "Tambah/Clone → reverse-engineer docs" menjanjikan sesi reverse; sampai spec ini
+// SPEC-848 · CTA "Tambah/Salin repo dan susun dokumen" menjanjikan sesi reverse; sampai spec ini
 // ia hanya membuat project lalu membuka Docs yang masih kosong. Berkas ini mengunci janji itu.
 const CREATED = {
   id: "repo", name: "repo", desc: "", kind: "existing", repoDir: null, binding: null,
@@ -62,15 +62,15 @@ async function openNewProjectExisting() {
   await act(async () => { await Promise.resolve(); });
   fireEvent.click(screen.getAllByText("Projects")[0]!);
   fireEvent.click((await screen.findAllByText("Project baru"))[0]!);
-  fireEvent.click(await screen.findByText("Existing codebase"));
+  fireEvent.click(await screen.findByText("Kode yang sudah ada"));
 }
 
 async function submitClone() {
-  fireEvent.click(await screen.findByText("Clone dari URL git"));
+  fireEvent.click(await screen.findByText("Salin dari URL git"));
   fireEvent.change(screen.getByPlaceholderText("https://github.com/org/repo.git"),
     { target: { value: "https://github.com/org/repo.git" } });
   fireEvent.change(screen.getByPlaceholderText("/path/ke/repo"), { target: { value: "/tmp/clone" } });
-  fireEvent.click(screen.getByText("Clone → reverse-engineer docs"));
+  fireEvent.click(screen.getByText("Salin repo dan susun dokumen"));
 }
 
 describe("existing project → reverse docs auto-start (SPEC-848)", () => {
@@ -89,7 +89,7 @@ describe("existing project → reverse docs auto-start (SPEC-848)", () => {
     }));
     await openNewProjectExisting();
     fireEvent.change(screen.getByPlaceholderText("/path/ke/repo"), { target: { value: "/repo/ada" } });
-    fireEvent.click(screen.getByText("Tambah → reverse-engineer docs"));
+    fireEvent.click(screen.getByText("Tambah dan susun dokumen"));
     expect(await screen.findByText("Reverse docs")).toBeInTheDocument();
     expect(reverseDocs).toHaveBeenCalledTimes(1);
     expect(reverseDocs).toHaveBeenCalledWith("repo");
@@ -99,7 +99,7 @@ describe("existing project → reverse docs auto-start (SPEC-848)", () => {
   it("mode folder lokal memulai tepat satu sesi reverse lalu membuka Terminal", async () => {
     await openNewProjectExisting();
     fireEvent.change(screen.getByPlaceholderText("/path/ke/repo"), { target: { value: "/repo/ada" } });
-    fireEvent.click(screen.getByText("Tambah → reverse-engineer docs"));
+    fireEvent.click(screen.getByText("Tambah dan susun dokumen"));
 
     await waitFor(() => expect(reverseDocs).toHaveBeenCalledWith("repo"));
     expect(reverseDocs).toHaveBeenCalledTimes(1);
@@ -126,7 +126,7 @@ describe("existing project → reverse docs auto-start (SPEC-848)", () => {
       { error: "gagal membuat worktree: not a git repository" }));
     await openNewProjectExisting();
     fireEvent.change(screen.getByPlaceholderText("/path/ke/repo"), { target: { value: "/repo/ada" } });
-    fireEvent.click(screen.getByText("Tambah → reverse-engineer docs"));
+    fireEvent.click(screen.getByText("Tambah dan susun dokumen"));
 
     await waitFor(() => expect(reverseDocs).toHaveBeenCalledTimes(1));
     expect(createProject).toHaveBeenCalledTimes(1);

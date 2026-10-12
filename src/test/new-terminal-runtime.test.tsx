@@ -126,3 +126,24 @@ describe("Sesi baru · pemilih runtime (SPEC-517)", () => {
     await waitFor(() => expect(createTerminal).toHaveBeenCalled());
   });
 });
+
+describe("Sesi baru · galat tak ditelan (audit UI/UX)", () => {
+  it("GET /settings gagal tampil sebagai catatan, dan form tetap memakai default", async () => {
+    getSettings.mockRejectedValue(new Error("boom"));
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByText("Belum ada sesi terminal");
+    fireEvent.click(screen.getByRole("button", { name: "Sesi baru" }));
+    expect(await screen.findByText(/Gagal memuat pengaturan: boom/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Agen")).toHaveValue("claude");
+  });
+
+  it("gagal membuka sesi tampil alasannya dan modal tetap terbuka untuk dicoba lagi", async () => {
+    createTerminal.mockRejectedValueOnce(new Error("project belum di-bind"));
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByText("Belum ada sesi terminal");
+    fireEvent.click(screen.getByRole("button", { name: "Sesi baru" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Buka sesi" }));
+    expect(await screen.findByText(/Gagal membuka sesi: project belum di-bind/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Buka sesi" })).toBeInTheDocument();
+  });
+});

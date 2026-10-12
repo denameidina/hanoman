@@ -1,0 +1,86 @@
+/* Palet perintah, bantuan shortcut, tombol ⌘K topbar, dan project switcher (Audit UI/UX 2026-10 · Fase 2C).
+   Dimuat dari main.tsx. Warna lewat token DS saja; kontrol sentuh ≥44px di mobile / pointer kasar. */
+
+kbd.hn-kbd,
+.hn-palette kbd,
+.hn-palette-foot kbd,
+.hn-shortcut-help kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box;
+  border: 1px solid var(--border-hair); border-bottom-width: 2px; border-radius: 4px;
+  background: var(--bone-100); color: var(--text-body);
+  font-family: var(--font-mono); font-size: 11px; line-height: 1;
+}
+
+/* Tombol ⌘K di topbar. aria-label "Cari" dipasang di TSX; hint hanya tampil di layar lebar. */
+.hn-shell-cmdk {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 8px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface-card); color: var(--text-muted); cursor: pointer;
+  font-family: var(--font-ui); font-size: var(--text-sm);
+}
+.hn-shell-cmdk:hover { background: var(--bone-200); }
+.hn-shell-cmdk:focus-visible { outline: none; border-color: var(--border-focus); box-shadow: var(--ring); }
+
+.hn-shell-scope { width: 200px; }
+
+/* Palet */
+.hn-palette { display: flex; flex-direction: column; gap: 10px; }
+.hn-palette-search {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-card);
+}
+.hn-palette-search:focus-within { border-color: var(--border-focus); box-shadow: var(--ring); }
+/* Fokus kotak cari: SATU indikator, yaitu pembungkusnya (batas --border-focus, brass-600 4,83:1 di kartu,
+   ditambah ring). Outline `input:focus-visible` global (2 px, offset 2 px) menggambar kotak kedua di dalam
+   field. Spesifisitas di sini (dua kelas + elemen) mengalahkannya; `.hn-palette-input` saja (satu kelas)
+   kalah dan outline-nya tetap tampil. */
+.hn-palette-search input:focus-visible,
+.hn-palette-input:focus-visible { outline: none; }
+.hn-palette-input {
+  flex: 1 1 auto; min-width: 0; border: none; outline: none; background: transparent;
+  color: var(--text-strong); font-family: var(--font-ui); font-size: var(--text-md);
+}
+.hn-palette-list { display: flex; flex-direction: column; gap: 4px; max-height: min(56vh, 480px); overflow-y: auto; }
+.hn-palette-group-label {
+  padding: 8px 4px 2px; color: var(--text-subtle);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.hn-palette-option {
+  display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; box-sizing: border-box;
+  border-radius: var(--radius-sm); cursor: pointer; color: var(--text-body);
+  font-family: var(--font-ui); font-size: var(--text-md);
+}
+.hn-palette-option.is-active { background: var(--brass-100); color: var(--brass-700); }
+.hn-palette-option.is-disabled { color: var(--text-subtle); cursor: default; }
+.hn-palette-option-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hn-palette-option-hint { flex: 0 0 auto; color: var(--text-subtle); font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
+.hn-palette-empty { padding: 16px 4px; color: var(--text-subtle); font-family: var(--font-ui); font-size: var(--text-sm); }
+.hn-palette-foot { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--text-subtle); font-family: var(--font-ui); font-size: 12px; }
+
+/* Bantuan shortcut */
+.hn-shortcut-title {
+  margin: 14px 0 6px; color: var(--text-subtle);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.hn-shortcut-title:first-child { margin-top: 0; }
+.hn-shortcut-list { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.hn-shortcut-row { display: flex; align-items: center; gap: 12px; min-height: 32px; }
+.hn-shortcut-row dt { display: flex; gap: 4px; min-width: 120px; margin: 0; }
+.hn-shortcut-row dd { margin: 0; color: var(--text-body); font-family: var(--font-ui); font-size: var(--text-md); }
+
+@media (max-width: 767px) {
+  .hn-shell-scope { width: 100%; }
+}
+
+/* Mobile / pointer kasar: tombol ikon ≥44px, hint ⌘K disembunyikan (tak ada keyboard fisik). */
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-shell-cmdk { min-width: var(--touch-target); min-height: var(--touch-target); justify-content: center; padding: 0; }
+  .hn-shell-cmdk kbd { display: none; }
+  .hn-palette-search { min-height: var(--touch-target); }
+  .hn-palette-option { min-height: var(--touch-target); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hn-shell-cmdk { transition: none; }
+}

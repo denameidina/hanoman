@@ -1,0 +1,8 @@
+/* Kartu auto-merge per project (SPEC-486 · ADR-0103) · kelas `hn-am-*`. Susunan dan teks saja;
+   nilai dari token. Warna peringatan memakai `--status-warn` dengan cadangan muted, seperti sebelumnya. */
+.hn-am-intro { font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5; }
+.hn-am-warn { font-size: 12.5px; color: var(--status-warn, var(--text-muted)); margin-bottom: 12px; }
+.hn-am-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.hn-am-grid { display: grid; gap: 10px; }
+.hn-am-label { margin-bottom: 4px; }
+.hn-am-note { font-size: 12.5px; color: var(--text-subtle); }

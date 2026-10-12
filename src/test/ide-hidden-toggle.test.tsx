@@ -1,9 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { IdeScreen } from "../src/screens/IdeScreen";
 import { api } from "../src/api/client";
 
 const projects = [{ id: "p1", name: "p1", repoDir: "/r", kind: "existing" }] as any;
+
+// Audit UI/UX 2026-10 (3H): pohon berkas kini di tab Berkas (default-nya Perubahan).
+async function openBerkas() {
+  const list = await screen.findByRole("tablist", { name: "Bagian IDE" });
+  fireEvent.click(within(list).getByRole("tab", { name: "Berkas" }));
+  return screen.findByText("README.md");
+}
 
 // Balasan server: `dist` diruntuhkan — namanya ada di `dirs`, isinya TIDAK ikut terkirim.
 const HIDDEN = {
@@ -30,7 +37,7 @@ beforeEach(() => {
 describe("Explorer · toggle tersembunyi", () => {
   it("mati secara default; menyala → memuat ulang dengan hidden dan menampilkan entri terabaikan", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
-    await screen.findByText("README.md");
+    await openBerkas();
     expect(api.ideTree).toHaveBeenCalledWith("p1", "", { hidden: false });
     expect(screen.queryByText("secret.env")).toBeNull();
 
@@ -41,7 +48,7 @@ describe("Explorer · toggle tersembunyi", () => {
 
   it("mematikannya lagi membuang entri terabaikan dari pohon", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
-    await screen.findByText("README.md");
+    await openBerkas();
     const btn = screen.getByRole("button", { name: /tersembunyi/i });
     fireEvent.click(btn);
     await screen.findByText("secret.env");
@@ -51,7 +58,7 @@ describe("Explorer · toggle tersembunyi", () => {
 
   it("direktori terabaikan yang diruntuhkan baru memuat isinya saat dibuka", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
-    await screen.findByText("README.md");
+    await openBerkas();
     fireEvent.click(screen.getByRole("button", { name: /tersembunyi/i }));
     // `dist` tampil sebagai folder meski tak satu pun berkas di bawahnya terkirim…
     const dir = await screen.findByText("dist/");
@@ -65,7 +72,7 @@ describe("Explorer · toggle tersembunyi", () => {
 
   it("togglenya mati saat sedang melihat sebuah ref — commit tak punya berkas terabaikan", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
-    await screen.findByText("README.md");
+    await openBerkas();
     fireEvent.change(screen.getByDisplayValue("· working tree ·"), { target: { value: "main" } });
     await waitFor(() => expect(screen.getByRole("button", { name: /tersembunyi/i })).toBeDisabled());
   });

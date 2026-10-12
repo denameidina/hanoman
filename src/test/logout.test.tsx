@@ -28,9 +28,14 @@ describe("logout dari topbar", () => {
     fireEvent.click(acct);
     expect(screen.getByText("a@b.co")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Keluar"));
+    // Keluar lewat konfirmasi (Audit UI/UX 2026-10): logout baru jalan setelah dialognya disetujui.
+    expect(logout).not.toHaveBeenCalled();
+    // Menu sudah tertutup saat dialog terbuka, jadi satu-satunya "Keluar" kini tombol konfirmasi.
+    fireEvent.click(screen.getByText("Keluar"));
     await waitFor(() => expect(logout).toHaveBeenCalled());
     // kembali ke AuthScreen: field email login (placeholder unik) muncul, menu Akun hilang
-    await waitFor(() => expect(screen.getByPlaceholderText("kamu@nafanesia.id")).toBeInTheDocument());
+    // Placeholder berbentuk contoh bernilai (SPEC-490): awalan "mis. ".
+    await waitFor(() => expect(screen.getByPlaceholderText("mis. kamu@nafanesia.id")).toBeInTheDocument());
     expect(screen.queryByLabelText("Akun")).toBeNull();
   });
 });

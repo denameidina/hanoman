@@ -5,10 +5,11 @@ import React from "react";
 import { Modal, StateBlock, Icon, MarkdownView, DocDownload, ResponsivePanels } from "../ds";
 import { type SpecDoc } from "../api/client";
 import { useApi } from "../api/instance";
+import "./styles/dialogs.css";
 
 const KIND_LABEL: Record<string, string> = {
   audit: "Audit", spec: "Spec", plan: "Plan",
-  objective: "Objective", brainstorm: "Brainstorm", other: "Lainnya",
+  objective: "Tujuan", brainstorm: "Brainstorm", other: "Lainnya",
 };
 
 export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: () => void }) {
@@ -66,30 +67,22 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
             active={panel}
             onActiveChange={(next) => setPanel(next as "files" | "preview")}
             masterWidth={240}
-            className="hn-workspace-panels"
-            style={{ height: "100%" }}
+            className="hn-workspace-panels hn-sdm-panels"
             panels={[
-              { id: "files", label: "Files", className: "hn-panel-flex", content: (
-            <div style={{ overflow: "auto", borderRight: "1px solid var(--border-hair)", paddingRight: 8 }}>
+              { id: "files", label: "Berkas", className: "hn-panel-flex", content: (
+            <div className="hn-sdm-files">
               {groups.map((grp) => (
-                <div key={grp.kind} style={{ marginBottom: 10 }}>
-                  <div className="hn-eyebrow" style={{ padding: "4px 6px", color: "var(--text-subtle)" }}>
+                <div key={grp.kind} className="hn-sdm-group">
+                  <div className="hn-eyebrow hn-sdm-kind">
                     {KIND_LABEL[grp.kind] ?? grp.kind}
                   </div>
                   {grp.items.map((f) => {
                     const on = f.path === sel;
                     return (
-                      <button key={f.path} onClick={() => { setSel(f.path); setPanel("preview"); }} style={{
-                        display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 8px",
-                        borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer", textAlign: "left",
-                        background: on ? "var(--brass-100)" : "transparent",
-                      }}>
+                      <button key={f.path} onClick={() => { setSel(f.path); setPanel("preview"); }}
+                        className="hn-sdm-doc" data-on={on ? "true" : "false"}>
                         <Icon name="file-text" size={13} color={on ? "var(--brass-700)" : "var(--text-subtle)"} />
-                        <span style={{
-                          fontFamily: "var(--font-mono)", fontSize: 11.5,
-                          color: on ? "var(--brass-700)" : "var(--text-body)", fontWeight: on ? 600 : 400,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>{f.name}</span>
+                        <span className="hn-sdm-doc-name">{f.name}</span>
                       </button>
                     );
                   })}
@@ -97,15 +90,14 @@ export function SpecDocsModal({ specId, onClose }: { specId: string; onClose: ()
               ))}
             </div>
               ) },
-              { id: "preview", label: "Preview", className: "hn-panel-flex", content: (
-            <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+              { id: "preview", label: "Pratinjau", className: "hn-panel-flex", content: (
+            <div className="hn-sdm-preview">
               {/* SPEC-361 · unduh dokumen yang sedang dibuka sebagai evidence untuk tim */}
-              <div style={{ display: "flex", justifyContent: "flex-end", paddingBottom: 6,
-                borderBottom: "1px solid var(--border-hair)", marginBottom: 8 }}>
+              <div className="hn-sdm-bar">
                 <DocDownload href={(f) => api.specDocDownloadUrl(specId, sel, f)}
                   disabled={!sel || docLoading || docFailed} />
               </div>
-              <div data-testid="doc-preview-scroll" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", padding: "0 8px 16px" }}>
+              <div data-testid="doc-preview-scroll" className="hn-sdm-scroll">
                 {docLoading ? <StateBlock kind="loading" title="Memuat…" hint={sel} />
                   : docFailed ? <StateBlock kind="error" title="Gagal memuat berkas" hint={sel} />
                   : <MarkdownView text={cache[sel] ?? ""} name={sel} />}

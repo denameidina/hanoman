@@ -1,0 +1,42 @@
+/* Limit Claude & Codex (SPEC-338 · SPEC-205) · kelas `hn-lim-*`. Warna severity datang dari token
+   `severityToken` lewat dua CSS var yang diset di pembungkus masing-masing: --lim-fg (teks, isi meter,
+   titik) dan --lim-bg (latar pil). Lebar meter lewat --lim-fill. Semua diwarisi turunannya. */
+
+.hn-lim-empty { font-size: var(--text-sm); color: var(--text-muted); padding: 4px 0; }
+.hn-lim-windows { display: flex; flex-direction: column; gap: 10px; }
+.hn-lim-window { display: flex; flex-direction: column; gap: 3px; }
+.hn-lim-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.hn-lim-label { font-size: var(--text-sm); color: var(--text-body); }
+.hn-lim-value { display: inline-flex; gap: 6px; align-items: baseline; }
+.hn-lim-pct { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--lim-fg); }
+.hn-lim-word { font-size: var(--text-xs); color: var(--lim-fg); }
+.hn-lim-meter { height: 5px; background: var(--bone-300); border-radius: var(--radius-pill); overflow: hidden; }
+.hn-lim-meter-fill {
+  width: var(--lim-fill); height: 100%; background: var(--lim-fg); border-radius: var(--radius-pill);
+}
+.hn-lim-reset { font-size: var(--text-xs); color: var(--text-subtle); }
+.hn-lim-foot { font-size: var(--text-xs); color: var(--text-subtle); margin-top: 2px; }
+
+/* Pil: dua agen tetap dua pil. Tinggi sentuh 44 px hanya di pointer kasar: `hn-lim-pill-touch` dipasang
+   dari `useCoarsePointer()`. Spesifisitas (0,2,0) mengalahkan `button` 44 px di app.css, sama seperti
+   inline `minHeight` dulu. Tanpa kelas itu, aturan app.css berlaku apa adanya. */
+.hn-lim-pill-wrap { position: relative; }
+.hn-lim-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+  border-radius: var(--radius-pill, 999px); border: 1px solid var(--border-hair);
+  background: var(--lim-bg); color: var(--lim-fg); cursor: pointer;
+  font-family: var(--font-mono); font-size: var(--text-xs);
+}
+.hn-lim-pill.hn-lim-pill-touch { min-height: 44px; }
+/* Titik untuk Claude, kotak untuk Codex. Warnanya `currentColor` = teks pil. */
+.hn-lim-dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
+.hn-lim-dot-square { border-radius: 2px; }
+
+/* Popover di bawah pil; kelas `hn-viewport-popover` (app.css) hanya menambah box-sizing dan max-width. */
+.hn-lim-popover {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; width: 280px;
+  background: var(--surface-card); border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 14px;
+}
+.hn-lim-eyebrow { margin-bottom: 8px; }
+.hn-lim-footnote { font-size: var(--text-xs); color: var(--text-subtle); margin-top: 6px; line-height: 1.45; }

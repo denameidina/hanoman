@@ -12,6 +12,7 @@ import { getSetting } from "../services/settings";
 import { runTurn } from "../services/portal-chat/turn";
 import { sanitizeClientText } from "../services/portal-chat/guard-input";
 import { quotaView, startSessionWithQuota } from "../services/portal-chat/quota";
+import { chatOpen } from "../services/portal-chat/gate";
 
 // SPEC-854 · ADR-0129 · permukaan chat klien. Ia hidup di berkas sendiri, bukan di `portal.ts`:
 // portal.ts adalah permukaan BACA + satu pintu tiket, dan menaruh mesin percakapan di sana
@@ -41,11 +42,10 @@ const toMessageView = (m: {
 });
 
 export default async function (app: FastifyInstance) {
-  /** Gerbang bersama: master switch + akses project. Satu tempat, bukan empat. */
+  /** Gerbang bersama: master switch + akses project (`chatOpen`, ADR-0211). Satu tempat, bukan empat. */
   async function gate(userId: string, projectId: string) {
     const s = await getSetting();
-    if (!s.portalChat.enabled) return null;
-    if (!(await hasProjectAccess(userId, projectId))) return null;
+    if (!chatOpen(s.portalChat.enabled, await hasProjectAccess(userId, projectId))) return null;
     return s.portalChat;
   }
 

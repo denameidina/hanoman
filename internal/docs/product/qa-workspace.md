@@ -9,12 +9,16 @@ Keputusan desain: [ADR-0174](../adr/0174-workspace-qa.md).
 
 1. **Laporan baru** → isi judul, versi, penguji, sistem operasi, browser, perangkat, alamat aplikasi,
    dan cakupan (apa yang diuji dan apa yang sengaja **tidak**).
-2. Tab **Langkah uji** (test case): tambah langkah uji; catat hasil per case (`pass` / `fail` / `blocked` / `skipped`).
+2. Tab **Langkah uji** (test case): tambah langkah uji; pilih hasilnya per case dengan satu ketukan (Lulus, Gagal, Terhambat, Dilewati, atau Belum diuji).
 3. Tab **Temuan**: satu temuan = satu masalah. Isi repro bernomor (satu langkah per baris), Expected vs
    Actual, tautkan ke test case, lalu lampirkan screenshot.
-4. Pilih **Keputusan** (`go` / `no-go` / `conditional`) dan tulis ringkasan alasannya, lalu **Ajukan laporan**.
-   Mengajukan/menyelesaikan laporan ditolak bila keputusan belum diisi.
-5. **Selesaikan dan kunci** mengunci laporan (read-only). **Buka kembali** bila perlu merevisi.
+4. Tekan **Ajukan** di header. Dialog **Tinjau dan ajukan** memuat syaratnya: judul dan **Keputusan** (`go` / `no-go` /
+   `conditional`) wajib diisi; temuan yang masih terbuka hanya ditampilkan sebagai informasi. Mengajukan/menyelesaikan
+   laporan ditolak bila keputusan belum diisi.
+5. **Selesaikan dan kunci** (dialog yang sama) mengunci laporan (read-only). **Buka kembali** bila perlu merevisi.
+
+Info laporan (versi, penguji, keputusan, perangkat) tampil ringkas di atas tab. **Ubah info** membuka isiannya di drawer;
+perubahan disimpan dengan tombol **Simpan** di header.
 
 ## Severity ≠ prioritas
 
@@ -34,7 +38,7 @@ dan 100 MB per laporan. Berkas yang ditolak dilaporkan per nama dengan alasannya
 
 ## Kerjakan temuan langsung dalam sesi
 
-Pilih **Kerjakan langsung** pada temuan untuk membuka sesi agen tanpa membuat backlog. Agen memakai pengaturan sesi default dan worktree terisolasi pada branch `qa/<id>`; klik ulang membuka sesi aktif yang sama. Laporan yang sudah dikunci tetap boleh memulai perbaikan. Temuan yang ditandai tidak akan diperbaiki harus dibuka kembali; temuan yang sudah masuk backlog dikerjakan dari sesi backlog.
+Pilih **Kerjakan langsung** di menu ⋯ temuan untuk membuka sesi agen tanpa membuat backlog. Agen memakai pengaturan sesi default dan worktree terisolasi pada branch `qa/<id>`; klik ulang membuka sesi aktif yang sama. Laporan yang sudah dikunci tetap boleh memulai perbaikan. Temuan yang ditandai tidak akan diperbaiki harus dibuka kembali; temuan yang sudah masuk backlog dikerjakan dari sesi backlog.
 
 Sesi membawa konteks laporan, langkah reproduksi, pengujian terkait, dan lampiran milik laporan/temuan/pengujian itu. Lampiran yang belum tersedia menghalangi peluncuran dengan pesan untuk sinkronisasi ulang. Review dan integrasikan hasil melalui Terminal. Setelah perbaikan, jalankan retest dan catat hasilnya di QA; peluncuran sesi tidak otomatis mengubah status temuan.
 
@@ -42,8 +46,9 @@ Sesi membawa konteks laporan, langkah reproduksi, pengujian terkait, dan lampira
 
 Tombol **Kirim ke backlog** di tiap temuan `open` membuat backlog item (jenis QA) berisi judul, langkah repro,
 expected/actual, lingkungan, dan screenshot temuan sebagai konteks agen. **Kirim semua yang open** melakukannya
-sekaligus (temuan `wontfix` dilewati). Temuan lalu berstatus `sent` dan menampilkan lencana `SPEC-n · stage`
-yang membuka Backlog, jadi progres perbaikan terlihat dari laporan QA.
+sekaligus (temuan `wontfix` dilewati). Hasilnya tampil di dialog per temuan: berhasil (dengan nomor SPEC) atau gagal
+beserta alasannya. Temuan yang sudah terkirim berstatus `sent` dan menampilkan tombol **Buka backlog**, jadi progres
+perbaikan terlihat dari laporan QA.
 
 - Pemetaan sengaja kasar: severity blocker/critical → critical, minor/trivial → minor; P0/P1 → tinggi,
   P2 → sedang, P3 → rendah. Severity dan prioritas QA yang asli tetap tertulis di isi backlog.
@@ -58,7 +63,7 @@ yang membuka Backlog, jadi progres perbaikan terlihat dari laporan QA.
   Mulai dari Ringkasan, ganti/hapus contoh, lalu **Impor Excel / ZIP**. Judul laporan wajib; kolom lain boleh kosong.
   Formulir dashboard memisahkan informasi laporan, lingkungan, dan hasil akhir, dengan contoh dan label bahasa Indonesia.
   Sistem operasi/browser/perangkat memakai input biasa; metadata lain tersedia di bagian lingkungan tambahan.
-- **DOCX** dan **PDF** (tab Pratinjau) untuk dibaca atau diserahkan: ringkasan angka, tabel test case berwarna
+- **DOCX** dan **PDF** (menu ⋯ editor) untuk dibaca atau diserahkan: ringkasan angka, tabel test case berwarna
   per status, temuan lengkap, dan screenshot **tertanam** di dalam dokumen.
 - **XLSX** berisi lima sheet seperti template, dapat diimpor kembali sebagai laporan lengkap; **CSV** hanya matriks test case. Untuk Excel gunakan
   XLSX — CSV berkoma dibuka Excel berlokal Indonesia dalam satu kolom (impor tetap menerima CSV bertitik-koma).
@@ -67,7 +72,7 @@ yang membuka Backlog, jadi progres perbaikan terlihat dari laporan QA.
   test case baru. Kolom yang tidak ada dibiarkan; sel kosong pada kolom yang ada mengosongkan nilai. Status boleh
   berbahasa Indonesia (lulus, gagal, terblokir, dilewati, belum). Satu baris salah menggagalkan seluruh impor
   dengan pesan "baris N: …" — tidak ada yang tertulis setengah-setengah.
-- **Ekspor ZIP** (di editor dan tab Pratinjau) → `report.xlsx` + `report.md` + folder `attachments/` dengan tautan relatif;
+- **Ekspor ZIP** (menu ⋯ editor, atau tombol Unduh ZIP di daftar laporan) → `report.xlsx` + `report.md` + folder `attachments/` dengan tautan relatif;
   terbaca di editor Markdown mana pun, gambar tampil langsung. **Unduh .md** hanya dokumennya.
 - **Impor Excel / ZIP** menerima `.xlsx`, `.zip` atau `.md`. Excel mengimpor ringkasan, test case, temuan,
   tautan test case, dan pemetaan lampiran. Pilih screenshot/log bersama Excel dalam kolom Berkas lampiran;

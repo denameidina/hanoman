@@ -1,0 +1,266 @@
+/* Klien (Beranda Klien) dan Help Center publik — Audit UI/UX 2026-10 · Fase 3 (3M).
+   Dimuat oleh ClientPortal, TicketForm, ChatPanel, TicketTimeline, dan PublicHelpApp. Scroller dan
+   rantai gulir tetap di inline style pada komponennya (dikunci test); di sini hanya susunan, warna,
+   dan ukuran. Input teks 16 px: iOS men-zoom bila kolom isian di bawah 16 px saat difokus. */
+
+/* ---------- Beranda Klien: kerangka ---------- */
+.hn-portal-content {
+  box-sizing: border-box;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 24px 28px 32px;
+}
+.hn-portal-brand { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--text-strong); }
+.hn-portal-who { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-subtle); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hn-portal-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; flex: 0 0 auto; border-radius: var(--radius-sm); background: var(--accent);
+}
+.hn-portal-projects { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+
+.hn-portal-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.hn-portal-title { margin: 0; font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 600;
+  color: var(--text-strong); line-height: 1.2; }
+.hn-portal-sub { margin: 4px 0 0; font-size: var(--text-sm); color: var(--text-subtle); line-height: 1.5; }
+.hn-portal-tabs-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.hn-portal-tabs-row > .hn-tabs { flex: 1 1 auto; min-width: 0; }
+
+.hn-portal-note {
+  margin: 0 0 14px; padding: 10px 14px; border-radius: var(--radius-lg); background: var(--bone-100);
+  border: 1px solid var(--border-hair); color: var(--text-subtle); font-size: var(--text-sm); line-height: 1.6;
+}
+.hn-portal-alert { margin: 0 0 14px; color: var(--clay-600); font-size: var(--text-sm); }
+
+/* ---------- Keluhan saya: kartu per laporan ---------- */
+.hn-portal-cases { display: flex; flex-direction: column; gap: 10px; }
+.hn-portal-case {
+  display: flex; flex-direction: column; gap: 12px; width: 100%; box-sizing: border-box;
+  padding: 14px 16px; min-height: var(--touch-target); text-align: left; cursor: pointer;
+  font: inherit; color: inherit; background: var(--surface-card);
+  border: 1px solid var(--border-hair); border-radius: var(--radius-lg);
+}
+.hn-portal-case:hover { border-color: var(--border-strong); }
+.hn-portal-case-head { display: flex; align-items: flex-start; gap: 8px 12px; flex-wrap: wrap; min-width: 0; }
+.hn-portal-case-num { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-subtle); padding-top: 3px; }
+.hn-portal-case-title { flex: 1 1 200px; min-width: 0; font-size: var(--text-md); font-weight: 600; color: var(--text-strong);
+  overflow-wrap: anywhere; line-height: 1.35; }
+.hn-portal-case-note { margin: 0; font-size: var(--text-sm); color: var(--text-body); line-height: 1.55; }
+.hn-portal-case-meta { font-size: var(--text-xs); color: var(--text-subtle); }
+
+/* ---------- Progres pekerjaan: baris daftar ---------- */
+.hn-portal-list { overflow: hidden; }
+.hn-portal-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box;
+  padding: 12px 16px; min-height: var(--touch-target); border: none; background: transparent;
+  border-bottom: 1px solid var(--border-hair); cursor: pointer; color: inherit; font: inherit; text-align: left;
+}
+.hn-portal-row:last-child { border-bottom: none; }
+.hn-portal-row:hover { background: var(--bone-100); }
+.hn-portal-row-title { flex: 1 1 0; min-width: 0; font-weight: 500; color: var(--text-strong);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hn-portal-meta { font-size: var(--text-sm); color: var(--text-subtle); white-space: nowrap; }
+
+/* ---------- Linimasa 4 langkah (TicketTimeline) ---------- */
+.hn-timeline {
+  display: flex; margin: 0; padding: 0; list-style: none; width: 100%; box-sizing: border-box;
+}
+.hn-timeline-step {
+  position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: flex-start;
+  gap: 6px; padding-top: 2px;
+}
+/* Garis penghubung: dari titik sebelumnya ke titik ini. Warnanya ikut langkah yang sudah lewat. */
+.hn-timeline-step + .hn-timeline-step::before {
+  content: ""; position: absolute; top: 7px; right: calc(50% + 8px); left: calc(-50% + 8px);
+  height: 2px; background: var(--border-hair);
+}
+.hn-timeline-step[data-state="done"]::before,
+.hn-timeline-step[data-state="current"]::before { background: var(--leaf-600); }
+.hn-timeline-step[data-state="closed"]::before { background: var(--clay-600); }
+
+.hn-timeline-dot {
+  position: relative; z-index: 1; width: 16px; height: 16px; box-sizing: border-box; flex: 0 0 auto;
+  border-radius: 50%; background: var(--surface-card); border: 2px solid var(--border-strong);
+}
+.hn-timeline-step[data-state="done"] .hn-timeline-dot { background: var(--leaf-600); border-color: var(--leaf-600); }
+.hn-timeline-step[data-state="current"] .hn-timeline-dot {
+  background: var(--brass-100); border-color: var(--brass-600); box-shadow: 0 0 0 3px var(--brass-100);
+}
+.hn-timeline-step[data-state="closed"] .hn-timeline-dot { background: var(--clay-600); border-color: var(--clay-600); }
+
+.hn-timeline-label { font-size: var(--text-xs); line-height: 1.3; color: var(--text-subtle); overflow-wrap: anywhere; }
+.hn-timeline-step[data-state="done"] .hn-timeline-label { color: var(--text-body); }
+.hn-timeline-step[data-state="current"] .hn-timeline-label { color: var(--text-strong); font-weight: 600; }
+.hn-timeline-step[data-state="closed"] .hn-timeline-label { color: var(--clay-600); font-weight: 600; }
+.hn-timeline-compact .hn-timeline-label { font-size: var(--text-2xs); }
+.hn-timeline-compact .hn-timeline-dot { width: 12px; height: 12px; border-width: 2px; }
+.hn-timeline-compact .hn-timeline-step + .hn-timeline-step::before { top: 5px; }
+.hn-timeline-note { margin: 12px 0 0; font-size: var(--text-sm); color: var(--text-body); line-height: 1.55; }
+
+/* ---------- Detail keluhan & pekerjaan (Modal) ---------- */
+.hn-portal-detail { display: flex; flex-direction: column; gap: 14px; }
+.hn-portal-dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; margin: 0; }
+.hn-portal-dl dt { font-size: var(--text-sm); color: var(--text-subtle); }
+.hn-portal-dl dd { margin: 0; font-size: var(--text-sm); color: var(--text-body); }
+.hn-portal-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; color: var(--text-body); }
+
+/* ---------- Lapor masalah (TicketForm, dua langkah) ---------- */
+.hn-portal-form { display: flex; flex-direction: column; gap: 14px; }
+.hn-portal-steps { font-size: var(--text-xs); color: var(--text-subtle); letter-spacing: 0.02em; }
+.hn-portal-field-note { margin: 0; font-size: var(--text-sm); color: var(--text-subtle); line-height: 1.55; }
+.hn-portal-textarea {
+  display: block; width: 100%; box-sizing: border-box; min-height: 120px; padding: 10px 12px; resize: vertical;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-card);
+  color: var(--text-strong); font-family: var(--font-ui); font-size: 16px; line-height: 1.5;
+}
+.hn-portal-textarea:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+/* Input berkas: kotak ≥44px (sentuh) dan tombol "Pilih berkas" di dalamnya ikut diberi tinggi dan batas,
+   supaya tak tampak sebagai teks kecil 21px. Dipakai bersama TicketForm dan Help Center publik. */
+.hn-portal-file { display: block; width: 100%; box-sizing: border-box; min-height: var(--touch-target); padding: 0;
+  font-size: var(--text-md); color: var(--text-body); cursor: pointer; }
+.hn-portal-file::file-selector-button {
+  min-height: 36px; margin: 0 12px 0 0; padding: 0 14px; font: inherit; color: var(--text-strong);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-card); cursor: pointer;
+}
+.hn-portal-file::file-selector-button:hover { background: var(--bone-100); }
+.hn-portal-file:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+/* Help Center publik: input berkas native disembunyikan (tetap fokusabel, namanya dari label field), dan
+   yang tampak adalah tombol DS "Pilih berkas" (label yang menunjuk input). Teks bawaan browser
+   ("Choose Files") tak pernah tampil, jadi bahasa tombolnya ikut bahasa layar. */
+.hn-public-file { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
+.hn-public-file > input[type="file"].hn-public-file-input {
+  position: absolute; width: 1px; height: 1px; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; opacity: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+.hn-public-file-btn {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; cursor: pointer;
+  font-family: var(--font-ui); font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--text-strong);
+  background: var(--surface-card); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); white-space: nowrap;
+}
+.hn-public-file-btn:hover { background: var(--bone-100); }
+.hn-public-file-input:focus-visible + .hn-public-file-btn { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.hn-portal-files { margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); color: var(--text-subtle);
+  overflow-wrap: anywhere; }
+.hn-portal-summary { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--bone-100);
+  border: 1px solid var(--border-hair); border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--text-body); }
+.hn-portal-summary strong { color: var(--text-strong); font-weight: 600; overflow-wrap: anywhere; }
+.hn-portal-foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.hn-portal-error { margin: 0; font-size: var(--text-sm); color: var(--clay-600); }
+
+/* ---------- Obrolan (ChatPanel) ---------- */
+.hn-chat { display: flex; flex-direction: column; gap: 14px; }
+.hn-chat-types { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.hn-chat-type { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.hn-chat-type p { margin: 0; color: var(--text-subtle); font-size: var(--text-sm); line-height: 1.6; }
+.hn-chat-history { margin-top: 22px; }
+.hn-chat-history h3 { margin: 0 0 10px; font-size: var(--text-md); color: var(--text-strong); }
+.hn-chat-row {
+  display: flex; gap: 12px; width: 100%; box-sizing: border-box; text-align: left; padding: 12px 16px;
+  min-height: var(--touch-target); background: none; border: none; border-bottom: 1px solid var(--border-hair);
+  cursor: pointer; font: inherit; color: inherit;
+}
+.hn-chat-row-type { width: 110px; flex: 0 0 auto; font-size: var(--text-sm); color: var(--text-subtle); }
+.hn-chat-row-sum { flex: 1 1 0; min-width: 0; color: var(--text-strong); overflow-wrap: anywhere; }
+.hn-chat-jatah { margin: 0; color: var(--text-subtle); font-size: var(--text-sm); line-height: 1.6; }
+.hn-chat-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hn-chat-bar > span { font-size: var(--text-sm); color: var(--text-subtle); }
+.hn-chat-thread { display: flex; flex-direction: column; gap: 10px; }
+.hn-chat-msg { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.hn-chat-msg[data-role="klien"] { align-items: flex-end; }
+.hn-chat-bubble {
+  max-width: min(560px, 88%); box-sizing: border-box; padding: 10px 14px; border-radius: var(--radius-lg);
+  border: 1px solid var(--border-hair); background: var(--surface-card); white-space: pre-wrap; line-height: 1.6;
+  color: var(--text-body); overflow-wrap: anywhere;
+}
+.hn-chat-msg[data-role="klien"] .hn-chat-bubble { background: var(--bone-100); }
+.hn-chat-msg[data-gagal="true"] .hn-chat-bubble { opacity: 0.85; border-color: var(--clay-500); }
+.hn-chat-failed { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--text-xs); color: var(--clay-600); }
+.hn-chat-compose { display: flex; gap: 10px; align-items: flex-end; }
+.hn-chat-compose > div { flex: 1 1 0; min-width: 0; }
+
+/* ---------- Help Center publik (PublicHelpApp) ---------- */
+.hn-public-page { display: flex; flex-direction: column; gap: 16px; max-width: 640px; margin: 0 auto; }
+.hn-public-form { display: flex; flex-direction: column; gap: 14px; }
+/* Label ke kontrol: jarak 6px, sama dengan `.hn-field` DS (label `marginBottom: 6`) yang dipakai portal. */
+.hn-public-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.hn-public-label { display: block; font-size: var(--text-sm); font-weight: 600; line-height: 1.3; color: var(--text-strong); }
+.hn-public-input {
+  display: block; width: 100%; box-sizing: border-box; min-height: var(--touch-target); padding: 8px 10px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-card);
+  color: var(--text-body); font-family: var(--font-ui); font-size: 16px;
+}
+textarea.hn-public-input { min-height: 140px; resize: vertical; line-height: 1.5; }
+.hn-public-input:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+.hn-public-files { font-size: var(--text-xs); color: var(--text-subtle); overflow-wrap: anywhere; }
+.hn-public-check { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.hn-public-check .hn-public-field { flex: 1 1 200px; }
+.hn-public-linkbox {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--brass-300); background: var(--brass-100);
+}
+.hn-public-code { display: block; font-family: var(--font-mono); font-size: var(--text-xs); overflow-wrap: anywhere; color: var(--text-strong); }
+.hn-public-status-dl { display: grid; gap: 12px; margin: 0; }
+.hn-public-status-dl dt { font-size: var(--text-xs); color: var(--text-subtle); }
+.hn-public-status-dl dd { margin: 2px 0 0; color: var(--text-body); overflow-wrap: anywhere; }
+
+/* ---------- Ukuran sentuh & zoom iOS ---------- */
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-portal button,
+  .hn-portal select,
+  .hn-portal .hn-input-core,
+  .hn-public button,
+  .hn-public .hn-input-core,
+  .hn-public select { min-height: var(--touch-target); }
+  .hn-portal-file::file-selector-button { min-height: var(--touch-target); }
+  .hn-public-file-btn { min-height: var(--touch-target); }
+  .hn-portal select,
+  .hn-portal .hn-input-core,
+  .hn-public select,
+  .hn-public .hn-input-core { font-size: 16px; }
+}
+@media (max-width: 767px) {
+  .hn-portal-content { padding: 16px 16px 24px; }
+  .hn-portal-head { align-items: stretch; flex-direction: column; }
+  .hn-portal-head > button { width: 100%; justify-content: center; }
+  .hn-portal-row { align-items: flex-start; flex-wrap: wrap; }
+  .hn-portal-row-title { flex-basis: 100%; white-space: normal; }
+  .hn-timeline-label { font-size: var(--text-2xs); }
+  .hn-chat-row { flex-wrap: wrap; }
+  .hn-chat-row-type { width: 100%; }
+  .hn-chat-compose { flex-direction: column; align-items: stretch; }
+  .hn-portal-foot > * { flex: 1 1 auto; }
+  .hn-portal-dl { grid-template-columns: minmax(0, 1fr); }
+  .hn-portal-dl dt { margin-top: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hn-portal-case, .hn-portal-row { transition: none; }
+}
+
+/* ---------- Kerangka tambahan (ClientPortal) ---------- */
+.hn-portal-header {
+  box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 22px;
+  height: var(--topbar-h); border-bottom: 1px solid var(--border-hair); background: var(--bone-100);
+}
+.hn-portal-spacer { flex: 1 1 auto; }
+.hn-portal-titlebox { min-width: 0; }
+.hn-portal-tabs { flex: 1 1 auto; min-width: 0; }
+.hn-portal-pillrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hn-portal-pager { margin-top: 14px; border: 1px solid var(--border-hair); border-radius: var(--radius-lg); overflow: hidden; }
+.hn-portal-cases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.hn-portal-case-title {
+  /* Tinggi area klik ≥24 px lewat padding (baris teks 14 px hanya 19 px). Pointer kasar: 44 px dari `.hn-portal button`. */
+  flex: 1 1 200px; min-width: 0; min-height: 24px; padding: 3px 0; margin: 0; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: var(--text-md); font-weight: 600; color: var(--text-strong); text-align: left;
+  overflow-wrap: anywhere; line-height: 1.35; text-decoration: underline; text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+.hn-portal-case-title:hover { text-decoration-color: var(--text-strong); }
+.hn-portal-case-title:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: var(--radius-xs); }
+.hn-chat .hn-portal-textarea { min-height: 84px; }
+
+.hn-public-lead { margin: 0; color: var(--text-body); line-height: 1.6; }
+.hn-public-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
+.hn-portal-wide { width: 100%; }

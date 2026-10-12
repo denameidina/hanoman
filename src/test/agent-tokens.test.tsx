@@ -46,7 +46,7 @@ describe("AgentAccessPanel", () => {
     expect(screen.queryByLabelText("Project yang diizinkan (memori)")).toBeNull();
     expect(api.listProjects).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText("Nama token"), { target: { value: "ci" } });
-    fireEvent.click(screen.getByLabelText("projects:read"));
+    fireEvent.click(screen.getByLabelText("Projects — baca"));
     fireEvent.click(screen.getByRole("button", { name: /buat token/i }));
     await waitFor(() => expect(api.createAgentToken).toHaveBeenCalledWith({ name: "ci", capabilities: ["projects:read"] }));
     await waitFor(() => expect(screen.getByText("hnm_agt_secret")).toBeTruthy());

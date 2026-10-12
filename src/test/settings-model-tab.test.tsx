@@ -36,7 +36,7 @@ beforeEach(() => {
 
 const openModel = () => {
   render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sesi harian" }));
 };
 
 // SPEC-383 · Temuan A · blok claude tak pernah menyebut "claude" di teks yang TERLIHAT (hanya

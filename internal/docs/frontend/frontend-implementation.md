@@ -23,7 +23,7 @@ menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
 
 - React + TypeScript (Vite). Komponen dari Hanoman Design System.
 - Layout responsif (SPEC-763): drawer mobile `<768px`, rail 72px pada tablet `768–1199px`, sidebar
-  248px pada desktop `≥1200px`; topbar minimum 56px dan dapat wrap; konten maks 1200px (Docs full-width).
+  248px pada desktop `≥1200px`; topbar 56px dengan alat yang tak pernah membungkus (QA run4); konten maks 1200px (Docs full-width).
 - Bagian: Overview, Projects (list + pagination + cari + hapus project per baris) → **detail project** (identitas, coverage, edit `name`/`desc` lewat `PATCH /projects/:id`, dan pintu: Source of Truth, Terminal, Backlog, Reverse docs). `id` tak pernah dapat diubah — ia kunci asing spec (SPEC-146). Hapus project ada di detail dan di header Docs — konfirmasi dulu, ditolak bila ada sesi tmux aktif; rename tidak ditolak, karena `id` tak bergerak. **PRD** (SPEC-210 · ADR-0041 — layar nav sebelum Backlog, **two-pane**: sidebar kiri daftar dokumen PRD yang bisa diklik + pane kanan preview `MarkdownView` inline. Filter project punya opsi **"Semua project"** → `GET /prds` lintas-project (item dikelompokkan per project); satu project terpilih → `GET /projects/:id/prds`; keduanya freshest-wins. **PRD baru** membuka sesi `flow:"prd"` project-level; project target dipilih **di dalam modal** (field `Select` project, default ikut filter aktif atau project pertama saat "Semua project") — tombol selalu aktif, tak perlu memfilter daftar dulu (SPEC-212); **Take ke backlog** membuka `NewSpecModal` ter-prefill dengan tautan PRD di teks Konteks, ke project asal PRD), Backlog (cari teks + filter project/stage/prioritas + tab sumber + tiga mode tampilan grid/list/board + aksi per spec + detail spec via modal: judul, stage bar, objective, field brief/QA), Terminal (sesi Claude Code interaktif di tmux), Docs (tree realtime semua `.md` di repo via `GET /docs`, dikelompokkan per direktori; kategori di luar `docsDir` masuk grup **Lainnya (tidak dinilai)** tanpa status linked — hanya kategori berskor yang masuk coverage, lihat ADR-0013; tombol **Muat ulang** membaca ulang tree, **Hapus** menghapus file asli, path ditampilkan repo-relative tanpa prefix `internal/docs`), VPS (daftar + audit/harden + Test connection + Open Console shell ssh + buka sesi Claude, SPEC-211; **klik baris membuka satu modal** berisi detail VPS — last audit + health disk/mem/load — menyatu dengan checklist kepatuhan 232 item, SPEC-220/221; tak ada lagi side panel terpisah), Tim (papan kerja **manusia** — tiga mode tampilan: Papan kanban empat kolom, Linimasa Gantt rencana, dan Lintas project satu baris ringkas per project; SPEC-946/948/949), Settings (model & effort sesi — **default global**; model/effort dipilih **per sesi saat Start** lewat picker `StartSessionModal`, matrix per-fase dicabut, SPEC-252/ADR-0061; notifikasi, akun, users).
 - **Dikte suara** ([ADR-0177](../adr/0177-dikte-suara-seam-speech-engine.md)) — `TerminalPane` menampilkan baris
   `VoiceControls` (tombol mic toggle, pemilih bahasa `id-ID`/`en-US`, pratinjau interim, pesan galat) di antara
@@ -80,6 +80,186 @@ menyebut platform tidak didukung, bukan angka nol atau klaim mesin senggang.
   lokal tiap layar (SPEC-146) — detail project memakainya untuk membuka Backlog dalam keadaan tersaring.
   Sentinel `"all"` = "Semua project" (PRD → `GET /prds` lintas-project; Backlog → `project` di-omit).
 
+## Audit UI/UX 2026-10 · Fase 1 (quick win)
+
+Fase 1 dari [audit UI/UX](ui-ux-audit-2026-10.md) sudah ada di kode; diverifikasi terhadap diff `main`,
+bukan terhadap rencana. Status per butir dan sisanya ada di [§Status pelaksanaan](ui-ux-audit-2026-10.md#status-pelaksanaan).
+Token dan aturan lintas-layar ada di [design-system](../design-system/design-system.md#kontras-konfirmasi-dan-error-audit-uiux-2026-10--fase-1).
+
+Per layar:
+
+- **Overview** — state kosong (belum ada project) hanya menampilkan kartu dan CTA "Buat project pertama",
+  tanpa KPI strip (`screens/OverviewScreen.tsx:126-137`; `test/overview-screen.test.tsx`).
+- **Dalang** — ticker 26 ms terisolasi di `BootTicker` dan jam 1 dtk di `DalangClock`
+  (`screens/DalangHanomanScreen.tsx:46-104`), sehingga layar induk tak ikut re-render. Teks statis
+  "HANOMAN ONLINE" diganti status koneksi nyata dari `events.connected` (`:172`). Tombol keluar berada di
+  luar `.hn-dlg-chips` dan berukuran 44×44 pada `(pointer: coarse)` atau ≤767px (`app.css:1013-1025`,
+  `--touch-target`). Di desktop tombol tetap 34px. Tes: `test/dalang-hanoman.test.tsx`.
+- **Backlog** — hapus spec lewat `useConfirm` (`screens/BacklogScreen.tsx:1082-1096`). Kartu menampilkan
+  satu aksi utama sadar-stage; sisanya di `OverflowActions` ⋯ (`:600-638`). `TaskModal` tak bisa ditutup
+  saat menyimpan (`screens/TaskModal.tsx:125`), dan hapus tugas berkonfirmasi (`:102-105`). Tes:
+  `test/backlog-delete-confirm.test.tsx`, `test/backlog-ui-audit.test.tsx`, `test/task-modal-busy.test.tsx`.
+- **Terminal** — kill sesi berkonfirmasi (`requestKill`, `screens/TerminalScreen.tsx:336-350`); "Buang"
+  ketikan tertahan berkonfirmasi (`confirmDiscard`, `screens/TerminalPane.tsx:828-835`). Panel Diagnostik
+  tertutup secara default (`TerminalScreen.tsx:531`). Sesi berakhir memakai banner "Berakhir" tanpa
+  meredupkan badan (`:1362-1372`). Modal fullscreen tak ditutup oleh Escape (`:1389`). `Ctrl+Shift+Esc`
+  melepas fokus dari terminal (`TerminalPane.tsx:517-518`). Tes: `test/terminal-screen.test.tsx`,
+  `test/terminal-pane.test.tsx`. Celah: "Hapus sel" (`TerminalPane.tsx:854-856`) masih memanggil
+  `killSession` tanpa konfirmasi.
+- **Settings** — persist jujur: toast sukses hanya setelah PUT berhasil, galat tampil, dan nilai kembali ke
+  nilai tersimpan saat gagal (`screens/SettingsScreen.tsx:871-874`). Penyimpanan berurutan lewat antrean
+  GET → rebase → PUT (`:801,865-869`; `test/settings-rebase.test.tsx`). Gagal memuat setelan menampilkan
+  galat dan tidak jatuh ke default yang bisa menimpa server (`:828-832`). Reset konfigurasi, hapus atau
+  cabut token, hapus log, hapus pengguna, dan hapus kredensial Telegram memakai `useConfirm`
+  (`:231,299,362,435,609,947`). Tab default adalah **Sesi** (`:803`; `test/settings-nav.test.tsx`).
+- **Klien** — tab IDE meneruskan `projectId` (`screens/ClientsScreen.tsx:193` → `RemoteInstanceView.tsx:59`;
+  `test/clients-screen.test.tsx`). Hapus akun berkonfirmasi (`screens/ClientAccessPanel.tsx:89-96`;
+  `test/client-access-panel.test.tsx`). Grant berisiko (Tulis, Mulai sesi) berkonfirmasi di
+  `screens/RemoteControlPanel.tsx:134-139`, yaitu di Settings → Kendali jarak jauh, bukan di Klien.
+- **IDE** — guard draft saat pindah berkas atau ganti ref (`screens/IdeScreen.tsx:225-238,434`). Edit
+  diblokir saat ref lain dipilih (`:302,607`; `test/ide-edit-guard.test.tsx`). Input nama, folder, dan
+  rename memakai `Modal` design system (`:673-686`), hapus memakai `useConfirm` (`:370-374`), dan konflik
+  unggah memakai Modal (`:689`). Tree memakai ARIA tree dan navigasi panah (`screens/file-tree.tsx`;
+  `test/file-tree-keyboard.test.tsx`).
+- **Docs** — guard draft saat pindah dokumen (`screens/DocsWorkspace.tsx:177-187,200`). Simpan memakai
+  try/catch dengan galat inline (`:191-195,346-348`; `test/docs-save-guard.test.tsx`).
+- **Skills** — guard dirty (`screens/skills/SkillsWorkspace.tsx:43-52`, `SkillEditor.tsx:136-137`).
+  "Timpa" berkonfirmasi (`SkillEditor.tsx:200`). Nama skill baru lewat `Modal` (`SkillEditor.tsx:79-93`,
+  `SkillsWorkspace.tsx:105-133`; `screens/skills/SkillsWorkspace.test.tsx`).
+- **GitGraph** — tak ada pemanggilan `window.confirm`. Reset hard dan Clean untracked lewat `guard` →
+  `confirm` aplikasi (`screens/GitGraph.tsx:222-224,532-535,855-871`; `test/git-graph-destructive.test.tsx`).
+  `test/confirm-inventory.test.ts` menjaga jumlah `window.*` native tetap nol.
+- **Scheduler** — input angka tak dipaksa ke minimum saat dikosongkan. Nilai disimpan sebagai draft; blur
+  mengembalikannya ke nilai tersimpan, dan komit lewat Enter atau "Simpan setelan" (`screens/SchedulerScreen.tsx:270-320`).
+  Jeda dan Hentikan berkonfirmasi (`:458-474`). Simpan setelan tak menimpa `enabled`/`paused` (`:289-291`).
+  Hapus cron berkonfirmasi (`screens/SchedulerCrons.tsx:178-190`; `screens/SchedulerCrons.test.tsx`).
+- **Lead** — input angka memakai draft, tanpa PUT per ketukan dan tanpa `disabled={busy}`. Komit saat blur
+  atau Enter (`screens/LeadScreen.tsx:85,103-109,140-161`). Batal keputusan dan batal atau kirim rangkaian
+  berkonfirmasi (`:475-492`). Helper `screens/sched-lead-shared.tsx` dipakai Scheduler, Cron, dan Lead
+  (`test/sched-lead-shared.test.tsx`).
+- **QA** — hapus test case, lampiran, dan "Kirim semua ke backlog" berkonfirmasi (`screens/qa/QaCasesPanel.tsx:28`,
+  `QaAttachments.tsx:41`, `QaFindingsPanel.tsx:79,100`; `screens/qa/QaWorkspace.test.tsx`, `screens/qa/QaAttachments.test.tsx`).
+  "Kembali" dengan isian belum tersimpan bertanya dulu, dan badge "Belum disimpan" tampil
+  (`qa/QaReportEditor.tsx:79-88,115`). Severity dan status tampil sebagai label (`qa/qa-ui.ts:10,62-63`).
+  `QaField` memisahkan label (`htmlFor`) dari hint (`qa/QaField.tsx:23-26`).
+- **Triase** — tolak tiket dan tolak issue GitHub berkonfirmasi (`screens/TriageScreen.tsx:145-160,362-373`).
+  Clipboard punya catch dengan toast galat (`:162-167`). Query di-debounce, dan loading penuh hanya tampil
+  bila belum ada data (`:445-460`). Label filter kosong "Semua project" dan "Semua status" (`:541-545`).
+- **Projects** — galat dipisah dari daftar kosong (`screens/ProjectsScreen.tsx:181-186`). Muat ulang yang
+  gagal mempertahankan baris lama (`:139-141`). Enum `from-scratch` memakai label "Dari nol" (`:22`). Clone
+  dikonfirmasi satu kali di modal (`screens/MissingRepoCard.tsx:44-51`).
+- **PRD** — seleksi tersimpan tak dibuang saat mount (`screens/PrdScreen.tsx:333-343`). Daftar memiliki
+  loading dan error (`:315,365-368`); isi memiliki error (`:224-227`).
+- **Tim** — filter kosong memiliki "Hapus filter" (`screens/TeamScreen.tsx:278-281,356-357`). Anggota yang
+  gagal dimuat tampil sebagai galat dengan Coba lagi (`:87-89,325-328`).
+- **Review dan Reconcile** — `ReconcileModal` gagal memuat tak lagi menampilkan "Tak ada konflik"; teks itu
+  hanya tampil bila `loadError` kosong (`screens/ReconcileModal.tsx:94,106-112`). `ReviewScreen`
+  mengubah 409 menjadi empty state, bukan galat merah (`:40-41`). Review belum punya aksi Merge/Buang.
+- **Auth dan Setup** — galat login dibedakan per penyebab: 401, 429, dan jaringan (`screens/AuthScreen.tsx:16-31`).
+  Galat setup selain 409 jatuh ke `failureMessage` (`:27`). Status 400 masih memuat "Password minimal 8 karakter"
+  (`:22`); sisanya ada di tindak lanjut.
+- **VPS** — preview di-reset saat pilihan item berubah (`screens/VpsChecklist.tsx:170-173`). Konfirmasi
+  menyebut item (`:193-204`). Galat `r.out` tampil di toast, tidak dibuang (`screens/VpsScreen.tsx:128,152`).
+- **Portal** — label ramah untuk kategori dan prioritas (`portal/labels.ts:4-18`) serta stage
+  (`portal/ClientPortal.tsx:23`). Pesan yang gagal terkirim ditandai "Gagal terkirim" (`portal/ChatPanel.tsx:101,190-196`).
+  Muat gagal dipisah dari "Belum ada pekerjaan" (`ClientPortal.tsx:180-185`; `portal/ChatPanel.test.tsx`).
+
+Lintas layar:
+
+- **Shell** — `ds/shell.tsx` merender tautan "Lewati ke konten" (`:138-154,224`) dan judul layar sebagai
+  `<h1>` (`:266-272`). `src/index.html:6` memakai `viewport-fit=cover`.
+- **Responsif** — tiga grid inline di `App.tsx` (`:577,595,618`) memakai kelas `hn-grid-mobile`, yang di
+  bawah 768px menjadi satu kolom (`app.css:287`).
+- **Konfirmasi dan galat** — `useConfirm` dipakai 34 berkas. `ConfirmDialog` menerima `impact` (daftar bebas)
+  dan `confirmLabel`. `lib/report-error.ts` menyediakan `errorMessage` dan `failureMessage`. Sisa
+  `.catch(() => {})` di kode non-test berjumlah 9 dan ada di tindak lanjut.
+- **FolderPicker** — baris folder berupa `<button>` native sehingga bisa difokus dengan keyboard
+  (`screens/FolderPicker.tsx:17-21`). "Pilih folder ini" aktif hanya bila draft sama dengan folder yang
+  dimuat dan tidak sedang memuat atau galat (`:62,68`; `test/folder-picker.test.tsx`).
+- **Performa** — `lib/snapshot-digest.ts` (`digestOf`, `applyIfChanged`) dipasang di `App.tsx` untuk frame
+  WS `sessions`, `leadAsks`, dan `pending`: frame yang isinya sama tak menyentuh state (`App.tsx:949-950,1007-1013`).
+  `specs` memakai `specsDigestOf` yang sudah ada (`:1000-1001`). Tulis scroll ke `localStorage` di-throttle
+  200 ms dan di-flush saat `scrollend` dan unmount (`ui-state/hooks.ts:66,84-107`). `index.html:8-9`
+  memakai `preconnect` untuk Google Fonts; `@import` di `ds/tokens/fonts.css:9` belum diubah.
+- **Design system** — token kontras, alias, dan aturan konfirmasi/error ada di
+  [design-system](../design-system/design-system.md#kontras-konfirmasi-dan-error-audit-uiux-2026-10--fase-1).
+
+Test baru Fase 1 (berkas tak terlacak di `main`): `test/app-snapshot-digest.test.tsx`,
+`test/backlog-delete-confirm.test.tsx`, `test/backlog-ui-audit.test.tsx`, `test/docs-save-guard.test.tsx`,
+`test/file-tree-keyboard.test.tsx`, `test/folder-picker.test.tsx`, `test/git-graph-destructive.test.tsx`,
+`test/ide-edit-guard.test.tsx`, `test/limit-indicator-a11y.test.tsx`, `test/notifications-mark-read.test.tsx`,
+`test/orchestration-panel.test.tsx`, `test/overview-screen.test.tsx`, `test/portal-labels.test.ts`,
+`test/report-error.test.ts`, `test/sched-lead-shared.test.tsx`, `test/shell-a11y.test.tsx`,
+`test/task-modal-busy.test.tsx`, `test/ui-audit-tokens.test.ts`, dan `lib/snapshot-digest.test.ts`.
+
+## Audit UI/UX 2026-10 · Fase 2C · Palet perintah & shortcut
+
+Fase 2C dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md): palet perintah ⌘K,
+shortcut `g` + huruf, `?`, `/`, dan project switcher tunggal di topbar. Aturan interaksinya ada di
+[design-system](../design-system/design-system.md#palet-perintah-dan-shortcut-audit-uiux-2026-10--fase-2c).
+Tak ada endpoint baru: palet membaca state App yang sudah ada (`projects`, `backlog`, `sessions`,
+`projectFilter`) dan menyimpan riwayatnya di ui-state (`hn.ui.v1.palette.recent`).
+
+Berkas di `src/src/palette/`:
+
+- `commands.ts` — sumber perintah murni (`buildPaletteCommands`) dan pencarian (`searchCommands`). Kueri kosong
+  menampilkan Riwayat, Menunggu kamu, Aksi, dan Pindah ke; Backlog dan Project hanya muncul saat diketik
+  (dipangkas `SEARCH_CAP` = 8). Layar bergerbang (`gate`) tak muncul selama gerbangnya mati.
+- `fuzzy.ts` — pencocokan urutan karakter, tanpa membedakan huruf besar dan diakritik. Kata yang muncul utuh
+  selalu mengalahkan kecocokan berpencar.
+- `shortcuts.ts` — peta chord `CHORD_KEYS` (17 huruf, satu per entri `HN_NAV`), `stepChord` dengan jendela
+  1 dtk, dan `shortcutSections` untuk dialog bantuan.
+- `useGlobalShortcuts.ts` — satu listener `keydown` di window. Tidak aktif saat fokus di input, textarea,
+  select, atau contenteditable; di dalam `.xterm` (termasuk ⌘K, karena Ctrl+K milik readline); saat ada
+  `[aria-modal="true"]`; saat memakai Ctrl/⌘/Alt; dan saat `enabled=false` (login, portal klien).
+- `ui-store.ts` — status buka palet dan bantuan. Store modul, bukan context, supaya tombol topbar di setiap
+  cabang `App` bisa membukanya tanpa prop baru (alasan yang sama dengan `NavGate`).
+- `CommandPalette.tsx` — `Modal` DS berisi combobox + listbox. Fokus tetap di kotak kueri dan opsi aktif
+  ditunjuk lewat `aria-activedescendant`. Panah melewati perintah nonaktif, Enter menjalankan, Esc menutup
+  dan fokus kembali ke pemicu. Riwayat ditulis langsung ke storage karena komponen unmount saat palet
+  tertutup, sehingga state `usePersistedState` tak sempat tersimpan.
+- `ShortcutHelp.tsx` — dialog `?`. Isinya dibangkitkan dari `shortcuts.ts`, sehingga tak bisa menyimpang dari
+  shortcut yang benar-benar bekerja.
+- `ProjectSwitcher.tsx` — `ProjectScopeContext` (diisi App dari state `projectFilter`) dan `Select`
+  "Project aktif". Hanya tampil di layar `PROJECT_SCOPED_KEYS` (backlog, team, prd) — layar yang benar-benar
+  membaca filter itu. Nama scope masuk breadcrumb (`data-testid="scope-crumb"`).
+- `palette.css` — gaya palet, dialog bantuan, dan `.hn-shell-cmdk`. Pada `(pointer: coarse), (max-width: 767px)`
+  tombol ≥ `--touch-target` dan petunjuk ⌘K/Ctrl K disembunyikan.
+
+Shell (`ds/shell.tsx`): tombol topbar `aria-label="Cari"` membuka palet dan memasang `aria-keyshortcuts`
+(`Meta+K` di Mac, `Control+K` di lainnya). Kotak cari layar (`showSearch`, Projects) tetap ada berdampingan.
+
+App (`App.tsx`):
+
+- `useGlobalShortcuts` diberi `navKeys` = `HN_NAV` yang sudah tersaring gerbang; hook dipanggil sebelum gerbang
+  auth, sehingga urutan hook tetap.
+- `paletteCommands` disusun dari state App. "Jawab sesi yang menunggu" memakai `waitingSessions` dari
+  `screens/pet-state.ts` dan membuka Terminal ter-fokus ke sesi itu.
+- Dalang keluar ke layar sebelumnya: `lastPageRef` menyimpan layar nav terakhir yang bukan dalang dan dipakai
+  sebagai `previous`. Tanpa riwayat (dibuka langsung dari URL) ia jatuh ke Overview.
+- `TeamScreen` menerima `onOpenSpec` → `/backlog/<id>` (Backlog dengan SpecDetail terbuka).
+- `AuthScreen` menerima `setupTokenPath` dari `/auth/status`. Field itu sudah ada di `AuthStatus`
+  (`shared/src/dto.ts`) dan server (`server/src/routes/auth.ts`).
+- Toast: App merender `ToastHost` (antrean dari `ds/kit.tsx`), diimpor langsung dari `./ds/kit`.
+
+Tes:
+
+- `src/palette/commands.test.ts` — fuzzy, perintah, pencarian, dan "setiap layar HN_NAV bisa dicapai lewat
+  palet" (termasuk layar bergerbang yang mati).
+- `src/palette/shortcuts.test.ts` — chord dan jendelanya; setiap entri HN_NAV punya huruf; isi bantuan.
+- `src/palette/CommandPalette.test.tsx` — dialog, navigasi panah, perintah nonaktif, prefill, Esc + fokus,
+  riwayat.
+- `src/palette/useGlobalShortcuts.test.tsx` — chord, pengecualian fokus/xterm/dialog/modifier, ⌘K, `?`, `/`.
+- `src/palette/shell-topbar.test.tsx` — tombol Cari, petunjuk Ctrl K, project switcher, breadcrumb scope.
+- `src/routes.test.ts` — setiap entri HN_NAV kembali ke section-nya lewat `routePath`/`parseRoute`.
+- `src/test/palette-app.test.tsx` — ⌘K lalu Backlog, `g p` lalu `?`, Dalang kembali ke Projects.
+
+Belum di Fase 2C (lihat [§Status pelaksanaan](ui-ux-audit-2026-10.md#status-pelaksanaan)):
+
+- Tombol "Buat project pertama" di Overview masih `onGoto("projects")`. Membuka modal project baru langsung
+  butuh prop `onCreateProject` di `OverviewScreen` (`screens/`, milik Fase 2F).
+- Tombol "Jawab" pada toast dan notifikasi keputusan: sudah ada sejak Fase 4 (lihat § Fase 4 · Jawab dari notifikasi).
+
 ## Kontrak responsive seluruh frontend (SPEC-763)
 
 Semua permukaan — seluruh `HN_NAV`, section transien App, Auth/setup, Modal/form, Pet Hanoman, Help
@@ -88,7 +268,7 @@ desktop. Tidak ada route atau screen mobile kedua. Breakpoint tunggal ada di `ds
 mobile `<768px`, tablet `768–1199px`, desktop `≥1200px`; `Shell` menulis tier hidup ke
 `data-layout` untuk kontrak dan diagnosis.
 
-**Chrome.** `Shell` merender satu navigation tree berisi seluruh `HN_NAV`. Pada mobile tree itu
+**Chrome.** `Shell` merender satu navigation tree berisi delapan hub bergrup (`HN_HUBS`, ADR-0205; `HN_NAV` tetap daftar rute yang valid). Pada mobile tree itu
 menjadi drawer ber-backdrop dengan tombol `aria-controls`/`aria-expanded`, focus trap, Escape,
 focus restore, konten belakang `inert`, dan menutup sesudah navigasi. Tablet merender rail 72px (ikon + `title`), desktop
 sidebar 248px. Topbar/search/limit/notifikasi/update/action/account membungkus pada ruang sempit;
@@ -205,7 +385,8 @@ dengan memotong atau menjepit, bukan dengan reflow. Ketiganya kini punya aturan:
   tetangga yang basis-nya selebar isinya — terukur judul tersisa **"Ba…"** (konten terpotong 667px)
   sementara id project yang identik di semua baris tampil penuh. Di mobile `.hn-picker-title` turun
   ke barisnya sendiri dan membungkus; `!important` wajib karena `white-space: nowrap`-nya inline.
-- **Pet melayang mencuri tap, dan z-index bukan yang membatasinya.** Pet `position: fixed` z-80
+- **Pet melayang mencuri tap, dan z-index bukan yang membatasinya.** (Catatan historis: sejak ADR-0206 jalur pet tak lagi
+  `position: fixed`.) Pet `position: fixed` z-80
   memang di bawah lapisan chrome (header 90, Modal 150), tapi **di atas konten halaman**. Tombol
   tembus-pandangnya dulu selebar seluruh panggung 76×76, sehingga tap yang ditujukan ke kontrol di
   bawahnya mendarat di pet — terukur `elementFromPoint` atas 9 titik sampel per kontrol: "Hapus
@@ -218,6 +399,865 @@ dengan memotong atau menjepit, bukan dengan reflow. Ketiganya kini punya aturan:
   **111px (13%)** pada layar tanpa search/aksi. Yang diringkas hanya kata-nya — kontrol, versi, dan
   `aria-label`/`title`-nya tetap ada, sesuai aturan "tak satu pun dihilangkan"; ikon telanjang
   ditolak karena lingkaran kosong tak mengatakan apa pun.
+
+## Audit UI/UX 2026-10 · Fase 3A · Navigasi 8 hub bergrup (ADR-0205)
+
+Fase 3A dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md): 17 entri sidebar
+menjadi 8 hub di tiga grup. Keputusan dan alasannya ada di [ADR-0205](../adr/0205-navigasi-8-hub-bergrup.md);
+pola interaksinya di [design-system](../design-system/design-system.md#navigasi-hub-audit-uiux-2026-10--fase-3a).
+URL tidak berubah dan tidak ada redirect, karena path setiap section sama seperti sebelumnya.
+
+Berkas:
+
+- `src/src/nav-hubs.ts` — murni: `HN_HUBS` (delapan hub, tab, `default`, turunan `derived`), `HN_GROUPS`,
+  `PALETTE_ONLY_SECTIONS` (dalang), `hubOf`, `tabOf` (tab yang mewakili sebuah section), `sectionsOf`,
+  `tabsOf` (menyaring gerbang), `hubTarget` (tab terakhir, lalu default), dan `hubBadge` (jumlah antrean tab).
+- `src/src/ds/shell.tsx` — sidebar merender hub per grup berlabel (`role="group"`). Item aktif = hub dari
+  `active`. Klik hub → `hubTarget`. Tab terakhir per hub disimpan di ui-state `nav.lastTab` dan **hanya
+  ditulis `Shell`** lewat efek pada `active`. Crumb `hub-crumb` `Hub › Tab` untuk hub bertab banyak;
+  deskripsi layar dibungkus span sendiri agar teksnya tetap utuh. `HN_NAV` tetap diekspor.
+- `src/src/ds/section-tabs.tsx` — `SectionTabs`: `Tabs` DS (`role="tablist"`). Tab terpilih diturunkan dari
+  `section` (URL). Klik tab → `onNavigate` (kecuali tab yang sama dengan `section`). Gerbang tab disaring,
+  badge per tab dari `NavPending`. Tak merender apa pun bila hub hanya punya satu tab yang tampil.
+- `src/src/App.tsx` — `hubTabs` (`SectionTabs`) dipasang di layar anak hub: Projects (`projects`, `project`,
+  `prd`, `docs`, `qa`, `ide`), Backlog (`backlog`, `team`, `review`), Sesi (`terminal`, `clients`), Otonom
+  (`scheduler`, `lead`), dan Pengaturan (`settings`, `vps`). Layar hub satu-tab (Overview, Triase, Skills)
+  tak memasangnya. Dalang tetap `section`, tanpa Shell.
+- `src/src/palette/commands.ts` — aksi **"Buka panggung"** (`action:panggung` → `dalang`), karena Dalang tak
+  lagi di sidebar. Entri "Pindah ke Dalang Hanoman" tetap ada.
+- `src/src/palette/shortcuts.ts` — baris bantuan Dalang bernama "Buka panggung" (`g d`).
+- `src/src/app.css` — `.hn-nav-group`, `.hn-nav-group-label` (disembunyikan di rail tablet, diganti garis
+  pemisah), dan `.hn-section-tabs`. Kelas `.hn-shell-workspace` dihapus bersama eyebrow "Workspace".
+
+Tes:
+
+- `src/src/nav-hubs.test.ts` — delapan hub dan tiga grup; setiap section `HN_NAV` dimiliki sebuah hub atau
+  tercatat palet-saja (**tak ada section yatim**); satu section hanya punya satu hub; gerbang tab sama dengan
+  gerbang `HN_NAV`; `default` tak bergerbang; `hubTarget` (riwayat, gerbang, fallback); `hubBadge`.
+- `src/test/nav-hub.test.tsx` — `SectionTabs` (tab terpilih, turunan, klik, tab induk dari detail project,
+  gerbang, badge, tanpa bar); `Shell` (crumb, riwayat tab bertahan lewat pemasangan ulang, fallback gerbang).
+- `src/test/hub-nav-app.test.tsx` — App utuh: delapan hub di sidebar; `/prd` membuka tab PRD tanpa mengubah
+  URL; klik tab memindahkan URL ke `/team`; klik hub kembali ke tab terakhir; palet "Buka panggung" → `/dalang`.
+- `src/test/responsive-shell-modal.test.tsx` — drawer memuat delapan hub dan tiga grup; tab bergerbang tak
+  pernah jadi tombol sidebar (hub Sesi tetap ada).
+- `src/test/nav-pending-badge.test.tsx` — badge hub = antrean tab-tabnya (PRD di Projects, Lead di Otonom).
+- `src/src/palette/commands.test.ts` dan `shortcuts.test.ts` — "Buka panggung" membuka Dalang dan terbaca di
+  bantuan shortcut.
+
+Overview kini punya tombol "Buka panggung" (lihat Fase 3B di bawah).
+
+## Audit UI/UX 2026-10 · Fase 3E · Terminal: rail sesi dan mode fokus
+
+Fase 3E dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md): default layar
+Terminal berpindah dari grid ke **Fokus**, yaitu satu pane terminal dengan rail sesi di sampingnya. Grid tetap
+ada sebagai mode opsional (toggle **Fokus | Grid**) dan memakai workspace kanonik
+[ADR-0118](../adr/0118-workspace-terminal-kanonik-per-user.md) tanpa perubahan. Mode tampilan adalah state
+presentasional per browser ([ADR-0115](../adr/0115-state-tampilan-dashboard-persisten.md)). Tidak ada API baru,
+jadi tak ada keputusan MCP baru ([ADR-0202](../adr/0202-keputusan-mcp-wajib-untuk-setiap-api-baru.md)). Keputusan
+layar ini dicatat di [ADR-0209](../adr/0209-terminal-rail-sesi-fokus-default.md). Pola interaksinya ada di [design-system](../design-system/design-system.md).
+
+Berkas:
+
+- `src/src/screens/terminal-rail.ts` — murni (tanpa React): `railStatus` (Menunggu keputusan · Lead memutuskan ·
+  Berjalan · Gagal · exit N · Selesai), `sortRail` (butuh keputusan → berjalan → gagal → selesai; di grup
+  "butuh keputusan" yang paling lama menunggu tampil dulu), `resolveFocus` (`focusId` bila masih hidup, selain
+  itu baris pertama), `railTarget` (↑/↓ tanpa berputar, Home/End), `railStartedMs` (`startedAt` server dalam
+  detik epoch; 0 = tak diketahui), dan `isTerminalView` (`focus` | `grid`).
+- `src/src/screens/TerminalRail.tsx` — `SessionRail`: `ul` daftar sesi. Tiap baris = tombol fokus (roving
+  tabindex, `aria-current`) + `StatusPill` dot + waktu relatif (`relativeTime`, diperbarui tiap 30 dtk) + menu ⋯
+  `OverflowActions` ("Aksi sesi <id> di daftar"). Aksi tak pernah di dalam tombol klik.
+- `src/src/screens/TerminalScreen.tsx` — `view` (ui-state `terminal.view`, default `focus`), `focusId` (lokal,
+  tak dipersist), `finishedIds` (verdict plan dari pane, SPEC-433), `sessionMenuItems` (satu sumber menu ⋯ untuk
+  sel grid, baris rail, dan kepala pane fokus), `SessionDialogs` (dialog dokumen dan integrasi dipegang layar,
+  jadi tetap terbuka walau drawer mobile menutup), `OpenMenu` ("Buka…"), dan `FocusView` (rail, kepala pane,
+  banner Berakhir, strip fase, satu `TerminalPane`).
+- `src/src/screens/styles/terminal.css` — kelas `hn-terminal-*`: toolbar, toggle segmen, rail, pane fokus, dock,
+  dan pemicu laci mobile. Diimpor dari `TerminalScreen.tsx`; `app.css` tidak disentuh.
+- `src/src/screens/TerminalPane.tsx` — prop opsional `composer` (pane fokus selalu menampilkan composer).
+  Composer, dikte, dan papan tombol kini dibungkus `.hn-terminal-dock`; grid tetap memakai perilaku lama.
+- `src/src/screens/NewTerminalModal.tsx` — pemilih project (`projects`, `onProjectChange`) pindah ke "Sesi baru".
+  Toolbar tak lagi memuat pemilih project; "Terminal biasa" memakai project yang terakhir dipilih.
+
+Toolbar (≤ 6 kontrol): **Sesi baru** (primer) · **Buka…** (Ambil backlog, Riwayat sesi, Terminal biasa) ·
+toggle **Fokus | Grid** · **Tampilan** (font, papan tombol, ketik responsif; Diagnostik tetap tertutup; Reset grid
+hanya di mode grid) · **Layar penuh**. Baris grid (mode grid saja): tab grup, `+ Kolom`, dan `+ Baris`. Di sempit,
+ketiga aksi susunan itu masuk menu **Atur grid**.
+
+**Ponsel (<768px, QA Fase 3E+).** Toolbar tetap satu baris: **Sesi baru** · **Buka…** (ikon ber-label `Buka…`,
+nama aksesibelnya sama, tak ada teks yang terpotong) · **Sesi · N** (laci rail, hanya mode Fokus) ·
+**⋯ Menu terminal** (Pakai mode Grid/Fokus, Layar penuh, Tampilan terminal yang dibuka sebagai sheet). Kepala pane
+satu baris: nama, status, ⋯; tanpa tombol Sesi. Strip fase memakai `PhaseStrip compact`. Dock pane fokus
+ringkas: composer satu baris (mic · kolom · **Kirim**), lalu baris **Tombol khusus** (mengalihkan papan tombol) ·
+galat dikte · **⋯ Opsi dikte suara** (bahasa dan keterangan audio). Papan tombol **tertutup** secara default di
+ponsel; pilihan tersimpan di `hn.ui.v1.terminal.keys` dan tetap menang. Tablet sentuh tetap terbuka seperti dulu.
+Tinggi pane dijaga `min-height: calc(55dvh + 168px)` (`terminal.css`, `@media (max-width: 767px)`): xterm
+≥ ~55% viewport dalam keadaan default; papan tombol terbuka mengurangi sekitar 52 px lagi. Tablet dan desktop
+tetap memakai toolbar dan dock lama. Jsdom tak mengukur tinggi, jadi kontrak CSS-nya diikat di
+`test/terminal-css-contract.test.ts`; angka nyatanya milik verifikasi visual 390×844.
+
+Perilaku:
+
+- Mode dipersist per browser. Pengguna yang memakai grid bisa kembali dengan satu klik, dan nilai rusak di
+  storage jatuh ke Fokus.
+- Pane fokus memasang satu `TerminalPane`, jadi satu sesi tetap satu attach tmux. Layar penuh per sesi
+  (`fullId`) menampilkan placeholder di pane fokus, sama seperti sel grid.
+- Deep link (`focusSession` dari notifikasi atau palet), sesi baru, ambil backlog, dan riwayat membuka sesi itu
+  di fokus DAN menempatkannya di grid, sehingga mode grid tetap utuh.
+- "Tutup" dari rail atau pane fokus selalu lewat `useConfirm` dan menyebut nama sesinya. Sel grid tetap punya
+  tombol × sendiri.
+- Mobile (<768px): rail menjadi laci (`Modal`), dibuka dari tombol "Sesi · N" di kepala pane. Memilih sesi di
+  laci menutupnya dan membuka sesi itu.
+- Keterbatasan: "Selesai" karena plan tuntas hanya diketahui untuk sesi yang pernah dibuka di pane (verdict
+  dari frame phase). Sesi lain tampil "Berjalan" sampai dibuka. "Putus" (hasil rekonsiliasi boot) hanya ada di
+  riwayat, bukan di daftar hidup.
+
+Tes:
+
+- `src/test/terminal-rail.test.ts` — urutan rail, status, fallback fokus, navigasi keyboard, `startedAt`, dan
+  validasi mode.
+- `src/test/terminal-focus.test.tsx` — default Fokus (satu pane), urutan rail, panah/Home/End, klik baris, kill
+  lewat menu (Batal tak mematikan; Tutup dikonfirmasi), deep link fokus, toggle Grid bertahan lintas mount, nilai
+  rusak, toolbar ≤ 6 kontrol, dan laci mobile. Ponsel: toolbar satu baris, isi ⋯, kepala pane tanpa tombol Sesi,
+default papan tombol tertutup dan tablet tetap terbuka (`terminal-focus`). `terminal-pane` menguji dock ringkas
+(Kirim, Tombol khusus, mic di baris composer, bahasa di ⋯). `terminal-css-contract` mengikat aturan CSS yang tak
+terukur jsdom.
+- Suite terminal yang menguji komposisi grid (`terminal-screen`, `terminal-screen-memo`, `terminal-cleanups`) memasang
+  `hn.ui.v1.terminal.view = "grid"`. Pembukaan Ambil backlog, Riwayat, dan Terminal biasa kini lewat "Buka…".
+
+## Audit UI/UX 2026-10 · Fase 2E · Pembersihan CSS
+
+Pembersihan setelah redesign Fase 3: kelas yang tak lagi dirender dihapus, `!important` yang penyebabnya sudah
+hilang dicabut, dan font tak lagi memblokir render. Perilaku dan tampilan layar yang masih dipakai tidak berubah.
+
+- **Dihapus:** `screens/DalangStage.tsx` beserta `test/dalang-stage.test.tsx`. Hero-nya tak dirender layar mana pun.
+  `WayangSilhouette` pindah ke `screens/WayangSilhouette.tsx` (satu-satunya ekspor yang dipakai, oleh
+  `DalangHanomanScreen`; impor di sana hanya baris yang berubah).
+- **Kelas `.hn-*` mati** (nol pemakai di TSX/TS/tes, termasuk yang dibentuk dinamis) dicabut dari `app.css`:
+  `.hn-dalang*` seluruhnya; `.hn-dlg-*` lama (HUD, KPI, donut, rig, grafik, footer, chip, kartu project,
+  benang, scan); `.hn-backlog-*`, `.hn-team-*` (toolbar), `.hn-project-header|row|open`, `.hn-vps-row|main|actions|pills|sep`,
+  `.hn-stat-grid`, `.hn-card-footer`, `.hn-wrap-mobile`, dan `.hn-portal-toolbar` (sudah tak dipakai `ClientPortal`).
+  Keyframes tanpa rujukan ikut dicabut: `hn-dalang-flow`, `hn-dalang-sway`, `hn-dlg-blink|rot|rotr|scan|arm-a|arm-b|float|ping`,
+  `hn-toast-in`. Aturan yang campur kelas mati dan hidup dipangkas hanya di bagian yang mati.
+- **Dipertahankan (hidup):** `.hn-dlg`, `.hn-dlg-top|title|exit|empty|rt|dot` di `app.css` (dipakai
+  `DalangHanomanScreen`; `dalang.css` menimpa sebagian, dan kedua aturan tetap berlaku sesuai urutan kaskade).
+  Kelas dinamis (`hn-skeleton-r-*`, `hn-responsive-panels--*`, `hn-terminal-gutter--*`, dan sejenisnya) tetap.
+- **`!important`: 45 → 30 deklarasi** (teks 47 → 32 termasuk dua di komentar). Yang tersisa, dengan penyebab yang
+  sudah diperiksa satu per satu:
+  - `.hn-viewport-popover` (4): menimpa `position`/`width`/`max-height` inline di AccountMenu, LimitIndicator,
+    UpdateIndicator, dan NotificationBell.
+  - `.hn-modal-*` (7): menimpa `alignItems`, `width`/`maxWidth`/`maxHeight`/`borderRadius`, dan `padding` inline di
+    `ds/kit.tsx`.
+  - `.hn-grid-mobile`, `.hn-stack-mobile`, `.hn-dense-row` (3): `gridTemplateColumns` inline di App.tsx dan
+    ReconcileModal; `alignItems` inline di TerminalScreen dan SessionHistoryModal.
+  - `.hn-picker-row > .hn-picker-title` (4): `flex`, `minWidth`, `whiteSpace`, dan `overflow` inline.
+  - `.hn-portal-header|content|row` (4): `height` dan `padding` inline di `portal/ClientPortal.tsx`. Portal sedang
+    digarap agen lain, jadi aturan ini tak disentuh.
+  - `.hn-setting-row` dan dua aturan `.hn-setting-control` (3): `.hn-set-row` di `screens/styles/settings.css` memakai
+    `align-items: center` dan dimuat setelah `app.css`. Dua aturan kontrol belum diverifikasi per elemen, jadi dibiarkan.
+  - `.hn-touch-target` dan `[role="button"][tabindex="0"]` (2): `minWidth: 28`/`height: 28` inline pada tombol ikon di
+    `ds/kit.tsx`.
+  - Reduced motion `*` (3): selektor universal kalah spesifisitas, dan `ds/kit.tsx` memberi `animation` inline
+    pada modal.
+  Menurunkan angka ini lebih jauh berarti memindahkan layout inline tersebut ke kelas (Fase 2 yang belum selesai).
+- **Font:** `@import` Google Fonts di `ds/tokens/fonts.css` (memblokir render) dipindah ke `index.html`: `<link rel="preload"
+  as="style">` yang berpindah ke `rel="stylesheet"` saat tiba, dengan `<noscript>` sebagai cadangan. Offline atau tanpa JS,
+  fallback generik keluarga font di `ds/tokens/typography.css` yang berlaku. `preconnect` tetap.
+- **Ukuran `app.css`:** 64.956 → 43.102 byte (1.349 → 998 baris). Selektor `.hn-*` unik 236 → 139. Catatan: angka ini berlaku pada `c81413cb`. Tiga commit perbaikan QA Chrome sesudahnya (`56eb30cd`, `82b5dee4`, `cfabc308`) menaikkan berkas itu lagi menjadi 54.105 byte (1.167 baris) di `cfabc308`; basis `8380d3fa` 54.592 byte (lihat § Status pelaksanaan di audit).
+- **Tes:** `test/ui-audit-tokens.test.ts` (kontras footer Dalang diganti kontras teks `dalang.css` di atas `--term-bg`;
+  asersi chip Dalang diganti "tombol keluar tak disembunyikan di `dalang.css`"; kontrak font non-blocking dan fallback
+  generik). `test/responsive-touch-targets.test.ts` (`.hn-project-open` dicabut dari daftar). `ds-css-contract.test.ts`
+  tak membaca kelas yang dicabut dan tak berubah.
+- **Catatan:** aset `internal/assets/dalang/*.webp` tak lagi diimpor kode (DalangStage pemakai terakhirnya). Berkas
+  aset dibiarkan; pembersihannya di luar 2E.
+
+## Audit UI/UX 2026-10 · Fase 3B · Overview "Hari ini" dan Dalang sebagai papan senyap
+
+Fase 3B dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md) untuk dua layar. Keputusan
+Dalang: [ADR-0208](../adr/0208-dalang-papan-senyap-pengecualian-gelap.md).
+Aturan susunan ada di [design-system](../design-system/design-system.md) (Primitif layout) dan istilah di
+[glosarium](glossary.md).
+
+**Overview** (`screens/OverviewScreen.tsx`, `screens/styles/overview.css`) — satu kolom "Hari ini", tanpa KPI
+strip dan tanpa hero:
+
+- `PageHeader` "Hari ini" dengan satu kalimat status (`N sesi berjalan · N menunggu jawabanmu · N perlu
+  perhatian`, satu hitungan untuk kalimat dan seksi). CTA primer kontekstual: "Jawab sesi yang menunggu" bila
+  ada yang menunggu, selain itu "Buka backlog". "Buka panggung" sekunder (`onGoto("dalang")`).
+- Sesi berjalan: `RowList`, yang menunggu di atas dengan tombol "Jawab". Baris membuka sesinya. Durasi
+  ditulis "dimulai N menit lalu" lewat `relativeTime` (tak ada formatter durasi di `lib/`).
+- Perlu perhatian: dokumen rusak/drift, label dari `DOC_STATUS_LABEL`.
+- Project: nama, cakupan (`ProgressBar` + persentase), status, dan `ProjectView.backlog` sebagai "N item
+  terbuka". Footer satu baris "Backlog: N dari brief · N dari QA · N prioritas tinggi" menggantikan kartu KPI.
+- Aktivitas terbaru: maks 5 baris klik. Limit langganan: satu seksi bertab Claude/Codex (tetap).
+- Tanpa project: kartu "Selamat datang" dengan "Buat project pertama"; ilustrasi kecil PST-001 hanya di sini.
+- Judul seksi `<h3>` (judul `Card` DS adalah div). Layout lewat kelas `hn-ov-*`, tanpa inline grid.
+- `DalangStage` tak lagi dirender Overview.
+
+**Dalang Hanoman** (`screens/DalangHanomanScreen.tsx`, `screens/styles/dalang.css`) — dipangkas jadi papan
+status senyap. Gelap tetap dipertahankan sebagai **pengecualian terdokumentasi**: satu-satunya layar gelap
+penuh, karena seluruh layarnya kerja aktif. Dihapus: HUD berputar, scan line, float, kursor berkedip,
+count-up, ticker mengetik, footer slogan, KPI ganda, jam per detik, rig animasi, donut distribusi, grafik
+7 hari, dan panel aktivitas. Tersisa:
+
+- Ringkasan satu baris dan status koneksi nyata (`useEventsStatus`: Terhubung, Jeda, atau Koneksi terputus).
+- Seksi "Menunggu jawabanmu" di atas, dengan tombol Jawab.
+- Daftar project sebagai baris `<button>`: wayang `WayangSilhouette` 24px, nama, fase, sesi, dan aksi.
+- Jalan keluar 44×44 di semua ukuran layar, di `.hn-dlg-actions` (bukan di `.hn-dlg-chips`).
+- Tanpa timer dan tanpa animasi. Pet **tidak** dirender di layar ini: Dalang berada di luar `Shell`, sehingga tak punya
+  slot pet (lihat [ADR-0206](../adr/0206-pet-footer-sidebar-default-per-tier.md) § 5). Koreksi atas teks Fase 3B sebelumnya
+  yang menyebut pet tetap bergerak di sini.
+
+Kelas `.hn-dlg-*` lama yang tak lagi dirender sudah dicabut di Fase 2E (lihat § Fase 2E). `dalang.css` menimpa
+kelas yang masih dipakai.
+
+**DalangStage** (`screens/DalangStage.tsx`) sudah dihapus di Fase 2E. Layar Dalang memakai `WayangSilhouette`
+dari `screens/WayangSilhouette.tsx`.
+
+Tes: `src/test/overview-screen.test.tsx` (kalimat status, CTA kontekstual, urutan sesi, aktivitas maks 5,
+kontrak tanpa inline grid), `src/test/dalang-hanoman.test.tsx` (ringkasan, seksi menunggu, tiap project sekali,
+status koneksi, papan senyap tanpa animasi dan timer), dan `src/test/responsive-no-squeeze.test.tsx` (baris
+Overview memakai `DenseRow`).
+
+## Audit UI/UX 2026-10 · Fase 3 · IDE "Perubahan dulu" (3H)
+
+Fase 3H dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md): IDE dibuka pada
+tab **Perubahan**, bukan pada pohon berkas. Tanpa endpoint baru, jadi tak ada keputusan MCP baru
+(aturan #7 AGENTS.md tak tersentuh). Berkas: `screens/IdeScreen.tsx` (shell, toolbar, Perubahan, Berkas),
+`screens/CabangPanel.tsx` (menggantikan `BranchesPanel` + `WorktreesPanel`), `screens/GitGraph.tsx`
+(Riwayat), `screens/file-tree.tsx` (pohon + menu konteks), `screens/ide-menu.tsx` (menu konteks bersama),
+dan `screens/styles/ide.css` (layout yang dipindah dari inline; `app.css` tak disentuh).
+
+Susunan layar:
+
+- **Tab** (`Tabs` DS, label tab "Bagian IDE", tersimpan per project di `hn.ui.v1.ide@<project>.tab`):
+  Perubahan (default, dengan jumlah perubahan) · Riwayat · Cabang · Berkas. Jalur lama tetap membuka tempat
+  yang sama: `explorer` → Berkas, `graph` → Riwayat, `branches`/`worktrees` → Cabang (`LEGACY_TAB`). Nilai
+  tak dikenal jatuh ke Perubahan. Buka berkas dari commit atau dari baris uncommitted pindah ke Berkas.
+- **Toolbar atas** (≤ 6 kontrol): proyek, ref, Fetch, Tersembunyi, Muat ulang, ⋯. Checkout ref dan Kelola
+  remote ada di ⋯ (`OverflowActions`).
+- **Perubahan**: daftar Staged dan Changed sebagai `RowList` dengan badge M/A/D dan legenda. Pilih berkas →
+  diff di panel kanan. Satu aksi primer **Commit dari Terminal** (`onGotoTerminal`, nonaktif bila host tak
+  memberi handler). Commit tulis belum punya endpoint di klien API, jadi aksinya membawa ke sesi Terminal.
+- **Riwayat**: git graph. Lane SVG `aria-hidden`; baris `role="listitem"` di dalam `role="list"`; merge diberi
+  teks "merge". Menu commit dikelompokkan **Navigasi** (checkout, salin, bandingkan) · **Cabang & tag** (merge,
+  rebase, branch, tag, hapus branch) · **Lanjutan** (cherry-pick, revert, reset, drop) — reset hard dan drop
+  tetap lewat dialog dampak dan ada di grup paling bawah. Remote, tag, redupkan merge, dan gaya ada di
+  disclosure **Tampilan**. Menu branch menaut **Kelola di tab Cabang**.
+- **Cabang**: branch dan worktree dalam **satu daftar**. Worktree tampil sebagai barisnya dengan branch-nya;
+  branch tanpa worktree tampil sebagai baris sendiri. Filter status dan cari di bar; base, cakupan, dan
+  "Hapus branch worktree juga" di disclosure **Opsi**. Pembersihan (per baris atau massal) menulis dampaknya
+  di satu dialog: sesi yang ditutup, commit yang hilang, berkas kotor, branch ikut. Branch belum ter-merge
+  menuntut ketikan ulang (nama branch, atau `hapus paksa` bila batch) sesuai ADR-0121. Satu-satunya tempat
+  hapus branch utama adalah tab ini; menu commit hanya menautkan ke sini.
+- **Berkas**: satu baris kontrol (Berkas baru · Unggah · ⋯ berisi Folder baru dan Unggah folder · label tujuan
+  `→ folder`). Aksi per entri pindah ke **menu konteks baris pohon**: klik-kanan, tombol ⋯ untuk pointer, atau
+  tombol Menu / Shift+F10 saat baris difokus. Isi menu: Berkas baru di folder itu, Folder baru (folder saja),
+  Ganti nama…, Hapus berkas/folder…. Guard draft Fase 1 dan konfirmasi hapus ber-`requireText` untuk folder tetap.
+- **Pemisah panel berkas**: `role="separator"` antara pohon dan isi (tablet/desktop; di mobile tak dirender).
+  Keyboard: ←/→ 16 px, Shift+←/→ 48 px, Home/End ke batas. Pointer: seret. Lebar 220–560 px tersimpan di
+  `treeW` dan diteruskan ke `ResponsivePanels` sebagai `masterWidth`.
+
+Keputusan:
+
+- Satu seleksi dipakai dua tab (`selKind`): `"file"` tampil di Berkas, staged/unstaged tampil di Perubahan.
+  Pindah tab tak membawa diff ke Berkas (dan sebaliknya).
+- Tombol ⋯ pada baris pohon `aria-hidden` dan di luar tab order: ia jalan pointer. Jalur keyboard-nya tombol
+  Menu/Shift+F10 pada `treeitem` itu sendiri, supaya tak ada tombol bersarang di dalam treeitem.
+- `Menu` dipindah dari `GitGraph.tsx` ke `ide-menu.tsx` dan kini mendukung grup (`MenuItem.group`). Fokus, panah,
+  Home/End, Escape, dan klik-luar tetap seperti sebelumnya.
+- Pane yang diuji kontrak scroll-chain (SPEC-393) tetap memakai gaya inline `flex`/`min-height`/`overflow`.
+- `IdeReadPanel` (dipakai Klien): galat memuat riwayat tampil sebagai galat, bukan "Tak ada commit".
+
+Pengujian: `ide-tabs.test.tsx` (tab default, jalur lama, toolbar ≤ 6, Commit, RowList M/A/D, role list Riwayat,
+pemisah keyboard), `cabang-panel.test.tsx` (mewarisi suite BranchesPanel dan WorktreesPanel), dan
+`git-graph-menu.test.tsx` (grup menu, Kelola di tab Cabang). Asersi lama yang menegaskan Explorer sebagai
+tab default, tombol toolbar Hapus/Ganti nama, dan tab "Git Graph" / "Branches" / "Worktrees" diperbarui ke
+bentuk baru di `ide-screen`, `ide-file-ops`, `ide-hidden-toggle`, `ide-edit-guard`, `ide-responsive`, dan tiga
+tes di luar folder IDE (`doc-download-screens`, `preview-fill-height`, `scroll-chain`).
+
+Belum diverifikasi: tampilan di 390/820/1100 px (jsdom tanpa layout; pemisah bertumpu pada celah grid
+`ResponsivePanels`) dan commit dari UI. Commit tulis butuh endpoint dan keputusan MCP sendiri (ADR-0202).
+
+**QA Fase 4 · kepala IDE (toolbar, fokus, sentuh).** Tiga temuan dari audit visual 390/820/1280 px:
+
+- **Toolbar membungkus, tidak lagi menggulir.** `<select>` project memakai lebar intrinsik opsi terpanjang
+  (`flex: 0 0 auto` dari app.css), sehingga satu nama project panjang melebarkan toolbar ke 648 px dan
+  mendorong selector cabang keluar layar. Override di `screens/styles/ide.css` (selektor `.hn-ide-head >
+  .hn-ide-toolbar`, dua kelas, mengalahkan `nowrap` + `overflow-x: auto` di app.css): `.hn-ide-proyek`
+  `flex: 1 1 140px` (ponsel: baris penuh), `.hn-ide-ref` `flex: 1 1 140px`, keduanya `min-width: 0` dengan
+  `max-width` dan ellipsis; nama project utuh di `title`. Tombol tetap `flex: 0 0 auto`, jadi toolbar tetap
+  ≤ 6 kontrol. **Ini membalik keputusan SPEC-879** (toolbar menggulir di barisnya sendiri); aturan `nowrap`
+  dan `overflow-x` di app.css belum dihapus (berkas itu di luar lingkup Fase 4).
+- **Ring fokus region panel.** `ResponsivePanels` memberi `tabIndex=-1` pada setiap panel. Di mode split
+  ring UA biru menggambar kotak di sekeliling panel Perubahan. Kini `:focus` tanpa outline, dan
+  `:focus-visible` di mode selector memakai `--border-focus` (brass-600).
+- **Target sentuh toggle diff/source (dan Preview/Source).** Tinggi 22 px → `min-height: 24px` (WCAG 2.5.8),
+  44 px di `(pointer: coarse), (max-width: 767px)`, dan kelas `hn-touch-target` di JSX.
+
+Belum diverifikasi visual ulang di Chrome: wrap toolbar di 390/820/1280 (jumlah baris kontrol di ponsel
+diperkirakan tiga) dan ellipsis `<select>` di Chrome, Safari, dan Firefox.
+
+## Audit UI/UX 2026-10 · Fase 3I · Scheduler (tab hub Otonom)
+
+Fase 3I dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md): layar Scheduler
+sebagai tab "Scheduler" di hub Otonom (ADR-0205). Tanpa perubahan API, jadi tak ada keputusan MCP baru.
+Server sudah memberi `serverTimeZone` dan requeue baris gagal lewat ADR-0204.
+
+Susunan layar:
+
+- **Strip status** satu baris di atas tab: state (`StatusPill` titik: Berjalan / Dijeda / Berhenti),
+  kapasitas `ProgressBar` "N dari M sesi", limit ringkas (`LimitBadge`, `CodexLimitBadge`), status koneksi
+  live, lalu Jeda/Lanjutkan (atau Aktifkan). **Hentikan** berdiri sendiri setelah garis pemisah, `variant="danger"`,
+  dan selalu lewat `useConfirm` dengan daftar dampak.
+- **Antre** (`QueueSection` status `queued`): `DenseRow` dengan Batalkan.
+- **Berjalan**: `state.sessions` sebagai `RowList`, dengan Buka terminal dan penanda "menunggu kamu".
+- **Riwayat**: chip Selesai · Gagal · Dibatalkan. Chip hanya untuk status yang berisi, dan awalnya memilih
+  Gagal, lalu Selesai, lalu Dibatalkan. Aksi per status: Buka review dan Salin, Antre ulang, atau Antre lagi.
+- **Cron**: `SchedulerCrons` berupa tabel yang menjadi kartu di mobile (satu markup, CSS yang mengubah
+  susunannya). Setiap cron punya menu ⋯ (Ubah · Jalankan sekarang · Riwayat · Hapus lewat konfirmasi).
+  Form memakai dua tab: **Dasar** (nama, jadwal, prompt, aktif) dan **Lanjutan** (runtime, model, effort).
+- **Setelan**: bahasa biasa dengan draft dan "Simpan setelan" (pola Fase 1G). Kelompok: Sesi, Peluncuran
+  (dengan status pemeriksaan saat ini), Sumber otomatis, Project yang diizinkan, lalu Orkestrasi.
+- **Orkestrasi** di Setelan: `OrchestrationPanel variant="accordion"`, satu baris per flow yang bisa dibuka,
+  tertutup secara default. Tiap perubahan tersimpan langsung lewat `PUT /settings` dengan rebase ke DB terbaru.
+
+Tab kosong hanya menampilkan satu baris keterangan dan tak memakan ruang. Angka di tab muncul hanya bila
+lebih dari nol. Semua muat awal memakai `SkeletonList`. Galat muat tetap tampil sebagai galat dengan Coba lagi.
+
+Zona waktu (ADR-0204): instan dari server (jalan berikutnya, terakhir, riwayat) ditampilkan lewat `fmtAt`
+dalam `serverTimeZone`, dan tab Cron menyebut zonanya. Preview "jalan berikutnya" di form memakai
+`nextRunFor(expr, now, serverTimeZone)` (ADR-0212), jadi tampil dalam zona server walau zona browser berbeda.
+Tanpa keterbatasan zona lagi; `nextRunFor` tanpa `tz` tetap zona lokal proses.
+
+Keadaan tab: tab aktif bertahan di ui-state `scheduler.tab`, dan pilihan chip di `scheduler.riwayatStatus`.
+Riwayat dan Cron baru dimount saat tabnya dibuka (muat antrean dan daftar cron on-demand). Antre, Berjalan,
+dan Setelan selalu termount, supaya draft Setelan tak hilang saat pindah tab.
+
+Copy yang berubah (glosarium): "Batas sesi berjalan" → **Batas sesi bersamaan**; "Pemeriksaan sebelum
+peluncuran" (saklar) → **Tahan peluncuran saat server sibuk**; tab "Antrean" → **Antre**; "sesi hidup" →
+**N dari M sesi**. Pesan kosong "tak ada" diganti "Tidak ada".
+
+Berkas:
+
+- `src/src/screens/SchedulerScreen.tsx`: strip, lima tab, `QueueSection`, `HistoryPanel`, `SettingsPanel`,
+  `OptInPanel`, `OrchestrationSection`, dan `useSettingsSnapshot` (baca dan tulis orkestrasi).
+- `src/src/screens/SchedulerCrons.tsx`: tabel/kartu, menu ⋯, form dua tab, dan prop opsional `timeZone`.
+- `src/src/screens/OrchestrationPanel.tsx`: varian `accordion` (opsional). Varian default `cards` tetap dipakai
+  Settings tanpa perubahan. `FlowBody` dipakai bersama kedua varian.
+- `src/src/screens/sched-lead-shared.tsx`: `fmtAt` dan `browserTimeZone`. `InlineError` memakai kelas
+  `hn-sched-error` (dipakai LeadScreen juga).
+- `src/src/screens/styles/scheduler.css`: gaya layar ini. Diimpor dari keempat berkas di atas. `app.css` tak disentuh.
+- `src/src/App.tsx`: tidak berubah. Props `SchedulerScreen` sama, dan tak ada prop baru yang dibutuhkan.
+
+Tes:
+
+- `src/test/scheduler-screen.test.tsx`: tab, chip riwayat, kontrol (Jeda, Hentikan, Simpan), orkestrasi accordion,
+  galat, dan pembatalan.
+- `src/test/scheduler-live.test.tsx`: langganan lazy (Antre saat mount, Riwayat saat dibuka) dan frame live.
+- `src/test/scheduler-queue-pager.test.tsx`: pager per status.
+- `src/src/screens/SchedulerCrons.test.tsx`: menu ⋯, form dua tab, zona server, dan preview.
+- `src/test/orchestration-panel.test.tsx`: varian accordion dan varian kartu (Settings).
+- `src/test/sched-lead-shared.test.tsx`: `fmtAt` (zona, tanggal kosong, zona tak dikenal).
+- Penjaga: `glossary-guard`, `placeholder-contract`, `no-silent-catch`, dan `confirm-inventory`.
+
+## Audit UI/UX 2026-10 · Fase 3F · Triase & Lead (kotak masuk keputusan)
+
+Fase 3F dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md). Usulan dan aturannya
+ada di [audit § Triase & Lead](ui-ux-audit-2026-10.md) dan [aturan minimalis](ui-ux-audit-2026-10.md#3-aturan-minimalis-hanoman-usulan).
+Istilah tampil mengikuti [glosarium](glossary.md). Kelas layout di `screens/styles/triage.css` (`hn-triage-*`) dan
+`screens/styles/lead.css` (`hn-lead-*`), keduanya diimpor dari komponen; `app.css` tak disentuh.
+
+Berkas:
+
+- `src/src/screens/TriageScreen.tsx` — satu daftar gabungan tiket Help Center dan issue GitHub (tanpa tab).
+  Tipe `Row` menyatukan keduanya dengan kunci `t:<id>` / `i:<id>`. Segmented status `Belum ditinjau (N) · Diterima ·
+  Ditutup` menggantikan select status. `InboxRow`: titik status (`StatusPill` dot), judul, meta satu baris, checkbox
+  untuk yang belum ditinjau, dan Terima/Tolak inline. `TicketDetailView` dan `IssueDetailView` memakai decision bar
+  sticky (`.hn-triage-decision`); aksi lain di `OverflowActions`. `CombinedPager` untuk footer dua sumber.
+- `src/src/screens/LeadScreen.tsx` — satu kalimat status, `RadioGroup` mode Aktif/Jeda/Mati, kolom utama "Menunggu
+  kamu" (`WaitingCard`) dan timeline riwayat (`DecisionItem`, `FlowItem`), kolom samping dengan callout keamanan,
+  lipatan "Project yang dipimpin", dan lipatan "Pengaturan lead" (draft lokal + Simpan pengaturan).
+
+Perilaku Triase:
+
+- Penyaring: pencarian `Cari tiket` dan popover "Filter" (Project, Sumber: Semua sumber / Help Center / GitHub),
+  chip aktif, dan "Hapus semua filter". Status selalu satu pilihan (default "Belum ditinjau").
+- Issue GitHub hanya dimuat bila satu project dipilih (satu repo). "Tarik issue" tampil di baris status saat ada
+  project dan sumber bukan Help Center. Sumber GitHub tanpa project menyatakan "Pilih satu project".
+- Tolak tiket langsung tanpa dialog, lalu toast "Urungkan" 6 dtk yang memanggil `PATCH /tickets/:id` dengan
+  `{ status: "new" }`. Tolak issue GitHub dan Tolak terpilih tetap lewat konfirmasi: tak ada endpoint ubah status
+  untuk issue (`unlink` melepas tautan, bukan membuka kembali), jadi tak ada "Urungkan" untuk issue.
+- Terima pada baris dan lewat keyboard tetap di kotak masuk (toast "Diterima → SPEC-n"). Terima pada detail membawa
+  ke backlog seperti sebelumnya (`onAccepted` dari App).
+- Aksi massal: Terima terpilih (tiket: `acceptTicket` per id, prioritas sedang; issue: `acceptGithubIssues`) dan
+  Tolak terpilih dengan konfirmasi yang memuat daftar nama item.
+- Keyboard: J/K pindah baris (membuka detail), A terima, R tolak, Esc tutup detail. Pintasan aktif hanya saat fokus
+  ada di layar ini dan bukan di kolom isian atau dialog.
+- Menu ⋯ detail: Edit, Buka status publik, Salin link publik, Salin link backlog, Lepas tautan, Hapus.
+  Lampiran tampil di disclosure "Lampiran (n)".
+- Pagination: satu sumber memakai pager eksak. Dua sumber memakai footer "Halaman N dari M" karena kedua sumber
+  dipaginasi pada nomor halaman yang sama dan totalnya tak bisa dijumlah secara bermakna.
+- Pencarian: tiket disaring server; issue disaring di klien pada halaman yang dimuat.
+- Realtime tiket: langganan `tickets` dengan params status/project/q/page. Status default `new` ikut dalam kunci.
+
+Perilaku Lead:
+
+- Kalimat status: "Lead {aktif|dijeda|mati} · N menunggu kamu · N antre". Mode Aktif/Jeda langsung menulis
+  `enabled`/`paused`; Mati minta konfirmasi yang menyebut efeknya.
+- "Menunggu kamu": kartu per sesi. Untuk sesi yang bisa dijawab, pertanyaannya dibaca lewat
+  `GET /terminal/sessions/:id/dialog` (`api.sessionDialog`) dan opsi tunggal jadi tombol sekali klik
+  (`POST …/dialog/answer`); opsi jamak jadi checkbox + "Kirim pilihan". Jika dialog tak bisa dibaca, kartu menyatakan
+  "Jawab di Terminal". Nama sesi: project · spec dari antrean scheduler, lalu dari jejak keputusan.
+- Riwayat: satu timeline keputusan dan rangkaian dengan chip Semua / Keputusan / Rangkaian, dan penyaring project
+  di popover "Project". Pager eksak per jenis; "Semua" memakai footer halaman gabungan (`decPage` dan `flowPage`
+  disinkronkan saat berpindah halaman di mode itu).
+- Ubah jawaban: pilihan (radio untuk tunggal, checkbox untuk jamak) dan isian, lalu "Kirim jawaban" membuka
+  konfirmasi yang menyebut jawaban sekarang dan jawaban baru. Draft tetap utuh bila server menolak.
+- Kolom samping: callout "Dikunci secara teknis" (produksi, VPS, dan penghapusan data), lipatan "Project yang
+  dipimpin · N dari M diurus lead" (opt-in dan jeda per project), dan lipatan "Pengaturan lead" (interval, batas
+  waktu, batas jawaban otomatis, syarat integrasi, baris model lead). Pengaturan memakai draft lokal dengan
+  "Simpan pengaturan" dan "Batal"; simpan yang tak mengubah nilai tak menulis apa pun.
+
+Kontrak: prop `TriageScreen` (`projects`, `onAccepted`, `onToast`) dan `LeadScreen` (`projects`,
+`onProjectChanged`, `onToast`, `onGotoTerminal`) tak berubah, jadi `App.tsx` tak perlu diedit. `GithubIssuesPanel`
+tak lagi diekspor: panel tab sudah digantikan daftar gabungan.
+
+Keputusan:
+
+- Menu detail memakai "Edit", bukan "Ubah" (glosarium: *Ubah isi* → Edit). "Ubah jawaban" tetap; itu frasa lead.
+- Tidak ada aksi "Tautkan" di menu ⋯: belum ada endpoint untuk menautkan tiket ke spec yang sudah ada. "Lepas tautan" tetap.
+- Tolak issue GitHub tak punya "Urungkan" (lihat di atas).
+
+Tes:
+
+- `src/test/triage.test.tsx`, `triage-github.test.tsx`, `github-issues-pager.test.tsx`, `triage-live.test.tsx`,
+  `triage-pager.test.tsx`, `triage-state-persist.test.tsx`.
+- `src/test/lead-screen.test.tsx`, `lead-live.test.tsx`, `lead-pager.test.tsx`, `scheduler-lead-state-persist.test.tsx`.
+- Guard: `glossary-guard`, `no-silent-catch`, `placeholder-contract`, `confirm-inventory`.
+
+## Audit UI/UX 2026-10 · Fase 3 · Klien & VPS (3G · 3J)
+
+Fase 3G (Klien) dan 3J (VPS) dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md).
+Aturan layar mengikuti [audit § Klien dan VPS](ui-ux-audit-2026-10.md#2-per-layar) dan
+[glosarium](glossary.md). Selektor tingkat memetakan ke grant `PUT /remote-control` yang sudah ada (keputusan di
+[ADR-0210](../adr/0210-perangkat-tingkat-akses-lihat-kerja-tulis.md)). Grant per perangkat remote: opsi D (tingkat yang
+dilaporkan, baca-saja) dan opsi C (**permintaan tingkat dengan persetujuan lokal**, [ADR-0217](../adr/0217-permintaan-tingkat-akses-perangkat-remote-disetujui-lokal.md),
+dari keputusan [ADR-0216](../adr/0216-grant-per-perangkat-remote-diusulkan.md)). Pemetaan tingkat ↔ grant kini satu sumber: `REQUEST_TIER_GRANTS` di `shared`.
+
+Berkas:
+
+- `src/src/screens/remote-access-tier.ts` — murni: tingkat Lihat/Kerja/Tulis ↔ grant (`TIER_GRANTS`, diambil dari
+  `REQUEST_TIER_GRANTS` di `shared`), `tierOf` (termasuk `khusus` dan `kosong`), `grantDiff`, `needsConfirm`, dan kalimat dampak per grant.
+- `src/src/screens/access-request.ts` — murni (ADR-0217): `requestBlockReason` (alasan "Minta tingkat…" mati: offline,
+  protokol tak cocok, kendali belum diizinkan), `hostOf` (host dari origin hub), `REQUEST_STATUS_LABEL`.
+- `src/src/screens/RemoteControlPanel.tsx` — `RemoteAccessSection` (master + selektor tingkat, konfirmasi naik
+  dan turun), `AccessRequestsApproval` (ADR-0217: bagian "Permintaan dari server pusat" di dalam `RemoteAccessCard`;
+  hanya permintaan `pending`; Setujui lewat `useConfirm` yang menyebut dampak tiap grant dan nonaktif bila master
+  mati; Setujui mengirim `{tier, from}` dari kartu, dan 409 (kartu basi) memuat ulang daftar dengan pesan
+  "Permintaan berubah, periksa lagi"; Tolak langsung; dimuat ulang saat jendela fokus, tanpa polling), `RemoteAccessCard` (kartu izin di tab
+  Perangkat), `RemoteControlPanel` (panel Pengaturan: log, status relay dan riwayat diringkas, rinciannya di `<details>`).
+- `src/src/screens/ClientsScreen.tsx` — tab **Perangkat · Akun · Log**. Baris Perangkat = `DenseRow`: nama,
+  online/offline (`StatusPill` dot), "N sesi berjalan" / "Tidak ada sesi berjalan", terakhir terlihat, dan satu
+  aksi "Lihat (baca saja)". Sesi tanpa SPEC hanya teks. Prop `onToast` opsional. Perangkat remote juga punya
+  tombol **Minta tingkat…** (ADR-0217, `AccessRequestPanel`): pilih Lihat/Kerja/Tulis, kirim, lalu status
+  permintaan (menunggu persetujuan di perangkat itu · disetujui · ditolak · kedaluwarsa). Tombol mati dengan alasan
+  saat offline, protokol tak cocok, atau kendali belum diizinkan. Galat hub (mis. 409 perangkat belum mendukung) tampil `role="alert"`.
+  Baris "Tingkat akses" (opsi D, baca-saja) tetap ada.
+- `src/src/screens/ClientAccessPanel.tsx` — tab Akun: baris akun = `DenseRow`. Aksi: Nonaktifkan/Aktifkan,
+  **Cabut akses** (dikonfirmasi; mengosongkan `projects`), dan **Hapus akun** di menu ⋯ (dikonfirmasi).
+- `src/src/screens/RemoteBanner.tsx` — bar brass solid yang menempel (`.kl-banner`): "Nama · Baca-saja · vX ·
+  online" dan tombol Keluar.
+- `src/src/screens/vps-status.ts` — murni: `vpsSteps` (Terhubung → Diaudit → Diperkuat, masing-masing dengan
+  teks), `canApplyRemediation`, `scoreText`.
+- `src/src/screens/VpsScreen.tsx` — daftar sebagai `RowList`: nama dan alamat, stepper tiga langkah, skor,
+  satu aksi **Periksa** (audit). Menu ⋯ (`OverflowActions`): Tes koneksi, Buka console, Sesi Claude, Edit,
+  Harden (danger), Hapus registrasi (danger). Harden dan hapus selalu lewat `useConfirm`. Detail server
+  dibuka sebagai modal bertab.
+- `src/src/screens/VpsChecklist.tsx` — modal bertab **Ringkasan · Checklist · Pemasangan · Akses**; panel
+  tetap ter-mount dan disembunyikan (`TabPanel`), jadi pilihan dan filter tak hilang saat pindah tab.
+  Header checklist menempel: skor, dan `FilterBar` (kotak cari tetap terlihat; seksi, mode, status, dan
+  severity di popover Filter; filter aktif tampil sebagai chip). Badge hanya untuk item bermasalah. Alur perbaikan tiga langkah:
+  **Pilih → Pratinjau → Terapkan**. Terapkan nonaktif sampai pratinjau dibuat untuk pilihan yang sama, dan
+  mengubah pilihan membatalkan pratinjau.
+- `src/src/screens/styles/clients.css`, `src/src/screens/styles/vps.css` — kelas `kl-*` dan `vps-*`. Ukuran
+  dari skala token, jarak dari `--space-N`, warna dari token semantik. Target sentuh 44px pada pointer kasar.
+
+Keputusan:
+
+- **Pemetaan tingkat ↔ grant.** Lihat = `sessions:read`, `backlog:read`, `ide:read`. Kerja = Lihat +
+  `backlog:write` + `sessions:spawn`. Tulis = Kerja + `sessions:write`. Kombinasi lain tampil sebagai **Khusus**
+  dengan rincian yang dilipat. Tingkat selalu memuat `sessions:read`, karena server menolak grant tulis tanpa
+  itu.
+- **Konfirmasi.** Naik ke Kerja atau Tulis memakai dialog `danger` dan menyebut apa yang diizinkan. Turun, atau
+  grant yang dicabut, memakai dialog biasa yang menyebut "Dicabut: …". Lihat tak bisa dimatikan dari selektor.
+  Mematikan kendali lewat master tidak mengubah grant yang tersimpan, sama seperti sebelumnya.
+- **Skor kepatuhan di daftar VPS.** Selesai (ADR-0211): `VpsView.scoreTotal` dari snapshot audit tersimpan,
+  dibaca langsung dari listing; "Skor —" bila belum pernah diaudit di mesin ini. Checklist yang dimuat
+  memuat ulang daftar, jadi N/A/attest yang baru ditandai ikut tampil di baris.
+- **Istilah.** Copy memakai glosarium: Terhubung/Diaudit/Diperkuat, Pratinjau, Terapkan, Tandai terpenuhi,
+  "Lihat (baca saja)", "Baca-saja". Tak ada "hub", "Device", "basi", atau "retry" di teks tampil.
+
+Tes:
+
+- `src/test/remote-access-tier.test.ts` — pemetaan tingkat, `tierOf`, `grantDiff`, dan konfirmasi.
+- `src/test/vps-status.test.ts` — tiga langkah, syarat Terapkan, dan teks skor.
+- `src/screens/RemoteControlPanel.test.tsx` — selektor, dialog naik dan turun, Khusus, relay dan riwayat,
+  lajur log.
+- `src/test/clients-screen.test.tsx`, `client-access-panel.test.tsx`, `remote-instance-view.test.tsx` (banner).
+- `src/test/vps-screen.test.tsx`, `vps-checklist.test.tsx`, `vps-apply-confirm.test.tsx`.
+
+Utang yang perlu keputusan di luar berkas ini:
+
+- `App.tsx`: teruskan `onToast` ke `ClientsScreen` (opsional, tanpanya toast akses tak tampil).
+- `SettingsScreen.tsx`: tab Akses klien dan Kendali jarak jauh. *Diputuskan di 3C:* keduanya dipertahankan
+  sebagai bagian di niat "Integrasi & akses" (lihat [Fase 3C](#audit-uiux-2026-10--fase-3c--pengaturan-empat-niat)).
+- `lib/labels.ts`: `MODE_LABEL` (Otomatis/Audit/Info) masih di `VpsChecklist.tsx`; pindahkan ke sana.
+- `VpsView`: tambahkan `scoreTotal` ke daftar bila skor perlu tampil tanpa membuka checklist.
+
+## Audit UI/UX 2026-10 · Fase 3 · Backlog & Tim (3D)
+
+Fase 3D dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md). Aturan layar
+mengikuti [audit § Backlog · Tim](ui-ux-audit-2026-10.md#2-per-layar) dan [glosarium](glossary.md). **Tidak ada
+perubahan API.** Pengelompokan tahap dan lensa dilakukan di klien.
+
+Berkas:
+
+- `src/src/screens/BacklogScreen.tsx` — **daftar** (`RowList`/`DenseRow`) adalah tampilan utama, papan (`Board`)
+  tampilan kedua lewat `ViewToggle` (ikon, nama "Daftar"/"Papan"). Segmen tahap = `Tabs` pill dengan hitungan dari
+  himpunan yang sama dengan daftar: Semua · Brainstorm (brainstorming, objective) · Spec (spec-ready, planned) ·
+  Dikerjakan (executing) · Selesai (done). Baris/kartu: `PrioDot` (titik, bentuk membawa makna), judul, id, asal
+  (`SourceTag`, teks meta), pil tahap, dan paling banyak dua lencana (Terblokir, kehadiran). Satu aksi primer
+  sadar-tahap (`startLabel`: Mulai/Lanjutkan; "Buka sesi" bila berjalan; "Review perubahan" untuk item selesai),
+  sisanya di `OverflowActions`.
+- `SpecDetail` alur linier: **Ringkasan** (progres `StageBar`, rincian project/penulis/tanggal/branch asal, prioritas
+  diubah langsung) → **CTA "Jalankan"** (semua tahap; "Buka sesi" bila berjalan) → **Review, dokumen, lampiran** →
+  **Lanjutan** (`<details>` tertutup: branch, dependency, auto-merge, ubah status, integrasi, type, jejak) →
+  **Zona berbahaya** (Hapus, lewat `useConfirm`).
+- Penyaring: `FilterBar` = pencarian + popover "Filter" (sumber, project, prioritas, rentang tanggal) + chip aktif +
+  Reset. Hanya satu baris utama; tahap di atasnya.
+- Urung: perubahan prioritas (hanya selagi `brainstorming` dan belum dimulai) menampilkan toast "Urungkan" lewat
+  `useToast` + `ToastHost` milik layar. Hapus tetap konfirmasi.
+- Muat: `SkeletonList` hanya untuk muat pertama; refetch menampilkan "Memuat…" tanpa mengosongkan daftar.
+- **Data:** daftar mengambil himpunan terfilter penuh (tanpa `page`/`limit`, seperti papan) lalu dipaginasi di klien.
+  Alasan: server hanya menyaring SATU nilai `stage` persis, sedangkan segmen adalah grup.
+- **Keputusan:** segmen "Review" tidak dibuat. `Spec.stage` tak punya tahap review; tinjauan adalah aksi "Review
+  perubahan" pada item. Menambahkannya butuh keputusan produk dan tahap/penanda di server.
+- `src/src/screens/TeamScreen.tsx` — **lensa "Saya"** bawaan (`memberId(email)` dari `api.authStatus`, hanya bila
+  akunnya terdaftar sebagai anggota; tanpanya lensa tak ditawarkan), "Semua" melepasnya. Baris alat ≤6 kontrol:
+  mode (Papan/Linimasa/Lintas project), lensa, pencarian, Filter (project, kolom, anggota, zoom), Tugas baru, ⋯
+  (Anggota tim). `SyncButton` hanya tampil di instance klien. Pindah dan tugaskan punya toast "Urungkan".
+- `src/src/screens/team-board.tsx` — kartu hanya **judul, titik prioritas (sama dengan Backlog), avatar + penanggung
+  jawab, dan satu menu "Ubah tugas"** (pindah kolom, tugaskan, kosongkan, buka spec / lepas tautan / kirim ke
+  Backlog). Project ada di tooltip kartu. Mobile (≤767px): satu kolom + pemilih `Tabs`.
+- `src/src/screens/team-timeline.tsx` — tak berubah; legenda sudah ada di `TimelineLegend`.
+- `src/src/screens/styles/backlog.css`, `styles/team.css` — kelas `hn-bl-*` dan `hn-tm-*` (token saja). Prefiks baru
+  sengaja berbeda dari `.hn-backlog-*`/`.hn-team-*` di `app.css`, yang aturan `!important`-nya kini tak terpakai
+  (dihapus di Fase 2E).
+- `src/src/screens/AutoMergeCard.tsx` — copy "setelan basi" diganti (utang copy Fase 3 selesai).
+
+Tes: `backlog-*.test.tsx`, `reopen-session`, `revert-stage`, `search-filter`, `change-source`, `team-board`,
+`team-escalate`, `team-screen` (+ lensa dan urung baru), `backlog-ui-audit` (+ skeleton dan urung prioritas).
+Guard: `glossary-guard`, `no-silent-catch`, `placeholder-contract`, `confirm-inventory` hijau.
+
+`App.tsx` sudah meneruskan `onOpenSpec` ke `TeamScreen`, jadi item "Buka SPEC di Backlog" di menu kartu tampil. Tak ada
+perubahan di `App.tsx` untuk Fase 3D.
+
+## Audit UI/UX 2026-10 · Fase 3 · Projects, PRD, Docs, Skills (3P · 3K)
+
+Redesign hub Projects (daftar, detail, PRD, Docs) dan Skills, sesuai [usulan § Per layar](ui-ux-audit-2026-10.md#2-per-layar)
+dan [aturan minimalis](ui-ux-audit-2026-10.md#3-aturan-minimalis-hanoman-usulan). Label 3P dipakai karena
+label 3I di rencana sudah milik Scheduler. Skills tetap dicatat sebagai 3K.
+
+Berkas (milik fase ini; CSS baru di `src/src/screens/styles/`):
+
+- `ProjectsScreen.tsx`: RowList diurut perhatian oleh server (`sort=attention`, ADR-0212: dokumen rusak → drift → sisanya), chip Semua · Perlu perhatian · Sesi berjalan
+  dengan hitungan, StatStrip dibuang. Kolom: Project (nama + jenis + deskripsi) · Status (+ PresenceChip) · Dokumen · Backlog terbuka.
+  Hapus di ⋯ per baris.
+- `ProjectDetailScreen.tsx`: header, tiga pintu besar (Backlog n · Terminal · Dokumen), `MissingRepoCard` di atas pintu,
+  `<details>` "Pengaturan project" (Help Center, auto-merge, custom agent, tautan Skills), zona bahaya paling bawah.
+- `PrdScreen.tsx`: indeks kiri dikelompokkan per status (Draf · Dieskalasi · Terwujud, tiap grup `<details>`), halaman
+  baca ~68ch, bar aksi sticky (judul + "Jadikan backlog" + ⋯ berisi Unduh), sheet tiga pilihan (brief, goal, atau breakdown
+  dengan checklist usulan), usulan breakdown sebagai panel lipat baca-saja.
+- `DocsWorkspace.tsx` + `styles/docs.css`: satu toggle Baca | Edit, bar simpan sticky (belum disimpan · Batal · Simpan),
+  pencarian di atas pohon, chip kategori PRD · Spec · ADR · Lainnya (`docKind`, diturunkan dari path kategori), cakupan
+  sebagai chip, pohon `role="tree"` dengan panah atas/bawah. Hapus dan unduh di ⋯ kepala dokumen.
+- `skills/SkillsWorkspace.tsx`: Tabs "Skill" · "Agen". Tab Skill = master-detail. Tab Agen memuat `CustomAgentsPanel`
+  hanya saat pertama dibuka. Hapus skill di ⋯.
+- `skills/SkillsList.tsx`: daftar ringkas (nama, deskripsi satu baris, sumber, nama project), lapis sebagai chip
+  Semua · Global · Project · Plugin. Global = lapis `hanoman` + `user`. Tanpa grup lipat.
+- `skills/SkillEditor.tsx`: footer Simpan selalu tampil untuk skill yang bisa disunting, sticky, dengan "belum disimpan".
+- `CustomAgentsPanel.tsx` + `CustomAgentMetrics.tsx`: modal tiga tab (Dasar · Tools & Mention · Lanjutan). Jumlah galat
+  per tab tampil sebagai angka di tab. Kartu memuat Ubah, switch aktif, dan ⋯ berisi Hapus. Bukti dan sampel ada di
+  lipatan "Bukti", dan telemetri di lipatan "Bukti penggunaan" tingkat panel.
+- `FolderPicker.tsx`, `MissingRepoCard.tsx`: baris folder memakai kelas (hover di CSS). Modal clone memakai
+  `dismissible={!busy}` tanpa `() => {}`.
+
+Keputusan perilaku:
+
+1. **Sumber daftar project.** Tampilan "Semua" tanpa filter perangkat tetap memakai API (SPEC-198), jadi galat, Coba lagi,
+   dan paginasi Fase 1 tidak berubah. Chip aktif memakai daftar penuh dari App, sehingga hitungan chip sama dengan hasilnya.
+   Urutan perhatian selalu global (ADR-0212): tampilan default dan chip "Perlu perhatian" meminta `sort=attention`
+   (chip itu juga `attention=true`) ke server, dan klien tak mengurutkan ulang. Chip "Sesi berjalan" tetap dari daftar
+   penuh App (status sesi tak ada di API), jadi urutannya urutan App.
+2. **Kolom yang dipindah.** "Ditangani oleh" dan "Aktivitas" tak lagi jadi kolom daftar; keduanya tampil di detail. Filter
+   perangkat tetap di daftar. Jenis project ditampilkan sebagai teks, bukan lencana (maks. dua lencana per baris).
+3. **Tab Agen di Skills.** Katalog agen tidak dimuat sebelum tab dibuka. Ini menjaga halaman Skills tetap ringan dan
+   tidak menembak API agen saat layar dibuka.
+4. **Rantai flex Docs.** Pane preview Docs tetap memakai gaya inline `flex`/`minHeight`/`overflow` pada rantai
+   SPEC-363/393. Kontrak itu diuji lewat style, dan jsdom tak memuat CSS.
+5. **Status PRD tak dikenal** masuk grup sendiri, tidak hilang diam-diam.
+
+Test: `projects-screen`, `project-detail`, `project-handled-by`, `prd-screen`, `doc-download-screens`, `docs-*`,
+`custom-agents-panel`, `screens-state-persist`, `preview-fill-height`, `scroll-chain`, `skills/SkillsWorkspace`,
+`settings-agent*`, serta guard `glossary-guard` (allowlist "Cakupan SoT" dihapus), `no-silent-catch`,
+`placeholder-contract`, `confirm-inventory`, dan `ds-css-contract`. Test `edit-project-folder-picker` dan
+`app-flows` ikut dijalankan. Test IDE (`IdeScreen`) di luar lingkup fase ini.
+
+## Audit UI/UX 2026-10 · Fase 3 · QA (3L)
+
+Redesign workspace QA: editor laporan menjadi lembar kerja, daftar laporan dan temuan memakai RowList, dan
+pengajuan dikerjakan lewat satu dialog bersyarat. Sesuai [usulan § Per layar](ui-ux-audit-2026-10.md#2-per-layar)
+dan [aturan minimalis](ui-ux-audit-2026-10.md#3-aturan-minimalis-hanoman-usulan). Produk: [workspace QA](../product/qa-workspace.md).
+
+Berkas (`src/src/screens/qa/`; CSS baru di `src/src/screens/styles/qa.css`, dimuat oleh `QaWorkspace`):
+
+- `QaWorkspace.tsx`: toolbar lima kontrol (Project, Sinkronkan QA, Laporan baru, Impor, Unduh template). Daftar memuat
+  dengan `SkeletonList`. Modal impor dan buat laporan memakai `Field` DS; berkas native diberi `aria-label`.
+- `QaReportList.tsx`: `RowList`. Baris = kode · status (`Badge` titik) · judul · versi dan penguji · lulus n/m · temuan ·
+  keputusan · "Diubah …" (`relativeTime`). Satu pintu unduh per baris: ZIP.
+- `QaReportEditor.tsx`: 
+  - Header sticky: Kembali, kode, status, judul. Satu aksi utama mengikuti keadaan: terkunci → Buka kembali; ada
+    perubahan → Simpan (Ajukan atau Selesaikan dan kunci jadi sekunder); bersih → Ajukan atau Selesaikan dan kunci.
+    ⋯ berisi tautan ekspor (ZIP utama, lalu DOCX, PDF, XLSX, CSV, .md), Pratinjau laporan, dan Hapus (tak ada bila terkunci).
+  - Kartu "Info laporan" ringkas (versi, penguji, keputusan, perangkat). "Ubah info" membuka drawer berisi seluruh isian;
+    laporan baru membukanya otomatis. Perubahan tetap draf sampai disimpan dari header.
+  - Tab Langkah uji · Temuan · Lampiran tepat di bawah kartu, sehingga selalu terlihat tanpa menggulir melewati form.
+  - Ajukan dan Selesaikan dan kunci membuka dialog **Tinjau dan ajukan**: checklist judul (wajib), keputusan (wajib,
+    dipilih di dialog), dan temuan terbuka (informasi). Galat server tampil di dialog itu.
+  - Mobile (<768 px): header menyisakan judul dan ⋯; aksi utama, status simpan, dan ⋯ pindah ke bar bawah yang menempel
+    (`position: fixed` dengan `env(safe-area-inset-bottom)`), lewat CSS pada satu elemen yang sama.
+- `QaCasesPanel.tsx`: kartu test case = Kode · Nama · ⋯ (Hapus test case, dikonfirmasi). Status = `RadioGroup` satu
+  ketukan bergaya chip (Belum diuji · Lulus · Gagal · Terhambat · Dilewati), menggantikan select dan badge ganda. Indikator
+  simpan per kartu: Menyimpan… · Tersimpan · galat beserta alasannya.
+- `QaFindingsPanel.tsx`: `RowList` temuan. Baris = kode · dampak · status · judul · prioritas · fitur · test case · tautan
+  SPEC. Di luar baris: satu aksi utama, **Kirim ke backlog** (belum terkirim atau tautan putus) atau **Buka backlog**
+  (sudah terkirim). ⋯ berisi Kerjakan langsung, Ubah temuan, dan Hapus temuan. Mengetuk baris membuka detail (langkah,
+  hasil, lampiran). **Kirim semua ke backlog (n)**: konfirmasi menyebut dampaknya, lalu dialog hasil per temuan (berhasil
+  dengan SPEC dan baru atau sudah ada; gagal dengan alasannya), bukan hanya toast.
+- `QaPreview.tsx`: hanya pratinjau Markdown (renderer yang sama dengan ekspor). Tautan unduh pindah ke menu ⋯.
+- `QaAttachments.tsx`: gaya lewat kelas; perilaku dan struktur teks tak berubah.
+- `qa-ui.ts`: `QA_EXPORTS` satu daftar format untuk menu ⋯. `QaField.tsx` dihapus: `Field` DS sudah menautkan label, hint,
+  dan galat (lihat [design-system § Form, Modal, Toast](../design-system/design-system.md)).
+
+Keputusan perilaku:
+
+1. **Keputusan dipilih di dialog pengajuan.** Server hanya mensyaratkan keputusan (`verdict`) untuk mengajukan atau
+   menyelesaikan laporan; temuan terbuka tidak menghalangi. Karena itu "temuan terbuka" hanya ditampilkan sebagai
+   informasi. Judul dan keputusan menonaktifkan tombol konfirmasi.
+2. **Pratinjau dan ekspor di ⋯, bukan di tab.** Setiap format punya satu tempat. Pratinjau membuka dialog sendiri, dan tab
+   Pratinjau dihapus.
+3. **Drawer Info, bukan lipatan di atas tab.** Form panjang tak lagi mendorong tab kerja ke bawah. Drawer tidak punya
+   tombol simpan: satu jalur simpan di header, dan Kembali tetap bertanya bila ada draf.
+4. **Status test case tetap lengkap.** Lima nilai (`todo`, `pass`, `fail`, `blocked`, `skipped`) tetap tersedia sebagai
+   chip; tak ada yang disembunyikan demi ringkas.
+5. **Label, bukan enum mentah.** Tahap backlog di baris temuan memakai `STAGE_LABEL` (mis. "Brainstorm"), bukan nilai
+   mentah `brainstorming`.
+6. **Tanpa perubahan API.** Tidak ada route atau tool MCP baru; keputusan ADR-0202 tidak berubah.
+
+Belum diverifikasi: tampilan di 320, 390, 768, dan 1024 px (jsdom tak menghitung layout dan CSS). Pemeriksaan
+visual dilakukan manusia sebelum merge.
+
+Test: `QaWorkspace.test.tsx` (26 kasus: daftar, editor, status test case, alur ajukan, kirim ke backlog dan hasil massal,
+menu ⋯, impor dan ekspor, galat, drawer Info), `QaAttachments.test.tsx`, dan `qa-nav`. Guard: `glossary-guard`,
+`no-silent-catch`, `placeholder-contract`, `confirm-inventory`, `ds-css-contract`, `ui-audit-tokens`, dan
+`responsive-touch-targets`.
+
+## Audit UI/UX 2026-10 · Fase 3C · Pengaturan (empat niat)
+
+Fase 3C dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md): 16 tab datar dan
+`SettingsScreen.tsx` ±1 540 baris dipecah menjadi **shell tipis** dan modul per niat. Aturan layar mengikuti
+[audit § Settings](ui-ux-audit-2026-10.md#2-per-layar) dan [glosarium](glossary.md). Tidak ada API baru dan tidak ada
+perubahan skema; setiap PUT/endpoint yang sudah ada dipakai apa adanya.
+
+**Keputusan IA.** Empat niat — **Sesi harian** (default) · **Agen & model** · **Integrasi & akses** ·
+**Lanjutan** (tertutup default di navigasi). Di desktop/tablet, niat dengan lebih dari satu bagian membuka daftar
+bagiannya di bawah dirinya; di mobile, satu `Select` "Bagian pengaturan" memuat semua bagian dengan awalan niatnya.
+Keputusan IA ini dicatat di [ADR-0207](../adr/0207-pengaturan-empat-niat-satu-aturan-simpan.md) (ADR-0205 hanya
+mencakup level hub).
+
+Berkas:
+
+- `src/src/screens/SettingsScreen.tsx` — shell: store snapshot, pilihan bagian, navigasi niat, "Cari pengaturan",
+  dan `renderSection`. Mengekspor ulang `AgentAccessPanel` dan `DeviceTokensPanel` untuk pemanggil lama.
+- `src/src/screens/settings/model.ts` — katalog IA (`SETTINGS_INTENTS`, `SECTION_KEYS`), `normalizeSection`
+  (kunci lama `umum`→`sesi`, `orkestrasi`→`model`), `readHashSection`, default `S_DEFAULTS`, dan helper model claude.
+- `src/src/screens/settings/useSettingsStore.ts` — snapshot tunggal: `persist` (antrean PUT, rebase S5, toast jujur,
+  rollback per kunci yang berubah), `save`, `update`, `current`.
+- `src/src/screens/settings/useSettingField.ts` — **satu aturan simpan** (lihat tabel di bawah).
+- `src/src/screens/settings/rows.tsx` — `SettingRow` (dengan status simpan per baris), `Prose`, `SectionNote`, `BlockedHint`.
+- `src/src/screens/settings/fields.tsx` — `FunctionOverride` (komponen override satu-bentuk), `EngineFields`
+  (runtime/model/effort), `CodexVersionNote`, `AgentGroupHeader`, `NumberSettingField`.
+- `src/src/screens/settings/engines.ts` — penulis `lead` (`PUT /lead/config`) dan `telegram` (GET + PUT segar).
+- `src/src/screens/settings/SessionSettings.tsx` — Sesi harian: notifikasi, perilaku sesi, default agen & model,
+  mode goal, scope verifikasi, metode workflow.
+- `src/src/screens/settings/AgentsModels.tsx` — Agen & model: Override per fungsi (Konflik, Lead, obrolan portal) dan
+  orkestrasi.
+- `src/src/screens/settings/Integrations.tsx` — Integrasi & akses · Telegram (kredensial, uji, gateway, agen operator)
+  dan Webhook (dokumentasi dilipat di `<details>`).
+- `src/src/screens/settings/AgentAccess.tsx`, `DeviceTokens.tsx` — dipindah dari shell tanpa perubahan perilaku.
+- `src/src/screens/settings/Advanced.tsx` — Lanjutan: Akun, Pengguna, Setup awal, Konfigurasi (env), Log aktivitas,
+  Custom agent, dan Zona bahaya (Reset ke default, konfirmasi tetap).
+- `src/src/screens/settings/SettingsSearch.tsx` — "Cari pengaturan": filter DOM dan daftar bagian lintas niat.
+- `src/src/screens/styles/settings.css` — layout, nav, status simpan, dan lebar kontrol lewat kelas (bukan inline).
+- `src/src/screens/WebhooksPanel.tsx`, `WebhookDocs.tsx` — tombol "Dokumentasi webhook" dan "Kembali" hanya tampil bila
+  callback-nya diberikan (dipakai untuk pelipatan).
+
+**Aturan simpan (satu hook, tiga perilaku).**
+
+| Jenis field | Perilaku | Status baris |
+|---|---|---|
+| Sakelar, pilihan (diskret) | auto-save, `delayMs: 0`; nilai tampil langsung, rollback bila gagal | Menyimpan… / Tersimpan / Gagal — coba lagi |
+| Teks diketik (kondisi goal) | auto-save dengan debounce 400 ms (`SAVE_DEBOUNCE_MS`); blur menyimpan segera (`flush`) | sama |
+| Angka (jatah, batas waktu) | dinilai saat blur/Enter: di luar batas ditolak atau dipotong dengan toast; nilai lama dipertahankan saat kosong | sama |
+| Secret & kredensial Telegram | **tombol Simpan eksplisit** dalam `<form>` (Enter mengirim), tombol nonaktif tanpa perubahan, teks "Ada perubahan belum disimpan." | — |
+| Konfigurasi env (`Konfigurasi`) | tombol Simpan per baris dalam `<form>`; secret tetap lewat "Ganti"/"Hapus" | — |
+
+Gagal menyimpan: nilai tampil kembali ke nilai tersimpan (rollback), toast galat, dan baris menampilkan
+"Gagal — coba lagi" dengan tombol ulang yang mengirim nilai yang gagal. Simpan yang selesai setelah ada ubahan baru
+tak menimpa status ubahan itu. Sakelar dan pilihan tetap memberi toast sukses setelah PUT berhasil (perilaku Fase 1).
+
+**Override satu-bentuk.** Konflik, Lead, dan operator Telegram memakai `FunctionOverride` + `EngineFields`: sakelar
+"Pakai setelan sendiri", dan saat mati, teks warisan (`data-testid` tetap: `conflict-inherited`,
+`lead-engine-inherited`, `telegram-engine-inherited`). Obrolan portal memakai komponen yang sama dengan sakelar
+berlabel "Aktifkan obrolan" (fitur on/off, bukan override model). Agen operator Telegram ditaruh di Integrasi &
+akses · Telegram — satu tempat dengan kredensialnya — dan Agen & model hanya menunjuk ke sana.
+
+**Cari pengaturan.** Kotak `role="search"` "Cari pengaturan". Di dalam bagian aktif, baris (`data-setting-row`) dan
+kartu (`data-setting-card`) yang judul/penjelasan/kata kuncinya (`data-search`) tak cocok disembunyikan dengan atribut
+`hidden`; kartu yang judulnya cocok menampilkan seluruh barisnya. `MutationObserver` menyaring ulang bila daftar
+yang dimuat async masuk. Lintas bagian, daftar tautan bagian yang cocok muncul di bawah kotak. Escape mengosongkan.
+
+**Kunci persist dan deep link.** Bagian aktif tersimpan di `hn.ui.v1.settings.tab` (ADR-0115). Kunci lama dipetakan
+lewat `normalizeSection`; nilai rusak jatuh ke Sesi harian. Deep link `/settings#bagian=<kunci>` dibaca saat dibuka
+(tanpa route baru, dan hash tak ditulis ulang saat navigasi biasa supaya tak ikut terbawa).
+
+Test:
+
+- `src/test/settings-use-setting-field.test.tsx` — debounce, flush, nilai sama dilewati, status
+  pending→saving→saved, rollback dan retry, simpan usang tak menimpa status, unmount menyimpan.
+- `src/test/settings-search.test.tsx` — `applySettingsFilter` di DOM, `searchSections`, dan integrasi di layar.
+- `src/test/settings-intents.test.tsx` — empat niat, Lanjutan tertutup default, kunci lama, deep link, Reset hanya
+  di Zona bahaya.
+- Test lama Pengaturan (`settings-*.test.tsx`, `SettingsScreen.test.tsx`, `config-panel`, `codex-version-note`,
+  `method-*`, `workspace-state-persist`, `agent-tokens`) diperbarui ke nama niat/bagian baru; cakupan assertion-nya
+  tetap. Test navigasi ke Telegram memakai deep link agar tak memuat Akses AI Agent. `glossary-guard` kehilangan
+  allowlist `SettingsScreen.tsx` ("SoT, ADR…") karena copy-nya sudah diganti.
+
+Utang yang tersisa di Fase 3C:
+
+- `WebhookDocs.tsx`: copy "bisa basi" dan "Retry" masih di allowlist UTANG Fase 3 (keputusan istilah "Kirim ulang").
+- ADR untuk IA Pengaturan sudah ditulis: [ADR-0207](../adr/0207-pengaturan-empat-niat-satu-aturan-simpan.md).
+- `screens/AgentDocCard.tsx` dan `McpPanel.tsx` masih memakai inline style di dalam Akses AI Agent (bukan bagian Fase 3C).
+
+## Audit UI/UX 2026-10 · Fase 3 · Review, Auth, Portal, Onboarding (3L · 3M · 3N)
+
+Tiga layar yang dibaca operator sebagai "buntu" atau "membingungkan" di [audit](ui-ux-audit-2026-10.md#temuan-per-layar-ringkas):
+Review (tanpa keputusan), Setup (dua layar dengan penomoran 1/3), dan Klien (daftar tanpa jawaban atas "bagaimana masalah saya?").
+Susunan dan kelas ada di `screens/styles/review.css`, `screens/styles/auth.css`, dan `portal/portal.css` (bersama Help Center publik).
+
+### 3L · Review: "Tinjau lalu Putuskan"
+
+- **Kepala ringkas:** judul item, `N berkas berubah · +X −Y baris` (dihitung dari `changed`, tanpa endpoint baru), dan
+  "Kembali" + "Muat ulang".
+- **Daftar dan isi:** `ChangedSection` + `TreeRoot` di kiri (atau atas di mobile), viewer Diff|Sumber di kanan. Header viewer
+  menampilkan `+n −m` untuk berkas yang sedang dibuka.
+- **Bar keputusan sticky** di bawah. Tiga tujuan, semuanya *navigasi*, bukan mutasi baru:
+  - **Buka di Backlog** (item backlog; sesi PRD tidak punya tujuan ini): tempat merge/rebase (`integrateSpec` yang dipasang App lewat `onIntegrate`).
+  - **Buka di Terminal:** sesi konflik dan commit.
+  - **Buka di IDE:** git graph dan diff lintas cabang.
+  - Prop baru `onGoto?: (to: Route) => void`. Tanpa prop ini tiap tujuan menjadi tautan `routePath()` (`/backlog/<id>`, `/terminal`, `/ide`).
+- **Keputusan: tidak ada merge/buang langsung di Review.** `integrateSpec` punya penanganan konflik (→ sesi Terminal) dan dialog
+  dampaknya di Backlog. Menyalinnya ke Review menggandakan jalur mutasi tanpa konteks itu. Tidak ada endpoint "buang" untuk worktree
+  item yang bisa dipakai layar ini; `revertStage` mengubah stage, bukan worktree.
+
+**ReconcileModal (Konflik sinkron):**
+
+- Hanya field yang **berbeda** yang tampil, sebagai `<dl>` dengan kolom Lokal dan Server. Di mobile dua kolom jadi bertumpuk, dan
+  label sisi (`Lokal`/`Server`) tampil lewat `hn-reconcile-side`. Di desktop label itu tetap ada untuk pembaca layar.
+- Jenis data (`spec`, `sessionResult`, …) lewat `ENTITY_LABEL` lokal; jenis yang belum dikenal menjadi "Data", bukan kode mentah.
+- **Istilah "server pusat"** menggantikan "hub" di seluruh copy konflik. Ini menutup keputusan terbuka di
+  [glosarium](glossary.md#keputusan-terbuka); entri allowlist `ReconcileModal` di `glossary-guard` dihapus.
+- `.catch(() => {})` yang sempat ada digantikan `.catch` yang menampilkan galat lewat `failureMessage`.
+
+### 3N · Onboarding: setup satu layar, akun dengan nomor jujur
+
+- **SetupWizard** kini satu layar: *Peruntukan* (`RadioGroup`; default "Perangkat ini" pada setup pertama) dan, hanya bila
+  publik tanpa hardening, pengakuan risiko. **Hardening** dan prasyaratnya di `Lanjutan · keamanan (hardening)` yang tertutup
+  (`<details>`); toggle tetap terkunci selama ada prasyarat merah (aturan lama tak berubah).
+- **Penomoran:** "hanoman · setup 1/2" hanya saat setup pertama. Akun pertama adalah langkah 2/2 **hanya** bila wizard tadi
+  tampil. `AuthScreen` menerima `setupStep?: 2` dan baru menampilkan "setup 2/2" bila layar induk meneruskannya
+  (App.tsx sudah meneruskannya, lihat di bawah). Tanpa prop itu, layar akun tidak mengklaim nomor langkah.
+- **AuthScreen:** input `size="lg"` (16 px, mencegah zoom iOS); ilustrasi `PST-001` kecil (dekoratif) hanya di setup;
+  tombol nonaktif selalu menyebut alasannya (`#auth-block-reason`); galat per penyebab tetap.
+- **AccountMenu:** gaya dipindah ke kelas `hn-account-*`; perilaku dan kontrak tes tak berubah.
+
+### 3M · Portal klien: "Beranda Klien"
+
+- **Kerangka:** header bermerek "Klien", judul = nama project (`h1`) dan kalimat "Beranda Klien · lihat bagaimana masalah
+  Anda berkembang di sini." CTA primer **Lapor masalah** di kanan kepala. Pemilih project (chip) hanya bila ada lebih dari satu.
+- **Tab:** *Keluhan saya* (default; jawaban atas "bagaimana masalah saya?") · *Progres pekerjaan* (backlog, data tak berubah) ·
+  *Tanya & ide* (chat, hanya bila diaktifkan). Chat tetap tab: sesinya milik project, dan API tak mengaitkan sesi ke tiket,
+  jadi memasukkannya ke detail keluhan butuh perubahan API.
+- **Kartu keluhan:** nomor, judul (tombol → detail), pill status, linimasa 4 langkah (kompak), dan satu kalimat keadaan
+  (`ticketNote`). Detail (modal) memuat linimasa penuh, kalimat keadaan, dan isi laporan.
+- **Linimasa** (`portal/ticket-timeline.ts`, fungsi murni; `portal/TicketTimeline.tsx`, komponen bersama dengan Help Center):
+
+  | status publik (`publicStatus()`) | Diterima | Ditinjau | Dikerjakan | Selesai |
+  |---|---|---|---|---|
+  | Sedang ditinjau | sudah | **sekarang** | belum | belum |
+  | Diterima | sudah | sudah | **sekarang** (menunggu giliran) | belum |
+  | Sedang dikerjakan | sudah | sudah | **sekarang** | belum |
+  | Selesai | sudah | sudah | sudah | sudah |
+  | Ditutup | sudah | *tidak dilanjutkan* | belum | belum |
+
+  Keputusan: urutan langkah mengikuti kosakata klien (Diterima → Ditinjau → Dikerjakan → Selesai), bukan urutan status server.
+  Server mengurutkan "Sedang ditinjau" sebelum "Diterima"; di sini "Diterima" berarti tinjauan sudah lewat dan laporan
+  menunggu giliran. Status tak dikenal hanya menandai langkah pertama dan tak pernah melempar.
+- **Lapor masalah** = sheet dua langkah (`Modal`, `langkah 1 dari 2`): *Apa yang terjadi?* (project bila >1, kategori, judul, detail),
+  lalu *Lampiran (opsional)* dengan ringkasan dan "Tercatat atas nama <email akun>". Tombol Lanjut nonaktif dengan alasan.
+  Payload tak berubah (`createTicket`, multipart). Email tak diketik ulang.
+- **PublicHelpApp:** halaman status memakai `TicketTimeline` + `TicketNote` + `StatusPill` yang sama; form memakai kelas
+  `hn-public-*`. Honeypot (SPEC-352) tak berubah, termasuk gaya offscreen inline yang disengaja.
+- **Input 16 px:** `Input size="lg"`, `.hn-portal-textarea`, dan `.hn-public-input` (font 16 px). Di layar sentuh/mobile
+  tombol, select, dan input mendapat tinggi minimum 44 px lewat `portal.css`.
+
+### Penjaga dan tes
+
+- `glossary-guard`: entri allowlist `ReconcileModal` dihapus (copy "server pusat"). `no-silent-catch`, `placeholder-contract`, dan
+  `confirm-inventory` lulus tanpa allowlist baru.
+- Test yang diubah ke struktur baru: `client-portal`, `portal-scroll`, `public-help`, `setup-wizard` (satu layar), `reconcile-modal`,
+  `review-screen` (bar keputusan dan header), `auth-screen-token` (penomoran), dan `ChatPanel.test` (nama "Keluhan saya").
+- Test baru: `ticket-timeline.test.tsx` (pemetaan murni untuk semua status `publicStatus()` + komponen dengan `aria-current`).
+- Verifikasi: `pnpm typecheck` bersih; 22 berkas test area ini + test sekitar App (`app-*`, `hub-nav-app`, `palette-app`,
+  `triage`, `nav-*`, `illustration-placement`) lulus. CSS baru diuji sintaksnya dengan PostCSS. **Render browser per layar ini tidak tercatat di sini**
+  (uji layout 320/390/768 px dan bar sticky per layar ini belum tercatat; tiga commit QA Chrome yang menyentuh Review dan Portal ada di riwayat git, lihat § Status pelaksanaan di audit).
+
+### Prop App.tsx (sudah tersambung; tidak ada yang wajib)
+
+1. `ReviewScreen` menerima `onGoto` di `App.tsx:1793` (sudah tersambung). Tanpa itu, tiga tujuan keputusan
+   menjadi tautan biasa (muat ulang halaman penuh, state hilang).
+2. `AuthScreen` menerima `setupStep` di `App.tsx:1570` (sudah tersambung). Tanpa itu, layar akun setup
+   tampil tanpa nomor (aman, tidak menyesatkan).
+
+### Risiko dan keputusan yang perlu dilihat
+
+- Pemetaan "Diterima" (lihat tabel) adalah keputusan produk; jika server kelak mengubah urutan status, `ticket-timeline.ts` dan test-nya
+  harus ikut berubah.
+- Nama tab Klien berubah ("Laporan & keluhan" → "Keluhan saya", "Obrolan" → "Tanya & ide"). Test dan docs lama yang menyebut nama
+  lama sudah diperbarui; dokumen lain di luar area ini belum dicek.
+- `ClientPortal`, `PublicHelpApp`, dan `ReviewScreen` tetap memakai `style` inline untuk root scroller dan `LIST_SCROLL_STYLE`
+  karena tes rantai gulir (`portal-scroll`, `public-help`, `auth-responsive`) mengunci nilai itu lewat `toHaveStyle`.
+
 
 ## State tampilan persisten (SPEC-740 · ADR-0115)
 
@@ -385,7 +1425,9 @@ besar.
 
 ## Pet Hanoman: status sesi sebagai sprite hidup (SPEC-585 · SPEC-648 · Pet hidup A ADR-0140 · Pet hidup B SPEC-897 · Pet hidup C SPEC-898 ADR-0141 · Pet hidup D SPEC-899 ADR-0142 · Pet hidup E SPEC-904 · Pet hidup F SPEC-905 ADR-0144 · Pet hidup G SPEC-909 ADR-0146)
 
-Widget maskot di tepi bawah, hadir di semua halaman. Pose-nya **turunan** keadaan sesi & backlog,
+Widget maskot: penempatan dan default per tier ada di [ADR-0206](../adr/0206-pet-footer-sidebar-default-per-tier.md)
+(menggantikan sebagian [ADR-0144](../adr/0144-pet-diseret-sumbu-y-jalur-melebar.md); desktop di footer sidebar,
+tablet dan ponsel di lajur bawah dan mati default; tak tampil di Dalang). Pose-nya **turunan** keadaan sesi & backlog,
 bukan hiasan, dan seluruh sinyalnya sudah ada di klien — tak ada endpoint status, tak ada skema,
 tak ada channel realtime baru (ADR-0024 & ADR-0039 utuh).
 
@@ -516,8 +1558,8 @@ elemen sendiri, keyframe hanya menulis `transform`/`opacity`, tanpa JS per frame
 rAF/interval.
 
 ```
-pet-root     fixed · left:0 right:0 · bottom: max(safe-bottom, 0) · tinggi 1 sel × s · pointer-events:none · z 80
-             SPEC-905 · selagi held/falling: top: max(0px, var(--safe-top)) menggantikan tingginya
+pet-root     relative · width 100% · tinggi 1 sel × s (66 px saat disembunyikan) · pointer-events:none · z 80
+             di slot Shell: .hn-shell-dock (desktop) atau .hn-shell-lane (tablet/ponsel) — bukan fixed
 └─ pet-actor   transform: translate(var(--x), calc(-1 * var(--y))) · transition: transform <segmen> <linear|fall>
    ├─ pet-bubble  gelembung bicara · di LUAR live region · pointer-events:none (tombol rekap auto)
    ├─ pet-stage   role=status aria-live=polite · hn-pet-reveal
@@ -557,7 +1599,8 @@ masukan + `rng` dan mengembalikan keadaan baru, baris yang harus diputar, dan pe
 | pose perhatian: `waiting`, `blocked` | `mode: "home"` — jalan pulang ke pojok kanan bila belum di sana, lalu berdiri memutar baris pose; kabar penting selalu di tempat yang sama |
 | `shipped` | berhenti di tempat, baris `shipped` sekali → `idle` (lewat `then`), lalu aturan tenang |
 | `hovered` ∨ `panelOpen` ∨ `documentHidden` | berhenti (transisi dipotong di posisi saat ini); masuk hover → `wave` **berulang** sampai hover lepas (SPEC-905) |
-| resize (`laneWidth` berubah) | `x` di-clamp; transisi yang sedang berjalan dipotong |
+| resize (`laneWidth` berubah) | `fitWalk` (QA run3): rencana yang sedang berjalan dihentikan, `x` di-clamp ke jalur baru, jadwal berdiri dimulai ulang. Posisi yang digambar juga di-clamp tiap render (`clampMove`) |
+| lebar jalur belum terukur (0) | tak ada langkah dan aktor tak dirender; rencana pertama dimulai di rumah (`tick` di `HanomanPet.tsx`). Tanpa fallback ke `window.innerWidth`, yang dulu menempatkan pet di 1280 px di sidebar 248 px |
 
 Penjadwalan: **satu** `setTimeout` pada `state.until` + `transitionend` pada `pet-actor` (difilter
 `propertyName === "transform"`) + `visibilitychange` + `resize` (debounce 150 ms). Tanpa interval.
@@ -580,14 +1623,11 @@ dari kodenya:
 - **Koordinat dihitung sebagai SELISIH, bukan dari `getBoundingClientRect()`**
   (`dx = clientX − currentX()`, `dy = clientY + y`). Offset jalur saling menghilangkan, jadi rumus
   yang sama benar di browser **dan** bisa di-assert di jsdom yang memberi rect nol.
-- **Plafon angkat dibaca dari jalur yang SUDAH melebar**, bukan diparsing dari custom property:
-  `getComputedStyle(...).getPropertyValue("--safe-top")` mengembalikan token `env(...)` yang belum
-  di-resolve. Terukur: 661 px di 1280×800, 725 px di 390×844 — persis `tinggi jalur − tinggi sel`.
-- **Jalur melebar HANYA selagi `held`/`falling`,** dan tepi **bawah**nya tak bergerak, jadi sprite,
-  panel, dan gelembung tak bergeser satu piksel pun. `pointer-events: none` tak disentuh; terukur,
-  `elementFromPoint` di tengah layar tetap mengembalikan konten dashboard selagi jalur melebar.
-  Alasannya **bukan** clipping — `pet-root` ber-`overflow: visible` dan sprite 300 px di atas jalur
-  tetap tergambar & tetap dijawab `elementFromPoint` (ADR-0144 Konsekuensi).
+- **Jalur TIDAK melebar saat diangkat (lajur pet, Audit UI/UX 2026-10).** Dulu jalur `position: fixed` melebar
+  ke `var(--safe-top)` selagi `held`/`falling`, dan plafonnya dibaca dari rect yang sudah melebar. Sekarang
+  jalur ada di alur layout: melebar berarti konten bergeser. Pet yang diangkat melayang di atas konten
+  (manipulasi langsung oleh manusia); plafonnya tinggi viewport (`laneHeight()`), dan `pointer-events: none`
+  di root tetap berlaku — `elementFromPoint` di bawah jalur tetap mengembalikan konten dashboard.
 - **Satu properti `transform` untuk kedua sumbu, juga saat `y = 0`.** Daftar properti yang
   di-transisi tak boleh berganti di tengah rantai berjalan → diangkat → jatuh → mendarat.
   `ease: "fall"` = `cubic-bezier(0.55, 0.085, 0.68, 0.53)` (easeInQuad — percepatan, bukan linear).
@@ -712,12 +1752,17 @@ sebelum SPEC-909**, termasuk kalimat `"Pertanyaannya tak terbaca dari sini"`.
 Gelembung pose `waiting` menawarkan **"Jawab di sini"** yang menutup gelembung lalu membuka panel —
 jalur yang sama persis dengan tombol `Lihat` milik rekap.
 
-**Penempatan & mount.** `HanomanPet` dipasang **sekali** di `App.tsx` sebagai saudara `{screen}`,
-bukan di dalam `Shell`: `<Shell>` ditulis ulang di tiap cabang `section`, jadi pet yang tinggal di
-sana lahir kembali tiap navigasi (animasi mulai dari nol, keadaan transient hilang persis saat
-operator pindah layar untuk melihatnya). Jalur `position: fixed` selebar viewport di tepi bawah —
-dan sejak SPEC-905 setinggi **seluruh** viewport selagi pet diangkat/jatuh — `z-index: 80` → di
-bawah header (90), terminal fullscreen (100), Modal (150), Toast (200).
+**Penempatan & mount (Audit UI/UX 2026-10 · lajur pet; [ADR-0206](../adr/0206-pet-footer-sidebar-default-per-tier.md)).** `HanomanPet` dibuat **sekali** di `App.tsx`
+(satu elemen, di dalam `PetDockContext.Provider` yang membungkus `{screen}`; `petOn` = preferensi
+`hn.ui.v1.pet.enabled` atau default tier, lihat `ui-state/pet-pref.ts`). `Shell` menaruhnya di slot:
+`.hn-shell-dock` di footer sidebar (desktop) atau `.hn-shell-lane` di bawah `<main>` (tablet/ponsel).
+Pet tak lagi `position: fixed`: jalurnya ada di alur layout, sehingga tak ada kontrol yang tertutup dan
+tak ada `z-index` pet yang harus dijaga terhadap header, modal, dan toast. Tablet dan ponsel: lajur selalu setinggi
+**chip 56 px** (`LANE_CHIP_H`, rata kanan, tombol 44 px), tak pernah lebih tinggi meski pet dibangkitkan — sprite
+lalu melayang di atas lajur sebagai overlay sementara (`peek`), ditutup Esc atau klik di luar root (Esc saat panel
+terbuka menutup panel dulu). Layar tanpa Shell (Dalang)
+tak punya slot dan tak menampilkan pet. Pet tetap dibuat di App, bukan di Shell, karena `<Shell>` ditulis
+ulang di tiap cabang `section`: pet yang tinggal di sana lahir kembali tiap navigasi.
 
 **Interaksi & preferensi.** Klik = panel + `wave` sekali + berhenti; hover/fokus = berhenti +
 `wave` **berulang** sampai hover lepas (SPEC-905). Gerbangnya `canWave()`, dan daftarnya jangan
@@ -756,13 +1801,12 @@ tentu pojok. Gelembung bicara
 tetap **tampil** di sana (ia informasi, bukan gerak) hanya tanpa `hn-pet-bubble-in`; hati tak
 dirender sama sekali.
 
-**Gerbang tap (SPEC-763, diperluas).** Jalur pet kini selebar viewport — dan selagi pet
-diangkat/jatuh **setinggi viewport juga** (SPEC-905) — jadi "tak menutupi kontrol" harus ditegakkan
-struktur, bukan koordinat: `pet-root` dan seluruh pembungkusnya `pointer-events: none`; hanya tombol
-44 px di kaki sprite (ikut berpindah bersama pet), pegangan, dan panel yang `auto`. Pelebaran
-vertikal itu karena itu **tak boleh** dijadikan permanen dan tak boleh membawa satu pun anak
-ber-`pointer-events: auto` baru; terukur SPEC-905, `elementFromPoint` di tengah layar tetap
-mengembalikan konten dashboard di setiap langkah seret. Terukur lewat CDP: 1280×800 jalur 1265 px: atlas termuat, `animation-name: hn-pet-frames`, transform frame −256 → −640 px dalam 400 ms, actor 1136 → 1027,4 px (`mode: walk`, baris `working` lalu `walk-left`), dan tombol di bawah jalur tetap dijawab `elementFromPoint`; 390×844: actor diam di rumah 264 px, `mode: stand`, tak satu pun baris walk muncul, frame tetap berjalan, tap tetap tembus.
+**Gerbang tap (SPEC-763, diperluas).** Jalur pet selebar slotnya dan setinggi satu sel — ia duduk di alur
+layout, jadi "tak menutupi kontrol" ditegakkan oleh tata letak, bukan koordinat. `pet-root` dan seluruh
+pembungkusnya `pointer-events: none`; hanya tombol 44 px di kaki sprite (ikut berpindah bersama pet),
+pegangan, dan panel yang `auto`. Tak boleh ada anak ber-`pointer-events: auto` baru yang tak perlu.
+Pengukuran SPEC-905 di bawah ini dibuat saat jalur masih `fixed`; angka posisinya tetap berlaku, tetapi
+pelebaran vertikalnya sudah dicabut. Terukur lewat CDP: 1280×800 jalur 1265 px: atlas termuat, `animation-name: hn-pet-frames`, transform frame −256 → −640 px dalam 400 ms, actor 1136 → 1027,4 px (`mode: walk`, baris `working` lalu `walk-left`), dan tombol di bawah jalur tetap dijawab `elementFromPoint`; 390×844: actor diam di rumah 264 px, `mode: stand`, tak satu pun baris walk muncul, frame tetap berjalan, tap tetap tembus.
 
 **Tanpa ADR untuk SPEC-897, dan itu disengaja.** Tak ada endpoint, skema, poll, atau channel yang
 berubah; status koneksi adalah pengamat socket `events` yang sudah ada, dan dua baris atlas
@@ -786,6 +1830,9 @@ artwork),
 `internal/scripts/pet/test-petlib.py` (pipeline atas lembar sintetis).
 
 ## DalangStage — hero Overview: Anoman sebagai dalang
+
+> **Fase 3B:** hero ini tak lagi dirender Overview (lihat § Fase 3B di atas). **Fase 2E:** berkas dan test-nya sudah
+> dihapus (lihat § Fase 2E). Uraian di bawah menggambarkan kondisi sebelum Fase 3B dan dipertahankan sebagai sejarah.
 
 Metafora produk dinaikkan ke permukaan: Overview dibuka `DalangStage`
 (`src/src/screens/DalangStage.tsx`), panel kelir tempat Anoman-dalang "memainkan" project.
@@ -830,6 +1877,9 @@ Pengujian: `src/test/dalang-stage.test.tsx` (state sunyi/running, hitung stat ha
 navigasi klik, kontrak token warna).
 
 ## Dalang Hanoman — layar panggung orkestrasi sinematik
+
+> **Fase 3B:** layar ini sudah dipangkas jadi papan status senyap (lihat § Fase 3B di atas). Uraian di bawah
+> menggambarkan panggung sinematik sebelum Fase 3B.
 
 Menu `dalang` ("Dalang Hanoman", ikon `drama`) membuka
 `src/src/screens/DalangHanomanScreen.tsx` — implementasi layar dari konsep Claude Design
@@ -1208,7 +2258,10 @@ mengikuti pembagian yang persis sama lewat `team-projects.test.tsx`, dengan satu
 hanya bisa diuji di DOM: **urutan lukis** amplop terhadap segmennya.
 
 ## Terminal (sesi Claude Code interaktif)
-`TerminalScreen` menampilkan sesi dalam **grid `rows × cols`** (CSS Grid): `+ Kolom` menambah
+> **Sejak Fase 3E** default tampilannya **Fokus** (rail sesi + satu pane); seksi ini menjelaskan mode **Grid**
+> opsional. Lihat [Fase 3E](#audit-uiux-2026-10--fase-3e--terminal-rail-sesi-dan-mode-fokus).
+
+`TerminalScreen` dalam mode Grid menampilkan sesi dalam **grid `rows × cols`** (CSS Grid): `+ Kolom` menambah
 kolom (kiri↔kanan), `+ Baris` menambah baris (atas↔bawah); tiap kolom dan baris punya `×` di gutter
 untuk menutupnya (grid tak boleh menyusut di bawah 1×1). Menutup kolom/baris **tidak** mematikan
 sesi — selnya lenyap dan sesinya jatuh ke tray, karena itu tak ada konfirmasi. Tiap sel me-mount satu `TerminalPane`
@@ -1513,6 +2566,9 @@ menggulir sampai SPEC-393 memindahkannya ke prop **`fill`** — lihat aturan `Ca
 Kartu Docs (`DocsWorkspace`) dan kedua kartu IDE Explorer (`IdeScreen`) kini `<Card padding={0} fill>`.
 
 ## Review worktree: collapse & tree Changed (SPEC-171, SPEC-177)
+
+> Fase 3L (Audit UI/UX 2026-10): kepala ringkas, bar keputusan sticky, dan Konflik sinkron hanya menampilkan field yang berbeda. Lihat [Fase 3 · Review, Auth, Portal, Onboarding](#audit-uiux-2026-10--fase-3--review-auth-portal-onboarding-3l--3m--3n).
+
 `ReviewScreen` (`screens/ReviewScreen.tsx`) menampilkan file worktree backlog item ala VSCode:
 sidebar **Changed** (SCM) + **Files** (tree), viewer Diff|Source, read-only. Dua pohon dibangun
 oleh `buildFileTree(paths)` dan dirender `TreeRow` — keduanya kini di modul bersama
@@ -1756,9 +2812,11 @@ bersandar pada notifikasi yang **dibuat server-side** (`GET /notifications`) —
   listener unlock audio). Klik notifikasi OS → `window.focus()` + redirect ke sesi (`onOpen`).
 - **`NotificationBell`** (`.../NotificationBell.tsx`) dirender di topbar `Shell` (konsumsi context,
   nol prop-threading ke ~9 call-site `<Shell>`; nilai context default aman untuk test tanpa provider):
-  tombol lonceng + badge unread (`--clay-500`), dropdown daftar (`SPEC-x · judul`, "selesai · Xm lalu",
-  dot unread). Membuka dropdown = `POST /notifications/read` (unread → 0). Tombol "Bersihkan" =
-  `DELETE /notifications`.
+  tombol lonceng + badge unread (`--clay-500`), dropdown daftar (`SPEC-x · judul`, "selesai · 5 menit lalu" (`relativeTime`),
+  dot unread). Membuka dropdown TIDAK menandai apa pun (audit 2026-10). "Jawab" (keputusan, aksi primer) dan "Buka" pada satu item =
+  `POST /notifications/:id/read` (ADR-0204): optimistik, galat → item kembali belum-dibaca + toast err;
+  arsip "Semua notifikasi" memakai jalur yang sama. "Tandai semua dibaca" = `POST /notifications/read`.
+  Tombol "Bersihkan" = `DELETE /notifications`.
 - **`UpdateBadge`** (`screens/UpdateIndicator.tsx`) — pil topbar **dua wajah dalam satu kontrol**
   (SPEC-906), keduanya bersumber dari `useUpdate()` (store WS grup `update`, pola `useLimits`).
   `updateAvailable` → pil **brass** `Update · <latest>`; popover: heading, perintah update dalam blok
@@ -1788,6 +2846,36 @@ bersandar pada notifikasi yang **dibuat server-side** (`GET /notifications`) —
   `NotificationsProvider`), supaya bunyi dari push notifikasi WS tak ditolak autoplay (SPEC-192).
 - **Setting** di layar Settings → section "Sesi & notifikasi": toggle **Notifikasi backlog selesai**
   (`notifyDone`), select **Sound** (`notifySound`: Short/Medium/Long/Senyap) + tombol **Preview**.
+
+## Audit UI/UX 2026-10 · Fase 4 · Jawab dari notifikasi & migrasi inline
+
+Lanjutan [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md) (Fase 2C/2G yang tertunda). Dua hal: aksi **Jawab** langsung dari notifikasi, dan migrasi `style={{` literal ke kelas CSS (visual-ekuivalen).
+
+**Jawab dari notifikasi.**
+
+- Toast keputusan (`NotificationsContext`, satu-satunya tempat toast notifikasi live) membawa `action: { label: "Jawab" }` dan `duration: 7000`. Aksi = `markRead(id)` lalu `onOpen(n)`, yaitu `App.openNotification` → Terminal terfokus ke sesi itu (`notifTarget`, fokus yang sudah ada).
+- Toast **dilewati** bila `isViewing(n)` bernilai benar: `section === "terminal" && focusSession === n.sessionId` (App). Bunyi dan notifikasi OS tetap berjalan. Batas: sesi yang dipilih manual di rail Terminal tak dilaporkan ke App (layar itu memegang fokusnya sendiri), jadi predikat hanya mengenali sesi yang dibuka dari notifikasi, palet, atau pet.
+- Satu notifikasi = satu toast: `toasted` (Set id, berbatas 200) di atas baseline frame pertama.
+- Lonceng dan arsip: keputusan menampilkan **Jawab** sebagai aksi primer (`.hn-notif-open--primary`); "Buka" dan "Lihat triase" tetap. Membuka dropdown tetap tak menandai apa pun.
+- Waktu relatif di lonceng dan arsip memakai `relativeTime` ("5 menit lalu"), bukan "5m lalu".
+
+**Migrasi inline → kelas.** Kelas baru di `src/src/styles/app-shell.css` (diimpor `ds/kit.tsx`) dan `src/src/notifications/notifications.css`. Nilai tiap kelas sama dengan inline yang diganti. `app.css` tak disentuh.
+
+| Berkas | `style={{` sebelum | sesudah | Sisa dan alasannya |
+|---|---|---|---|
+| `App.tsx` | 49 | 0 | — |
+| `ds/kit.tsx` | 24 | 3 | lebar panel Modal (prop `width`); `HnTextarea` (fokus dan invalid dinamis); `PagerBtn` (aktif, hover, disabled dinamis) |
+| `ds/shell.tsx` | 8 | 1 | tombol nav (aktif, hover, `interactive` dinamis). Skip link (`style={skipShown ? …}`) tetap dan dites di `shell-a11y` |
+| `notifications/NotificationBell.tsx` | 17 | 0 | — |
+| `notifications/NotificationsArchiveModal.tsx` | 5 | 0 | — |
+| `screens/PetAnswer.tsx` | 15 | 0 | `style={flat}` ×4 tetap: override reduced-motion ke `Button`, yang menaruh transisinya sendiri secara inline |
+
+Catatan:
+
+- `Input` dan `Select` meneruskan `className` dan `style` ke **pembungkus**, bukan ke `<input>`. Maka `width: 100%` → `hn-w-full`, `flex: 1` → `hn-grow`, dan `flex: 1, minWidth: 0` → `hn-grow-min`.
+- Aturan mobile `!important` di `app.css` (grid, modal, popover) tetap menang atas kelas baru.
+- Footer Modal memakai `.hn-modal-panel > .hn-modal-footer` (spesifisitas lebih) supaya padding bawahnya tetap 14px dan tak bergantung urutan impor CSS.
+- Test: `test/notifications-decision-toast.test.tsx` (aksi Jawab lewat `ToastHost`, dilewati saat sesi ditonton, durasi 7 dtk, satu notifikasi satu toast) dan `test/notification-bell.test.tsx` (Jawab menandai terbaca dan memanggil navigasi; waktu relatif).
 
 ## IDE Visual (SPEC-182 · ADR-0034)
 Nav entri **IDE** (`code-2`) membuka `IdeScreen` (`screens/IdeScreen.tsx`), difilter per project lewat
@@ -1934,6 +3022,9 @@ icon `inbox`; `NotificationBell` per-tipe (icon/warna brass, label "keluhan baru
 tersiar lewat grup `notifications` WS existing.
 
 ## Portal klien — chrome sendiri, rantai gulir sendiri, warna dari fungsi murni (SPEC-617/626/647 · ADR-0110/0111)
+
+> Fase 3M (Audit UI/UX 2026-10): Beranda Klien dengan linimasa keluhan 4 langkah dan sheet "Lapor masalah" dua langkah. Tab kini *Keluhan saya* · *Progres pekerjaan* · *Tanya & ide*. Lihat [Fase 3 · Review, Auth, Portal, Onboarding](#audit-uiux-2026-10--fase-3--review-auth-portal-onboarding-3l--3m--3n).
+
 
 `ClientPortal` (`portal/ClientPortal.tsx`) di-fork di `App.tsx` **sesudah gerbang auth**, sebelum
 `Shell`: sidebar `HN_NAV` adalah navigasi operator, dan setiap entrinya adalah 403 yang menunggu
@@ -2219,6 +3310,10 @@ menyebut observasi transport server sejak boot, bukan mengklaim semua hook runti
 
 ## Obrolan portal klien — `ChatPanel` + `PortalChatPanel` (SPEC-854 · ADR-0129/0130)
 
+> Fase 3M: `ChatPanel` memakai kelas `hn-chat-*` (portal.css); tab-nya berlabel "Tanya & ide" dan teks pembedanya menunjuk ke "Keluhan saya".
+> ADR-0211: tab "Tanya & ide" mengikuti `chatEnabled` pada proyeksi project (tanpa probe ke `/chat/sessions`). Tab `tanya` yang tertinggal dari project tanpa chat jatuh ke Keluhan.
+
+
 Dua komponen, dua audiens, dua berkas API terpisah — sengaja tak berbagi apa pun kecuali DTO.
 
 **`src/src/portal/ChatPanel.tsx`** (klien, di dalam `ClientPortal` sebagai tab **Obrolan**):
@@ -2291,3 +3386,58 @@ Menu, halaman, pintu project, API client, setelan agen changelog, dan allowlist
 project token khusus memori dihapus. Notifikasi/badge memori tidak lagi dirender.
 URL `/memory*` dan `/changelog*` serta state section lama mengikuti fallback
 navigasi yang sudah ada. UI tidak menyediakan akses ke data fitur yang dihapus.
+
+## Audit UI/UX 2026-10 — gelombang 4 (penutupan)
+
+- Inline style → kelas/CSS-var: Terminal, IDE (GitGraph lane `--graph-lane-0..5`, `--lane`, `--depth`, `--row-h`), panel Pengaturan (Webhook/Logs/MCP/Members), `App.tsx`, `ds/kit.tsx`, dialog/timeline/VPS/limit. Berkas CSS baru di `screens/styles/` (`dialogs.css`, `limits.css`, `portal-chat.css`, `auto-merge.css`; tambahan `ide.css`, `team.css`, `vps.css`). Urutan aturan di `ide.css` penting (`.hn-ide-sel` harus setelah `.hn-ide-changed-row`).
+- `test/project-css.ts`: helper yang menyuntikkan CSS proyek ke jsdom agar tes layout membaca kaskade, bukan style inline; jsdom mengabaikan spesifisitas dan `@media` non-screen.
+- Tombol "Jawab" di toast keputusan dan lonceng; `OverflowActions` menu ARIA penuh (`role=menu/menuitem`, roving, typeahead); `Button variant="danger-outline"`; fokus keyboard Button/IconButton terlihat (ring `--border-focus`); toggle "Mode pembaca layar" xterm.
+- Review: prop `onIntegrate/onRevert/onDiscard` (Integrasikan, Kembalikan ke Dikerjakan, Hapus worktree) tanpa endpoint baru.
+- Backend aditif: `PortalProject.chatEnabled`, `VpsView.scoreTotal` (ADR-0211); `nextRunFor(expr, after, tz)` dan `GET /projects?sort=attention` (ADR-0212). ADR 0206–0210 mencatat keputusan pet, Pengaturan, Dalang, Terminal, Perangkat.
+
+## Audit UI/UX 2026-10 — gelombang 5: filter Ber-worktree dan setup (ADR-0214)
+
+- **Backlog, filter "Ber-worktree"** (`screens/backlog-worktree.ts`): field "Worktree" di popover Filter (`Select` aria "Filter worktree"), chip "Ber-worktree" saat aktif, ikut Reset filter. Predikatnya `baseSha` terisi, yaitu "hanoman pernah membuatkan worktree" (kolom sejak ADR-0030). Worktree yang sudah dibersihkan tetap terhitung; pekerjaan di luar hanoman dan item yang selesai sebelum ADR-0030 tidak. Angka segmen tahap ikut himpunan yang disaring. Label di `lib/labels.ts` (`WORKTREE_SCOPE_LABEL`). Tes: `test/backlog-worktree-filter.test.tsx`.
+- **Backlog, mengapa tidak "Perlu ditinjau"**: stage `done` sudah segmen "Selesai"; status tinjau dan integrasi tidak ada di `SpecSlim` (status tinjau kini ada sejak ADR-0218 sebagai `reviewedAt`; integrasi tetap tidak); keputusan sesi "menunggu manusia" (`SessionDTO.decision`) tidak sampai ke Backlog, yang hanya menerima `activeSpecs`. Predikat itu baru jujur bila `App` meneruskan himpunan sesi yang menunggu keputusan; sampai itu, filter ini tidak menjanjikan "belum ditinjau".
+- **Setup, dua langkah dengan nomor jujur** (ADR-0214): wizard "setup 1/2" dan akun "setup 2/2" tetap. Nomor "2/2" hanya tampil bila wizard dijawab di sesi itu. Penerapannya, `setupStep={setupDone ? 2 : undefined}` pada `AuthScreen` di `App.tsx`, menunggu pemilik `App.tsx`.
+
+## Audit UI/UX 2026-10 — Review tanpa 409 dan hapus worktree item (ADR-0213)
+
+- **Review, keadaan kosong** (`screens/ReviewScreen.tsx`): `GET /specs/:id/review` menjawab **200** `{ empty:true, reason }` untuk "belum ada worktree maupun commit", bukan 409. Layar memeriksa `r.empty` lalu menampilkan keadaan kosong dengan teks sesuai `reason`: `no-worktree` ("Sesi belum membuat worktree…") atau `no-commit` ("Worktree sudah dilepas dan belum ada commit…"). `data-reason` pada `.hn-review-empty` memuat alasannya; `409` hanya dipetakan pada jalur spec (repoDir belum diatur), lihat ADR-0215. Tes: `screens/ReviewScreen.test.tsx`.
+- **Jalur sesi, ADR-0215** (amandemen ADR-0213): `GET /terminal/sessions/:id/review` juga menjawab **200** `{ empty, reason }` (`no-worktree` bila sesi tak punya worktree, `no-commit` bila direktorinya lenyap). Layar tak lagi memetakan 409 pada jalur sesi; 409 di sana (repoDir belum diatur) tampil sebagai galat "Gagal memuat review". Tes: `src/test/review-screen.test.tsx` dan `screens/ReviewScreen.test.tsx`.
+- **Hapus worktree satu item** mengganti `deleteWorktrees` dengan nama turunan. Tombol "Hapus worktree" di `App.tsx` memanggil `api.deleteSpecWorktree(spec.id)` → `DELETE /specs/:id/worktree`. Ini mengamandemen kalimat "tanpa endpoint baru" pada bagian Review di atas. Galat `ok:false` tetap dilempar ke bar keputusan.
+- **Tipe kontrak** `SpecReview`, `ReviewFile`, dan `ChangedFile` berasal dari `@hanoman/shared` (`spec-review.ts`, `zSpecReview`). `api/client.ts` mengekspor ulang namanya, jadi pemakainya tak berubah.
+
+## Audit UI/UX 2026-10 — gelombang 6 (perbaikan hasil QA Chrome gelombang 4–5)
+
+- Review: aksi navigasi berlabel pada bar (Backlog/Terminal/IDE), "Aksi lain" berlabel aksesibel, konfirmasi Integrasikan bernada netral (bukan danger), bar satu baris <400px. Aturan pohon berkas dipindah dari `ide.css` ke `screens/styles/file-tree.css` (diimpor `file-tree.tsx`) agar Review/Skills tak bergantung pada `ide.css`.
+- Popover Filter Backlog ter-clamp di mobile; daftar "Bergantung pada" tak menyusut; select native berelipsis ≤640px; tab Scheduler membungkus ≤420px; ring fokus untuk wrapper Input DS (`:focus-within:has(> .hn-input-core)`).
+- Overview: nama aktivitas `min-width: 8ch`, footer Backlog tautan penuh di mobile; Settings merender backtick sebagai `<code>` (`SettingRow desc`); chip jenis modal Feature brief membungkus; dialog Remote IDE bertumpuk ≤640px.
+- Terminal: "Jawab" ke sesi yang sudah berakhir tak lagi memfokus sesi lain — toast "Sesi itu sudah berakhir." dengan aksi "Riwayat sesi"; target fokus dibersihkan saat meninggalkan Terminal (`App.tsx`). Composer sticky di dasar pada ponsel; select dikte 44px pada pointer kasar. IDE: label ref berupa pil berelipsis dengan area klik ≥24px (44px pada pointer kasar).
+- Batas verifikasi: pengecekan layout dilakukan dengan Chrome headless pada fixture CSS asli dan jsdom; QA aplikasi hidup untuk gelombang 6 dicatat di audit doc.
+
+## Audit UI/UX 2026-10 — gelombang 7: filter "Perlu ditinjau" (Backlog)
+
+- **Predikat** (`screens/backlog-worktree.ts`, `reviewSpecIdsOf`): item yang sesinya hidup dan `sessionKind` = `waiting` (`decision && !deciding`). Kondisinya sama dengan "Menunggu jawabanmu" di Overview dan pet. Tes `test/backlog-review-filter.test.tsx` mengunci kesamaannya dengan `waitingSessions`.
+- **Data**: `App.tsx` menghitung `reviewSpecIds` dari daftar sesi dan meneruskannya ke `BacklogScreen` sebagai prop opsional. Tanpa prop, filter ini menghasilkan daftar kosong. Layar Backlog tetap tak menerima daftar sesi.
+- **Tampilan**: field "Tinjauan" di popover Filter, berdampingan dengan "Worktree"; chip "Perlu ditinjau" saat aktif; ikut Reset filter; digabung AND dengan "Ber-worktree". Angka segmen tahap mengikuti himpunan yang disaring. Daftar yang kosong karena filter kini dijawab "Tidak ada spec untuk filter ini" dengan Reset, bukan "Tidak ada spec di tahap …".
+- **Klausa `stage` done + `baseSha` (semula tidak dipakai; kini diamandemen ADR-0218).** Alasan lama: status tinjau tak tercatat di server, dan `baseSha` tak berarti worktree masih ada. Status tinjau kini tercatat di `Spec.reviewedAt`, jadi klausa itu masuk sebagai (b) `stage = done` **dan** `baseSha` terisi **dan** `reviewedAt` null. Lihat gelombang 8 di bawah.
+- **Batas (diperbarui ADR-0218)**: tinjauan item selesai kini punya sinyal jujur, yaitu penanda yang ditulis operator. Label "Perlu ditinjau" dan "Menunggu jawabanmu" untuk kondisi yang sama masih keputusan terbuka di `glossary.md`.
+
+## Audit UI/UX 2026-10 — gelombang 8: penanda "sudah ditinjau" (ADR-0218)
+
+- **Data**: `Spec.reviewedAt` (zod `zSpec`/`zSpecSlim`, `.nullable().default(null)`), ikut `GET /specs` lewat projection `live-specs`. Klien versi lama tetap parse.
+- **Predikat**: `reviewSpecIdsOf(sessions, specs)` (ADR-0218 §7). Klausa sesi tak berubah. `App.tsx` meneruskan `backlog` sebagai argumen kedua dan memakainya sebagai dependensi memo.
+- **Tombol "Tandai ditinjau" / "Batalkan tanda ditinjau"** di dua tempat, keduanya untuk item `done`. (1) Bar keputusan ReviewScreen: prop `reviewed` dan `onMarkReviewed`, di layar sempit pindah ke menu ⋯. Galat dari server tampil di bar. (2) Menu ⋯ item Backlog (`SpecActions`) di semua tampilan (daftar, kartu, papan). Yang kedua wajib: item yang worktree-nya sudah dihapus menampilkan keadaan kosong di Review, tanpa bar.
+- **Hint filter** "Tinjauan" menyebut kedua kondisi. Tes `test/backlog-reviewed.test.tsx` mengunci predikat klausa baru dan aksi menu. `test/review-screen-reviewed.test.tsx` mengunci tombol bar, pembalikan, galat, dan letaknya di layar sempit.
+- **Tanpa dialog konfirmasi**: aksinya bisa dibalik dengan tombol yang sama dan tak membuang apa pun.
+- **Batas yang tersisa**: integrasi tidak menandai otomatis (ADR-0218 §5). Item yang sudah diintegrasikan tetap tampil di filter sampai operator menandainya.
+
+## Audit UI/UX 2026-10 — Perangkat: tingkat yang dilaporkan dan alasan "Lihat (baca saja)" (ADR-0216 opsi D)
+
+- **Baris "Tingkat akses" per perangkat remote** di tab Perangkat (`ClientsScreen.tsx`, `ReportedAccessLine`). Tingkatnya dibaca dari `control.capabilities` (hello relay), bukan dari API baru. Keadaannya: Lihat, Kerja, Tulis, Khusus (dengan rincian), Nonaktif (kendali aktif tanpa grant), atau Tidak diketahui (tanpa laporan, atau protokol tak cocok). Penanda "Diatur di perangkat itu" dan penjelasan singkat menegaskan bahwa pengaturannya hanya di perangkat itu. Tidak ada tombol ubah.
+- **Pemetaan murni** `reportedAccessOf(d)` dan **alasan tombol** `openBlockReason(d)`, keduanya diekspor dari `ClientsScreen.tsx` dan diuji di `test/clients-remote-access.test.tsx`.
+- **Alasan tombol memeriksa capability.** "Lihat (baca saja)" butuh `sessions:read`, karena terminal tampilan remote dimulai dari WS baca-saja yang menuntutnya, dan setiap tingkat memuatnya. Perangkat dengan `capabilities: []` atau tanpa `sessions:read` kini menonaktifkan tombol dan menjelaskan alasannya. Sebelumnya tombol tetap aktif lalu ditolak 403.
+- **Batas.** Tab Dokumen dan IDE di `RemoteInstanceView` tetap menuntut `backlog:read` dan `ide:read` dan gagal sendiri; tombol tidak memeriksanya. Copy ada di `lib/labels.ts` (`REPORTED_ACCESS_*`, `OPEN_BLOCK_*`), baris glosarium "Izin yang dilaporkan perangkat remote". Keputusan grant per perangkat (opsi B dan C) tetap di [ADR-0216](../adr/0216-grant-per-perangkat-remote-diusulkan.md).
+
+- Review (penutup gelombang 7): 409 pada jalur spec tidak lagi dipetakan ke keadaan kosong; ia tampil sebagai galat "Gagal memuat review" yang bisa dicoba ulang. Keadaan kosong hanya datang dari 200 `empty` (ADR-0213/0215).

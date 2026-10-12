@@ -1,9 +1,8 @@
 /* ============================================================
    Hanoman — Webfonts
-   The IBM Plex trio, served from Google Fonts.
-   NOTE: no local binaries are bundled — consumers load these
-   over the network. See readme.md "Fonts" for how to vendor
+   The IBM Plex trio, served from Google Fonts by the <link> tags in index.html.
+   Audit UI/UX 2026-10 · Fase 2E: tak lagi @import di sini, karena @import memblokir render sampai
+   CSS font terunduh. Fallback offline = keluarga generik di tokens/typography.css.
+   NOTE: no local binaries are bundled — see readme.md "Fonts" for how to vendor
    local .woff2 files if you need fully offline builds.
    ============================================================ */
-
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap');

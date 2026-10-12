@@ -6,11 +6,18 @@ import { useModelCatalog } from "./api/model-catalog";
 import { coerceClaudeEffort, zLaunchRejection, type LaunchRejection } from "@hanoman/shared";
 import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
 import { parseRoute, routePath } from "./routes";
+import { STAGE_LABEL } from "./lib/labels";
 import { LazyBoundary } from "./ds/LazyBoundary";
 import { NotificationsProvider } from "./notifications/NotificationsContext";
 import { notifTarget } from "./notifications/target";
-import { Shell, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, Toast, useToast, StateBlock, useConfirm } from "./ds";
+import { Shell, HN_NAV, NAV_KEYS, NavGate, NavPending, Modal, Field, HnTextarea, Button, StatusPill, Select, Input, Switch, Checkbox, MultiSelect, Tabs, useToast, ToastHost, StateBlock, useConfirm, useResponsiveTier } from "./ds";
+import { SectionTabs } from "./ds/section-tabs";
+import { PetDockContext } from "./ds/shell";
+
+import { CommandPalette, ShortcutHelp, ProjectScopeContext, buildPaletteCommands, useGlobalShortcuts } from "./palette";
+import { waitingSessions } from "./screens/pet-state";
 import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
+import { usePetEnabled, petVisibleOn } from "./ui-state/pet-pref";
 import { api, ApiError, createApi, type TerminalSession, type SourceResetPending } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, SpecSlim, SpecListItem, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView, PendingCounts } from "@hanoman/shared";
@@ -38,6 +45,7 @@ import { ClientsScreen } from "./screens/ClientsScreen";
 import { presenceIndex } from "./screens/presence-map";
 import { specsDigestOf, toSlim } from "./lib/specs-digest";
 import { presenceKeyOf } from "./lib/presence-key";
+import { applyIfChanged } from "./lib/snapshot-digest";
 import { repoBasename, cloneErrorText } from "./screens/git-remote";
 import { parseSpecHash } from "./screens/deeplink";
 import { OverviewScreen } from "./screens/OverviewScreen";
@@ -46,6 +54,7 @@ import { ProjectDetailScreen } from "./screens/ProjectDetailScreen";
 import { SkillsWorkspace } from "./screens/skills/SkillsWorkspace";
 import { QaWorkspace } from "./screens/qa/QaWorkspace";
 import { BacklogScreen } from "./screens/BacklogScreen";
+import { reviewSpecIdsOf } from "./screens/backlog-worktree";
 import { PrdScreen, NewPrdModal, type PrdPrefill, type PrdBriefForm } from "./screens/PrdScreen";
 import type { AuditEscalation } from "@hanoman/shared";
 // SPEC-585 · pet maskot. Dipasang di App, BUKAN di dalam Shell: <Shell> ditulis ulang di tiap
@@ -288,15 +297,12 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
         {launchRejection && !isBlocked && !isRemoteTarget && <Button leftIcon="lock" variant="danger" disabled={busy}
           onClick={() => void start(true)}>Mulai tetap</Button>}
       </>}>
-      <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
+      <div className="hn-sheet-lead">
         Agen, model &amp; effort <b>orchestrator</b> sesi ini. Default dari setelan global; ubah bila perlu. Bila
         orkestrasi flow ini aktif, tiap fase dikerjakan subagent dengan model &amp; effort di bawah (Settings ›
         Orkestrasi). Override di bawah hanya berlaku untuk sesi ini dan tidak mengubah Settings.
       </div>
-      {launchRejection && <div role="alert" style={{
-        fontSize: 12.5, lineHeight: 1.55, marginBottom: 12, padding: "9px 11px",
-        borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-strong)",
-      }}>
+      {launchRejection && <div role="alert" className="hn-sheet-alert">
         <b>{launchRejection.error}</b>
         <div>{launchRejection.admission.liveCount} sesi hidup · {launchRejection.admission.liveAgentCount} agen terstruktur · cap {launchRejection.admission.maxConcurrent}</div>
         <div>Load per core: {launchRejection.admission.loadStatus === "available" && launchRejection.admission.loadPerCore !== null
@@ -308,10 +314,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
           operator harus melihat dulu apa yang ia lewati. Worktree sesi lahir `--detach` dari
           basisnya, jadi pekerjaan dependency yang belum ter-merge memang TAK ADA di dalamnya. */}
       {isBlocked && (
-        <div data-testid="dep-blocked-note" style={{
-          fontSize: 12.5, lineHeight: 1.55, marginBottom: 12, padding: "9px 11px",
-          borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-strong)",
-        }}>
+        <div data-testid="dep-blocked-note" className="hn-sheet-alert">
           Backlog ini menunggu{" "}
           <b>{blockers.map((b) => `${b.id} (${b.reason === "missing" ? "tak ditemukan"
             : b.reason === "unmerged" ? "belum ter-merge" : "belum selesai"})`).join(", ")}</b>.
@@ -321,18 +324,18 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       )}
       {/* SPEC-1216 · ADR-0165 §11 · target Start: "hub ini" atau device handledBy/online lainnya. */}
       <Field label="Target" hint="Mesin yang menjalankan sesi ini. Tak terpilih tetap tampil beserta alasannya.">
-        <Select aria-label="target" value={targetId} style={{ width: "100%" }}
+        <Select aria-label="target" value={targetId} className="hn-w-full"
           options={targets.map((t) => ({ value: t.deviceId, label: t.eligible ? t.name : `${t.name} — ${reasonLabel(t.reason)}`, disabled: !t.eligible }))}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setTargetId(e.target.value); setRemoteError(null); }} />
       </Field>
       {remoteError?.error === "remote-session" && remoteError.remoteSession && (
-        <div role="alert" style={{ fontSize: 12.5, marginBottom: 12, padding: "9px 11px", borderRadius: 8, background: "var(--warn-bg, #fdf6e3)" }}>
+        <div role="alert" className="hn-sheet-notice">
           Sesi ini sudah berjalan di <b>{remoteError.remoteSession.name}</b>.
           {/* aksi "Sambung ke sesi" milik navigasi TerminalScreen — turunan C; di sini cukup pesan + tutup */}
         </div>
       )}
       {remoteError?.error === "confirm-required" && (
-        <div role="alert" style={{ fontSize: 12.5, marginBottom: 12, padding: "9px 11px", borderRadius: 8, background: "var(--warn-bg, #fdf6e3)" }}>
+        <div role="alert" className="hn-sheet-notice">
           <div>Device terakhir yang mengerjakan ini sudah offline.</div>
           <Button variant="danger" disabled={busy} onClick={() => void start(false, true)}>Tetap mulai</Button>
         </div>
@@ -340,27 +343,24 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       {/* SPEC-338 · ADR-0074 · mesin sesi. Perilaku sesi identik (worktree, fase, stage, review);
           yang berbeda hanya CLI yang dijalankan — dan karenanya katalog model/effort-nya. */}
       <Field label="Agen" hint="Mesin yang menjalankan sesi ini. Perilaku sesi sama; hanya CLI-nya berbeda.">
-        <Select aria-label="Agen" value={agent} style={{ width: "100%" }}
+        <Select aria-label="Agen" value={agent} className="hn-w-full"
           options={[{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex CLI" }]}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickAgent(e.target.value as Agent)} />
       </Field>
       <Field label="Model">
-        <Select aria-label="Model" value={model} style={{ width: "100%" }}
+        <Select aria-label="Model" value={model} className="hn-w-full"
           options={runtimeModelOptions(agent, model)}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickModel(e.target.value)} />
       </Field>
       <Field label="Effort">
-        <Select aria-label="Effort" value={effort} style={{ width: "100%" }}
+        <Select aria-label="Effort" value={effort} className="hn-w-full"
           options={efforts.map((v) => ({ value: v, label: v }))}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEffort(e.target.value)} />
       </Field>
       {/* SPEC-339 · catatan LUNAK: CLI terlalu tua untuk model terpilih. Tidak memblokir Mulai —
           aturannya sama persis dengan kartu Settings karena keduanya memanggil codexClientTooOld. */}
       {agent === "codex" && codexClientTooOld(model, codexVer) && (
-        <div data-testid="codex-version-note" style={{
-          fontSize: 12, lineHeight: 1.5, marginBottom: 12, padding: "8px 10px",
-          borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-muted)",
-        }}>
+        <div data-testid="codex-version-note" className="hn-sheet-note">
           Codex CLI terpasang <b>{codexVer}</b>, sedangkan <b>{model}</b> butuh <b>{codexModel(model)?.minClient}</b>.
           Sesi tetap boleh dijalankan, tapi modelnya belum tentu dikenali CLI ini.
         </div>
@@ -379,10 +379,10 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
         hint={goalLocked
           ? "Backlog goal selalu berjalan dalam mode goal — sesi menolak berhenti sampai goal item ini terbukti tercapai. Kosongkan kondisi untuk memakai goal item apa adanya."
           : "Sesi menolak berhenti sampai kondisinya terbukti. Kosongkan kondisi untuk memakai bawaan hanoman: semua fase tercatat, plan tak menyisakan task, push sukses."}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: goalOn ? 10 : 0 }}>
+        <div className={goalOn ? "hn-goal-row hn-goal-row--on" : "hn-goal-row"}>
           <Switch aria-label="Mode goal" checked={goalOn} disabled={goalLocked}
             onChange={(v: boolean) => { if (!goalLocked) setGoalOn(v); }} />
-          <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+          <span className="hn-sheet-meta">
             {goalLocked ? "aktif · terkunci" : goalOn ? "aktif" : "nonaktif"}
           </span>
         </div>
@@ -396,7 +396,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
           RAM & CPU tetap tersisa untuk sesi lain di mesin yang sama. */}
       <Field label="Scope verifikasi"
         hint="Hanya yang berubah = test/typecheck/lint hanya menyentuh berkas yang disentuh sesi ini. Suite penuh tetap dijalankan manusia sebelum merge.">
-        <Select aria-label="Scope verifikasi" value={verifyScope} style={{ width: "100%" }}
+        <Select aria-label="Scope verifikasi" value={verifyScope} className="hn-w-full"
           options={[
             { value: "changed", label: "Hanya yang berubah — hemat RAM & CPU" },
             { value: "full", label: "Seluruh project" },
@@ -408,11 +408,10 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
           tanpa satu pun perubahan di berkas ini. */}
       <Field label="Metode"
         hint="Metodologi kerja sesi ini: skill per fase + direktori plan/spec. Fase-fasenya sendiri tak berubah. Item yang sudah pernah dijalankan memakai metode tercatatnya saat dilanjutkan.">
-        <Select aria-label="Metode" value={method} style={{ width: "100%" }}
+        <Select aria-label="Metode" value={method} className="hn-w-full"
           options={METHOD_IDS.map((id) => ({ value: id, label: METHODS[id]!.label }))}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMethod(e.target.value)} />
-        <div data-testid="method-requires"
-          style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+        <div data-testid="method-requires" className="hn-sheet-foot">
           Butuh terpasang: {METHODS[method]?.requires.join(" · ") ?? "—"}
         </div>
         {/* SPEC-739 · ADR-0114 · sampai spec ini `requires` cuma teks: hanoman menjanjikan
@@ -420,10 +419,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
             hidup (ADR-0037, cermin catatan versi codex SPEC-339) — tapi wajib menyebut AGEN:
             skill yang hilang tak mematikan sesi, ia menghapus gerbang yang disebut prompt. */}
         {methodStat && !methodStat.ready && (
-          <div data-testid="method-status-note" style={{
-            fontSize: 12, lineHeight: 1.5, marginTop: 8, padding: "8px 10px", overflowWrap: "anywhere",
-            borderRadius: 8, background: "var(--warn-bg, #fdf6e3)", color: "var(--text-muted)",
-          }}>
+          <div data-testid="method-status-note" className="hn-sheet-status">
             <b>{methodStat.label}</b> belum siap untuk <b>{agent === "codex" ? "Codex CLI" : "Claude Code"}</b> di
             mesin ini
             {methodStat.missingPackages.length > 0 && <> · paket kurang: <code>{methodStat.missingPackages.join(" · ")}</code></>}
@@ -506,8 +502,8 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
             : isGoal ? "Buat goal → sesi goal" : "Buat brief → brainstorm"}
         </Button>
       </>}>
-      <div style={{ marginBottom: 16 }}>
-        <Tabs variant="pill" value={f.kind} onChange={(v) => setF((s) => ({ ...s, kind: v }))} tabs={[
+      <div className="hn-sheet-block">
+        <Tabs variant="pill" className="hn-sheet-kinds" value={f.kind} onChange={(v) => setF((s) => ({ ...s, kind: v }))} tabs={[
           { value: "brief", label: "Feature brief", icon: "lightbulb" },
           { value: "qa", label: "QA finding", icon: "bug" },
           { value: "audit", label: "Audit", icon: "search" },
@@ -516,7 +512,7 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
           // SPEC-825 · ADR-0123 · task remeh: satu fase, bahkan tanpa fase pembuktian terpisah.
           { value: "no_effort", label: "Tanpa effort", icon: "zap" },
         ]} />
-        <div style={{ fontSize: 12, color: "var(--text-subtle)", marginTop: 8, lineHeight: 1.5 }}>
+        <div className="hn-sheet-hint">
           {isNoEffort ? "Sesi satu fase (Kerjakan): langsung mengerjakan lalu berhenti — tanpa brainstorm, spec, plan, maupun fase pembuktian terpisah. Untuk ganti copy, bump konstanta, perbaiki typo docs, tambah satu baris allowlist."
             : isGoal ? "Sesi goal langsung mengejar goal-nya — tanpa brainstorm, spec, atau plan (fase: Goal → Verifikasi). Sesi lahir dengan mode goal aktif dan menolak berhenti sampai buktinya ada di transkrip."
             : isQa ? "Finding masuk lewat alur audit → spec → plan → execute. hanoman menelusuri akar masalah dulu."
@@ -525,12 +521,11 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
         </div>
       </div>
       <Field label="Project">
-        <Select value={f.project} onChange={set("project")} style={{ width: "100%" }}
+        <Select value={f.project} onChange={set("project")} className="hn-w-full"
           options={projects.map((p) => ({ value: p.id, label: p.name }))} />
       </Field>
-      <Field label="Branch" hint="branch yang di-copy ke git worktree saat run">
-        <Select value={f.branchFrom} onChange={set("branchFrom")} disabled={!branches.length}
-          style={{ width: "100%" }} options={branchOptions(branches, remoteOnly)} />
+      <Field label="Branch" hint="branch yang disalin ke worktree (salinan kerja terpisah untuk sesi ini) saat sesi dimulai">
+        <Select value={f.branchFrom} onChange={set("branchFrom")} disabled={!branches.length} className="hn-w-full" options={branchOptions(branches, remoteOnly)} />
       </Field>
       {/* SPEC-447 · ADR-0093 · sesi item ini tak akan lahir sebelum semua yang dicentang selesai
           DAN commit-nya ada di branch basis. Otomasi memblokirnya keras; Start manual masih bisa
@@ -538,14 +533,11 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
       <Field label="Bergantung pada"
         hint="Backlog yang harus selesai & ter-merge lebih dulu. Kosongkan bila item ini berdiri sendiri.">
         {depCandidates.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: "var(--text-subtle)" }}>
+          <div className="hn-sheet-empty">
             Belum ada backlog lain di project ini.
           </div>
         ) : (
-          <div style={{
-            maxHeight: 132, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6,
-            border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)", padding: 8,
-          }}>
+          <div className="hn-dep-list">
             {depCandidates.map((s) => (
               <Checkbox key={s.id} aria-label={`Bergantung pada ${s.id}`}
                 checked={f.dependsOn.includes(s.id)} onChange={() => toggleDep(s.id)}
@@ -558,8 +550,7 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
         <Input aria-label="Judul" value={f.title} onChange={set("title")}
           placeholder={isQa ? "mis. Funnel double-count sesi lintas tengah malam"
             : isNoEffort ? "mis. Label tombol Simpan di form backlog"
-            : isGoal ? "mis. Latensi daftar backlog" : "mis. Jadwal invoice berulang"}
-          style={{ width: "100%" }} />
+            : isGoal ? "mis. Latensi daftar backlog" : "mis. Jadwal invoice berulang"} className="hn-w-full" />
       </Field>
       {/* SPEC-407 · ADR-0089 · bentuk payload goal: goal + bukti berhenti + batasan. Sengaja
           BUKAN konteks/outcome — server mengikat source ↔ bentuk payload di boundary. */}
@@ -573,34 +564,34 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
             <HnTextarea aria-label="Selesai bila" value={f.done} onChange={set("done")} rows={2}
               placeholder="mis. output benchmark menunjukkan < 200 ms" />
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+          <div className="hn-grid-mobile hn-grid-split">
             <Field label="Batasan" hint="opsional">
               <Input aria-label="Batasan" value={f.constraints} onChange={set("constraints")}
-                placeholder="mis. tanpa cache eksternal" style={{ width: "100%" }} />
+                placeholder="mis. tanpa cache eksternal" className="hn-w-full" />
             </Field>
             <Field label="Prioritas">
-              <Select aria-label="Prioritas" value={f.priority} onChange={set("priority")} style={{ width: "100%" }} options={PRIORITY} />
+              <Select aria-label="Prioritas" value={f.priority} onChange={set("priority")} className="hn-w-full" options={PRIORITY} />
             </Field>
           </div>
         </>
       ) : isQa ? (
         <>
           <Field label="Severity">
-            <Select value={f.severity} onChange={set("severity")} style={{ width: "100%" }} options={SEVERITY} />
+            <Select value={f.severity} onChange={set("severity")} className="hn-w-full" options={SEVERITY} />
           </Field>
           <Field label="Langkah reproduksi">
             <HnTextarea value={f.steps} onChange={set("steps")} rows={3} mono placeholder={"1. Buka …\n2. Lakukan …\n3. Amati …"} />
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="hn-grid-mobile hn-grid-even">
             <Field label="Diharapkan"><HnTextarea value={f.expected} onChange={set("expected")} rows={2} placeholder="mis. total funnel sama dengan jumlah baris laporan harian" /></Field>
             <Field label="Aktual"><HnTextarea value={f.actual} onChange={set("actual")} rows={2} placeholder="mis. total funnel dua kali lipat untuk sesi yang melewati tengah malam" /></Field>
           </div>
           <Field label="Environment" hint="build / kanal tempat finding muncul">
-            <Input value={f.env} onChange={set("env")} placeholder="prod · web · v0.9.2" style={{ width: "100%" }} />
+            <Input value={f.env} onChange={set("env")} placeholder="prod · web · v0.9.2" className="hn-w-full" />
           </Field>
           <Field label="Batasan" hint="opsional — batasan pengerjaan yang sudah kamu ketahui">
             <Input aria-label="Batasan" value={f.constraints} onChange={set("constraints")}
-              placeholder="mis. jangan ubah kontrak API" style={{ width: "100%" }} />
+              placeholder="mis. jangan ubah kontrak API" className="hn-w-full" />
           </Field>
         </>
       ) : (
@@ -614,12 +605,12 @@ export function NewSpecModal({ open, onClose, projects, defaultProject, onCreate
             <HnTextarea value={f.outcome} onChange={set("outcome")} rows={2}
               placeholder={isAudit ? "Jawaban/kepastian yang dicari…" : "mis. satu badge di Overview menunjukkan jumlah sesi yang menunggu"} />
           </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+          <div className="hn-grid-mobile hn-grid-split">
             <Field label="Batasan" hint="opsional">
-              <Input value={f.constraints} onChange={set("constraints")} placeholder="mis. reuse queue yang ada" style={{ width: "100%" }} />
+              <Input value={f.constraints} onChange={set("constraints")} placeholder="mis. reuse queue yang ada" className="hn-w-full" />
             </Field>
             <Field label="Prioritas">
-              <Select value={f.priority} onChange={set("priority")} style={{ width: "100%" }} options={PRIORITY} />
+              <Select value={f.priority} onChange={set("priority")} className="hn-w-full" options={PRIORITY} />
             </Field>
           </div>
         </>
@@ -653,9 +644,9 @@ function NewProjectModal({ open, onClose, onCreate }:
     try { await onCreate(f); } finally { setBusy(false); }
   };
   const [picker, setPicker] = React.useState(false);
-  const submitLabel = scratch ? "Buat → brainstorm objective"
-    : clone ? (busy ? "Meng-clone…" : "Clone → reverse-engineer docs")
-    : "Tambah → reverse-engineer docs";
+  const submitLabel = scratch ? "Buat dan susun tujuan"
+    : clone ? (busy ? "Menyalin repo…" : "Salin repo dan susun dokumen")
+    : "Tambah dan susun dokumen";
   return (
     <Modal open={open} onClose={onClose} icon="box" eyebrow="workspace" title="Project baru"
       footer={<>
@@ -663,59 +654,59 @@ function NewProjectModal({ open, onClose, onCreate }:
         <Button size="sm" leftIcon={scratch ? "messages-square" : clone ? "git-branch" : "radar"}
           onClick={submit} disabled={!canSubmit || busy}>{submitLabel}</Button>
       </>}>
-      <div style={{ marginBottom: 16 }}>
+      <div className="hn-sheet-block">
         <Tabs variant="pill" value={f.kind} onChange={(v) => setF((s) => ({ ...s, kind: v }))} tabs={[
-          { value: "from-scratch", label: "From scratch", icon: "sparkles" },
-          { value: "existing", label: "Existing codebase", icon: "folder-git-2" },
+          { value: "from-scratch", label: "Dari nol", icon: "sparkles" },
+          { value: "existing", label: "Kode yang sudah ada", icon: "folder-git-2" },
         ]} />
-        <div style={{ fontSize: 12, color: "var(--text-subtle)", marginTop: 8, lineHeight: 1.5 }}>
-          {scratch ? "hanoman brainstorm sampai MVP objective terkunci, lalu scaffold seluruh doc index sebagai Source of Truth."
-            : "hanoman reverse-engineer docs dari codebase yang ada, lalu menyusun Source of Truth-nya."}
+        <div className="hn-sheet-hint">
+          {scratch ? "hanoman menggali ide sampai tujuan MVP disepakati (brainstorm), lalu membuat kerangka dokumen acuan (Source of Truth)."
+            : "hanoman membaca kode yang sudah ada, lalu menyusun dokumen acuan (Source of Truth) dari kode itu."}
         </div>
       </div>
       {scratch ? (
         <>
           <Field label="Nama project" hint="lowercase, tanpa spasi">
-            <Input value={f.name} onChange={set("name")} placeholder="mis. kirana" style={{ width: "100%" }} />
+            <Input value={f.name} onChange={set("name")} placeholder="mis. kirana" className="hn-w-full" />
           </Field>
-          <Field label="Direktori" hint="folder tempat repo baru di-init (mesin ini)">
-            <div style={{ display: "flex", gap: 8 }}>
-              <Input value={f.dir} onChange={set("dir")} leftIcon="folder" mono placeholder="/path/ke/project-baru" style={{ flex: 1 }} />
+          <Field label="Direktori" hint="folder tempat repo baru dibuat (mesin ini)">
+            <div className="hn-row-8">
+              <Input value={f.dir} onChange={set("dir")} leftIcon="folder" mono placeholder="/path/ke/project-baru" className="hn-grow" />
               <Button size="sm" variant="secondary" leftIcon="folder-open" onClick={() => setPicker(true)}>Pilih folder</Button>
             </div>
           </Field>
           <FolderPicker open={picker} onClose={() => setPicker(false)}
             start={f.dir} onPick={(p) => setF((s) => ({ ...s, dir: p }))} />
-          <Field label="Ide awal" hint="bahan brainstorm objective → jadi deskripsi & seed scaffold">
+          <Field label="Ide awal" hint="bahan awal brainstorm tujuan; menjadi deskripsi dan kerangka dokumen">
             <HnTextarea value={f.objective} onChange={set("objective")} rows={2} placeholder="mis. POS ritel dengan stok multi-gudang dan laporan harian" />
           </Field>
         </>
       ) : (
         <>
           {/* SPEC-218 · dua cara menambah existing: folder lokal, atau clone dari URL git. */}
-          <div style={{ marginBottom: 12 }}>
+          <div className="hn-mb-12">
             <Tabs variant="pill" value={f.mode} onChange={(v) => setF((s) => ({ ...s, mode: v as "local" | "clone" }))} tabs={[
               { value: "local", label: "Dari folder lokal", icon: "folder" },
-              { value: "clone", label: "Clone dari URL git", icon: "git-branch" },
+              { value: "clone", label: "Salin dari URL git", icon: "git-branch" },
             ]} />
           </div>
           {clone ? (
             <Field label="URL repository" hint="GitHub/GitLab · https atau ssh">
               <Input value={f.gitRemote} onChange={set("gitRemote")} leftIcon="git-branch" mono
-                placeholder="https://github.com/org/repo.git" style={{ width: "100%" }} />
+                placeholder="https://github.com/org/repo.git" className="hn-w-full" />
             </Field>
           ) : null}
-          <Field label={clone ? "Folder tujuan clone" : "Direktori"}
-            hint={clone ? "path lokal tempat repo di-clone (mesin ini)" : "opsional · path checkout lokal (bisa diedit belakangan per-mesin)"}>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Input value={f.dir} onChange={set("dir")} leftIcon="folder" mono placeholder="/path/ke/repo" style={{ flex: 1 }} />
+          <Field label={clone ? "Folder tujuan salinan" : "Direktori"}
+            hint={clone ? "folder lokal tempat repo disalin (git clone) di mesin ini" : "opsional · folder checkout lokal (bisa diedit belakangan per-mesin)"}>
+            <div className="hn-row-8">
+              <Input value={f.dir} onChange={set("dir")} leftIcon="folder" mono placeholder="/path/ke/repo" className="hn-grow" />
               <Button size="sm" variant="secondary" leftIcon="folder-open" onClick={() => setPicker(true)}>Pilih folder</Button>
             </div>
           </Field>
           <FolderPicker open={picker} onClose={() => setPicker(false)}
             start={f.dir} onPick={(p) => setF((s) => ({ ...s, dir: p }))} />
           <Field label="Deskripsi" hint="opsional">
-            <Input value={f.desc} onChange={set("desc")} placeholder="mis. POS ritel + inventori" style={{ width: "100%" }} />
+            <Input value={f.desc} onChange={set("desc")} placeholder="mis. POS ritel + inventori" className="hn-w-full" />
           </Field>
         </>
       )}
@@ -767,21 +758,21 @@ export function EditProjectModal({ open, project, onClose, onSave }:
       {/* SPEC-255 · ADR-0064 · `id` kini renameable lewat operasi khusus (cascade + rambat sync). */}
       <Field label="ID project" hint="slug unik · huruf-kecil/angka/hubung · ganti = pengaruh Help Center & sync ke server">
         <Input value={f.id} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, id: e.target.value }))}
-          leftIcon="hash" mono placeholder="mis. erp-tumbuh-ai" style={{ width: "100%" }} />
+          leftIcon="hash" mono placeholder="mis. erp-tumbuh-ai" className="hn-w-full" />
       </Field>
       <Field label="Nama project" hint="label tampilan — boleh berbeda dari id">
         <Input value={f.name} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, name: e.target.value }))}
-          placeholder="mis. ERP Tumbuh AI" style={{ width: "100%" }} />
+          placeholder="mis. ERP Tumbuh AI" className="hn-w-full" />
       </Field>
       <Field label="Deskripsi">
         <Input value={f.desc} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, desc: e.target.value }))}
-          placeholder="mis. ERP manufaktur + inventori" style={{ width: "100%" }} />
+          placeholder="mis. ERP manufaktur + inventori" className="hn-w-full" />
       </Field>
       {/* SPEC-858 · picker folder yang sama dengan modal Project baru; ketik manual tetap jalan. */}
       <Field label="Path (mesin ini)" hint="opsional · disimpan lokal, tak disync · kosongkan = pakai default">
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="hn-row-8">
           <Input value={f.dir} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, dir: e.target.value }))}
-            leftIcon="folder" mono placeholder="/path/ke/repo (mesin ini)" style={{ flex: 1, minWidth: 0 }} />
+            leftIcon="folder" mono placeholder="/path/ke/repo (mesin ini)" className="hn-grow-min" />
           <Button size="sm" variant="secondary" leftIcon="folder-open" onClick={() => setPicker(true)}>Pilih folder</Button>
         </div>
       </Field>
@@ -790,7 +781,7 @@ export function EditProjectModal({ open, project, onClose, onSave }:
       {/* SPEC-218 · remote resmi (disync) — device lain bisa clone project ini. */}
       <Field label="Git remote" hint="opsional · remote resmi agar device lain bisa clone project ini · disync antar-device">
         <Input value={f.gitRemote} onChange={(e: React.ChangeEvent<any>) => setF((s) => ({ ...s, gitRemote: e.target.value }))}
-          leftIcon="git-branch" mono placeholder="https://github.com/org/repo.git" style={{ width: "100%" }} />
+          leftIcon="git-branch" mono placeholder="https://github.com/org/repo.git" className="hn-w-full" />
       </Field>
       {/* SPEC-880 · ADR-0135 · "ditangani oleh" — pernyataan DISYNC, beda dari "Path (mesin ini)"
           di atas. Nilai tersimpan yang device-nya tak ada di katalog mesin ini (dicabut, atau
@@ -828,7 +819,6 @@ export default function App() {
 }
 
 function AppInner() {
-  useModelCatalog();
   // ADR-0160 · halaman = URL. `section` diturunkan dari pathname (`routes.ts`), bukan disimpan
   // sebagai state; tombol Kembali/Maju browser dan link yang dibagikan bekerja dengan sendirinya.
   const location = useLocation();
@@ -872,6 +862,9 @@ function AppInner() {
   // the successful hand-off here so the session appears in the grid before the next WS snapshot.
   const [terminalStartedSession, setTerminalStartedSession] = React.useState<TerminalSession | null>(null);
   const [startOrigin, setStartOrigin] = React.useState<"backlog" | "terminal" | null>(null);
+  // Target fokus hanya berlaku selama Terminal terbuka; tanpa ini pemasangan Terminal berikutnya
+  // mengulang notifikasi "Sesi itu sudah berakhir" untuk id yang sama.
+  React.useEffect(() => { if (section !== "terminal") setFocusSession(null); }, [section]);
   const openTerminal = React.useCallback((sessionId?: string | null) => {
     setFocusSession(sessionId ?? null);
     setSection("terminal");
@@ -895,14 +888,26 @@ function AppInner() {
   const [auth, setAuth] = React.useState<AuthStatus | null>(null);
   const onLoggedOut = React.useCallback(() => setAuth({ needsSetup: false, user: null }), []);
   React.useEffect(() => { api.authStatus().then(setAuth).catch(() => setAuth({ needsSetup: false, user: null })); }, []);
+  // SPEC-617 · ADR-0110 · gerbang peran untuk SEMUA efek operator di bawah. Klien tak punya kuasa atas
+  // endpoint operator (403 di konsol: ws-tickets, models, projects, specs, terminal/sessions,
+  // setup/status), jadi efek-efek itu hanya berjalan setelah login operator diketahui. Sebelum login
+  // diketahui (splash) tak ada yang dimuat — sama dengan perilaku lama untuk pengguna tanpa sesi.
+  const operatorSession = auth?.user != null && auth.user.role !== "client";
+  // Katalog model dimuat hanya untuk operator: ia memanggil `/api/models` dan membuka socket `events`.
+  useModelCatalog(operatorSession);
+  // Pet Hanoman: tampil di desktop secara default; tablet dan ponsel mati sampai dinyalakan dari palet
+  // atau Pengaturan. Keputusannya di sini, bukan di dalam pet, supaya palet dan pet membaca satu nilai.
+  const [petEnabled, setPetEnabled] = usePetEnabled();
+  const petTier = useResponsiveTier();
+  const petOn = operatorSession && petVisibleOn(petEnabled, petTier);
   // SPEC-884 · ADR-0139 · wizard setup awal berdiri DI DEPAN AuthScreen: pilihannya menentukan
   // apakah akun pertama nanti diminta setup token. Status yang sama juga menyalakan penanda
-  // permanen sesudah login, jadi ia dimuat pada kedua keadaan.
+  // permanen sesudah login, jadi ia dimuat pada kedua keadaan operator.
   const [setupStatus, setSetupStatus] = React.useState<SetupStatus | null>(null);
   const [setupDone, setSetupDone] = React.useState(false);
   React.useEffect(() => {
-    if (auth?.needsSetup || auth?.user) api.setupStatus().then(setSetupStatus).catch(() => setSetupStatus(null));
-  }, [auth?.needsSetup, auth?.user?.id]);
+    if (auth?.needsSetup || operatorSession) api.setupStatus().then(setSetupStatus).catch(() => setSetupStatus(null));
+  }, [auth?.needsSetup, operatorSession, auth?.user?.id]);
   // SPEC-740 · ADR-0115 · state dari versi kunci lama tak pernah dibaca lagi (versi hidup
   // di dalam kunci) — disapu sekali di sini supaya storage tak tumbuh selamanya.
   React.useEffect(() => { pruneUiState(); }, []);
@@ -941,6 +946,13 @@ function AppInner() {
      (jebakan yang sama yang membuat muat awal presence duduk di ClientsScreen). */
   const [pending, setPending] = React.useState<PendingCounts | null>(null);
 
+  /* Audit UI/UX 2026-10 · frame `sessions`, `leadAsks`, `pending` hanya menyentuh state bila isinya
+     berbeda dari yang SEDANG tampil. Ref ini diperbarui tiap render, jadi perubahan lokal (mis. sesi
+     yang baru dimulai) ikut terhitung dan tak tertimpa frame identik. Tanpa ini tiap snapshot WS
+     me-render ulang App — dan HanomanPet serta modal di dalamnya — walau tak ada yang berubah. */
+  const shown = React.useRef({ sessions, leadAsks, pending });
+  shown.current = { sessions, leadAsks, pending };
+
   const load = React.useCallback(() => {
     setStatus("loading");
     Promise.all([api.listProjects(), api.listSpecs(), api.listTerminals()])
@@ -957,8 +969,8 @@ function AppInner() {
         showToast("Gagal memuat data dari server", "err", "x-circle");
       });
   }, [showToast, onLoggedOut]);
-  // Muat data hanya setelah login; run baru pada perubahan status login.
-  React.useEffect(() => { if (auth?.user) load(); }, [load, auth?.user]);
+  // Muat data hanya setelah login operator; klien tak memuat daftar operator sama sekali.
+  React.useEffect(() => { if (operatorSession) load(); }, [load, operatorSession, auth?.user?.id]);
 
   // ProjectVM dulu membawa daftar tipe trigger per project; trigger sudah tak ada (SPEC-162).
   const projectsView: ProjectVM[] = projects;
@@ -977,6 +989,9 @@ function AppInner() {
   const activeSpecs = React.useMemo(
     () => new Set(sessions.filter((s) => s.specId && !s.exited).map((s) => s.specId as string)),
     [sessions]);
+  // Filter "Perlu ditinjau" di Backlog (gelombang 7, diperluas ADR-0218): item yang sesinya menunggu
+  // jawaban manusia, atau item selesai yang belum ditandai sudah ditinjau.
+  const reviewSpecIds = React.useMemo(() => reviewSpecIdsOf(sessions, backlog), [sessions, backlog]);
 
   const presenceMap = React.useMemo(() => presenceIndex(presence), [presence]);
   const specTitles = React.useMemo(
@@ -987,23 +1002,28 @@ function AppInner() {
   // Stage tetap forward-only & write-through di server (liveSpecs) — board hanya menampilkan.
   // SPEC-198 · bump dataVersion tiap snapshot specs tiba supaya layar self-fetch (Backlog,
   // Projects) yang berpaginasi-server ikut me-refetch dan tetap segar selama sesi hidup.
-  React.useEffect(() => subscribe((m) => {
-    if (m.t === "specs") {
-      const digest = specsDigestOf(m.specs);
-      if (digest !== lastSpecsDigest.current) {
-        lastSpecsDigest.current = digest;
-        setBacklog(m.specs);
-        setDataVersion((v) => v + 1);
+  // SPEC-617 · socket ini dibuka hanya untuk operator: membukanya bagi klien meminta ws-ticket yang
+  // ditolak server (403) dan tak pernah dipakai portal klien.
+  React.useEffect(() => {
+    if (!operatorSession) return undefined;
+    return subscribe((m) => {
+      if (m.t === "specs") {
+        const digest = specsDigestOf(m.specs);
+        if (digest !== lastSpecsDigest.current) {
+          lastSpecsDigest.current = digest;
+          setBacklog(m.specs);
+          setDataVersion((v) => v + 1);
+        }
       }
-    }
-    else if (m.t === "sessions") setSessions(m.sessions as TerminalSession[]);
-    else if (m.t === "leadAsks") setLeadAsks(m.asks);
-    else if (m.t === "presence") {
-      const next = { enabled: m.enabled, devices: m.devices, hubVersion: m.hubVersion };
-      setPresence((cur) => (presenceKeyOf(cur) === presenceKeyOf(next) ? cur : next));
-    }
-    else if (m.t === "pending") setPending(m.counts);
-  }), []);
+      else if (m.t === "sessions") applyIfChanged(shown.current.sessions, m.sessions as TerminalSession[], setSessions);
+      else if (m.t === "leadAsks") applyIfChanged(shown.current.leadAsks, m.asks, setLeadAsks);
+      else if (m.t === "presence") {
+        const next = { enabled: m.enabled, devices: m.devices, hubVersion: m.hubVersion };
+        setPresence((cur) => (presenceKeyOf(cur) === presenceKeyOf(next) ? cur : next));
+      }
+      else if (m.t === "pending") applyIfChanged(shown.current.pending, m.counts, setPending);
+    });
+  }, [operatorSession]);
 
   const proj = projectsView.find((p) => p.id === projectId) || projectsView[0];
   // SPEC-198 · search project via API di ProjectsScreen (bukan filter klien di App).
@@ -1029,6 +1049,42 @@ function AppInner() {
         : { id: route.id!, kind: route.kind!, title: backlog.find((s) => s.id === route.id)?.title ?? route.id! })
     : null;
 
+  /* Audit UI/UX 2026-10 · Fase 2C · palet perintah (⌘K), shortcut `g`+huruf, dan project switcher.
+     Semua hook di sini sebelum gerbang auth di bawah — urutan hook tak boleh berubah antar render. */
+  // Layar yang tampil di sidebar (gerbang sudah diterapkan): hanya ini yang boleh dituju shortcut dan
+  // dicantumkan di bantuan. Layar bergerbang yang tak aktif tak pernah dicapai lewat pintasan.
+  const visibleNav = React.useMemo(() => HN_NAV.filter((n) => !n.gate || presence.enabled), [presence.enabled]);
+  const chordNavKeys = React.useMemo(() => visibleNav.map((n) => n.key), [visibleNav]);
+  // Shortcut hidup hanya untuk operator yang sudah login; klien portal dan layar login tak punya palet.
+  useGlobalShortcuts({ enabled: !!auth?.user && auth.user.role !== "client", navKeys: chordNavKeys, go: setSection });
+  const scopeProjects = React.useMemo(() => projectsView.map((p) => ({ id: p.id, name: p.name })), [projects]);
+  const scopeValue = React.useMemo(() => ({ value: projectFilter, projects: scopeProjects, onChange: setProjectFilter }),
+    [projectFilter, scopeProjects, setProjectFilter]);
+  const paletteCommands = React.useMemo(() => buildPaletteCommands({
+    nav: HN_NAV, gates: { clients: presence.enabled }, projects: scopeProjects,
+    specs: backlog,
+    waiting: waitingSessions(sessions, backlog).map((s) => {
+      const title = s.specId ? specTitles[s.specId] : undefined;
+      return { id: s.id, label: `${s.specId ?? s.id}${title ? ` · ${title}` : ""}` };
+    }),
+    scope: projectFilter, go: setSection,
+    openSpec: (specId) => navigate(routePath({ section: "backlog", specId })),
+    openSession: (sessionId) => openTerminal(sessionId),
+    newSpec: () => setModal("brief"), newProject: () => setModal("project"),
+    setScope: setProjectFilter,
+    petOn, setPetOn: setPetEnabled,
+  }), [backlog, sessions, scopeProjects, presence.enabled, projectFilter, specTitles, setSection, navigate, openTerminal,
+    petOn, setPetEnabled]);
+  // Dalang keluar kembali ke layar sebelumnya, bukan selalu Overview. Ref menyimpan layar nav terakhir
+  // yang BUKAN dalang; tanpa riwayat (dibuka langsung dari URL) ia jatuh ke Overview seperti dulu.
+  const lastPageRef = React.useRef<string | null>(null);
+  React.useEffect(() => { if (section !== "dalang") lastPageRef.current = section; }, [section]);
+
+  // Keputusan sesi yang sedang ditonton (Terminal, sesi itu terfokus) tak perlu toast: keputusannya
+  // sudah di layar dan tetap terlihat di rail sesi. `focusSession` = sesi yang dibuka dari notifikasi,
+  // palet, atau pet; pilihan manual di rail Terminal tak dilaporkan ke sini (layar itu memegang fokusnya).
+  const isViewingSession = React.useCallback((nt: Notification) =>
+    section === "terminal" && !!nt.sessionId && focusSession === nt.sessionId, [section, focusSession]);
   // SPEC-184 · klik aksi notifikasi. `sessions` = daftar ter-poll (cek liveness untuk notif done).
   const openNotification = React.useCallback((nt: Notification) => {
     const t = notifTarget(nt, sessions);
@@ -1124,7 +1180,7 @@ function AppInner() {
         try {
           const { id } = await api.scaffoldDocs(created.id);
           setProjectId(created.id); openTerminal(id);
-          showToast(`Project ${created.id} dibuat · scaffold docs · sesi ${id} dimulai`, "ok", "sparkles");
+          showToast(`Project ${created.id} dibuat · buat kerangka dokumen · sesi ${id} dimulai`, "ok", "sparkles");
           return;
         } catch { /* jatuh ke layar project di bawah */ }
       }
@@ -1139,13 +1195,13 @@ function AppInner() {
     try {
       const { id } = await api.reverseDocs(created.id);
       openTerminal(id);
-      showToast(`Project ${created.id} dibuat · reverse docs · sesi ${id} dimulai`, "ok", "radar");
+      showToast(`Project ${created.id} dibuat · susun dokumen · sesi ${id} dimulai`, "ok", "radar");
     } catch (e) {
       // Project dipertahankan (cermin kegagalan clone di atas): mendarat di detail project, tempat
       // pintu "Reverse docs" jadi retry-nya — bukan Docs kosong yang tak menawarkan langkah apa pun.
       const detail = (e as { detail?: { error?: string } }).detail?.error;
       goProject(created.id);
-      showToast(`Project ${created.id} dibuat, tapi reverse docs gagal dimulai`
+      showToast(`Project ${created.id} dibuat, tapi susun dokumen gagal dimulai`
         + (detail ? ` · ${detail}` : "") + ` · ulangi lewat "Reverse docs"`, "warn", "radar");
     }
   }
@@ -1222,9 +1278,9 @@ function AppInner() {
     try {
       const { id } = await (force ? api.reverseDocs(p.id, { force }) : api.reverseDocs(p.id));
       openTerminal(id);
-      showToast(p.id + " · reverse docs · sesi " + id + " dimulai", "info", "radar");
+      showToast(p.id + " · susun dokumen · sesi " + id + " dimulai", "info", "radar");
     } catch (e) {
-      if (launchAdmission.offerRetry(e, `${p.id} · reverse docs`, (next) => reverseDocs(p, next))) return;
+      if (launchAdmission.offerRetry(e, `${p.id} · susun dokumen`, (next) => reverseDocs(p, next))) return;
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
       showToast(p.id + " · gagal mulai reverse" + (noRepo ? " · project belum punya repoDir" : ""), "warn", "x-circle");
     }
@@ -1235,9 +1291,9 @@ function AppInner() {
     try {
       const { id } = await (force ? api.scaffoldDocs(p.id, { force }) : api.scaffoldDocs(p.id));
       openTerminal(id);
-      showToast(p.id + " · scaffold docs · sesi " + id + " dimulai", "info", "sparkles");
+      showToast(p.id + " · buat kerangka dokumen · sesi " + id + " dimulai", "info", "sparkles");
     } catch (e) {
-      if (launchAdmission.offerRetry(e, `${p.id} · scaffold docs`, (next) => scaffoldDocs(p, next))) return;
+      if (launchAdmission.offerRetry(e, `${p.id} · buat kerangka dokumen`, (next) => scaffoldDocs(p, next))) return;
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
       showToast(p.id + " · gagal mulai scaffold" + (noRepo ? " · project belum punya repoDir" : ""), "warn", "x-circle");
     }
@@ -1266,7 +1322,7 @@ function AppInner() {
       openTerminal(id);
       showToast(`Breakdown · sesi ${id} dimulai`, "info", "split");
     } catch (e) {
-      if (launchAdmission.offerRetry(e, `${project} · breakdown`, (next) => startBreakdown(project, prdPath, next))) return;
+      if (launchAdmission.offerRetry(e, `${project} · pecah jadi backlog`, (next) => startBreakdown(project, prdPath, next))) return;
       const noRepo = e instanceof ApiError && (e.status === 422 || e.status === 400);
       showToast("gagal mulai breakdown" + (noRepo ? " · project belum punya repoDir/PRD" : ""), "warn", "x-circle");
     }
@@ -1277,10 +1333,10 @@ function AppInner() {
       const { created } = await api.createSpecsBatch({ project, items, prdPath });
       setBacklog((b) => [...created, ...b]);
       setSection("backlog");
-      showToast(`${created.length} backlog dibuat dari breakdown`, "ok", "list-checks");
+      showToast(`${created.length} backlog dibuat dari PRD`, "ok", "list-checks");
       return created.length;
     } catch {
-      showToast("Gagal membuat backlog dari breakdown", "err", "x-circle");
+      showToast("Gagal membuat backlog dari PRD", "err", "x-circle");
       return 0;
     }
   }
@@ -1402,9 +1458,23 @@ function AppInner() {
       const res = await api.patchSpec(spec.id, { stage: target, confirmDelete });
       if ("pending" in res) return res;
       setBacklog((b) => b.map((s) => (s.id === res.id ? res : s)));
-      showToast(spec.id + " dikembalikan ke " + target, "warn", "rotate-ccw");
+      showToast(spec.id + " dikembalikan ke " + (STAGE_LABEL[target as keyof typeof STAGE_LABEL] ?? target), "warn", "rotate-ccw");
       return res;
     } catch { showToast("Gagal mengembalikan stage " + spec.id, "err", "x-circle"); return undefined; }
+  }
+
+  // Audit UI/UX 3L′ · aksi keputusan di layar Review memakai jalur yang sudah ada (integrateSpec) dan
+  // endpoint item (ADR-0213, `DELETE /specs/:id/worktree`). Galat dilempar agar ditampilkan di bar keputusan.
+  async function integrateReviewSpec(spec: SpecSlim) {
+    const { defaultBranch } = await api.listBranches(spec.projectId);
+    const base = spec.branchFrom ?? defaultBranch;
+    if (!base) { showToast(spec.id + " · cabang tujuan belum diketahui", "err", "x-circle"); return; }
+    await integrateSpec(spec, "merge", "local:" + base);
+  }
+  async function discardReviewWorktree(spec: SpecSlim) {
+    const r = await api.deleteSpecWorktree(spec.id);
+    if (!r.ok) throw new Error(r.error ?? "worktree tidak ditemukan");
+    showToast(spec.id + " · worktree dihapus", "ok", "trash-2");
   }
 
   // SPEC-804 · ADR-0120 · tandai item selesai manual. 409 `confirm-required` bukan kegagalan:
@@ -1426,6 +1496,18 @@ function AppInner() {
     }
   }
 
+  // ADR-0218 · tandai/batalkan "sudah ditinjau" pada item selesai. Dipanggil dari bar Review dan dari menu
+  // item Backlog. Galat DILEMPAR: pemanggil yang menampilkannya. State item diganti hanya dari balasan server.
+  async function markSpecReviewed(spec: SpecSlim, reviewed: boolean) {
+    const updated = await api.markSpecReviewed(spec.id, reviewed);
+    setBacklog((b) => b.map((s) => (s.id === updated.id ? { ...s, reviewedAt: updated.reviewedAt } : s)));
+    showToast(spec.id + (reviewed ? " ditandai sudah ditinjau" : " tanda ditinjau dibatalkan"), "ok",
+      reviewed ? "circle-check" : "rotate-ccw");
+  }
+
+  // Audit UI/UX 2026-10 · P0 aksi destruktif. Satu-satunya jalur hapus spec di App ini ialah
+  // `onDelete` BacklogScreen, dan konfirmasi (useConfirm, ADR-0127) dipasang DI SANA — fungsi ini
+  // hanya boleh dipanggil setelah pengguna menyetujui. Jangan mengirimkannya ke layar lain tanpa dialog.
   async function deleteSpec(spec: SpecSlim) {
     await api.deleteSpec(spec.id);
     setBacklog((b) => b.filter((s) => s.id !== spec.id));
@@ -1492,6 +1574,9 @@ function AppInner() {
           title="Gagal memuat data dari server"
           hint="Pastikan server hanoman berjalan, lalu coba lagi." action={load} />
       : suspend(body);
+  // ADR-0205 · bar tab hub di atas layar anak hub. Diturunkan dari `section` (URL), jadi klik tab
+  // hanya menavigasi. Layar yang hubnya tak punya tab (Overview, Triase, Skills) tak merender apa pun.
+  const hubTabs = <SectionTabs section={section} onNavigate={setSection} />;
 
   // SPEC-169 · gerbang auth: splash → Setup/Login → app.
   if (!auth) return <StateBlock kind="loading" title="Memuat hanoman…" />;
@@ -1499,6 +1584,8 @@ function AppInner() {
     return <SetupWizard status={setupStatus} onDone={() => setSetupDone(true)} />;
   if (!auth.user) return <AuthScreen needsSetup={auth.needsSetup}
     setupTokenRequired={auth.setupTokenRequired ?? false}
+    setupTokenPath={auth.setupTokenPath}
+    setupStep={auth.needsSetup && setupDone ? 2 : undefined}
     onDone={(u) => setAuth({ needsSetup: false, user: u })} />;
   // SPEC-617 · ADR-0110 · akun klien mendarat di permukaannya sendiri, bukan dashboard operator.
   // Percabangan di SINI (bukan di dalam Shell) supaya tak satu pun state/efek dashboard operator
@@ -1512,21 +1599,26 @@ function AppInner() {
     screen = (
       <Shell active="overview" title="Overview" breadcrumb="nafanesia.id · ringkasan workspace" onNavigate={setSection}>
         {gate(<OverviewScreen projects={projectsView} backlog={backlog} sessions={sessions}
-          onOpenProject={openProject} onGoto={setSection}
+          onOpenProject={openProject} onGoto={setSection} onCreateProject={() => setModal("project")}
           onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }} />)}
       </Shell>
     );
   } else if (section === "dalang") {
     // Takeover layar penuh — sengaja TANPA Shell: panggung memenuhi viewport, keluar via ✕/Esc.
+    // Audit UI/UX 2026-10 · Fase 1 · `previous` mengembalikan ke layar yang tadi dibuka (bukan Overview).
+    const backKey = lastPageRef.current;
+    const backLabel = HN_NAV.find((n) => n.key === backKey)?.label;
     screen = gate(<DalangHanomanScreen projects={projectsView} backlog={backlog} sessions={sessions}
       onOpenProject={openProject} onGoto={setSection}
       onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }}
+      previous={backKey && backLabel ? { label: backLabel, onBack: () => setSection(backKey) } : undefined}
       onExit={() => setSection("overview")} />);
   } else if (section === "projects") {
     screen = (
       <Shell active="projects" title="Projects" breadcrumb="nafanesia.id · workspace"
         showSearch searchValue={search} onSearchChange={setSearch} onNavigate={setSection}
         actions={<Button size="sm" leftIcon="plus" onClick={() => setModal("project")}>Project baru</Button>}>
+        {hubTabs}
         {gate(
           projectsView.length === 0
             ? <StateBlock kind="empty" icon="box" title="Belum ada project"
@@ -1541,6 +1633,7 @@ function AppInner() {
     screen = (
       <Shell active="projects" title={proj ? proj.name : "Project"}
         breadcrumb={proj ? "projects · " + proj.id : "projects"} onNavigate={setSection}>
+        {hubTabs}
         {/* SPEC-848 · gerbang pintu Reverse/Scaffold memakai path EFEKTIF, cermin `resolveRepoDir`
             di server: project hasil clone disimpan sebagai LocalBinding (SPEC-213/217/218) dan
             `repoDir`-nya tetap null — digerbangi `repoDir` saja, pintunya tak pernah muncul justru
@@ -1564,13 +1657,14 @@ function AppInner() {
     screen = (
       <Shell active="backlog" title="Backlog" breadcrumb="specs · brainstorm → execute" onNavigate={setSection}
         actions={<Button size="sm" leftIcon="plus" onClick={() => setModal("brief")}>Tambah</Button>}>
+        {hubTabs}
         {gate(<BacklogScreen backlog={backlog} projects={projectsView} pageSize={20}
-          onStart={startSession} activeSpecs={activeSpecs} presenceBySpec={presenceMap.bySpec}
+          onStart={startSession} activeSpecs={activeSpecs} presenceBySpec={presenceMap.bySpec} reviewSpecIds={reviewSpecIds}
           onNew={() => setModal("brief")}
           onDelete={deleteSpec}
           onOpenRun={(spec) => openTerminal(sessions.find((s) => s.specId === spec.id && !s.exited)?.id)}
           onOpenReview={openReview}
-          onEditBranch={editBranch} onRevertStage={revertStage} onMarkDone={markSpecDone} onIntegrate={integrateSpec} onEditSpec={editSpec} onEditDeps={editDeps} onEditAutoMerge={editAutoMerge}
+          onEditBranch={editBranch} onRevertStage={revertStage} onMarkDone={markSpecDone} onMarkReviewed={(s, reviewed) => markSpecReviewed(s, reviewed).catch(() => showToast(s.id + " gagal diperbarui", "warn", "x-circle"))} onIntegrate={integrateSpec} onEditSpec={editSpec} onEditDeps={editDeps} onEditAutoMerge={editAutoMerge}
           onChangeSource={changeSourceOfSpec}
           onPromoteToQa={promoteToQa} onPromoteToBrief={promoteToBrief} onPromoteToPrd={promoteToPrd}
           onToast={showToast} initialDetailId={openSpecId}
@@ -1583,8 +1677,10 @@ function AppInner() {
     // sampai muatan backlog/sessions App selesai, dan layar ini tak memakai satu pun dari keduanya.
     screen = (
       <Shell active="team" title="Tim" breadcrumb="tugas manusia · backlog → selesai" onNavigate={setSection}>
+        {hubTabs}
         <TeamScreen projects={projectsView} projectFilter={projectFilter}
-          onProjectFilter={setProjectFilter} onToast={showToast} />
+          onProjectFilter={setProjectFilter} onToast={showToast}
+          onOpenSpec={(specId) => navigate(routePath({ section: "backlog", specId }))} />
       </Shell>
     );
   } else if (section === "triage") {
@@ -1604,6 +1700,7 @@ function AppInner() {
     // SPEC-210 · PRD: PM/PO menulis brief + brainstorm → dokumen PRD (docs/prd/), preview, take ke backlog.
     screen = (
       <Shell active="prd" title="PRD" breadcrumb="brief → brainstorm → dokumen" onNavigate={setSection}>
+        {hubTabs}
         {gate(projectsView.length === 0
           ? <StateBlock kind="empty" icon="box" title="Belum ada project"
               hint="PRD butuh project dengan repoDir untuk menulis docs/prd/."
@@ -1617,6 +1714,7 @@ function AppInner() {
   } else if (section === "terminal") {
     screen = (
       <Shell active="terminal" title="Terminal" breadcrumb="Claude Code · sesi interaktif" onNavigate={setSection} wide>
+        {hubTabs}
         {gate(projectsView.length === 0
           ? <StateBlock kind="empty" icon="box" title="Belum ada project"
               hint="Terminal butuh project dengan repoDir untuk dijalankan."
@@ -1635,6 +1733,7 @@ function AppInner() {
     // SPEC-182 · IDE Visual: explorer + branch switch + git graph, difilter per project.
     screen = (
       <Shell active="ide" title="IDE" breadcrumb={proj ? proj.name : "workspace"} onNavigate={setSection} wide>
+        {hubTabs}
         {gate(projectsView.length === 0
           ? <StateBlock kind="empty" icon="box" title="Belum ada project"
               hint="IDE butuh project dengan repoDir." action={() => setModal("project")} actionLabel="Project baru" />
@@ -1647,6 +1746,7 @@ function AppInner() {
     // VpsScreen memuat datanya sendiri — tak lewat `gate`, yang menunggu project/backlog.
     screen = (
       <Shell active="vps" title="VPS" breadcrumb="infra · audit → harden" onNavigate={setSection}>
+        {hubTabs}
         <VpsScreen onToast={showToast} onGotoTerminal={openTerminal} />
       </Shell>
     );
@@ -1656,7 +1756,8 @@ function AppInner() {
     screen = (
       <Shell active="clients" title="Klien" breadcrumb="device · sesi yang sedang berjalan"
         onNavigate={setSection}>
-        <ClientsScreen view={presence} specTitles={specTitles} onOpenSpec={openReviewSpecId} />
+        {hubTabs}
+        <ClientsScreen view={presence} specTitles={specTitles} onOpenSpec={openReviewSpecId} onToast={showToast} />
       </Shell>
     );
   } else if (section === "scheduler") {
@@ -1664,6 +1765,7 @@ function AppInner() {
     // Screen mandiri (pola VPS) — memuat state fondasi sendiri (HTTP polling), tak lewat `gate`.
     screen = (
       <Shell active="scheduler" title="Scheduler" breadcrumb="otonom · jadwal → antrean → sesi" onNavigate={setSection}>
+        {hubTabs}
         <SchedulerScreen projects={projectsView} backlog={backlog}
           onProjectChanged={refreshProject} onToast={showToast}
           onGotoTerminal={openTerminal} />
@@ -1674,6 +1776,7 @@ function AppInner() {
     // Screen mandiri (pola Scheduler/VPS) — memuat statusnya sendiri lewat HTTP polling, tak lewat `gate`.
     screen = (
       <Shell active="lead" title="Lead" breadcrumb="otonom · keputusan → jejak → kendali" onNavigate={setSection}>
+        {hubTabs}
         <LeadScreen projects={projectsView} onProjectChanged={refreshProject} onToast={showToast}
           onGotoTerminal={openTerminal} />
       </Shell>
@@ -1687,6 +1790,7 @@ function AppInner() {
             options={projectsView.map((p) => ({ value: p.id, label: p.name }))} />
           <Button size="sm" variant="ghost" leftIcon="trash-2" onClick={() => deleteProject(proj)}>Hapus project</Button>
         </>}>
+        {hubTabs}
         {gate(proj
           ? <DocsWorkspace projectId={proj.id} projectName={proj.name} docStatus={proj.docStatus} />
           : <StateBlock kind="empty" icon="book-open" title="Belum ada project"
@@ -1697,12 +1801,27 @@ function AppInner() {
   } else if (section === "review") {
     // SPEC-171/230 · layar review file worktree — backlog item (spec) ATAU sesi PRD (session).
     const back = reviewTarget?.kind === "session" ? "terminal" : "backlog";
+    const reviewSpec = reviewTarget?.kind === "spec" ? backlog.find((s) => s.id === reviewTarget.id) : undefined;
     screen = (
       <Shell active="backlog" title="Review" wide onNavigate={setSection}
         breadcrumb={reviewTarget ? (reviewTarget.kind === "session" ? "terminal · " : "backlog · ") + reviewTarget.id : "review"}
         actions={<Button size="sm" variant="ghost" leftIcon="arrow-left" onClick={() => setSection(back)}>Kembali</Button>}>
+        {hubTabs}
         {gate(reviewTarget
-          ? <ReviewScreen specId={reviewTarget.id} kind={reviewTarget.kind} title={reviewTarget.title} onBack={() => setSection(back)} />
+          ? <ReviewScreen specId={reviewTarget.id} kind={reviewTarget.kind} title={reviewTarget.title} onBack={() => setSection(back)}
+              onGoto={(to) => navigate(routePath(to))}
+              {...(reviewSpec?.stage === "done" ? {
+                onIntegrate: () => integrateReviewSpec(reviewSpec),
+                integrateTarget: reviewSpec.branchFrom ?? undefined,
+                onRevert: async (_id: string, confirmDelete?: boolean) => {
+                  const res = await revertStage(reviewSpec, "executing", confirmDelete);
+                  return res && "pending" in res ? res : undefined;
+                },
+                // ADR-0218 · penanda "sudah ditinjau" di bar keputusan. Galat dilempar ke bar.
+                reviewed: Boolean(reviewSpec.reviewedAt),
+                onMarkReviewed: (_id: string, reviewed: boolean) => markSpecReviewed(reviewSpec, reviewed),
+              } : {})}
+              {...(reviewSpec && reviewSpec.stage !== "done" ? { onDiscard: () => discardReviewWorktree(reviewSpec) } : {})} />
           : <StateBlock kind="empty" icon="git-compare" title="Pilih item untuk di-review"
               hint="Buka Review dari Backlog atau dari sel sesi di Terminal." action={() => setSection("backlog")} actionLabel="Ke Backlog" />)}
       </Shell>
@@ -1712,6 +1831,7 @@ function AppInner() {
     const qaProjectId = route?.projectId ?? projects[0]?.id;
     screen = (
       <Shell active="qa" title="QA" wide onNavigate={setSection} breadcrumb="qa · laporan per project">
+        {hubTabs}
         {gate(<QaWorkspace key={qaProjectId ?? "none"} projects={projects} projectId={qaProjectId}
           onSelectProject={(id) => navigate(routePath({ section: "qa", projectId: id }))} onToast={showToast}
           onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }} />)}
@@ -1732,6 +1852,7 @@ function AppInner() {
   } else if (section === "settings") {
     screen = (
       <Shell active="settings" title="Settings" breadcrumb="nafanesia.id · workspace" onNavigate={setSection}>
+        {hubTabs}
         {suspend(<SettingsScreen onToast={showToast} me={me} onLoggedOut={onLoggedOut} />)}
       </Shell>
     );
@@ -1739,16 +1860,25 @@ function AppInner() {
 
   return (
     <AuthProvider user={me} onLoggedOut={onLoggedOut}>
-      <NotificationsProvider showToast={showToast} onOpen={openNotification}>
+      <NotificationsProvider showToast={showToast} onOpen={openNotification} isViewing={isViewingSession}>
         {/* SPEC-884 · ADR-0139 · instance publik yang perlindungannya turun jadi satu password
             tidak boleh terlihat sama dengan yang dikeraskan. Di luar ClientPortal: klien tak
             punya kuasa mengubahnya, jadi baginya ini cuma kecemasan tanpa tombol. */}
         <UnhardenedBanner status={setupStatus} />
-        <NavGate.Provider value={{ clients: presence.enabled }}>
-          <NavPending.Provider value={pending}>{screen}</NavPending.Provider>
-        </NavGate.Provider>
-        <HanomanPet sessions={sessions} backlog={backlog} asks={leadAsks}
-          onOpen={(t) => { if (t.sessionId) setFocusSession(t.sessionId); setSection(t.section); }} />
+        <ProjectScopeContext.Provider value={scopeValue}>
+          <NavGate.Provider value={{ clients: presence.enabled }}>
+            <NavPending.Provider value={pending}>
+              {/* Pet dibuat sekali di sini, lalu Shell menaruhnya di slot-nya (footer sidebar atau lajur bawah).
+                  Layar tanpa Shell (Dalang) tak punya slot: pet tak tampil di sana. */}
+              <PetDockContext.Provider value={petOn ? (
+                <HanomanPet sessions={sessions} backlog={backlog} asks={leadAsks}
+                  onOpen={(t) => { if (t.sessionId) setFocusSession(t.sessionId); setSection(t.section); }} />
+              ) : null}>
+                {screen}
+              </PetDockContext.Provider>
+            </NavPending.Provider>
+          </NavGate.Provider>
+        </ProjectScopeContext.Provider>
         <NewSpecModal open={modal === "brief"} onClose={() => { setModal(null); setSpecPrefill(null); }}
           projects={projectsView} defaultProject={proj ? proj.id : ""} onCreate={createSpec}
           prefill={specPrefill ?? undefined} specs={backlog} />   {/* SPEC-447 · kandidat dependency */}
@@ -1793,7 +1923,9 @@ function AppInner() {
           }} />
         {dialog}
         {launchAdmission.dialog}
-        <Toast toast={toast} />
+        <CommandPalette commands={paletteCommands} />
+        <ShortcutHelp nav={visibleNav} />
+        <ToastHost toast={toast} />
       </NotificationsProvider>
     </AuthProvider>
   );

@@ -8,8 +8,15 @@
    Test SPEC-363 lolos sepanjang bug ini karena ia hanya memeriksa style PANE-nya sendiri, yang
    memang tak pernah salah. Yang harus dijaga adalah INDUK-induknya, jadi di sini rantai leluhur
    yang dinaiki. jsdom tak melayout — yang diuji kontrak style tiap mata rantai. */
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
+
+// Audit UI/UX 2026-10 (3H): berkas IDE di tab Berkas (default-nya Perubahan).
+async function openBerkas() {
+  const list = await screen.findByRole("tablist", { name: "Bagian IDE" });
+  fireEvent.click(within(list).getByRole("tab", { name: "Berkas" }));
+}
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { injectProjectCss } from "./project-css";
 
 vi.mock("../src/api/client", () => ({
   api: {
@@ -46,12 +53,18 @@ import { DocsWorkspace } from "../src/screens/DocsWorkspace";
 import { IdeScreen } from "../src/screens/IdeScreen";
 import { GitGraph } from "../src/screens/GitGraph";
 
+beforeAll(() => injectProjectCss());
 beforeEach(() => vi.clearAllMocks());
 
 /* "Kerangka" = leluhur yang tingginya sudah PASTI dengan sendirinya: panel ber-`maxHeight`/
    `height`, atau overlay `position: fixed`. Ia sumber batas tinggi, jadi ia sendiri tak perlu
    bisa menyusut — cukup meneruskan (kolom flex). */
-const isFrame = (n: HTMLElement) => n.style.position === "fixed" || !!n.style.height || !!n.style.maxHeight;
+/* Nilai efektif: inline bila ada, selain itu kaskade dari CSS proyek (lihat project-css.ts). Layout
+   yang kini kelas (ide.css, app.css) terbaca lewat kaskade; yang masih inline tetap terbaca seperti dulu. */
+type Prop = "display" | "minHeight" | "height" | "maxHeight" | "position";
+const effective = (n: HTMLElement, prop: Prop): string => n.style[prop] || getComputedStyle(n)[prop];
+
+const isFrame = (n: HTMLElement) => effective(n, "position") === "fixed" || !!effective(n, "height") || !!effective(n, "maxHeight");
 
 /* Sebuah pane `overflow: auto` hanya bisa menggulir kalau tingginya dibatasi dari atas. Setiap
    leluhur antara pane dan kerangka (atau root layar) karena itu harus MENERUSKAN tinggi: menjadi
@@ -62,11 +75,12 @@ function brokenLinks(pane: HTMLElement, root: HTMLElement): string[] {
   const broken: string[] = [];
   for (let n = pane.parentElement; n; n = n.parentElement) {
     const frame = isFrame(n);
-    const display = n.style.display;
+    const display = effective(n, "display");
     const why: string[] = [];
     if (display !== "flex" && display !== "grid") why.push(`display "${display || "block"}"`);
-    if (!frame && n.style.minHeight !== "0" && n.style.minHeight !== "0px") {
-      why.push(`min-height "${n.style.minHeight || "auto"}"`);
+    const minHeight = effective(n, "minHeight");
+    if (!frame && minHeight !== "0" && minHeight !== "0px") {
+      why.push(`min-height "${minHeight || "auto"}"`);
     }
     if (why.length) broken.push(`<div style="${n.getAttribute("style") ?? ""}"> → ${why.join(" + ")}`);
     if (frame || n === root) break;
@@ -86,6 +100,7 @@ describe("rantai gulir pane tak boleh putus (SPEC-393)", () => {
   it("IDE · Explorer — pane berkas (preview, source, diff)", async () => {
     const { container } = render(<IdeScreen projects={[{ id: "p1", name: "P1" }] as never[]}
       projectId="p1" onProject={() => {}} />);
+    await openBerkas();
     fireEvent.click(await screen.findByText("README.md"));
     await waitFor(() => expect(screen.getByTestId("doc-preview-scroll")).toBeInTheDocument());
     expect(brokenLinks(screen.getByTestId("doc-preview-scroll"), rootOf(container))).toEqual([]);
@@ -94,6 +109,7 @@ describe("rantai gulir pane tak boleh putus (SPEC-393)", () => {
   it("IDE · Explorer — pane pohon berkas", async () => {
     const { container } = render(<IdeScreen projects={[{ id: "p1", name: "P1" }] as never[]}
       projectId="p1" onProject={() => {}} />);
+    await openBerkas();
     await waitFor(() => expect(screen.getByTestId("ide-tree-scroll")).toBeInTheDocument());
     expect(brokenLinks(screen.getByTestId("ide-tree-scroll"), rootOf(container))).toEqual([]);
   });

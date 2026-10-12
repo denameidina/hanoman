@@ -1,0 +1,313 @@
+/* Projects (daftar, detail, PRD) + helper bersama (chip, catatan, galat ringan, sheet, folder picker).
+   Audit UI/UX 2026-10 · redesign 3P. Susunan lewat kelas; nilai hanya token. Breakpoint mobile
+   mengikuti design system: `max-width: 767px`; pointer kasar memakai `pointer: coarse`. */
+
+/* ---------------------------------------------------------------- helper bersama */
+
+.hn-prj-mono { font-family: var(--font-mono); }
+.hn-prj-wrap { overflow-wrap: anywhere; word-break: break-all; }
+.hn-prj-grow { flex: 1 1 0%; min-width: 0; }
+.hn-prj-full { width: 100%; min-width: 0; }
+.hn-prj-required { color: var(--clay-600); margin-left: 3px; }
+
+.hn-prj-note {
+  margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--text-muted); line-height: 1.5;
+}
+.hn-prj-hint {
+  margin: 0; font-size: var(--text-xs); color: var(--text-subtle); line-height: 1.5;
+}
+.hn-prj-inline { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-width: 0; }
+.hn-prj-code {
+  font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-body);
+  overflow-wrap: anywhere; word-break: break-all;
+}
+.hn-prj-field { margin-bottom: var(--space-3); }
+.hn-prj-field-label {
+  display: block; font-size: var(--text-sm); font-weight: var(--weight-semibold);
+  color: var(--text-strong); margin-bottom: 6px;
+}
+.hn-prj-list-plain {
+  margin: 0 0 var(--space-3); padding-left: 18px; font-size: var(--text-sm); color: var(--text-body); line-height: 1.6;
+}
+.hn-prj-stderr {
+  margin: var(--space-2) 0 0; white-space: pre-wrap; word-break: break-all;
+  font-family: var(--font-mono); font-size: var(--text-xs); max-height: 160px; overflow: auto;
+}
+
+/* Galat/keadaan usang di atas daftar: data terakhir tetap tampil, tombol Coba lagi di sebelahnya. */
+.hn-prj-stale {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-hair);
+  background: var(--status-err-tint); font-size: var(--text-sm); color: var(--text-body);
+}
+.hn-prj-stale-text { flex: 1 1 auto; min-width: 0; }
+
+/* Chip filter dengan hitungan (dipakai Projects, Docs, dan Skills). */
+.hn-prj-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.hn-prj-chip {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 30px;
+  padding: 0 var(--space-3); border-radius: var(--radius-pill); border: 1px solid var(--border-hair);
+  background: var(--surface-card); color: var(--text-body); font: inherit; font-size: var(--text-sm);
+  cursor: pointer;
+}
+.hn-prj-chip[aria-pressed="true"] {
+  background: var(--brass-100); border-color: var(--brass-500); color: var(--brass-700);
+  font-weight: var(--weight-semibold);
+}
+.hn-prj-chip:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.hn-prj-chip-count { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
+.hn-prj-chip[aria-pressed="true"] .hn-prj-chip-count { color: var(--brass-700); }
+
+/* Sheet "Jadikan backlog" dan checklist usulan breakdown. */
+.hn-prj-sheet-options { display: flex; flex-direction: column; gap: var(--space-4); }
+.hn-prj-sheet-option {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2);
+  padding-bottom: var(--space-4); border-bottom: 1px solid var(--border-hair);
+}
+.hn-prj-sheet-option:last-child { border-bottom: 0; padding-bottom: 0; }
+.hn-prj-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); width: 100%; }
+.hn-prj-sheet-title { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--brass-700); }
+.hn-prj-checklist { list-style: none; margin: 0; padding: 0; width: 100%; max-height: 280px; overflow: auto; }
+.hn-prj-checklist li + li { border-top: 1px solid var(--border-hair); }
+.hn-prj-check { display: flex; align-items: flex-start; gap: var(--space-2); padding: 6px 0; cursor: pointer; min-height: 32px; }
+.hn-prj-check-input { margin-top: 3px; width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--brass-500); }
+.hn-prj-check-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.hn-prj-check-title {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text-strong);
+}
+
+/* Folder picker (FolderPicker): baris folder adalah <button>, hover lewat CSS. */
+.hn-prj-picker-path { margin-bottom: var(--space-2); }
+.hn-prj-picker-list {
+  border: 1px solid var(--border-hair); border-radius: var(--radius-sm); max-height: 320px; overflow: auto;
+}
+.hn-prj-folder-row {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%; box-sizing: border-box;
+  padding: 8px 12px; min-height: 44px; border: 0; border-bottom: 1px solid var(--border-hair);
+  background: transparent; color: var(--text-strong); font: inherit; font-size: var(--text-sm);
+  text-align: left; cursor: pointer;
+}
+.hn-prj-folder-row:hover { background: var(--bone-100); }
+.hn-prj-folder-row:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+
+/* ---------------------------------------------------------------- Projects · daftar */
+
+.hn-prj-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--space-3); padding-bottom: var(--space-3);
+}
+.hn-prj-device { min-width: 180px; }
+
+.hn-prj-list {
+  display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
+  background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+/* Baris DenseRow: kolom Project · Status · Dokumen · Backlog. Aksi ⋯ berada di luar kolom ini. */
+.hn-prj-list .hn-row-main {
+  display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.1fr) auto;
+  align-items: center; column-gap: var(--space-4); padding-left: var(--space-3); padding-right: var(--space-2);
+}
+.hn-prj-main { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.hn-prj-name {
+  font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--weight-medium);
+  color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-prj-desc {
+  font-size: var(--text-xs); color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-prj-status { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.hn-prj-docs { min-width: 0; }
+.hn-prj-backlog { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
+.hn-prj-num { color: var(--text-strong); font-weight: var(--weight-semibold); }
+
+@media (max-width: 767px) {
+  .hn-prj-list .hn-row-main { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--space-2); }
+  .hn-prj-docs, .hn-prj-backlog { grid-column: 1 / -1; }
+}
+
+/* ---------------------------------------------------------------- Projects · detail */
+
+.hn-prj-detail { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+.hn-prj-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap;
+}
+.hn-prj-head-text { min-width: 0; flex: 1 1 280px; }
+.hn-prj-head-title { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-width: 0; }
+/* h2, bukan h1: shell sudah memakai h1 untuk judul layar. */
+.hn-prj-title {
+  margin: 0; font-family: var(--font-display); font-size: var(--text-2xl); font-weight: var(--weight-semibold);
+  line-height: 1.25; color: var(--text-strong); overflow-wrap: anywhere;
+}
+.hn-prj-subtitle { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--text-subtle); }
+
+.hn-prj-meta {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-4);
+  margin: var(--space-5) 0 0; min-width: 0;
+}
+.hn-prj-meta-item { min-width: 0; }
+.hn-prj-meta-item dt { margin: 0; }
+.hn-prj-meta-item dd { margin: 0; }
+.hn-prj-meta-value {
+  margin-top: var(--space-1); display: flex; align-items: flex-start; gap: 6px; min-width: 0;
+  font-size: var(--text-sm); color: var(--text-body);
+}
+.hn-prj-meta-wrap {
+  flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: var(--text-sm);
+  overflow-wrap: anywhere; word-break: break-all;
+}
+.hn-prj-meta-clip {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-prj-copy {
+  flex: 0 0 auto; border: 0; background: transparent; cursor: pointer; padding: 2px;
+  min-width: 24px; min-height: 24px; color: var(--text-muted); line-height: 0; border-radius: var(--radius-sm);
+}
+.hn-prj-copy:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+.hn-prj-coverage { margin-top: var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); max-width: 420px; }
+
+/* Tiga pintu kerja besar. */
+.hn-prj-doors { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); min-width: 0; }
+.hn-prj-door {
+  display: flex; align-items: center; gap: var(--space-3); min-height: 64px; padding: var(--space-4);
+  background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-lg);
+  color: inherit; font: inherit; text-align: left; cursor: pointer; min-width: 0;
+}
+.hn-prj-door:hover { background: var(--surface-sunken); }
+.hn-prj-door:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.hn-prj-door-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--brass-050); color: var(--brass-700);
+}
+.hn-prj-door-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hn-prj-door-title {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-strong);
+}
+.hn-prj-door-count {
+  font-family: var(--font-mono); font-size: var(--text-xs); color: var(--brass-700);
+  background: var(--brass-100); border-radius: var(--radius-pill); padding: 1px 8px;
+}
+.hn-prj-door-hint { font-size: var(--text-xs); color: var(--text-subtle); }
+
+.hn-prj-doc-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+
+/* Pengaturan project: lipat. */
+.hn-prj-disclosure {
+  background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-lg);
+  min-width: 0;
+}
+.hn-prj-disclosure-summary {
+  display: flex; align-items: center; min-height: 44px; padding: var(--space-3) var(--space-4);
+  cursor: pointer; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-strong);
+}
+.hn-prj-disclosure-summary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.hn-prj-disclosure-body {
+  display: flex; flex-direction: column; gap: var(--space-5); padding: 0 var(--space-4) var(--space-4);
+  min-width: 0;
+}
+
+/* Zona bahaya: paling bawah, dengan batas merah sendiri. */
+.hn-prj-danger {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap;
+  padding: var(--space-4); border: 1px solid var(--status-err); border-radius: var(--radius-lg);
+  background: var(--status-err-tint);
+}
+.hn-prj-danger-text { min-width: 0; flex: 1 1 280px; }
+.hn-prj-danger-title { margin: 0; color: var(--clay-600); }
+
+/* ---------------------------------------------------------------- PRD */
+
+.hn-prd-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding-bottom: var(--space-3); }
+.hn-prd-toolbar-spacer { flex: 1 1 auto; }
+.hn-prd-portal { padding-bottom: var(--space-3); }
+
+/* Indeks kiri: grup per status yang bisa dilipat. */
+.hn-prd-index {
+  width: 100%; min-height: 0; overflow-y: auto; border-right: 1px solid var(--border-hair); padding-right: var(--space-3);
+}
+.hn-prd-group { margin-bottom: var(--space-3); }
+.hn-prd-group-summary {
+  display: flex; align-items: center; gap: var(--space-2); min-height: 32px; padding: var(--space-1) var(--space-2);
+  cursor: pointer; font-size: var(--text-2xs); font-weight: var(--weight-semibold); letter-spacing: 0.3px;
+  text-transform: uppercase; color: var(--text-subtle);
+}
+.hn-prd-group-summary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.hn-prd-group-body { display: flex; flex-direction: column; gap: 2px; }
+.hn-prd-project-label { padding: 6px 8px 2px; }
+
+.hn-prd-item {
+  display: block; width: 100%; min-height: 44px; box-sizing: border-box; text-align: left; cursor: pointer;
+  border: 0; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3);
+  background: transparent; color: inherit; font: inherit;
+}
+.hn-prd-item:hover { background: var(--bone-200); }
+.hn-prd-item.is-active { background: var(--brass-100); }
+.hn-prd-item:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.hn-prd-item-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.hn-prd-item-title {
+  min-width: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-strong);
+}
+.hn-prd-item.is-active .hn-prd-item-title { color: var(--brass-700); }
+.hn-prd-item-meta {
+  display: block; margin-top: 3px; font-size: var(--text-2xs); color: var(--text-subtle);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-prd-stale { margin-bottom: var(--space-2); }
+
+/* Halaman baca: satu pane yang menggulir, bar aksi sticky di atasnya. */
+.hn-prd-detail { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.hn-prd-pane { height: 100%; min-height: 0; overflow-y: auto; }
+.hn-prd-actionbar {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  padding: var(--space-2) 0; background: var(--surface-page); border-bottom: 1px solid var(--border-hair);
+}
+.hn-prd-actionbar-title {
+  flex: 1 1 200px; min-width: 0; font-size: var(--text-md); font-weight: var(--weight-semibold);
+  color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-prd-read { padding: var(--space-4) 0 var(--space-6); min-width: 0; }
+.hn-prd-head { margin-bottom: var(--space-4); min-width: 0; }
+.hn-prd-path { font-size: var(--text-2xs); color: var(--text-subtle); overflow-wrap: anywhere; margin-bottom: 4px; }
+.hn-prd-head-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.hn-prd-title {
+  margin: 0; font-family: var(--font-sans); font-size: var(--text-lg); font-weight: var(--weight-bold);
+  color: var(--text-strong); overflow-wrap: anywhere;
+}
+
+/* Usulan breakdown: panel lipat di halaman (daftar baca-saja; aksi di sheet). */
+.hn-prd-breakdown {
+  border: 1px solid var(--brass-300); border-radius: var(--radius-sm); background: var(--brass-050);
+  padding: var(--space-2) var(--space-3); margin-bottom: var(--space-4);
+}
+.hn-prd-breakdown-summary {
+  display: flex; align-items: center; min-height: 32px; cursor: pointer;
+  font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--brass-700);
+}
+.hn-prd-breakdown-list { list-style: none; margin: var(--space-2) 0; padding: 0; }
+.hn-prd-breakdown-list li {
+  display: flex; align-items: center; gap: var(--space-2); padding: 6px 0;
+  border-top: 1px solid var(--border-hair); font-size: var(--text-sm);
+}
+.hn-prd-breakdown-list li:first-child { border-top: 0; }
+.hn-prd-breakdown-item { font-weight: var(--weight-semibold); color: var(--text-strong); }
+
+/* Lebar baca ~68 karakter; batas ini milik halaman, bukan `.hn-md`. */
+.hn-prd-doc { max-width: 68ch; }
+
+@media (max-width: 767px) {
+  .hn-prd-actionbar-title { flex-basis: 100%; }
+}
+
+/* Segmented toggle dua pilihan (Baca | Edit di Docs; Pratinjau | Edit di Skills). */
+.hn-prj-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; }
+.hn-prj-seg button {
+  min-height: 30px; padding: 0 var(--space-3); border: 0; background: var(--surface-card);
+  color: var(--text-body); font: inherit; font-size: var(--text-sm); cursor: pointer;
+}
+.hn-prj-seg button + button { border-left: 1px solid var(--border-strong); }
+.hn-prj-seg button[aria-pressed="true"] { background: var(--brass-100); color: var(--brass-700); font-weight: var(--weight-semibold); }
+.hn-prj-seg button:disabled { opacity: 0.5; cursor: not-allowed; }
+.hn-prj-seg button:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }

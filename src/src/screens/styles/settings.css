@@ -1,0 +1,556 @@
+/* Pengaturan · Audit UI/UX 2026-10 · Fase 3C. Layout, nav, dan status simpan lewat kelas (bukan inline).
+   Ukuran font dari skala token (--text-2xs…--text-md), spacing dari --space-N. Batas responsif sama
+   dengan design-system.md: mobile < 768px, tablet 768–1199px, desktop ≥ 1200px. */
+
+.hn-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* Atribut hidden dari filter "Cari pengaturan" harus menang atas display dari kelas di bawah. */
+.hn-settings [hidden] {
+  display: none !important;
+}
+
+.hn-settings-layout {
+  display: grid;
+  align-items: start;
+  width: 100%;
+  max-width: 1040px;
+  gap: var(--space-6);
+  grid-template-columns: 196px minmax(0, 1fr);
+}
+.hn-settings-layout[data-layout="tablet"] {
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: var(--space-4);
+}
+.hn-settings-layout[data-layout="mobile"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.hn-set-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 0;
+  min-width: 0;
+}
+.hn-set-navgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hn-set-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.hn-set-nav-item:hover {
+  background: var(--bone-200);
+  color: var(--text-strong);
+}
+.hn-set-nav-item[aria-current="page"],
+.hn-set-nav-item--on {
+  background: var(--brass-100);
+  color: var(--brass-700);
+  font-weight: 600;
+}
+.hn-set-nav-item--parent {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.hn-set-nav-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hn-set-chev {
+  color: var(--text-subtle);
+  font-size: var(--text-xs);
+}
+.hn-set-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 6px 18px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-hair);
+}
+.hn-set-sub .hn-set-nav-item {
+  font-size: var(--text-sm);
+  padding: 7px 10px;
+}
+
+.hn-set-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.hn-set-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.hn-set-nomatch {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border-hair);
+  border-radius: var(--radius-sm);
+}
+
+/* ── Pencarian ─────────────────────────────────────────────────────────────── */
+.hn-set-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 1040px;
+  width: 100%;
+}
+.hn-set-search-hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.hn-set-search-hit {
+  border: 1px solid var(--border-hair);
+  background: var(--surface-card);
+  color: var(--text-strong);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.hn-set-search-hit:hover {
+  border-color: var(--brass-600);
+}
+
+/* ── Baris ─────────────────────────────────────────────────────────────────── */
+.hn-set-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-hair);
+}
+.hn-set-row--last {
+  border-bottom: none;
+}
+.hn-set-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hn-set-row-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.hn-set-row-desc {
+  margin-top: 3px;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: var(--leading-normal);
+}
+.hn-set-row-control {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Status simpan per baris. Teks, bukan hanya warna: "Menyimpan…", "Tersimpan", "Gagal — coba lagi". */
+.hn-set-save {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.hn-set-save--pending {
+  color: var(--text-subtle);
+}
+.hn-set-save--ok {
+  color: var(--status-ok);
+}
+.hn-set-save--err {
+  color: var(--status-err);
+}
+
+/* ── Teks dan blok bantu ───────────────────────────────────────────────────── */
+.hn-set-prose {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: var(--leading-normal);
+  margin-bottom: var(--space-3);
+}
+.hn-set-note {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  line-height: var(--leading-normal);
+  margin-top: var(--space-2);
+}
+.hn-set-hint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: var(--space-2);
+  line-height: var(--leading-normal);
+}
+.hn-set-muted {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+.hn-set-empty {
+  font-size: var(--text-sm);
+  color: var(--text-subtle);
+  padding: var(--space-2) 0;
+}
+.hn-set-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.hn-set-codeinline {
+  font-size: var(--text-xs);
+  word-break: break-all;
+}
+.hn-set-hintlabel {
+  font-weight: 400;
+  color: var(--text-subtle);
+}
+.hn-set-subhead {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-strong);
+  margin: var(--space-3) 0 var(--space-2);
+}
+.hn-set-block {
+  padding-top: var(--space-4);
+}
+.hn-set-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.hn-set-wrap {
+  flex-wrap: wrap;
+}
+.hn-set-spaced {
+  margin-bottom: var(--space-3);
+}
+.hn-set-badgeword {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  margin-right: var(--space-2);
+}
+.hn-set-result {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.hn-set-dirty {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+
+/* ── Lebar kontrol (dipakai sebagai className pada kontrol DS) ─────────────── */
+.hn-set-full {
+  width: 100%;
+}
+.hn-set-w-xs {
+  width: 130px;
+}
+.hn-set-w-sm {
+  width: 190px;
+}
+.hn-set-w-md {
+  width: 220px;
+}
+.hn-set-w-input {
+  width: 240px;
+  max-width: 100%;
+}
+.hn-set-w-field {
+  width: 320px;
+  max-width: 100%;
+}
+
+/* ── Form dan grid ─────────────────────────────────────────────────────────── */
+.hn-set-form-block {
+  padding-top: var(--space-4);
+}
+.hn-set-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+.hn-set-form3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-2);
+  align-items: end;
+}
+.hn-set-form2 {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-2);
+  align-items: end;
+}
+.hn-set-btn-align {
+  margin-bottom: 14px;
+}
+.hn-set-capgrid {
+  margin-top: var(--space-2);
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 6px 14px;
+  align-items: center;
+}
+.hn-set-capcol {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  text-align: center;
+}
+.hn-set-capcol--danger {
+  color: var(--status-err);
+}
+.hn-set-capcol-right {
+  text-align: right;
+}
+.hn-set-capcell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.hn-set-capword {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+.hn-set-capdomain {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.hn-set-capdomain-name {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.hn-set-capdomain-desc {
+  margin-top: 1px;
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  line-height: 1.4;
+}
+.hn-set-capdomain-danger {
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--status-err);
+  line-height: 1.4;
+}
+.hn-set-checkall {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  margin-left: 5px;
+}
+.hn-set-token-box {
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--brass-300);
+  border-radius: var(--radius-sm);
+  background: var(--brass-100);
+}
+.hn-set-token-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.hn-set-token-code {
+  display: block;
+  word-break: break-all;
+  font-size: var(--text-xs);
+}
+.hn-set-setupstatus {
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  margin-bottom: var(--space-3);
+}
+.hn-set-syncline {
+  margin-bottom: var(--space-2);
+}
+
+/* ── Override satu-bentuk & engine ─────────────────────────────────────────── */
+.hn-set-inherited {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  padding: var(--space-3) 0 2px;
+  line-height: var(--leading-normal);
+}
+.hn-set-inherited-note {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-hair);
+}
+.hn-set-group {
+  padding-top: var(--space-2);
+}
+.hn-set-group--codex {
+  border-top: 1px solid var(--border-hair);
+  margin-top: 6px;
+}
+.hn-set-catalog {
+  padding: var(--space-2) 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.hn-set-agent-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+.hn-set-agent-name {
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.hn-set-agent-badge {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--text-subtle);
+  border: 1px solid var(--border-hair);
+}
+.hn-set-agent-badge--on {
+  background: var(--brass-100);
+  color: var(--brass-700);
+  border-color: transparent;
+}
+.hn-set-codex-note {
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  margin: var(--space-2) 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--status-warn-tint);
+  color: var(--text-muted);
+}
+
+/* ── Metode workflow ───────────────────────────────────────────────────────── */
+.hn-set-method-status {
+  margin-top: var(--space-1);
+  display: grid;
+  gap: var(--space-3);
+}
+.hn-set-method {
+  display: grid;
+  gap: 6px;
+}
+.hn-set-method-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.hn-set-method-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+.hn-set-method-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.hn-set-method-missing {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* ── Webhook: dokumentasi dilipat ──────────────────────────────────────────── */
+.hn-set-fold {
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  padding: 0;
+}
+.hn-set-fold-summary {
+  cursor: pointer;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-strong);
+  list-style-position: outside;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.hn-set-fold > :not(summary) {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* ── Onboarding Telegram ───────────────────────────────────────────────────── */
+.hn-set-onboarding {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+.hn-set-onboarding ol {
+  margin: var(--space-2) 0 0;
+  padding-left: 20px;
+}
+
+/* ── Checkbox "pilih semua" & tombol sentuh ───────────────────────────────── */
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-set-nav-item,
+  .hn-set-search-hit {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 767px) {
+  .hn-settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hn-set-form3,
+  .hn-set-form2,
+  .hn-set-capgrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hn-set-btn-align {
+    margin-bottom: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hn-set-nav-item {
+    transition: none;
+  }
+}

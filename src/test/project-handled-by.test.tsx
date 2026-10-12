@@ -29,39 +29,19 @@ beforeEach(() => {
   vi.mocked(api.listDeviceTokens).mockResolvedValue([]);
 });
 
-describe("SPEC-880 · daftar project: kolom 'Ditangani'", () => {
-  it("baris punya sel Ditangani dan merender nama client", () => {
+describe("SPEC-880 · daftar project: penanda 'Ditangani' dipindah ke detail (redesign 3P)", () => {
+  it("baris daftar tak lagi memuat kolom Ditangani; penandanya ada di detail", () => {
     render(<ProjectsScreen projects={[P({
       handledBy: [{ deviceId: "d1", name: "hm-dena", revoked: false }],
     })] as never} onOpen={() => {}} />);
-    const row = screen.getByRole("button", { name: "Buka project arta" }).closest(".hn-project-row")!;
-    expect(row.querySelector('[data-label="Ditangani"]')).toBeInTheDocument();
-    expect(screen.getByText("hm-dena")).toBeInTheDocument();
-  });
-
-  it("tanpa penanda → 'belum ditetapkan', bukan sel kosong", () => {
-    render(<ProjectsScreen projects={[P()] as never} onOpen={() => {}} />);
-    expect(screen.getByText("belum ditetapkan")).toBeInTheDocument();
-  });
-
-  it("device dicabut ditandai, bukan disembunyikan", () => {
-    render(<ProjectsScreen projects={[P({
-      handledBy: [{ deviceId: "d1", name: "laptop-lama", revoked: true }],
-    })] as never} onOpen={() => {}} />);
-    expect(screen.getByText(/laptop-lama · dicabut/)).toBeInTheDocument();
-  });
-
-  it("view lama tanpa field handledBy tak meruntuhkan baris", () => {
-    const legacy = P();
-    delete (legacy as Record<string, unknown>).handledBy;
-    render(<ProjectsScreen projects={[legacy] as never} onOpen={() => {}} />);
-    expect(screen.getByText("belum ditetapkan")).toBeInTheDocument();
+    expect(screen.queryByText("hm-dena")).toBeNull();
+    expect(screen.queryByText("Ditangani oleh")).toBeNull();
   });
 
   it("instance tanpa katalog device: filter tak dirender", async () => {
     render(<ProjectsScreen projects={[P()] as never} pageSize={20} dataVersion={0} />);
     await waitFor(() => expect(api.listDeviceTokens).toHaveBeenCalled());
-    expect(screen.queryByLabelText("Saring per client")).toBeNull();
+    expect(screen.queryByLabelText("Saring per perangkat")).toBeNull();
   });
 
   it("dengan katalog device: filter dirender dan meneruskan handledBy ke API", async () => {
@@ -71,7 +51,7 @@ describe("SPEC-880 · daftar project: kolom 'Ditangani'", () => {
     ] as never);
     vi.mocked(api.listProjects).mockResolvedValue(envelope([P()]));
     render(<ProjectsScreen projects={[P()] as never} pageSize={20} dataVersion={0} />);
-    const select = await screen.findByLabelText("Saring per client");
+    const select = await screen.findByLabelText("Saring per perangkat");
     // device yang sudah dicabut tak ditawarkan sebagai pilihan baru
     expect(screen.queryByRole("option", { name: /sudah-dicabut/ })).toBeNull();
     (select as HTMLSelectElement).value = "d1";
@@ -90,6 +70,25 @@ const DETAIL_PROPS = {
 };
 
 describe("SPEC-880 · detail project", () => {
+  it("tanpa penanda → 'belum ditetapkan', bukan sel kosong", () => {
+    render(<ProjectDetailScreen p={P() as never} {...DETAIL_PROPS} />);
+    expect(screen.getByText("belum ditetapkan")).toBeInTheDocument();
+  });
+
+  it("device dicabut ditandai, bukan disembunyikan", () => {
+    render(<ProjectDetailScreen p={P({
+      handledBy: [{ deviceId: "d1", name: "laptop-lama", revoked: true }],
+    }) as never} {...DETAIL_PROPS} />);
+    expect(screen.getByText(/laptop-lama · dicabut/)).toBeInTheDocument();
+  });
+
+  it("view lama tanpa field handledBy tak meruntuhkan detail", () => {
+    const legacy = P();
+    delete (legacy as Record<string, unknown>).handledBy;
+    render(<ProjectDetailScreen p={legacy as never} {...DETAIL_PROPS} />);
+    expect(screen.getByText("belum ditetapkan")).toBeInTheDocument();
+  });
+
   it("penanda tampil di panel info dan dinyatakan DISYNC", () => {
     render(<ProjectDetailScreen p={P({
       handledBy: [{ deviceId: "d1", name: "hm-dena", revoked: false }],

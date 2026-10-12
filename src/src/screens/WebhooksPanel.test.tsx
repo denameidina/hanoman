@@ -1,4 +1,6 @@
 import React from "react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebhooksPanel } from "./WebhooksPanel";
@@ -92,5 +94,11 @@ describe("WebhooksPanel", () => {
     render(<WebhooksPanel onOpenDocs={onOpenDocs} />);
     fireEvent.click(await screen.findByRole("button", { name: /dokumentasi webhook/i }));
     expect(onOpenDocs).toHaveBeenCalled();
+  });
+
+  // Anggaran gaya inline (Z3): layout lewat kelas `hn-wh-*` di integrations.css.
+  it("layout lewat kelas: gaya inline tinggal ≤ 6", () => {
+    const src = readFileSync(resolve(import.meta.dirname, "WebhooksPanel.tsx"), "utf8");
+    expect((src.match(/style=\{\{/g) ?? []).length).toBeLessThanOrEqual(6);
   });
 });

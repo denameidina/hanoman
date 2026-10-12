@@ -1,8 +1,13 @@
 /* Page-level styles ported from the prototype's Hanoman App.html <style>:
    layout reset, button accent, rendered-markdown (.hn-md), and the
    toast/modal keyframes the kit primitives animate with. */
-html, body { margin: 0; height: 100%; background: var(--surface-page); }
-#root { height: 100vh; height: 100dvh; overflow: hidden; max-width: 100%; }
+/* Satu scroller per layar: `.hn-shell-main` (atau scroller 100dvh milik permukaan mandiri). Dokumen itu
+   sendiri tak boleh ikut menggulir. `#root` ber-`position: relative` sebagai wadah bagi elemen absolut
+   yang tak punya induk ber-posisi: tanpanya, elemen seperti itu memakai ICB sebagai wadah, lolos dari
+   `overflow: hidden` #root, dan menambah tinggi dokumen (QA: 844px layar → dokumen 1071px, Backlog ponsel,
+   `window.scrollY` 227 setelah scroll ke bawah). Posisinya tak berubah: #root berada di (0,0) selebar layar. */
+html, body { margin: 0; height: 100%; background: var(--surface-page); overflow: hidden; }
+#root { position: relative; height: 100vh; height: 100dvh; overflow: hidden; max-width: 100%; }
 
 .hn-dynamic-viewport {
   height: 100vh;
@@ -22,14 +27,22 @@ textarea:focus-visible,
 [role="radio"]:focus-visible,
 [role="switch"]:focus-visible,
 [role="separator"]:focus-visible {
-  outline: 2px solid var(--border-focus) !important;
+  outline: 2px solid var(--border-focus);
   outline-offset: 2px;
 }
 
 /* Select kit: pembungkusnya sudah menandai fokus lewat border + ring, jadi outline
    bawaan hanya menggambar kotak kedua di dalam field. */
 .hn-select select:focus,
-.hn-select select:focus-visible { outline: none !important; }
+.hn-select select:focus-visible { outline: none; }
+/* Input & textarea DS (ds/components/forms.tsx, kit.tsx) menggambar fokus lewat pembungkus (border +
+   ring). Outline `input:focus-visible` di atas menggambar kotak kedua; kelas yang lebih spesifik ini
+   mematikannya dan tetap berlaku bila aturan global kembali ber-!important. */
+.hn-input-core:focus-visible,
+.hn-textarea-core:focus-visible { outline: none; }
+/* Wrapper Input DS (div.hn-touch-target yang memuat .hn-input-core) hanya menggeser border saat fokus.
+   Cincinnya lewat outline, bukan box-shadow: box-shadow wrapper diset inline (forms.tsx) dan akan menang. */
+.hn-touch-target:focus-within:has(> .hn-input-core) { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 .hn-shell {
   display: flex;
@@ -55,8 +68,51 @@ textarea:focus-visible,
 }
 
 .hn-shell-wordmark { padding: 2px 4px 20px; }
-.hn-shell-workspace { padding: 0 10px 8px; }
 .hn-shell-nav { display: flex; min-height: 0; flex-direction: column; gap: 2px; overflow-y: auto; }
+/* Ikon nav tak boleh menyusut: di rail, badge sebagai flex item dulu mendorong svg sampai 7 px (C). */
+.hn-shell-nav svg { flex: 0 0 auto; }
+/* Cue gulir daftar hub: gradasi di tepi yang masih menyimpan hub di luar layar (shell.tsx `useNavCue`). Hanya saat
+   daftar meluap; lewat mask, bukan latar, sehingga warna di bawahnya tak berubah. `#000` di sini hanya alfa mask. */
+.hn-shell-nav[data-cue-start="true"],
+.hn-shell-nav[data-cue-end="true"] {
+  --hn-cue-t: 0px;
+  --hn-cue-b: 0px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--hn-cue-t), #000 calc(100% - var(--hn-cue-b)), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--hn-cue-t), #000 calc(100% - var(--hn-cue-b)), transparent 100%);
+}
+.hn-shell-nav[data-cue-start="true"] { --hn-cue-t: 16px; }
+.hn-shell-nav[data-cue-end="true"] { --hn-cue-b: 16px; }
+/* Pet di footer sidebar (desktop). Ia duduk dalam alur sidebar, di bawah daftar hub: `margin-top: auto`
+   mendorongnya ke dasar, dan daftar hub yang lebih panjang dari layar menggulir sendiri di atasnya. Slot
+   kosong (`:empty`) tak memesan ruang sama sekali — itulah keadaan pet mati dan keadaan tablet/ponsel. */
+.hn-shell-dock { flex: 0 0 auto; margin-top: auto; padding-top: 8px; }
+.hn-shell-dock:empty { display: none; }
+/* Lajur pet di tablet dan ponsel: anak kolom di bawah <main>, jadi area gulir berakhir di atasnya. */
+.hn-shell-lane { flex: 0 0 auto; }
+.hn-shell-lane:empty { display: none; }
+.hn-shell-lane:not(:empty) { padding-bottom: var(--safe-bottom); }
+/* Lencana status sekunder di topbar: `display: contents` membiarkan anaknya tetap menjadi item kluster. */
+.hn-topbar-extra { display: contents; }
+/* Baris kedua topbar (desktop): pilihan project, kotak cari, aksi halaman. Ia duduk di kiri kluster alat. */
+.hn-shell-subrow { display: flex; align-items: center; gap: 10px; min-width: 0; margin-left: auto; }
+.hn-shell-subrow + .hn-shell-tools { margin-left: 0; }
+/* Topbar desktop (QA Chrome run4 · P2): alat TAK membungkus di tier mana pun. Dulu `flex-wrap: wrap` di desktop
+   memindahkan avatar akun ke baris kedua di /review (topbar 79 px, layar lain 56 px). Yang menyusut kini kolom
+   judul dan baris kedua (project, cari, aksi); tombol dan lencana alat utuh. Target: topbar 56 px di semua rute. */
+.hn-shell-subrow > * { min-width: 0; }
+.hn-shell-subrow > button { flex: 0 0 auto; white-space: nowrap; }
+.hn-shell .hn-shell-subrow .hn-shell-scope { min-width: 0; max-width: 100%; }
+.hn-shell .hn-shell-subrow .hn-shell-scope select { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ADR-0205 · tiga grup berlabel (Kerja · Otomasi · Sistem). Label grup sekecil eyebrow; pemisah antar
+   grup memakai jarak, bukan garis, supaya di sidebar penuh terbaca sebagai daftar biasa. */
+.hn-nav-group { display: flex; flex-direction: column; gap: 2px; }
+.hn-nav-group + .hn-nav-group { margin-top: 14px; }
+.hn-nav-group-label { padding: 0 10px 6px; }
+/* ADR-0205 · bar tab hub di atas konten layar anak hub (SectionTabs). */
+/* Bar tab hub: SATU baris yang menggulir mendatar (`.hn-tabs` sudah `overflow-x: auto` dan tab-nya
+   `flex: 0 0 auto`); wadahnya tak boleh lebih lebar dari kolom, supaya gulirnya ada di bar, bukan di halaman. */
+.hn-section-tabs { min-width: 0; max-width: 100%; margin-bottom: var(--space-4); }
+.hn-section-tabs > .hn-tabs { max-width: 100%; }
 .hn-shell-column { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .hn-shell-topbar {
   min-height: var(--topbar-h);
@@ -84,9 +140,24 @@ textarea:focus-visible,
   color: var(--text-body);
 }
 .hn-shell-heading { min-width: 0; }
-.hn-shell-tools { margin-left: auto; display: flex; min-width: 0; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.hn-shell-tools { margin-left: auto; display: flex; flex: 0 0 auto; min-width: 0; align-items: center; justify-content: flex-end; flex-wrap: nowrap; gap: 10px; }
+/* Crumb dan judul SATU baris di semua tier: crumb panjang (nama project, "Hub › Tab · deskripsi") menyusut dengan
+   elipsis, tak membungkus menjadi beberapa baris yang mendorong tinggi topbar (QA run3: /docs 121–207 px). */
+.hn-shell-crumb { min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hn-shell-title { min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-bottom: 0.1em; }
 .hn-shell-search { width: 220px; }
-.hn-shell-main { flex: 1; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto; }
+/* Pet (HanomanPet) TIDAK lagi melayang di atas konten: ia duduk di alur layout — footer sidebar di desktop,
+   lajur di bawah <main> di tablet dan ponsel (lihat .hn-shell-dock / .hn-shell-lane). Area gulir karena itu
+   berakhir sendiri di atas pet, tanpa padding pemesan ruang, dan sticky bar (Review, Triase) menempel di
+   dasar area gulir yang sudah di atas pet. `--pet-h` (tinggi sel pet) hanya dibaca bar yang `position: fixed`
+   di ponsel — aksi QA — supaya ikut naik di atas lajur. Tanpa pet nilainya 0. */
+:root { --pet-h: 0px; }
+.hn-shell-main {
+  flex: 1; min-width: 0; min-height: 0; overflow-x: hidden; overflow-y: auto;
+}
+@media (max-width: 767px) {
+  .hn-shell .hn-qa-bar-actions { bottom: calc(var(--pet-h) + var(--safe-bottom)); }
+}
 .hn-shell-content {
   width: 100%;
   min-width: 0;
@@ -124,25 +195,10 @@ textarea:focus-visible,
 .hn-topbar-label-short { display: none; }
 .hn-grid-mobile,
 .hn-stack-mobile,
-.hn-wrap-mobile,
-.hn-dense-row,
-.hn-vps-row { min-width: 0; }
-
-/* Baris VPS · baris atas (identitas · pil status · aksi) dan baris bawah (status instalasi).
-   Aksi dikunci ke kanan lewat margin-left auto supaya kolom tombol tetap sejajar antar-baris
-   meski panjang nama & host berbeda-beda. */
-.hn-vps-row:hover { background: var(--surface-sunken); }
-.hn-vps-main { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
-.hn-vps-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; flex-shrink: 0; }
-.hn-vps-sep {
-  width: 1px; height: 18px; margin: 0 4px;
-  background: var(--border-hair);
-}
-
-@media (max-width: 1199px) {
-  /* Sempit: label tombol jadi mahal, tapi jangan sampai baris atas ikut membungkus. */
-  .hn-vps-actions { flex-wrap: wrap; justify-content: flex-end; }
-}
+.hn-dense-row { min-width: 0; }
+/* Header Card. Susunan dasar di sini (sebelum blok mobile), bukan inline, supaya `align-items: stretch`
+   di mobile menang lewat urutan kaskade biasa. */
+.hn-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 
 /* SPEC-961 · badge "butuh pengajuan" di entri sidebar. `margin-left: auto` mengunci angkanya ke
    tepi kanan supaya kolomnya sejajar antar-baris; `flex-shrink: 0` menjaga ia tak pernah menyusut
@@ -173,15 +229,45 @@ textarea:focus-visible,
 
 @media (min-width: 768px) and (max-width: 1199px) {
   .hn-shell-sidebar { width: var(--sidebar-w); padding: 14px 8px; }
-  /* Label disembunyikan di tier ini, jadi `margin-left: auto` tak lagi punya sisa ruang untuk
-     mendorong; badge duduk rapat di samping ikon dan tombolnya tetap terpusat. */
-  .hn-shell-sidebar .hn-nav-badge { margin-left: 0; }
+  /* Rail: badge hitungan DILEPAS dari aliran flex (absolut di pojok kanan-atas tombol). Sebagai flex item ia
+     tadinya ikut membagi lebar dengan ikon, dan ikon Backlog/Triase menyusut dari 17 ke 7 px (C). */
+  .hn-shell-sidebar .hn-nav-item { position: relative; }
+  .hn-shell-sidebar .hn-nav-badge {
+    position: absolute; top: 3px; right: 5px; margin-left: 0;
+    min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px;
+  }
 
   .hn-shell-sidebar .hn-nav-label,
-  .hn-shell-sidebar .hn-shell-workspace,
+  .hn-shell-sidebar .hn-nav-group-label,
   .hn-shell-sidebar .hn-shell-wordmark > div > div > span:last-child { display: none; }
+  /* Rail: label grup disembunyikan, jadi grup dipisah garis tipis agar tetap terbaca sebagai kelompok. */
+  .hn-shell-sidebar .hn-nav-group + .hn-nav-group { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-hair); }
   .hn-shell-sidebar nav button { justify-content: center; padding-inline: 0; }
   .hn-shell-wordmark { display: flex; justify-content: center; padding-inline: 0; }
+
+  /* Topbar tablet (QA run3 · P2): baris pertama = judul + alat, SATU baris, dengan alat yang tak membungkus. Lencana
+     update dan batas memakai bentuk pendeknya (`.hn-topbar-label-short`), dan judul yang menyusut menerima sisa
+     lebar. Baris kedua (project, cari, aksi) hanya ada bila layar memakainya, dan ia menggulir mendatar sendiri
+     ketimbang mendorong tinggi topbar. Target: ≤ 64 px tanpa baris kedua, +40 px dengan baris kedua. */
+  .hn-shell-topbar { flex-wrap: wrap; gap: 6px 16px; min-height: 0; padding-block: 8px; }
+  .hn-shell-heading { flex: 1 1 0; }
+  .hn-shell-tools { flex: 0 0 auto; flex-wrap: nowrap; gap: 6px; }
+  .hn-shell-subrow { order: 3; flex: 0 0 100%; height: 40px; margin: 0; min-width: 0; overflow-x: auto; }
+  /* Pilihan project di baris kedua: lebarnya dibatasi kolom dan namanya terpotong dengan elipsis ("Semua proje" tadinya). */
+  .hn-shell .hn-shell-subrow .hn-shell-scope { max-width: 100%; min-width: 0; }
+  .hn-shell .hn-shell-subrow .hn-shell-scope select { min-width: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hn-shell .hn-shell-cmdk .hn-kbd { display: none; }
+  .hn-topbar-label { display: none; }
+  .hn-topbar-label-short { display: inline; }
+}
+
+/* Desktop pendek (tinggi ≤ 760 px): sidebar harus memuat 8 hub + footer tanpa gulir. Pet menciut menjadi chip di
+   HanomanPet (JS, ambang yang sama); di sini jarak sidebar dirapatkan. Bila daftar tetap meluap, cue gulir
+   `.hn-shell-nav[data-cue-*]` yang menjawab, dan hub aktif digulir ke layar oleh shell.tsx. */
+@media (min-width: 1200px) and (max-height: 760px) {
+  .hn-shell-wordmark { padding-bottom: 12px; }
+  .hn-nav-group + .hn-nav-group { margin-top: 10px; }
+  .hn-shell-dock { padding-top: 4px; }
 }
 
 @media (max-width: 767px) {
@@ -207,124 +293,105 @@ textarea:focus-visible,
     border: 0;
     background: color-mix(in srgb, var(--ink-900) 42%, transparent);
   }
-  .hn-shell-topbar { align-items: flex-start; flex-wrap: wrap; gap: 8px 10px; padding: calc(6px + var(--safe-top)) var(--page-gutter-x) 8px; backdrop-filter: none; }
-  .hn-shell-heading { flex: 1 1 calc(100% - 54px); align-self: center; }
-  .hn-shell-tools { flex: 1 1 100%; margin-left: 0; justify-content: flex-start; gap: 6px; }
-  .hn-shell-search { flex: 1 1 100%; width: 100%; }
+  /* Topbar ponsel = SATU baris setinggi 44 px di dalam padding 6 px atas-bawah (total 56 px): menu, judul
+     (ellipsis), cari (ikon), notifikasi, akun. Lencana sekunder disembunyikan. Baris kedua (40 px) hanya ada
+     bila layar memakainya: pilihan project, kotak cari layar, dan aksi halaman. Tanpa itu header 56 px. */
+  .hn-shell-topbar {
+    align-items: center; flex-wrap: wrap; gap: 0 8px; min-height: 0;
+    padding: calc(6px + var(--safe-top)) var(--page-gutter-x) 6px; backdrop-filter: none;
+  }
+  .hn-shell-menu { order: 0; }
+  .hn-shell-heading { order: 1; flex: 1 1 0; align-self: center; }
+  .hn-shell-tools { order: 2; flex: 0 0 auto; margin-left: 0; gap: 4px; flex-wrap: nowrap; }
+  .hn-shell-subrow {
+    order: 3; flex: 0 0 100%; margin: 6px 0 0; margin-left: 0; height: 40px;
+    gap: 8px; min-width: 0;
+  }
+  .hn-shell .hn-shell-subrow > * { min-width: 0; }
+  .hn-shell .hn-shell-subrow .hn-shell-scope,
+  .hn-shell .hn-shell-subrow .hn-shell-search { width: auto; flex: 1 1 0; }
+  .hn-shell .hn-shell-subrow button,
+  .hn-shell .hn-shell-subrow input { min-height: 40px; }
+  .hn-topbar-extra { display: none; }
+  .hn-shell .hn-shell-cmdk { width: var(--touch-target); min-width: var(--touch-target); padding: 0; justify-content: center; }
+  .hn-shell .hn-shell-cmdk .hn-kbd { display: none; }
+  /* Crumb (deskripsi layar) dilepas dari baris judul: ia memakan baris kedua yang tak ada gunanya di ponsel.
+     Judul dipotong satu baris dengan elipsis: header tak lagi membungkus. */
+  .hn-shell-crumb { display: none; }
+  .hn-shell-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* SPEC-763 · label topbar yang panjang (pil update) diringkas di mobile supaya barisan tools muat
      satu baris; kontrolnya tetap ada, namanya dipikul aria-label/title, dan versinya tetap terbaca. */
   .hn-topbar-label { display: none; }
   .hn-topbar-label-short { display: inline; }
   .hn-shell button { min-width: var(--touch-target); min-height: var(--touch-target); }
-  .hn-viewport-popover {
-    position: fixed !important;
-    inset: auto max(var(--page-gutter-x), var(--safe-right)) calc(var(--page-gutter-y) + var(--safe-bottom)) max(var(--page-gutter-x), var(--safe-left)) !important;
-    width: auto !important;
+  /* Popover ponsel = lembar bawah. `div.` (0,1,1) mengalahkan posisi dan lebar dasar tiap popover
+     (.hn-notif-popover, .hn-account-menu, .hn-lim-popover, .hn-upd-popover) di berkas per layar yang
+     dimuat sesudah app.css. Keempatnya <div>. */
+  div.hn-viewport-popover {
+    position: fixed;
+    inset: auto max(var(--page-gutter-x), var(--safe-right)) calc(var(--page-gutter-y) + var(--safe-bottom)) max(var(--page-gutter-x), var(--safe-left));
+    width: auto;
     max-width: none;
-    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--page-gutter-y) - var(--page-gutter-y)) !important;
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--page-gutter-y) - var(--page-gutter-y));
     overflow: auto;
   }
-  .hn-modal-overlay {
-    align-items: flex-end !important;
+  /* Modal ponsel = lembar bawah (kit.tsx). `div.` menambah spesifisitas: aturan dasar `.hn-modal-scrim`,
+     `.hn-modal-sheet`, serta `.hn-modal-header/body/footer` ada di app-shell.css, yang dimuat sesudah app.css. */
+  div.hn-modal-overlay {
+    align-items: flex-end;
     padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
   }
-  .hn-modal-panel {
+  /* Lebar: kit.tsx memberi `style={{ width }}` inline, dan inline hanya bisa dikalahkan deklarasi penting.
+     Sisanya tanpa itu. max-width 100% sudah dari `.hn-modal-sheet` (app-shell.css). */
+  div.hn-modal-panel {
     width: 100% !important;
-    max-width: 100% !important;
-    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom)) !important;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+    max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
-  .hn-modal-header,
-  .hn-modal-body { padding-inline: var(--page-gutter-x) !important; }
-  .hn-modal-footer { padding-inline: var(--page-gutter-x) !important; }
+  div.hn-modal-header,
+  div.hn-modal-body { padding-inline: var(--page-gutter-x); }
+  .hn-modal-panel > div.hn-modal-footer { padding-inline: var(--page-gutter-x); }
   .hn-modal-footer > * { min-height: var(--touch-target); }
-  .hn-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-  .hn-project-header { display: none !important; }
-  .hn-project-row {
-    grid-template-columns: minmax(0, 1fr) !important;
-    align-items: stretch !important;
-    gap: 10px !important;
-    margin-bottom: 10px;
-    padding: 14px !important;
-    border: 1px solid var(--border-hair);
-    border-left-width: 3px;
-    border-radius: var(--radius-md);
-  }
-  .hn-project-row > [data-label] { min-width: 0; }
-  .hn-project-row > [data-label]::before {
-    content: attr(data-label);
-    display: block;
-    margin-bottom: 4px;
-    color: var(--text-subtle);
-    font: var(--weight-semibold) var(--text-2xs)/1.2 var(--font-mono);
-    letter-spacing: .08em;
-    text-transform: uppercase;
-  }
-  .hn-project-row > [data-label="Aktivitas"] { white-space: normal !important; }
-  /* SPEC-946 · toolbar papan Tim memakai aturan yang SAMA. Kelasnya dinamai sendiri, bukan
-     meminjam `.hn-backlog-*`: layar yang meminjam nama layar lain adalah cara aturan mulai
-     berubah untuk satu layar dan diam-diam ikut mengubah yang lain. */
-  .hn-backlog-topline,
-  .hn-team-topline,
-  .hn-backlog-view-actions,
-  .hn-team-view-actions,
-  .hn-backlog-filters,
-  .hn-team-filters { align-items: stretch !important; }
-  .hn-backlog-topline > *,
-  .hn-team-topline > *,
-  .hn-backlog-view-actions > *,
-  .hn-team-view-actions > *,
-  .hn-backlog-filters > *,
-  .hn-team-filters > * { max-width: 100%; }
-  .hn-backlog-view-actions,
-  .hn-team-view-actions { flex-wrap: wrap; }
-  .hn-backlog-filters .hn-touch-target,
-  .hn-team-filters .hn-touch-target { flex: 1 1 145px !important; width: auto !important; }
-  .hn-backlog-grid { grid-template-columns: minmax(0, 1fr) !important; }
-  .hn-backlog-row { align-items: flex-start !important; flex-wrap: wrap; }
-  .hn-backlog-row > div { flex-basis: 100% !important; }
-  .hn-card-footer { align-items: flex-start !important; flex-direction: column; }
-  .hn-grid-mobile { grid-template-columns: minmax(0, 1fr) !important; }
-  .hn-stack-mobile { align-items: stretch !important; flex-direction: column; }
-  .hn-wrap-mobile,
+  /* `div.` (0,1,1): `.hn-grid-split/even` (app-shell.css) dan `.hn-terminal-tabs-row` (terminal.css)
+     dimuat sesudah app.css dengan kelas tunggal. Semua pemakainya <div>. */
+  div.hn-grid-mobile { grid-template-columns: minmax(0, 1fr); }
+  div.hn-stack-mobile { align-items: stretch; flex-direction: column; }
+  /* Tetap deklarasi penting: CabangPanel.tsx memberi `alignItems: center` inline pada baris ini, dan
+     inline tak bisa dikalahkan selektor biasa. */
   .hn-dense-row { align-items: flex-start !important; flex-wrap: wrap; }
-  .hn-vps-main { align-items: flex-start; gap: 8px; }
-  .hn-vps-main > button { flex: 1 1 100%; }
-  .hn-vps-pills { flex-wrap: wrap; }
-  .hn-vps-actions { margin-left: 0; width: 100%; justify-content: flex-start; }
-  .hn-vps-actions > button { flex: 1 1 auto; }
-  .hn-vps-sep { display: none; }
-  .hn-dense-row > [style*="flex: 1"] { min-width: min(220px, 100%); }
+  .hn-dense-row > .hn-grow { min-width: min(220px, 100%); }
   /* SPEC-763 · baris pemilih (Ambil backlog, Riwayat sesi): judul adalah satu-satunya pembeda
      antar-baris, tapi `flex-basis: 0` membuatnya kalah dari tetangga yang basis-nya selebar isi —
      terukur di 390px judul tersisa "Ba…" (konten terpotong 667px) sementara id project yang
      identik di semua baris tampil penuh. Di mobile judulnya turun ke barisnya sendiri dan
-     membungkus; `!important` wajib karena `white-space: nowrap`-nya inline. */
+     membungkus. Selektor dua kelas ini (0,2,0) mengalahkan `.hn-terminal-*-title` (0,1,0) di terminal.css. */
   .hn-picker-row { flex-wrap: wrap; }
   .hn-picker-row > .hn-picker-title {
     order: 2;
-    flex: 1 1 100% !important;
-    min-width: 100% !important;
-    white-space: normal !important;
-    overflow: visible !important;
+    flex: 1 1 100%;
+    min-width: 100%;
+    white-space: normal;
+    overflow: visible;
   }
-  .hn-card-header { align-items: stretch !important; flex-direction: column; }
+  .hn-card-header { align-items: stretch; flex-direction: column; }
   .hn-card-actions { max-width: 100%; }
   .hn-card-actions > * { max-width: 100%; }
   .hn-settings-layout { width: 100%; }
-  .hn-portal-header {
-    height: auto !important;
+  /* `header.` / `div.` (0,1,1): portal.css memuat `.hn-portal-header` (height, padding) dan
+     `.hn-portal-content` (padding di 767px) dengan kelas tunggal, dimuat sesudah app.css. */
+  header.hn-portal-header {
+    height: auto;
     min-height: var(--topbar-h);
     flex-wrap: wrap;
-    padding: max(8px, var(--safe-top)) max(var(--page-gutter-x), var(--safe-right)) 8px max(var(--page-gutter-x), var(--safe-left)) !important;
+    padding: max(8px, var(--safe-top)) max(var(--page-gutter-x), var(--safe-right)) 8px max(var(--page-gutter-x), var(--safe-left));
   }
   .hn-portal-header > div { flex-basis: 1px; }
-  .hn-portal-content {
+  div.hn-portal-content {
     box-sizing: border-box;
-    padding: 16px max(var(--page-gutter-x), var(--safe-right)) calc(24px + var(--safe-bottom)) max(var(--page-gutter-x), var(--safe-left)) !important;
+    padding: 16px max(var(--page-gutter-x), var(--safe-right)) calc(24px + var(--safe-bottom)) max(var(--page-gutter-x), var(--safe-left));
   }
-  .hn-portal-toolbar { align-items: stretch !important; flex-direction: column; }
-  .hn-portal-row { align-items: flex-start !important; flex-wrap: wrap; min-height: var(--touch-target); }
+  /* Nilai yang sama dengan portal.css untuk breakpoint ini, jadi tak perlu deklarasi penting. */
+  .hn-portal-row { align-items: flex-start; flex-wrap: wrap; min-height: var(--touch-target); }
   .hn-portal-row > span:nth-child(2) { flex-basis: calc(100% - 110px); }
 }
 
@@ -338,12 +405,14 @@ textarea:focus-visible,
 }
 
 @media (max-width: 767px) {
-  .hn-setting-row { align-items: stretch !important; flex-direction: column; }
+  /* `div.` (0,1,1): settings.css memuat `.hn-set-row` (align-items: center) dengan kelas tunggal. */
+  div.hn-setting-row { align-items: stretch; flex-direction: column; }
   .hn-setting-control { width: 100%; }
+  /* Lebar pilihan (`.hn-set-w-*`, kelas tunggal 0,1,0) kalah dari selektor di bawah ini tanpa penanda penting. */
   .hn-setting-control > .hn-touch-target,
-  .hn-setting-control > div { width: 100% !important; max-width: 100%; }
+  .hn-setting-control > div { width: 100%; max-width: 100%; }
   .hn-setting-control > div { flex-wrap: wrap; }
-  .hn-setting-control > div > div.hn-touch-target { flex: 1 1 200px; width: auto !important; max-width: 100%; }
+  .hn-setting-control > div > div.hn-touch-target { flex: 1 1 200px; width: auto; max-width: 100%; }
 }
 
 .hn-local-overflow {
@@ -363,6 +432,28 @@ textarea:focus-visible,
      pointer-kasar, atau border-bottom hair). Kunci sumbu-Y supaya hanya scroll mendatar. */
   overflow-y: hidden;
   overscroll-behavior-inline: contain;
+  /* Tab yang meluap digulir per tab, tak berhenti di tengah label. `scroll-padding` = lebar gradasi tepi:
+     tab yang di-snap ke tepi tak tertutup gradasi, dan tab pertama tak menggeser strip 4 px (padding-nya). */
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 24px;
+}
+.hn-tabs > [role="tab"] { scroll-snap-align: start; }
+/* Gradasi di tepi yang masih menyimpan tab tersembunyi. Tabs men-set `data-fade-start` / `data-fade-end`
+   hanya saat strip meluap dan tepinya belum sampai ujung. Lewat mask, bukan latar: warna di bawahnya
+   tak berubah, dan tab yang tak meluap tak punya gradasi sama sekali. `#000` di sini hanya alfa mask. */
+.hn-tabs[data-fade-start="true"],
+.hn-tabs[data-fade-end="true"] {
+  --hn-fade-l: 0px;
+  --hn-fade-r: 0px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--hn-fade-l), #000 calc(100% - var(--hn-fade-r)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--hn-fade-l), #000 calc(100% - var(--hn-fade-r)), transparent 100%);
+}
+.hn-tabs[data-fade-start="true"] { --hn-fade-l: 24px; }
+.hn-tabs[data-fade-end="true"] { --hn-fade-r: 24px; }
+/* Scheduler (`.hn-sched`) punya lima tab; di 320 px strip yang digulir menyembunyikan tab aktif di luar layar.
+   Di layar sangat sempit tab membungkus ke baris berikutnya. Hanya strip Scheduler; strip lain tetap menggulir. */
+@media (max-width: 420px) {
+  .hn-sched > .hn-tabs { flex-wrap: wrap; overflow: visible; scroll-snap-type: none; }
 }
 
 /* SPEC-879 · baris kepala IDE = strip tab + toolbar. `flex-wrap` MEMUTUS BARIS SEBELUM MENYUSUT:
@@ -405,11 +496,72 @@ textarea:focus-visible,
 .hn-ide-toolbar > * { flex: 0 0 auto; }
 .hn-ide-toolbar > :first-child { margin-inline-start: auto; }
 
+/* Checkbox/radio mentah (Triase, PRD, VPS, Agent access, setup). Kontrol native ber-appearance auto tak
+   bisa dibesarkan (Chrome dan Safari mengabaikan width/height-nya), dan kotak 13 px-nya juga area klik.
+   Di sini kotak digambar sendiri 16 px; padding transparan di sekelilingnya menjadi area klik: 24×24 di
+   desktop (WCAG 2.5.8), 44×44 di pointer kasar dan ponsel (blok coarse di bawah). `background-clip` dan
+   `background-origin: content-box` menjaga padding tetap transparan, jadi tak ada blok warna 44 px yang
+   melebar baris (SPEC-879). Kontrol DS (`.hn-choice-control`) punya jalur sendiri di forms.tsx. */
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  box-sizing: content-box;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-origin: content-box;
+  background-clip: content-box;
+  /* Dua lapis dari bawah ke atas: ring (border-strong) penuh, lalu isi (surface-card) 1,5 px lebih kecil. */
+  background-image:
+    linear-gradient(var(--surface-card), var(--surface-card)),
+    linear-gradient(var(--border-strong), var(--border-strong));
+  background-size: calc(100% - 3px) calc(100% - 3px), 100% 100%;
+  cursor: pointer;
+}
+input[type="radio"] { border-radius: 50%; }
+/* Terpilih: isi brass (token --accent), ring --accent-hover, dan tanda centang/titik di atasnya.
+   Warna tanda (ink-900 = --accent-on) ditulis langsung karena SVG di data-URI tak membaca variabel CSS. */
+input[type="checkbox"]:checked {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.6 2.6L12 5.6' fill='none' stroke='%2317130c' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"),
+    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--accent-hover), var(--accent-hover));
+  background-size: 100% 100%, calc(100% - 3px) calc(100% - 3px), 100% 100%;
+}
+input[type="radio"]:checked {
+  background-image:
+    radial-gradient(circle, #17130c 0 2.5px, transparent 3px),
+    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--accent-hover), var(--accent-hover));
+  background-size: 100% 100%, calc(100% - 3px) calc(100% - 3px), 100% 100%;
+}
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled { opacity: 0.55; cursor: not-allowed; }
+/* Input file: kontrol bawaan browser ~21 px tinggi di pointer halus (tablet, desktop). 24 px = batas WCAG
+   2.5.8; di pointer kasar/ponsel naik ke 44 (blok coarse). */
+input[type="file"] { min-height: 24px; }
+
 @media (pointer: coarse), (max-width: 767px) {
   button:not(.hn-shell-backdrop) { min-width: var(--touch-target); min-height: var(--touch-target); }
-  input, select, textarea { min-width: var(--touch-target); min-height: var(--touch-target); }
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    min-width: var(--touch-target); min-height: var(--touch-target);
+  }
+  /* Checkbox/radio mentah: area klik 44×44 lewat padding (kotak 16 px + 14 px tiap sisi). Padding itu
+     transparan (aturan dasar di atas), jadi yang melebar hanya area klik, tak ada blok warna. */
+  input[type="checkbox"], input[type="radio"] { padding: 14px; }
+  /* Input file (Help Center, Keluhan, QA): tinggi tap 44, sebab kontrol bawaan browser hanya ~21 px. */
+  input[type="file"] { min-height: var(--touch-target); }
+  /* Target sentuh 44 px harus menang atas min-width/min-height komponen (24–40 px) yang tersebar di banyak
+     berkas dengan spesifisitas beragam, mis. `.hn-shell .hn-shell-subrow button` (0,2,1). Karena itu deklarasi penting. */
   .hn-touch-target,
-  .hn-project-open,
   .hn-terminal-unplaced-action,
   [role="button"][tabindex="0"] {
     min-width: var(--touch-target) !important;
@@ -596,10 +748,14 @@ textarea:focus-visible,
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   border-top: 1px solid var(--border-hair);
+  /* Kunci digulir per kunci. `scroll-padding` menjaga kunci yang di-snap tak tertutup gradasi tepi. */
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 24px;
 }
 
 .hn-terminal-key {
   flex: 0 0 auto;
+  scroll-snap-align: start;
   min-width: 40px;
   min-height: 32px;
   padding: 0 8px;
@@ -612,6 +768,18 @@ textarea:focus-visible,
 }
 
 .hn-terminal-key:hover { background: var(--bone-200); color: var(--text-strong); }
+
+/* Gradasi di tepi papan yang masih menyimpan kunci tersembunyi. TerminalKeys men-set `data-fade-*` hanya
+   saat papan meluap dan tepinya belum sampai ujung, sama dengan strip tab `.hn-tabs` di atas. Lewat mask. */
+.hn-terminal-keys[data-fade-start="true"],
+.hn-terminal-keys[data-fade-end="true"] {
+  --hn-fade-l: 0px;
+  --hn-fade-r: 0px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--hn-fade-l), #000 calc(100% - var(--hn-fade-r)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--hn-fade-l), #000 calc(100% - var(--hn-fade-r)), transparent 100%);
+}
+.hn-terminal-keys[data-fade-start="true"] { --hn-fade-l: 24px; }
+.hn-terminal-keys[data-fade-end="true"] { --hn-fade-r: 24px; }
 
 /* SPEC-882 · kolom ketik perangkat sentuh: satu baris, penanda kejujuran pengiriman di kanannya.
    Basis flex dinyatakan (bukan `auto`) karena `flex-wrap` memutus baris SEBELUM menyusut — pelajaran
@@ -739,6 +907,8 @@ textarea:focus-visible,
   .hn-responsive-panels--desktop .hn-responsive-panel[aria-hidden="true"] { display: block; }
 }
 
+/* Selektor `*` berspesifisitas 0: tanpa deklarasi penting, transisi dan animasi kelas mana pun di berkas
+   komponen akan menang. Sengaja global, sebab gerak dimatikan di mana pun. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
@@ -747,8 +917,9 @@ textarea:focus-visible,
   }
 }
 
-/* Primary/danger button text + icon white (buttons only) */
-button { --accent-on: #fff; }
+/* Teks + ikon tombol primer memakai `--accent-on` (ink-900 di atas brass-500, 5,74:1). Dulu di-override
+   putih di sini: #fff di atas brass-500 hanya 3,2:1. Tombol danger memberi #fff sendiri lewat inline
+   style (ds/components/forms.tsx), jadi tak bergantung pada aturan ini. */
 
 a { color: var(--text-link); text-decoration: none; }
 a:hover { color: var(--wind-700); text-decoration: underline; }
@@ -821,7 +992,6 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 
 @keyframes hn-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes hn-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
-@keyframes hn-toast-in { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* SPEC-648 · tiap transform punya layer sendiri agar hover, click, reveal, dan frame sprite dapat
    berjalan bersamaan. Seluruh keyframe hanya transform/opacity → compositor. */
@@ -878,108 +1048,10 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   100% { opacity: 0; transform: translateY(-26px) scale(0.9); }
 }
 
-/* ---- DalangStage (Overview hero) — Anoman dalang mengendalikan wayang project. ----
-   Kelir = gradasi bone; sesi running = wayang di panel gelap terminal ber-rim brass;
-   project idle = wayang parkir di debog. Sway hanya transform → compositor; padam
-   otomatis oleh blok prefers-reduced-motion global. */
-.hn-dalang {
-  border: 1px solid var(--border-hair); border-radius: var(--radius-lg);
-  background: var(--surface-card); overflow: hidden; margin-bottom: 20px;
-}
-.hn-dalang-head {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
-  padding: 16px 20px 10px;
-}
-.hn-dalang-stats { display: flex; gap: 22px; flex-wrap: wrap; }
-.hn-dalang-stat { text-align: right; }
-.hn-dalang-stat > div:first-child { justify-content: flex-end; }
-.hn-dalang-stage {
-  position: relative; display: flex; align-items: flex-end; gap: 16px; min-height: 148px;
-  padding: 6px 20px 0; background: linear-gradient(180deg, var(--bone-000), var(--bone-200));
-}
-/* Saat ada wayang dimainkan, kelir berubah jadi panggung gelap (permukaan gelap yang memang
-   disediakan sistem untuk kerja aktif) dengan pendar blencong dari atas — bahasa visual
-   concept art #4. Idle tetap bone: tenang. */
-.hn-dalang-stage[data-live] {
-  min-height: 196px; padding-top: 30px;
-  background: radial-gradient(ellipse 85% 130% at 50% -25%,
-    color-mix(in srgb, var(--brass-400) 24%, var(--term-bg)), var(--term-bg) 64%);
-}
-.hn-dalang-stage[data-live] .hn-dalang-mascot img {
-  filter: drop-shadow(0 0 20px color-mix(in srgb, var(--bone-000) 32%, transparent));
-}
-.hn-dalang-stage[data-live] .hn-dalang-live {
-  border-color: color-mix(in srgb, var(--brass-500) 45%, var(--term-line));
-}
-.hn-dalang-stage[data-live] .hn-dalang-live[data-waiting] { border-color: var(--amber-600); }
-.hn-dalang-stage[data-live] .hn-dalang-puppet img {
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--brass-300) 55%, transparent));
-}
-/* Benang gapit: energi mengalir dari tangan dalang ke tiap wayang (stroke-dashoffset —
-   dekoratif; padam total oleh blok prefers-reduced-motion global). */
-.hn-dalang-threads { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.hn-dalang-threads path {
-  fill: none; stroke: var(--brass-400); stroke-width: 1.5; stroke-linecap: round;
-  stroke-dasharray: 5 9; opacity: 0.75; animation: hn-dalang-flow 1.4s linear infinite;
-}
-@keyframes hn-dalang-flow { to { stroke-dashoffset: -28; } }
-.hn-dalang-mascot { width: 172px; flex: 0 0 auto; }
-/* Blencong di header panel; "menyala" (drop-shadow hangat) hanya saat ada wayang dimainkan.
-   Digambar Codex tanpa glow — cahayanya urusan UI (prompt aset). */
-.hn-dalang-blencong { height: 44px; width: auto; flex: 0 0 auto; pointer-events: none; }
-.hn-dalang-blencong[data-lit] {
-  filter: drop-shadow(0 0 14px color-mix(in srgb, var(--brass-400) 65%, transparent));
-}
-.hn-dalang-troupe {
-  flex: 1; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
-  padding: 4px 0 14px;
-}
-.hn-dalang-live {
-  appearance: none; font: inherit; text-align: left; cursor: pointer; width: 168px;
-  background: var(--term-bg); border: 1px solid var(--term-line);
-  border-radius: var(--radius-md); padding: 8px 12px 10px;
-  box-shadow: var(--shadow-sm), 0 0 16px 0 color-mix(in srgb, var(--brass-500) 28%, transparent);
-  transition: box-shadow var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
-}
-.hn-dalang-live:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md), 0 0 22px 0 color-mix(in srgb, var(--brass-500) 42%, transparent);
-}
-.hn-dalang-live:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-.hn-dalang-puppet {
-  display: block; width: fit-content; margin: 0 auto 6px;
-  transform-origin: 50% 100%;
-  animation: hn-dalang-sway 3.8s var(--ease-inout) infinite alternate;
-}
-@keyframes hn-dalang-sway {
-  from { transform: rotate(-2.4deg); }
-  to { transform: rotate(2.4deg); }
-}
-/* Sesi yang menunggu manusia: wayang diam menoleh — beda dari yang sedang dimainkan. */
-.hn-dalang-puppet--still { animation: none; transform: rotate(-3deg); }
-.hn-dalang-live[data-waiting] {
-  border-color: var(--amber-600);
-  box-shadow: var(--shadow-sm), 0 0 16px 0 color-mix(in srgb, var(--amber-500) 30%, transparent);
-}
-.hn-dalang-empty { flex: 1; padding: 22px 0 26px; }
-.hn-dalang-debog {
-  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-  padding: 10px 20px 12px; border-top: 1px solid var(--border-hair); background: var(--bone-100);
-}
-.hn-dalang-parked {
-  appearance: none; font: inherit; cursor: pointer; display: inline-flex; align-items: center;
-  gap: 7px; padding: 4px 12px 4px 8px; background: var(--surface-card);
-  border: 1px solid var(--border-hair); border-radius: var(--radius-pill);
-  transition: border-color var(--dur-fast) var(--ease-out);
-}
-.hn-dalang-parked:hover { border-color: var(--bone-400); }
-.hn-dalang-parked:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-/* ---- Dalang Hanoman (layar penuh) — panggung orkestrasi sinematik dari konsep Claude
-   Design "Dashboard Futuristik". Satu-satunya layar gelap penuh: peran warna DS menyediakan
-   permukaan gelap untuk KERJA AKTIF, dan seluruh layar ini adalah panggung kerja aktif.
-   Aksen tetap brass; glow = rgba brass, tak ada neon. ---- */
+/* ---- Dalang Hanoman (layar penuh). Gaya isinya ada di screens/styles/dalang.css (papan senyap, Fase 3B);
+   di sini hanya kerangka takeover dan tombol keluar yang dipakai bersama. ---- */
 /* Takeover layar penuh (cermin fullscreen Terminal, z 100 > header 90 > pet 80):
-   masuk menu = panggung memenuhi viewport; keluar lewat tombol ✕ atau Esc. */
+   masuk menu = layar memenuhi viewport; keluar lewat tombol ✕ atau Esc. */
 .hn-dlg {
   position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain;
   background: linear-gradient(180deg, var(--term-bg), #0d0b07 60%);
@@ -987,22 +1059,7 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
   padding-bottom: max(12px, var(--safe-bottom, 0px));
 }
 .hn-dlg-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.hn-dlg-blencong { height: 44px; width: auto; flex: 0 0 auto; }
-.hn-dlg-blencong[data-lit] { filter: drop-shadow(0 0 12px rgba(207,157,85,0.65)); }
 .hn-dlg-title { font-family: var(--font-display); font-size: 21px; font-weight: 600; color: var(--term-fg); margin: 0; }
-.hn-dlg-boot {
-  margin: 4px 0 0; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
-  color: var(--brass-300); min-height: 15px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-}
-.hn-dlg-boot::after { content: "▍"; color: var(--brass-500); margin-left: 2px; animation: hn-dlg-blink 1s steps(1) infinite; }
-@keyframes hn-dlg-blink { 50% { opacity: 0; } }
-.hn-dlg-chips { display: flex; gap: 8px; flex: 0 0 auto; }
-.hn-dlg-chip {
-  display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px;
-  border: 1px solid var(--term-line); border-radius: var(--radius-md); background: rgba(255,253,248,0.03);
-  font-family: var(--font-mono); font-size: 12px; color: var(--brass-300); white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
 .hn-dlg-exit {
   appearance: none; font: inherit; cursor: pointer; width: 34px; height: 34px; flex: none;
   display: inline-flex; align-items: center; justify-content: center;
@@ -1012,165 +1069,143 @@ a:hover { color: var(--wind-700); text-decoration: underline; }
 }
 .hn-dlg-exit:hover { color: var(--term-fg); border-color: var(--brass-700); }
 .hn-dlg-exit:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-.hn-dlg-kpis { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-top: 16px; }
-.hn-dlg-kpi {
-  display: flex; gap: 11px; align-items: flex-start; min-width: 0; padding: 12px 14px;
-  border: 1px solid var(--term-line); border-radius: var(--radius-md); background: rgba(255,253,248,0.03);
+/* Tombol keluar Dalang selalu tampil (di semua tier). 44×44 pada pointer kasar dan di ponsel. */
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-dlg-exit { width: var(--touch-target); height: var(--touch-target); }
 }
-.hn-dlg-kpi-ic { width: 34px; height: 34px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; justify-content: center; flex: none; }
-.hn-dlg-tone-wind { background: rgba(81,127,140,0.18); color: var(--wind-500); }
-.hn-dlg-tone-leaf { background: rgba(95,131,64,0.18); color: var(--leaf-500); }
-.hn-dlg-tone-brass { background: rgba(184,134,59,0.18); color: var(--brass-400); }
-.hn-dlg-tone-amber { background: rgba(207,143,40,0.18); color: var(--amber-500); }
-.hn-dlg-kpi-l { display: block; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.12em; color: var(--term-dim); }
-.hn-dlg-kpi-v { display: block; font-family: var(--font-display); font-size: 25px; font-weight: 700; line-height: 1.15; color: var(--term-fg); font-variant-numeric: tabular-nums; }
-.hn-dlg-kpi-s { display: block; font-size: 10.5px; color: var(--term-dim); margin-top: 1px; }
-.hn-dlg-grid { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 14px; align-items: start; margin-top: 14px; }
-.hn-dlg-hero {
-  position: relative; overflow: hidden; border: 1px solid var(--term-line); border-radius: var(--radius-lg);
-  background: radial-gradient(ellipse 75% 95% at 50% 0%, rgba(207,157,85,0.20), rgba(0,0,0,0) 62%);
-  padding: 16px 16px 0;
-}
-.hn-dlg-hud { position: absolute; left: 50%; top: 128px; transform: translate(-50%, -50%); width: 300px; height: 300px; pointer-events: none; opacity: 0.5; }
-.hn-dlg-hud circle { fill: none; stroke: var(--brass-700); stroke-width: 1; }
-.hn-dlg-hud-a, .hn-dlg-hud-b { transform-origin: 50% 50%; }
-.hn-dlg-hud-a { animation: hn-dlg-rot 26s linear infinite; }
-.hn-dlg-hud-b { animation: hn-dlg-rotr 40s linear infinite; }
-@keyframes hn-dlg-rot { to { transform: rotate(360deg); } }
-@keyframes hn-dlg-rotr { to { transform: rotate(-360deg); } }
-.hn-dlg-threads { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.hn-dlg-threads path {
-  fill: none; stroke: var(--brass-500); stroke-width: 1.4; stroke-linecap: round;
-  stroke-dasharray: 4 8; opacity: 0.8; animation: hn-dalang-flow 1.5s linear infinite;
-}
-/* Benang kendur ke wayang diam: utuh (tanpa dash), redup, tak beranimasi. */
-.hn-dlg-threads path.hn-dlg-thread--slack {
-  stroke: var(--brass-700); stroke-dasharray: none; opacity: 0.3; animation: none;
-}
-.hn-dlg-scan {
-  position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(207,157,85,0.05) 48%, rgba(227,201,136,0.09) 50%, rgba(207,157,85,0.05) 52%, rgba(0,0,0,0) 100%);
-  background-size: 100% 240px; background-repeat: no-repeat; background-position: 0 -240px;
-  animation: hn-dlg-scan 7s linear infinite;
-}
-@keyframes hn-dlg-scan { 0% { background-position: 0 -240px; } 60% { background-position: 0 460px; } 100% { background-position: 0 460px; } }
-/* Rig hero ber-sendi: kanvas komposisi 1003x757 unit sheet; badan + 4 lengan absolut,
-   tiap lengan berputar pada cakram pivot bahunya (transform-origin = pusat cakram,
-   koordinat diukur dari aset — lihat internal/assets/dalang/README.md). */
-/* Geometri dari internal/scripts/dalang/rigbuild.py (ARM_SCALE=0.78 — lengan generasi
-   terlalu tebal relatif badan; skala murni CSS, aset tak disentuh). */
-.hn-dlg-hero-art {
-  position: relative; width: min(540px, 94%); aspect-ratio: 835 / 582;
-  margin: 0 auto; animation: hn-dlg-float 6s ease-in-out infinite;
-}
-.hn-dlg-hero-art img {
-  position: absolute; display: block; height: auto;
-  filter: drop-shadow(0 0 18px rgba(212,164,60,0.35));
-}
-.hn-dlg-rig-body { left: 25.88%; top: 16.32%; width: 48.73%; z-index: 2; }
-.hn-dlg-rig-arm { z-index: 1; will-change: transform; }
-.hn-dlg-rig-arm--ul { left: 5.48%;  top: 0.39%;  width: 32.03%; transform-origin: 85.5% 86.8%; animation: hn-dlg-arm-a 5s   ease-in-out infinite; }
-.hn-dlg-rig-arm--ur { left: 61.65%; top: 0%;     width: 30.82%; transform-origin: 15.1% 87.1%; animation: hn-dlg-arm-b 5.6s ease-in-out infinite; }
-.hn-dlg-rig-arm--ml { left: 0%;     top: 58.84%; width: 37.36%; transform-origin: 89.2% 24.2%; animation: hn-dlg-arm-b 6.4s ease-in-out infinite; }
-.hn-dlg-rig-arm--mr { left: 61.80%; top: 58.32%; width: 38.20%; transform-origin: 11.1% 24.3%; animation: hn-dlg-arm-a 7s   ease-in-out infinite; }
-@keyframes hn-dlg-arm-a { 0%, 100% { transform: rotate(-2.5deg); } 50% { transform: rotate(3deg); } }
-@keyframes hn-dlg-arm-b { 0%, 100% { transform: rotate(2.5deg); } 50% { transform: rotate(-3deg); } }
-/* Jangkar benang: titik gapit di tiap tangan (centroid emas terukur → %). */
-.hn-dlg-hand { position: absolute; width: 2px; height: 2px; pointer-events: none; }
-.hn-dlg-hand[data-hand="ul"] { left: 15.5%; top: 9.9%; }
-.hn-dlg-hand[data-hand="ur"] { left: 82.7%; top: 9.6%; }
-.hn-dlg-hand[data-hand="ml"] { left: 10.2%; top: 76.1%; }
-.hn-dlg-hand[data-hand="mr"] { left: 89.5%; top: 75.5%; }
-@keyframes hn-dlg-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-.hn-dlg-cards { position: relative; display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; justify-content: center; padding: 18px 0 16px; }
-.hn-dlg-prj {
-  appearance: none; font: inherit; text-align: left; cursor: pointer; width: 168px;
-  background: rgba(10,8,5,0.85); border: 1px solid rgba(184,134,59,0.45); border-radius: var(--radius-md);
-  padding: 8px 12px 10px; color: var(--term-fg);
-  box-shadow: 0 0 16px 0 rgba(184,134,59,0.22);
-  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
-}
-.hn-dlg-prj:hover { transform: translateY(-3px); box-shadow: 0 0 24px 0 rgba(184,134,59,0.4); }
-.hn-dlg-prj:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-.hn-dlg-prj[data-waiting] { border-color: var(--amber-600); box-shadow: 0 0 16px 0 rgba(207,143,40,0.3); }
-/* Wayang tidak aktif: tetap tampil, tersandar redup — tanpa glow, tanpa goyang. */
-.hn-dlg-prj--off { border-color: var(--term-line); box-shadow: none; }
-.hn-dlg-prj--off:hover { box-shadow: 0 0 14px 0 rgba(184,134,59,0.14); }
-.hn-dlg-prj--off .hn-dlg-puppet img { filter: grayscale(0.85) brightness(0.55); }
-.hn-dlg-prj--off .hn-dlg-prj-name { color: var(--term-dim); }
-.hn-dlg-prj-sub--off { color: var(--term-dim); }
-.hn-dlg-puppet { display: block; width: fit-content; margin: 0 auto 6px; transform-origin: 50% 0%; animation: hn-dalang-sway 3.6s var(--ease-inout) infinite alternate; }
-.hn-dlg-puppet--still { animation: none; transform: rotate(-3deg); }
-.hn-dlg-puppet img { display: block; height: 108px; width: auto; filter: drop-shadow(0 0 10px rgba(227,201,136,0.5)); }
-.hn-dlg-prj--off .hn-dlg-puppet img { height: 88px; }
-.hn-dlg-prj-name { display: block; font-family: var(--font-mono); font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hn-dlg-prj-sub { display: block; font-family: var(--font-mono); font-size: 10.5px; color: var(--brass-400); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hn-dlg-prj-sub--amber { color: var(--amber-500); }
 .hn-dlg-empty { position: relative; text-align: center; padding: 26px 0 30px; color: var(--term-dim); font-size: 12.5px; line-height: 1.7; }
-.hn-dlg-cmd {
-  appearance: none; font: inherit; cursor: pointer; width: 100%; margin-top: 12px;
-  display: flex; align-items: center; gap: 12px; padding: 11px 15px; text-align: left;
-  border: 1px solid var(--brass-700); border-radius: var(--radius-lg);
-  background: linear-gradient(90deg, rgba(212,164,60,0.12), rgba(212,164,60,0.03)); color: var(--term-fg);
-  transition: border-color var(--dur-base) var(--ease-out);
-}
-.hn-dlg-cmd:hover { border-color: var(--brass-500); }
-.hn-dlg-cmd:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-.hn-dlg-mic { position: relative; width: 11px; height: 11px; border-radius: 50%; background: var(--brass-500); flex: none; }
-.hn-dlg-mic::before { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 1px solid var(--brass-500); opacity: 0; animation: hn-dlg-ping 1.8s ease-out infinite; }
-@keyframes hn-dlg-ping { 0% { transform: scale(0.85); opacity: 0.8; } 70% { transform: scale(1.4); opacity: 0; } 100% { opacity: 0; } }
-.hn-dlg-cmd-t { font-family: var(--font-mono); font-size: 12px; color: var(--term-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hn-dlg-cmd-t b { color: var(--brass-300); font-weight: 500; }
-.hn-dlg-cmd-k { margin-left: auto; flex: none; font-family: var(--font-mono); font-size: 10px; color: var(--term-dim); border: 1px solid var(--term-line); border-radius: var(--radius-sm); padding: 2px 8px; }
-.hn-dlg-rail { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.hn-dlg-card { border: 1px solid var(--term-line); border-radius: var(--radius-md); background: rgba(255,253,248,0.03); padding: 12px 14px; }
-.hn-dlg-rt { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.12em; color: var(--brass-300); margin-bottom: 9px; }
-.hn-dlg-mut { font-size: 12px; color: var(--term-dim); }
-.hn-dlg-act { display: flex; gap: 9px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--term-line); font-size: 11.5px; }
-.hn-dlg-act:last-of-type { border-bottom: 0; }
+.hn-dlg-rt { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; color: var(--brass-300); margin-bottom: 9px; }
 .hn-dlg-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--term-line); flex: none; margin-top: 4px; }
-.hn-dlg-dot--on { background: var(--brass-500); }
-.hn-dlg-act-x { color: var(--term-dim); line-height: 1.5; min-width: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.hn-dlg-act-x b { color: var(--term-fg); font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
-.hn-dlg-donut-wrap { display: flex; align-items: center; gap: 12px; }
-.hn-dlg-donut { position: relative; width: 112px; height: 112px; flex: none; }
-.hn-dlg-ring { fill: none; stroke: var(--term-line); }
-.hn-dlg-seg { fill: none; transition: stroke-dasharray var(--dur-slow) var(--ease-out); }
-.hn-dlg-seg--wind { stroke: var(--wind-500); }
-.hn-dlg-seg--leaf { stroke: var(--leaf-500); }
-.hn-dlg-seg--amber { stroke: var(--amber-500); }
-.hn-dlg-seg--brass { stroke: var(--brass-400); }
-.hn-dlg-leg { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--term-dim); }
-.hn-dlg-leg b { color: var(--term-fg); }
-.hn-dlg-leg i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 7px; }
-.hn-dlg-leg i.hn-dlg-seg--wind { background: var(--wind-500); }
-.hn-dlg-leg i.hn-dlg-seg--leaf { background: var(--leaf-500); }
-.hn-dlg-leg i.hn-dlg-seg--amber { background: var(--amber-500); }
-.hn-dlg-leg i.hn-dlg-seg--brass { background: var(--brass-400); }
-.hn-dlg-donut-c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.hn-dlg-donut-c b { font-family: var(--font-display); font-size: 23px; color: var(--term-fg); line-height: 1; }
-.hn-dlg-donut-c span { font-size: 9.5px; color: var(--term-dim); margin-top: 2px; }
-.hn-dlg-chart { display: block; width: 100%; height: auto; }
-.hn-dlg-chart line { stroke: var(--term-line); stroke-width: 0.6; }
-.hn-dlg-chart text { font-family: var(--font-mono); font-size: 7.5px; fill: var(--term-dim); }
-.hn-dlg-chart circle { fill: var(--wind-500); }
-.hn-dlg-trend { fill: none; stroke: var(--wind-500); stroke-width: 1.6; }
-.hn-dlg-foot { text-align: center; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.28em; color: var(--brass-700); padding: 12px 0 4px; }
-@media (max-width: 1199px) {
-  .hn-dlg-grid { grid-template-columns: 1fr; }
+
+/* ============================================================
+   Primitif layout & daftar (Audit UI/UX 2026-10 · Fase 2A)
+   Kontrak: internal/docs/design-system/design-system.md, "Primitif layout".
+   Gap dan warna datang dari token (var inline); kelas di sini hanya menyusun.
+   ============================================================ */
+
+/* Utilitas: bagian flex yang menyerap sisa ruang. Pengganti inline `flex: 1` supaya aturan mobile
+   bisa mengenalinya lewat kelas, bukan lewat `[style*="flex: 1"]`. */
+.hn-grow { flex: 1 1 0%; }
+
+.hn-stack { display: flex; flex-direction: column; min-width: 0; }
+.hn-inline { display: flex; flex-direction: row; flex-wrap: wrap; min-width: 0; }
+.hn-inline.hn-inline-nowrap { flex-wrap: nowrap; }
+
+/* PageHeader · judul layar = h2 (shell sudah punya h1). */
+.hn-page-header {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: var(--space-3) var(--space-5); min-width: 0;
 }
-@media (max-width: 767px) {
-  .hn-dlg-kpis { grid-template-columns: repeat(2, minmax(0,1fr)); }
-  .hn-dlg-chips { display: none; }
-  .hn-dlg-hero-art { width: min(360px, 100%); }
+.hn-page-header-text { flex: 1 1 260px; min-width: 0; }
+.hn-page-eyebrow { margin-bottom: var(--space-1); }
+.hn-page-title {
+  margin: 0; font-family: var(--font-display); font-size: var(--text-2xl); font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight); line-height: var(--leading-tight); color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.hn-page-description {
+  margin: var(--space-1) 0 0; max-width: 64ch; font-size: var(--text-sm);
+  line-height: var(--leading-normal); color: var(--text-muted);
+}
+.hn-page-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+
+/* FilterBar · pencarian, chip filter aktif, popover "Filter", Reset. */
+.hn-filter-bar { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.hn-filter-bar-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.hn-filter-search { flex: 1 1 220px; min-width: min(220px, 100%); max-width: 360px; }
+.hn-filter-actions { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+.hn-filter-bar-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; }
+.hn-filter-chip {
+  display: inline-flex; align-items: center; gap: var(--space-1); min-height: 28px; padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-pill);
+  background: var(--accent-tint); color: var(--text-strong);
+  font: var(--weight-medium) var(--text-xs)/1 var(--font-ui); cursor: pointer;
+}
+.hn-filter-chip:hover { background: var(--brass-300); }
+.hn-filter-popover-anchor { position: relative; display: inline-flex; }
+.hn-filter-trigger {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 32px; padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface-card); color: var(--text-body);
+  font: var(--weight-medium) var(--text-sm)/1 var(--font-ui); cursor: pointer;
+}
+.hn-filter-trigger:hover { background: var(--bone-100); color: var(--text-strong); }
+.hn-filter-trigger[aria-expanded="true"] { border-color: var(--border-focus); }
+.hn-filter-count {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: var(--radius-pill); background: var(--brass-700); color: var(--bone-000);
+  font: var(--weight-semibold) var(--text-2xs)/1 var(--font-mono);
+}
+.hn-filter-popover {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; min-width: 260px;
+  max-width: min(360px, calc(100vw - 2 * var(--page-gutter-x)));
+  display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3);
+  background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+/* ≤640 px: anchor memenuhi lebar barisnya, dan popover ter-clamp di antara tepi kirinya dan kanannya.
+   Tanpa ini, `left: 0` dari tombol yang ada di sisi kanan baris meluap ke kanan layar (QA 390 px: x 297–557). */
+@media (max-width: 640px) {
+  .hn-filter-popover-anchor { flex: 1 1 100%; }
+  .hn-filter-popover { right: 0; max-width: min(360px, 100%); }
+}
+.hn-filter-chip:focus-visible,
+.hn-filter-trigger:focus-visible,
+.hn-row-main:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* RowList / DenseRow · satu pola untuk baris klik (button/a) dan non-klik (div). */
+.hn-row-list { list-style: none; margin: 0; padding: 0; min-width: 0; }
+.hn-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); min-width: 0;
+  padding: 0 var(--space-3); border-bottom: 1px solid var(--border-hair);
+}
+.hn-row:last-child { border-bottom: 0; }
+.hn-row-main {
+  flex: 1 1 200px; min-width: 0; display: flex; align-items: center; gap: var(--space-3);
+  margin: 0; padding: 10px 0; border: 0; background: transparent; color: inherit;
+  font: inherit; text-align: left;
+}
+a.hn-row-main, a.hn-row-main:hover { color: inherit; border: 0; }
+button.hn-row-main { cursor: pointer; }
+.hn-row-interactive { transition: background var(--dur-fast) var(--ease-out); }
+.hn-row-interactive:hover,
+.hn-row-interactive:focus-within { background: var(--surface-sunken); }
+.hn-row-selected { background: var(--brass-050); box-shadow: inset 3px 0 0 var(--accent); }
+.hn-row-actions { display: flex; align-items: center; gap: var(--space-1); flex: 0 0 auto; }
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-row-interactive .hn-row-main,
+  .hn-row-actions button { min-height: var(--touch-target); }
 }
 
-@media (max-width: 767px) {
-  .hn-dalang-head { flex-direction: column; }
-  .hn-dalang-stats { gap: 16px; }
-  .hn-dalang-stat { text-align: left; }
-  .hn-dalang-stat > div:first-child { justify-content: flex-start; }
-  .hn-dalang-mascot { width: 116px; }
-  .hn-dalang-blencong { display: none; }
-  .hn-dalang-live { width: 100%; }
+/* Skeleton · shimmer hanya bila gerak diizinkan. */
+.hn-skeleton {
+  display: block; max-width: 100%;
+  background: linear-gradient(90deg, var(--bone-200) 0%, var(--bone-300) 50%, var(--bone-200) 100%);
+  background-size: 200% 100%;
+  animation: hn-skeleton-shimmer 1.4s var(--ease-inout) infinite;
 }
+.hn-skeleton-r-xs { border-radius: var(--radius-xs); }
+.hn-skeleton-r-sm { border-radius: var(--radius-sm); }
+.hn-skeleton-r-md { border-radius: var(--radius-md); }
+.hn-skeleton-r-pill { border-radius: var(--radius-pill); }
+.hn-skeleton-list { display: flex; flex-direction: column; gap: var(--space-2); }
+@keyframes hn-skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .hn-skeleton { animation: none; } }
+
+/* StatusPill/Badge dot · titik berdenyut untuk status yang hidup. Keyframes dipindah ke sini dari
+   inline <style> per-pill (dulu diinjeksi berulang di setiap StatusPill). */
+.hn-status-dot-pulse { animation: hn-pulse 1.4s ease-in-out infinite; }
+@keyframes hn-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .hn-status-dot-pulse { animation: none; } }
+
+/* LiveConnectionBadge · wilayah status selalu ada; saat kosong ia tak memakan ruang dan tak ikut gap. */
+.hn-live-status { display: inline-flex; align-items: center; min-width: 0; }
+.hn-live-status:empty {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* OverflowActions · item menu (`.hn-overflow-item*`) didefinisikan sekali di ds/components/ui.css. */
+
+/* Tabs · panel tab. Yang tak aktif memakai atribut `hidden` dari DOM. */
+.hn-tabpanel { min-width: 0; }
+.hn-tabpanel[hidden] { display: none; }

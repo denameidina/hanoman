@@ -3,7 +3,7 @@
 Empat gambar konsep (concept art, BUKAN aset produk) untuk arah visual dashboard: Anoman sebagai
 **dalang** yang mengendalikan wayang — tiap project adalah satu wayang kulit; sesi yang running =
 wayang yang sedang dimainkan di kelir, project diam = wayang parkir di debog. Gambar-gambar ini
-adalah **referensi desain** bagi panel `DalangStage` di Overview (`src/src/screens/DalangStage.tsx`);
+adalah **referensi desain** bagi panel `DalangStage` di Overview (`src/src/screens/DalangStage.tsx`, dihapus di Fase 2E);
 mereka tidak masuk katalog 41-ID (`../illustration/inventory.json`), tidak dibundel frontend, dan
 tidak melewati Gate review brand — karena itu duduk di `concepts/`, bukan `illustration/`.
 

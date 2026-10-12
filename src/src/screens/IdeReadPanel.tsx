@@ -8,7 +8,8 @@ import { MarkdownView } from "../ds/markdown";
 import { useApi } from "../api/instance";
 import type { RepoFile, ReviewFile, WorkingStatus } from "../api/client";
 import type { GraphCommit } from "@hanoman/shared";
-import { buildFileTree, TreeRow, ChangedSection } from "./file-tree";
+import { failureMessage } from "../lib/report-error";
+import { buildFileTree, TreeRow, TreeRoot, ChangedSection } from "./file-tree";
 import { DiffView } from "./diff-view";
 
 export function IdeReadPanel({ projectId }: { projectId: string }) {
@@ -52,7 +53,7 @@ export function IdeReadPanel({ projectId }: { projectId: string }) {
   const inDiff = selKind !== "file";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: "1 1 0", minHeight: 0 }}>
+    <div className="hn-ide-read-root">
       <Tabs tabs={[{ value: "explorer", label: "Explorer" }, { value: "graph", label: "Riwayat" }]}
         value={tab} onChange={(v) => setTab(v as "explorer" | "graph")} />
       {tab === "explorer" ? (
@@ -64,48 +65,52 @@ export function IdeReadPanel({ projectId }: { projectId: string }) {
           panels={[
             { id: "files", label: "Files", className: "hn-panel-flex", content: (
               <Card padding={0} fill>
-                <div style={{ flex: "0 0 auto", padding: "10px 14px", borderBottom: "1px solid var(--border-hair)" }}>
+                <div className="hn-ide-read-head">
                   <span className="hn-eyebrow">changes{status?.branch ? ` · ${status.branch}` : ""}</span>
                 </div>
-                <div data-testid="ide-tree-scroll" style={{ padding: 8, flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+                <div data-testid="ide-tree-scroll" className="hn-ide-read-tree">
                   <ChangedSection label="Staged" changed={status?.staged ?? []}
                     selected={selKind === "staged" ? selected : ""} onSelect={selectStaged}
                     view="list" onView={() => {}} emptyText="Tak ada file staged." />
-                  <div style={{ borderTop: "1px solid var(--border-hair)", margin: "6px 0" }} />
+                  <div className="hn-ide-read-divider" />
                   <ChangedSection label="Changed" changed={status?.unstaged ?? []}
                     selected={selKind === "unstaged" ? selected : ""} onSelect={selectChanged}
                     view="list" onView={() => {}} emptyText="Tak ada file berubah." />
-                  <div className="hn-eyebrow" style={{ padding: "6px 8px", marginTop: 8, borderTop: "1px solid var(--border-hair)" }}>
+                  <div className="hn-eyebrow hn-ide-read-section">
                     Files
                   </div>
                   {treeState === "loading" ? <StateBlock kind="loading" compact title="Memuat file…" />
                     : treeState === "error" ? <StateBlock kind="error" compact title="Gagal memuat file" />
                     : files.length === 0 ? <StateBlock kind="empty" compact icon="folder-open" title="Tak ada file" />
-                    : buildFileTree(files, dirs).map((n) => (
-                        <TreeRow key={n.path} node={n} selected={selKind === "file" ? selected : ""} onSelect={selectFile} />
-                      ))}
+                    : (
+                      <TreeRoot label="Pohon berkas" nodes={buildFileTree(files, dirs)}>
+                        {buildFileTree(files, dirs).map((n) => (
+                          <TreeRow key={n.path} node={n} selected={selKind === "file" ? selected : ""} onSelect={selectFile} />
+                        ))}
+                      </TreeRoot>
+                    )}
                 </div>
               </Card>
             ) },
             { id: "viewer", label: "Viewer", className: "hn-panel-flex", content: (
               <Card padding={0} fill>
-                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border-hair)" }}>
+                <div className="hn-ide-read-viewer-head">
                   <Icon name="file-text" size={15} color="var(--text-muted)" />
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--text-strong)" }}>{selected || "—"}</span>
+                  <span className="hn-ide-read-path">{selected || "—"}</span>
                   {inDiff && diff?.status && <Badge tone={diff.status === "D" ? "err" : diff.status === "A" ? "ok" : "brass"} size="sm">{diff.status}</Badge>}
                 </div>
-                <div data-testid="doc-preview-scroll" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
+                <div data-testid="doc-preview-scroll" className="hn-ide-scroll-body">
                   {inDiff
                     ? (!selected ? <StateBlock kind="empty" icon="file-text" title="Pilih file dari Staged/Changed" />
                         : diff === null ? <StateBlock kind="loading" title="Memuat…" hint={selected} />
                         : diff.binary ? <StateBlock kind="empty" icon="file" title="Berkas biner" hint={selected} />
-                        : <div style={{ padding: "10px 0" }}><DiffView diff={diff.diff ?? ""} /></div>)
+                        : <div className="hn-ide-read-diff"><DiffView diff={diff.diff ?? ""} /></div>)
                     : (!selected ? <StateBlock kind="empty" icon="file-text" title="Pilih file dari pohon di kiri" />
                         : file === null ? <StateBlock kind="loading" title="Memuat…" hint={selected} />
                         : file.binary ? <StateBlock kind="empty" icon="file" title="File biner" hint={selected} />
                         : isMarkdownPath(selected)
-                          ? <div style={{ padding: "16px 20px" }}><MarkdownView text={file.content ?? ""} name={selected} /></div>
-                          : <pre style={{ margin: 0, padding: "16px 18px", overflow: "auto", fontFamily: "var(--font-mono)", fontSize: 12.5, lineHeight: 1.7 }}>{file.content}</pre>)}
+                          ? <div className="hn-ide-read-md"><MarkdownView text={file.content ?? ""} name={selected} /></div>
+                          : <pre className="hn-ide-read-pre">{file.content}</pre>)}
                 </div>
               </Card>
             ) },
@@ -124,47 +129,60 @@ export function IdeReadPanel({ projectId }: { projectId: string }) {
 function GraphRead({ projectId }: { projectId: string }) {
   const api = useApi();
   const [commits, setCommits] = React.useState<GraphCommit[] | null>(null);
+  const [commitErr, setCommitErr] = React.useState("");
   const [compareFrom, setCompareFrom] = React.useState<string | null>(null);
   const [compare, setCompare] = React.useState<{ from: string; to: string; changed: { path: string }[] } | null>(null);
+  const [compareErr, setCompareErr] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    api.ideGraph(projectId, 100).then((g) => setCommits(g.commits)).catch(() => setCommits([]));
+    // Galat memuat tampil sebagai galat, bukan sebagai "Tak ada commit" (daftar kosong yang menyamar).
+    api.ideGraph(projectId, 100)
+      .then((g) => { setCommits(g.commits); setCommitErr(""); })
+      .catch((e: unknown) => { setCommits([]); setCommitErr(failureMessage("memuat riwayat", e)); });
   }, [projectId, api]);
 
   const onClickCommit = (sha: string) => {
     if (!compareFrom) { setCompareFrom(sha); return; }
-    if (compareFrom !== sha) api.ideCompare(projectId, compareFrom, sha).then(setCompare).catch(() => {});
+    if (compareFrom !== sha) {
+      setCompareErr(null);
+      // Perbandingan lama dilepas saat yang baru gagal; jangan biarkan hasil basi tampil sebagai hasil ini.
+      api.ideCompare(projectId, compareFrom, sha).then(setCompare)
+        .catch((e: unknown) => { setCompare(null); setCompareErr(failureMessage("membandingkan commit", e)); });
+    }
     setCompareFrom(null);
   };
 
   return (
     <Card padding={0} fill>
       {compareFrom && (
-        <div style={{ padding: "6px 14px", fontSize: 11.5, color: "var(--text-subtle)" }}>
+        <div className="hn-ide-read-from">
           Compare dari {compareFrom.slice(0, 7)} — klik commit kedua
         </div>
       )}
       {compare && (
-        <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--border-hair)" }}>
+        <div className="hn-ide-read-compare">
           <div className="hn-eyebrow">compare {compare.from.slice(0, 7)} … {compare.to.slice(0, 7)}</div>
           {compare.changed.length === 0
-            ? <div style={{ fontSize: 12, color: "var(--text-subtle)" }}>Tak ada perbedaan.</div>
+            ? <div className="hn-ide-read-empty">Tak ada perbedaan.</div>
             : compare.changed.map((f) => (
-                <div key={f.path} style={{ fontFamily: "var(--font-mono)", fontSize: 11.5, padding: "2px 0" }}>{f.path}</div>
+                <div key={f.path} className="hn-ide-read-cpath">{f.path}</div>
               ))}
         </div>
       )}
-      <div style={{ padding: 8, overflow: "auto" }}>
+      {compareErr && (
+        <div role="alert" className="hn-ide-read-alert">
+          {compareErr}
+        </div>
+      )}
+      <div className="hn-ide-read-list">
         {commits === null ? <StateBlock kind="loading" compact title="Memuat riwayat…" />
+          : commitErr ? <StateBlock kind="error" compact title="Gagal memuat riwayat" hint={commitErr} />
           : commits.length === 0 ? <StateBlock kind="empty" compact icon="git-commit" title="Tak ada commit" />
           : commits.map((c) => (
-              <button key={c.sha} onClick={() => onClickCommit(c.sha)} style={{
-                display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, width: "100%",
-                padding: "6px 10px", border: "none", cursor: "pointer", textAlign: "left",
-                background: compareFrom === c.sha ? "var(--brass-100)" : "transparent",
-              }}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5 }}>{c.subject}</span>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)" }}>
+              <button key={c.sha} onClick={() => onClickCommit(c.sha)}
+                className={compareFrom === c.sha ? "hn-ide-read-commit hn-ide-read-commit--from" : "hn-ide-read-commit"}>
+                <span className="hn-ide-read-subject">{c.subject}</span>
+                <span className="hn-ide-read-meta">
                   {c.sha.slice(0, 7)} · {c.author}
                 </span>
               </button>

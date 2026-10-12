@@ -39,6 +39,8 @@ const push = (m: unknown) => act(() => { ev.handler?.(m); });
 
 beforeEach(() => {
   localStorage.clear();
+  // Uji sel grid (tombol × per sel, pelepasan sel); default layar kini "Fokus" (Fase 3E).
+  localStorage.setItem("hn.ui.v1.terminal.view", JSON.stringify("grid"));
   listTerminals.mockReset(); deleteTerminal.mockReset();
   listTerminals.mockResolvedValue([]);
 });
@@ -84,6 +86,8 @@ describe("menutup sesi (SPEC-742)", () => {
     const tutup = await screen.findByLabelText("Tutup sesi spec-742");
 
     fireEvent.click(tutup);
+    // Menutup sesi yang masih berjalan dikonfirmasi dulu; setelah "ya", sel tetap dilepas seketika.
+    fireEvent.click(await screen.findByRole("button", { name: "Tutup sesi" }));
 
     await waitFor(() => expect(screen.queryByLabelText("Tutup sesi spec-742")).toBeNull());
     expect(deleteTerminal).toHaveBeenCalledWith("spec-742");

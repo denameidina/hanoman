@@ -3,6 +3,7 @@ import type { PendingCounts } from "./pending";
 import { z } from "zod";
 import type { SessionAsk } from "./session-ask";
 import type { TaskView } from "./team";
+import type { Scheduler } from "./entities";
 import { zProject, zBriefPayload, zQaPayload, zGoalPayload, zSpec, zScheduler, zAgent, zLead, zPhaseOverrides } from "./entities";
 import {
   zLeadGate, zLeadKind, zLeadConfidence, zLeadAction, zLeadStatus, zLeadChoice,
@@ -141,6 +142,12 @@ export const zMarkSpecDone = z.object({
   confirm: z.boolean().optional(),
 });
 export type MarkSpecDone = z.infer<typeof zMarkSpecDone>;
+// ADR-0218 · tandai/batalkan "sudah ditinjau" pada item selesai. Tanpa body = tandai (`true`).
+// `false` = batalkan. Hanya bermakna untuk stage `done` saat menandai; server menolak selain itu.
+export const zMarkSpecReviewed = z.object({
+  reviewed: z.boolean().optional(),
+});
+export type MarkSpecReviewed = z.infer<typeof zMarkSpecReviewed>;
 // SPEC-175 · rebase/merge branch hasil done spec. target = "local:<b>" | "origin:<b>".
 export const zIntegrate = z.object({
   op: z.enum(["merge", "rebase"]),
@@ -202,6 +209,10 @@ export const zSchedulerQueueCounts = z.object({
 });
 export type SchedulerQueueCounts = z.infer<typeof zSchedulerQueueCounts>;
 
+// ADR-0204 · `serverTimeZone` = zona waktu LOKAL server, tempat cron benar-benar dihitung
+// (shared/src/cron-expr.ts memakai penanda lokal). UI menampilkan preview dalam zona ini, bukan
+// zona browser. OPSIONAL di skema: respons server lama dan fixture yang belum membawanya tetap valid
+// (aditif). Server selalu mengirimkannya; klien memakai zona browser bila tak ada.
 export const zSchedulerState = z.object({
   config: zScheduler,
   cap: z.number(), liveCount: z.number(),
@@ -209,8 +220,12 @@ export const zSchedulerState = z.object({
   sources: z.array(zSchedulerSourceView),
   queueCounts: zSchedulerQueueCounts,
   sessions: z.array(zSchedulerSessionView),
+  serverTimeZone: z.string().optional(),
 });
 export type SchedulerStateView = z.infer<typeof zSchedulerState>;
+// ADR-0204 · GET /scheduler/config = setelan + zona waktu server (field tambahan, bukan bagian setelan:
+// PUT tetap menerima `zScheduler` polos, dan zod membuang field asing).
+export type SchedulerConfigView = Scheduler & { serverTimeZone: string };
 
 // SPEC-409 · ADR-0091 · satu baris jejak keputusan hanoman-lead (AC-23). Tanggal = string ISO.
 // `refs` sudah tersaring di server: hanya rujukan yang benar-benar ada di repo (AC-6).
@@ -575,6 +590,9 @@ export type VpsView = {
   components?: VpsComponents | null;
   componentsCheckedAt?: string | null;
   provisionProfile?: string | null;
+  // ADR-0211 · skor kepatuhan dari audit TERSIMPAN (listing `GET /vps` dan siaran `vps`; tak pernah
+  // menjalankan audit). Opsional: respons lain (POST/PATCH) tak memuatnya. null = belum pernah diaudit.
+  scoreTotal?: number | null;
 };
 
 // SPEC-220 · checklist kepatuhan (katalog 232 item + status per VPS). Server menghidrasi penuh

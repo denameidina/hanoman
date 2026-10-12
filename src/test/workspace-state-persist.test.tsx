@@ -57,7 +57,7 @@ describe("sub-tab Settings", () => {
 
   it("bertahan lintas unmount/remount", async () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-    fireEvent.click(await screen.findByText("Sesi"));
+    fireEvent.click(await screen.findByText("Sesi harian"));
     await waitFor(() => expect(readUiState(uiKey("settings", "tab"), "akun")).toBe("sesi"));
     cleanup();
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
@@ -67,7 +67,7 @@ describe("sub-tab Settings", () => {
   it("nilai tab rusak di storage tak membuat layar gagal render", async () => {
     localStorage.setItem(uiKey("settings", "tab"), "{rusak");
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-    expect(await screen.findByText("Sesi")).toBeTruthy();
+    expect(await screen.findByText("Sesi harian")).toBeTruthy();
   });
 });
 

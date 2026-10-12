@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
-import { enqueue, queueItemForSpec, markLaunched } from "../src/services/scheduler/queue";
+import { enqueue, queueItemForSpec, markLaunched, markFailed, markDone } from "../src/services/scheduler/queue";
 
 const app = buildApp({ requireAuth: false });
 const clean = async () => { await prisma.schedulerQueueItem.deleteMany(); await prisma.setting.deleteMany(); };
@@ -102,6 +102,50 @@ describe("scheduler routes", () => {
     const again = await app.inject({ method: "POST", url: `/api/scheduler/queue/${row.id}/requeue` });
     expect(again.statusCode).toBe(409);
     expect(again.json().status).toBe("queued");
+  });
+
+  // ADR-0204 · failed diantre ulang (200), status lain 409 dengan pesan yang menyebut yang bisa
+  // dikembalikan, dan id tak dikenal 404. Tak ada jalur yang menjawab 500.
+  it("POST /queue/:id/requeue mengembalikan baris failed ke antrean dan membuang jejak sesinya", async () => {
+    await enqueue({ specId: "SPEC-r6", projectId: "p1", source: "backlog", priority: "sedang" });
+    const row = (await queueItemForSpec("SPEC-r6"))!;
+    await markLaunched(row.id, "spec_r6");
+    await markFailed(row.id, "sesi berakhir sebelum mencapai done");
+    const r = await app.inject({ method: "POST", url: `/api/scheduler/queue/${row.id}/requeue` });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toMatchObject({ status: "queued", note: null, sessionId: null, launchedAt: null });
+  });
+
+  it("POST /queue/:id/requeue menolak status lain 409 dengan pesan jelas, idempoten tanpa 500", async () => {
+    await enqueue({ specId: "SPEC-r7", projectId: "p1", source: "backlog", priority: "sedang" });
+    const row = (await queueItemForSpec("SPEC-r7"))!;
+    await markLaunched(row.id, "spec_r7");
+    const launched = await app.inject({ method: "POST", url: `/api/scheduler/queue/${row.id}/requeue` });
+    expect(launched.statusCode).toBe(409);
+    expect(launched.json()).toMatchObject({ status: "launched" });
+    expect(launched.json().error).toMatch(/canceled atau failed/);
+
+    await markDone(row.id);
+    const done = await app.inject({ method: "POST", url: `/api/scheduler/queue/${row.id}/requeue` });
+    expect(done.statusCode).toBe(409);
+    expect(done.json()).toMatchObject({ status: "done" });
+
+    const missing = await app.inject({ method: "POST", url: "/api/scheduler/queue/tak-ada/requeue" });
+    expect(missing.statusCode).toBe(404);
+  });
+
+  // ADR-0204 · zona waktu server (tempat cron dihitung) ikut di config dan state, aditif. Body GET
+  // config yang dikirim balik ke PUT tetap diterima: zod membuang field asing.
+  it("GET /config dan GET /state membawa serverTimeZone; GET config bisa dikirim balik ke PUT", async () => {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const cfg = await app.inject({ method: "GET", url: "/api/scheduler/config" });
+    expect(cfg.json()).toMatchObject({ serverTimeZone: zone, enabled: false });
+    const st = await app.inject({ method: "GET", url: "/api/scheduler/state" });
+    expect(st.statusCode).toBe(200);
+    expect(st.json().serverTimeZone).toBe(zone);
+    const put = await app.inject({ method: "PUT", url: "/api/scheduler/config", payload: cfg.json() });
+    expect(put.statusCode).toBe(200);
+    expect(put.json()).not.toHaveProperty("serverTimeZone");
   });
 
   it("POST /queue/:id/cancel menolak reason kelewat panjang", async () => {

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("../src/api/client", () => ({
@@ -18,8 +18,11 @@ describe("SPEC-293 · BacklogScreen initialDetailId (deep-link)", () => {
       <BacklogScreen backlog={[spec()]} projects={[{ id: "p", name: "P" } as any]}
         projectFilter="all" onProjectFilter={() => {}} initialDetailId="SPEC-9" />,
     );
-    // Modal SpecDetail menampilkan judul + eyebrow "SPEC-9 · p"
-    expect(await screen.findByText(/SPEC-9 · p/)).toBeTruthy();
+    // Modal SpecDetail menampilkan judul + eyebrow id; project pindah ke rincian (SPEC-9 · Ringkasan).
+    // Id juga ada di baris daftar, jadi cari di dalam dialog.
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("SPEC-9")).toBeTruthy();
+    expect(within(dialog).getByText("Project")).toBeTruthy();
     expect(screen.getAllByText("Judul backlog tertaut").length).toBeGreaterThan(0);
   });
 });

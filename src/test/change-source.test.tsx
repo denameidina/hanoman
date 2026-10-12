@@ -114,9 +114,10 @@ describe("SPEC-546 · ChangeSourceDialog", () => {
 });
 
 describe("SPEC-546 · backlog: tab help & jejak konversi", () => {
-  it("tab filter punya pintu Help Center", () => {
+  it("filter sumber (popover Filter) punya pintu Help Center", () => {
     render(<BacklogScreen backlog={[]} projects={[]} projectFilter="all" onProjectFilter={() => {}} />);
-    expect(screen.getByRole("tab", { name: "Help Center" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Filter/ }));
+    expect(screen.getByRole("option", { name: "Help Center" })).toBeTruthy();
   });
 
   it("detail menampilkan tombol Ubah type dan blok jejak konversi", () => {

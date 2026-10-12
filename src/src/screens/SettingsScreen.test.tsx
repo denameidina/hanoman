@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SettingsScreen } from "./SettingsScreen";
 import { bundledModelCatalog } from "@hanoman/shared";
@@ -56,6 +56,8 @@ async function openTelegramTab() {
     me={{ id: "u1", email: "dena@example.test", role: "admin", createdAt: "2026-08-01T00:00:00.000Z" }}
     onLoggedOut={() => {}}
   />);
+  // Telegram kini bagian dari niat "Integrasi & akses": pilih niatnya, lalu bagiannya.
+  fireEvent.click(screen.getByRole("button", { name: "Integrasi & akses" }));
   fireEvent.click(screen.getByRole("button", { name: "Telegram" }));
   expect(await screen.findByText("Kredensial Telegram")).toBeInTheDocument();
 }
@@ -121,15 +123,18 @@ describe("SettingsScreen Telegram kredensial (SPEC-477)", () => {
     });
     await openTelegramTab();
     fireEvent.click(screen.getByRole("button", { name: "Hapus kredensial" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Hapus" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Keempat nilai dihapus dari database/i)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Hapus kredensial" }));
     await waitFor(() => expect(deleted).toBe(true));
   });
 
   it("toggle gateway & progress tetap ada dan mem-PUT settings", async () => {
     const fetchMock = telegramFetch();
     await openTelegramTab();
-    expect(screen.getAllByRole("switch")).toHaveLength(2);
-    fireEvent.click(screen.getAllByRole("switch")[0]!);
+    // Tiga sakelar: gateway, progress, dan "Pakai setelan sendiri" agen operator (satu komponen override).
+    expect(screen.getAllByRole("switch")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("switch", { name: "Gateway aktif" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/settings", expect.objectContaining({ method: "PUT" })));
   });
 });
@@ -143,7 +148,7 @@ describe("SettingsScreen obrolan portal klien (SPEC-854)", () => {
       me={{ id: "u1", email: "dena@example.test", role: "admin", createdAt: "2026-08-01T00:00:00.000Z" }}
       onLoggedOut={() => {}}
     />);
-    fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agen & model" }));
     expect(await screen.findByText("Obrolan portal klien")).toBeInTheDocument();
     expect((screen.getByLabelText("Jatah brainstorming") as HTMLInputElement).value)
       .toBe(String(PORTAL_CHAT_DEFAULTS.brainstormPerMonth));
@@ -165,11 +170,100 @@ describe("SettingsScreen obrolan portal klien (SPEC-854)", () => {
       me={{ id: "u1", email: "dena@example.test", role: "admin", createdAt: "2026-08-01T00:00:00.000Z" }}
       onLoggedOut={() => {}}
     />);
-    fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agen & model" }));
     const input = await screen.findByLabelText("Jatah brainstorming");
     fireEvent.change(input, { target: { value: "5" } });
     fireEvent.blur(input);
     await waitFor(() => expect(puts).toHaveLength(1));
     expect((puts[0] as { portalChat: { brainstormPerMonth: number } }).portalChat.brainstormPerMonth).toBe(5);
+  });
+});
+
+// Audit UI/UX 2026-10 (P0 Settings): simpan harus jujur — toast sukses hanya setelah PUT berhasil,
+// kegagalan membalikkan tampilan, dan kondisi goal tersimpan saat kolom ditinggalkan (bukan per ketikan).
+describe("SettingsScreen · simpan jujur (audit P0)", () => {
+  const me = { id: "u1", email: "dena@example.test", role: "admin" as const, createdAt: "2026-08-01T00:00:00.000Z" };
+
+  // Sakelar "Notifikasi backlog selesai" adalah sakelar pertama di tab Sesi (belum ber-aria-label).
+  const doneSwitch = async () => {
+    await screen.findByText("Notifikasi backlog selesai");
+    return screen.getAllByRole("switch")[0]!;
+  };
+
+  function settingsFetch(put: (init?: RequestInit) => Promise<Response>) {
+    const puts: unknown[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
+      const path = String(url);
+      if (path === "/api/settings" && init?.method === "PUT") {
+        puts.push(JSON.parse(String(init.body)));
+        return put(init as RequestInit);
+      }
+      if (path === "/api/settings") return json(setting);
+      if (path === "/api/codex/version") return json({ version: null, minRequired: "0.0.0", ok: true });
+      // Tab Sesi memuat daftar project untuk pemasangan skill; galatnya kini tampil sebagai toast,
+      // jadi mock harus menjawabnya — kalau tidak, toast galat mengotori assertion "belum ada toast".
+      if (path.startsWith("/api/projects")) return json({ items: [], total: 0, page: 1, pageSize: 100 });
+      if (path === "/api/models") return json(bundledModelCatalog());
+      if (path === "/api/telegram/status") return json(status);
+      throw new Error(`unexpected fetch ${path}`);
+    });
+    return puts;
+  }
+
+  it("toast sukses menunggu PUT selesai; belum apa-apa saat PUT masih berjalan", async () => {
+    localStorage.clear();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const puts = settingsFetch(() => gate.then(() => json(setting)));
+    const onToast = vi.fn();
+    render(<SettingsScreen me={me} onLoggedOut={() => {}} onToast={onToast} />);
+    fireEvent.click(await doneSwitch());
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(onToast).not.toHaveBeenCalled();
+    release();
+    await waitFor(() => expect(onToast).toHaveBeenCalledWith("Notifikasi backlog selesai · nonaktif", "ok", "check-circle-2"));
+  });
+
+  it("PUT gagal: sakelar kembali ke nilai semula dan galat diberi tahu, tanpa toast sukses", async () => {
+    localStorage.clear();
+    settingsFetch(() => json({ error: "boom" }, 500));
+    const onToast = vi.fn();
+    render(<SettingsScreen me={me} onLoggedOut={() => {}} onToast={onToast} />);
+    const toggle = await doneSwitch();
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(onToast).toHaveBeenCalledWith(
+      expect.stringContaining("Gagal menyimpan pengaturan"), "err", "alert-triangle"));
+    expect(onToast.mock.calls.some(([msg]) => String(msg).includes("nonaktif"))).toBe(false);
+    await waitFor(() => expect(screen.getAllByRole("switch")[0]).toHaveAttribute("aria-checked", "true"));
+  });
+
+  it("kondisi goal tersimpan saat kolom ditinggalkan, bukan per ketikan", async () => {
+    localStorage.clear();
+    const puts = settingsFetch(() => json(setting));
+    render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
+    const area = await screen.findByLabelText("Kondisi mode goal");
+    fireEvent.change(area, { target: { value: "s" } });
+    fireEvent.change(area, { target: { value: "se" } });
+    fireEvent.change(area, { target: { value: "sel" } });
+    expect(puts).toHaveLength(0);
+    fireEvent.blur(area);
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect((puts[0] as { goal: { condition: string } }).goal.condition).toBe("sel");
+  });
+
+  it("Reset ke default meminta konfirmasi dengan daftar dampak sebelum mengirim apa pun", async () => {
+    localStorage.clear();
+    const puts = settingsFetch(() => json(setting));
+    render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
+    // Reset tinggal di Lanjutan › Zona bahaya (bukan lagi di tab Umum).
+    fireEvent.click(await screen.findByRole("button", { name: "Lanjutan" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Zona bahaya" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Reset ke default" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Kendali jarak jauh, pengiriman log, dan retensi log/i)).toBeInTheDocument();
+    expect(puts).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Kembalikan ke default" }));
+    await waitFor(() => expect(puts).toHaveLength(1));
   });
 });

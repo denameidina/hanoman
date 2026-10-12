@@ -7,14 +7,15 @@ import { isTerminalResponse, paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { useInstance, useWsTarget } from "../api/instance";
-import { useCoarsePointer } from "../ds";
+import { IconButton, OverflowActions, useCoarsePointer, useConfirm, useScrollEdges } from "../ds";
 import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
-import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, TERMINAL_KEYS } from "./terminal-chrome";
+import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, isFocusEscape, TERMINAL_KEYS } from "./terminal-chrome";
 import * as P from "./terminal-predict";
 import * as D from "./terminal-diag";
 import { TerminalComposer } from "./TerminalComposer";
 import { VoiceControls } from "./VoiceControls";
-import { useVoiceInput } from "./use-voice-input";
+import { ERROR_MESSAGES, LANGS } from "./speech-engine";
+import { useVoiceInput, type VoiceInput } from "./use-voice-input";
 import { createHiddenRing } from "../lib/hidden-ring";
 
 // SPEC-800 · socket terminal bisa tertutup tanpa salah siapa pun: revalidasi principal ADR-0117
@@ -52,7 +53,8 @@ type LinkState =
 export const TerminalPane = React.memo(TerminalPaneImpl);
 
 function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT, showKeys = false,
-  predict = true, diag = false, mode = "local", hidden = false }: {
+  predict = true, diag = false, screenReader = false, mode = "local", hidden = false, onForget, label, composer = false,
+  compact = false, onToggleKeys }: {
   sessionId: string; onExit: (code: number) => void;
   // SPEC-433 · frame phase membawa VERDICT-nya juga: `complete` = seluruh fase tercatat DAN plan
   // tak menyisakan `- [ ]`. Tanpa itu sel tak punya satu pun kabar "selesai" — `exited` cuma
@@ -66,6 +68,10 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   // Perekam diagnostik jalur input. Opt-in, mati secara default: ia merekam SETIAP tombol yang
   // ditekan di pane ini, jadi ia hanya boleh menyala saat operator memang sedang menyelidiki.
   diag?: boolean;
+  // Audit UI/UX 2026-10 · keputusan 15: mode pembaca layar xterm (`screenReaderMode`). Opt-in, mati
+  // secara default. Ia menaruh teks terminal di DOM untuk NVDA/VoiceOver dengan biaya kecepatan.
+  // Tombol keluar fokus (Ctrl+Shift+Esc) tetap ditangani di `attachCustomKeyEventHandler` di bawah.
+  screenReader?: boolean;
   // SPEC-1218 · ADR-0165 §11 · "remote" = mirroring pane di klien lain lewat relay: server memegang
   // geometri (frame `geometry` menggantikan `resize` yang kita kirim), dan tanpa `sessions:write`
   // pane jadi baca-saja — tak ada `onData`/composer/keys yang bisa mengetik ke pty orang lain.
@@ -73,6 +79,19 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   // SPEC-1267 · pane display:none tak mem-parse keluaran: ditahan di ring 256 KB dan diputar ulang
   // (atau digambar ulang tmux bila ring meluap) saat tampil kembali.
   hidden?: boolean;
+  // Sesi sudah lenyap dari tmux (status "gone"): pemilik sel boleh melepasnya. Tanpa prop ini strip
+  // hanya menyatakan keadaan, dan sel tak punya jalan keluar selain tombol header.
+  onForget?: () => void;
+  /** Nama sel untuk judul konfirmasi "Hapus sel" (mis. project · spec). Absen = id sesi saja. */
+  label?: string;
+  // Audit UI/UX 2026-10 · Fase 3E: pane fokus selalu menampilkan composer sebagai aksi utama di
+  // bawah pane. Grid tetap memakai perilaku lama (composer hanya saat papan tombol/dikte aktif).
+  composer?: boolean;
+  // Audit UI/UX 2026-10 · Fase 3E+ · ponsel (pane fokus): dock ringkas. Composer satu baris dengan
+  // mic dan Kirim; papan tombol dibuka lewat "Tombol khusus" (dikendalikan pemilik lewat
+  // `showKeys`/`onToggleKeys`); bahasa dikte pindah ke ⋯. Tablet/desktop memakai dock lama.
+  compact?: boolean;
+  onToggleKeys?: () => void;
 }) {
   const wsTarget = useWsTarget(`terminal:${sessionId}`);
   const instance = useInstance();
@@ -86,6 +105,8 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   predictRef.current = predict;
   const diagRef = React.useRef(diag);
   diagRef.current = diag;
+  const screenReaderRef = React.useRef(screenReader);
+  screenReaderRef.current = screenReader;
   const hiddenRef = React.useRef(hidden);
   hiddenRef.current = hidden;
   // Long-press seleksi teks hanya untuk pointer kasar — laptop hybrid dengan touchscreen + mouse
@@ -95,7 +116,14 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   coarseRef.current = coarse;
   const ring = React.useRef(createHiddenRing());
   const resync = React.useRef<() => void>(() => {});
-  const view = React.useRef<{ term: Terminal; fit: FitAddon; sendSize: (force?: boolean) => void } | null>(null);
+  const view = React.useRef<{ term: Terminal; fit: FitAddon; sendSize: (force?: boolean) => void;
+    leave: () => void } | null>(null);
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  // Fokus xterm di dalam pane: hanya untuk memunculkan jalan keluar yang terlihat (tombol di bawah).
+  const [inTerminal, setInTerminal] = React.useState(false);
+  // Buang ketikan tertahan dan Hapus sel wajib dikonfirmasi lewat satu dialog: keduanya tak pernah
+  // terbuka bersamaan (tertahan vs. gone), dan konfirmasi baru menjawab yang lama dengan "batal".
+  const { confirm: confirmAction, dialog } = useConfirm();
   // onExit boleh berubah tiap render; menaruhnya di ref menjaga effect ini
   // hanya bergantung pada sessionId — remount = sesi yang benar-benar berbeda.
   const exitRef = React.useRef(onExit);
@@ -131,7 +159,7 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
   const voiceAppend = React.useRef<(t: string) => void>(() => {});
   const [draft, setDraft] = React.useState(false);
   const voice = useVoiceInput({ enabled: canWrite, onFinalText: (t) => voiceAppend.current(t) });
-  const showComposer = canWrite && (showKeys || voice.status === "listening" || draft);
+  const showComposer = canWrite && (composer || showKeys || voice.status === "listening" || draft);
 
   React.useEffect(() => {
     const el = host.current;
@@ -141,6 +169,8 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     const term = new Terminal({
       fontFamily: token("--font-mono", "monospace"),
       fontSize: clampFontSize(fontSizeRef.current), cursorBlink: false,
+      // Keputusan 15 · opsi awal; perubahan saat sesi hidup diterapkan di effect di bawah.
+      screenReaderMode: screenReaderRef.current,
       // SPEC-511 · tmux lahir dengan `mouse on` (SPEC-209) supaya wheel browser menggulir riwayat
       // pane; harganya, tmux menyalakan mouse-reporting di terminal klien (terukur: `?1000h`
       // `?1002h` `?1006h`) — dan xterm memanggil `SelectionService.disable()` begitu ada protokol
@@ -149,7 +179,23 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       // selamanya false, dan wiring salin SPEC-289 tak pernah punya apa pun untuk disalin.
       // Mematikan `mouse on` bukan alternatif: TUI claude menyalakan mode yang sama sendiri.
       macOptionClickForcesSelection: true,
-      theme: { background: token("--term-bg", "#1c1810"), foreground: token("--term-fg", "#e9e0cd") },
+      // Audit UI/UX Terminal · minimum kontras WCAG AA (4.5): xterm menaikkan warna ANSI yang terlalu
+      // redup di atas latar gelap, dan warna yang sudah cukup terbaca tak disentuh.
+      minimumContrastRatio: 4.5,
+      // ANSI diambil dari palet token, bukan default xterm yang tak ikut tema hanoman. Palet ini tak
+      // punya warna cyan/magenta khusus, jadi dua slot dipinjam dari token terdekat.
+      theme: {
+        background: token("--term-bg", "#1c1810"), foreground: token("--term-fg", "#e9e0cd"),
+        cursor: token("--term-fg", "#e9e0cd"),
+        black: token("--ink-900", "#17130c"), red: token("--clay-500", "#bd4a3a"),
+        green: token("--leaf-500", "#5f8340"), yellow: token("--amber-500", "#cf8f28"),
+        blue: token("--wind-600", "#3f6e7a"), magenta: token("--brass-400", "#cf9d55"),
+        cyan: token("--wind-500", "#517f8c"), white: token("--bone-300", "#e8dfcc"),
+        brightBlack: token("--ink-400", "#90826c"), brightRed: token("--clay-500", "#bd4a3a"),
+        brightGreen: token("--leaf-500", "#5f8340"), brightYellow: token("--amber-500", "#cf8f28"),
+        brightBlue: token("--wind-500", "#517f8c"), brightMagenta: token("--brass-300", "#e3c988"),
+        brightCyan: token("--wind-500", "#517f8c"), brightWhite: token("--bone-000", "#fffdf8"),
+      },
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
@@ -189,7 +235,9 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       lastSentSize = size;
       send({ t: "resize", cols: term.cols, rows: term.rows });
     };
-    view.current = { term, fit, sendSize };
+    // Fokus pindah ke akar pane (bisa difokus lewat kode, tak masuk urutan Tab): dari sana Tab
+    // melanjutkan ke kontrol berikutnya di DOM, bukan kembali ke xterm.
+    view.current = { term, fit, sendSize, leave: () => { term.textarea?.blur(); rootRef.current?.focus(); } };
     // Perekam diagnostik. Selalu DIBUAT, tapi `rec` diam total selama sakelarnya mati — dengan
     // begitu menyalakannya tak perlu melahirkan socket baru, sama seperti sakelar prediksi.
     const diagRec = D.createDiagRecorder({
@@ -483,7 +531,14 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
       clearTimeout(clipErrTimer);
       clipErrTimer = setTimeout(() => setClipErr(null), 2600);
     };
+    // Jalan keluar keyboard (audit UI/UX Terminal · keyboard trap): xterm menelan Tab dan Esc sebagai
+    // input pty, jadi tanpa ini fokus tak bisa pindah ke luar pane memakai keyboard. Hanya kombinasi
+    // ini yang tak dikirim ke pty; Esc polos tetap sampai ke agen.
     term.attachCustomKeyEventHandler((e) => {
+      if (isFocusEscape(e)) {
+        if (e.type === "keydown") view.current?.leave();
+        return false;
+      }
       const intent = clipboardIntent(e, term.hasSelection());
       if (intent === "copy") {
         void navigator.clipboard?.writeText(term.getSelection())
@@ -778,6 +833,15 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     current.sendSize(true);
   }, [fontSize, mode]);
 
+  // Mode pembaca layar (keputusan 15) berpindah di tempat: opsi runtime xterm 6 menyalakan atau
+  // membuang AccessibilityManager tanpa me-remount socket, jadi sesi tak kehilangan attach-nya.
+  React.useEffect(() => {
+    const current = view.current;
+    if (!current) return;
+    if (current.term.options.screenReaderMode === screenReader) return;
+    current.term.options.screenReaderMode = screenReader;
+  }, [screenReader, mode]);
+
   // SPEC-882 · kolom ketik & bar tombol memakan tinggi host, jadi `cols`/`rows` PTY ikut berubah
   // saat sakelarnya digeser. ResizeObserver menangkapnya di browser, tapi frame `resize` wajib
   // menyusul dari perubahan yang KITA lakukan juga — tanpa itu tmux menggambar untuk geometri lama.
@@ -791,8 +855,38 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
     current.sendSize(true);
   }, [showKeys, mode, showComposer, voice.supported]);
 
+  // Buang = membuang teks yang belum pernah sampai ke agen. Tak bisa dipulihkan, jadi dikonfirmasi.
+  const discardHeld = async () => {
+    const ok = await confirmAction({
+      title: `Buang ${queue.n} ketikan yang tertahan?`,
+      impact: ["Teks itu belum dikirim ke sesi dan tidak bisa diambil lagi."],
+      confirmLabel: "Buang ketikan", icon: "trash-2", tone: "danger",
+    });
+    if (ok) dropHeld.current();
+  };
+
+  const forgetCell = async () => {
+    if (!onForget) return;
+    const name = label ? `${label} · ${sessionId.slice(0, 6)}` : sessionId.slice(0, 6);
+    const ok = await confirmAction({
+      title: `Hapus sel "${name}"?`,
+      impact: ["Sel ini dihapus dari tampilan.", "Sesi tmux-nya sudah tidak ada; tak ada proses yang dihentikan."],
+      confirmLabel: "Hapus dari tampilan", icon: "x", tone: "default",
+    });
+    if (ok) onForget();
+  };
+
+  // Mic untuk composer ringkas (ponsel). Bahasa & keterangannya ada di ⋯ dock bar, bukan di sini.
+  const listening = voice.status === "listening";
+  const micButton = voice.supported ? (
+    <IconButton icon="mic" size="sm" variant={listening ? "solid" : "outline"}
+      label={listening ? "Hentikan dikte suara" : "Mulai dikte suara"}
+      aria-pressed={listening} data-testid="voice-toggle"
+      className={listening ? "hn-voice-rec" : ""} onClick={voice.toggle} />
+  ) : undefined;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+    <div ref={rootRef} tabIndex={-1} style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, outline: "none" }}>
       {/* Diam adalah cacatnya (audit SPEC-800 §3); diam tak boleh jadi bagian perbaikannya.
           SPEC-878 · strip juga bicara saat sambungan sehat: antrean yang ditahan karena memuat
           Enter adalah keputusan yang menunggu operator, bukan keadaan koneksi. */}
@@ -805,7 +899,13 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
           color: "var(--text-body)",
         }}>
           {link.state === "retrying" && <span>menyambung ulang… ({link.attempt}/{RECONNECT_MAX})</span>}
-          {link.state === "gone" && <span>sesi tidak ditemukan di tmux</span>}
+          {link.state === "gone" && <>
+            <span>sesi sudah tidak ada di tmux dan tak bisa disambung ulang</span>
+            {onForget && (
+              <button type="button" className="hn-terminal-action hn-terminal-action--text"
+                onClick={() => void forgetCell()}>Hapus sel</button>
+            )}
+          </>}
           {link.state === "lost" && <>
             <span>terputus</span>
             <button type="button" className="hn-terminal-action hn-terminal-action--text"
@@ -819,16 +919,28 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
             <button type="button" className="hn-terminal-action hn-terminal-action--text"
               onClick={() => sendHeld.current()}>Kirim</button>
             <button type="button" className="hn-terminal-action hn-terminal-action--text"
-              onClick={() => dropHeld.current()}>Buang</button>
+              onClick={() => void discardHeld()}>Buang</button>
           </>}
           {queue.full && <span data-testid="terminal-queue-full">antrean penuh</span>}
           {clipErr && <span data-testid="terminal-clip-error">{clipErr}</span>}
         </div>
       )}
-      <div style={{ position: "relative", display: "flex", flex: 1, minHeight: 0 }}>
+      {/* Jalan keluar terlihat hanya saat fokus ada di dalam terminal — tempat ia dibutuhkan. Fokus
+          yang berpindah ke tombol itu sendiri tetap "di dalam", jadi klik tak memadamkannya di tengah jalan. */}
+      <div style={{ position: "relative", display: "flex", flex: 1, minHeight: 0 }}
+        onFocus={() => setInTerminal(true)}
+        onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setInTerminal(false); }}>
         <div ref={host} data-testid="terminal-host" style={{ flex: 1, minHeight: 0, width: "100%",
           background: "var(--term-bg)", padding: 8, borderRadius: "var(--radius-sm)",
           touchAction: "pan-x pinch-zoom", overscrollBehavior: "contain" }} />
+        {inTerminal && (
+          <button type="button" className="hn-terminal-action hn-terminal-action--text"
+            onClick={() => view.current?.leave()}
+            title="Pindahkan fokus keluar dari terminal. Tab dan Esc tetap diteruskan ke sesi selama fokus di sini."
+            style={{ position: "absolute", top: 6, right: 6, zIndex: 2, background: "var(--surface-card)" }}>
+            Keluar fokus terminal · Ctrl+Shift+Esc
+          </button>
+        )}
         {/* Long-press mobile: satu-satunya jalan salin log/error tanpa Cmd/Ctrl+C keyboard fisik.
             `role="status"` di badge mengumumkan perubahan mode ke pembaca layar — gestur sentuh
             yang memicunya tak pernah lewat fokus/keyboard, jadi tanpa ini AT tak tahu apa-apa. */}
@@ -844,11 +956,63 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
           </div>
         )}
       </div>
-      <VoiceControls voice={voice} />
-      {showComposer && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
-        external={composerDrain} linkState={link.state} queue={queue}
-        voiceAppend={voiceAppend} onDraft={setDraft} />}
-      {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
+      {/* Dock bawah: dikte, composer, dan papan tombol satu blok. Kosong = tak tampil (CSS :empty). */}
+      {compact ? (
+        <div className="hn-terminal-dock">
+          {showComposer && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
+            external={composerDrain} linkState={link.state} queue={queue}
+            voiceAppend={voiceAppend} onDraft={setDraft} sendButton
+            leading={micButton} />}
+          {canWrite && (
+            <div className="hn-terminal-dock-bar">
+              {onToggleKeys && (
+                <button type="button" className="hn-terminal-keys-toggle" aria-expanded={showKeys}
+                  onClick={onToggleKeys}>Tombol khusus</button>
+              )}
+              {voice.supported && voice.status === "listening" && voice.interim && (
+                <span className="hn-terminal-voice-interim" data-testid="voice-interim">{voice.interim}</span>
+              )}
+              {voice.error && (
+                <span className="hn-terminal-voice-error" role="status" data-testid="voice-error">
+                  {ERROR_MESSAGES[voice.error]}
+                </span>
+              )}
+              {voice.supported && (
+                <OverflowActions label="Opsi dikte suara" items={[]}>
+                  <VoiceOptions voice={voice} />
+                </OverflowActions>
+              )}
+            </div>
+          )}
+          {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
+        </div>
+      ) : (
+        <div className="hn-terminal-dock">
+          <VoiceControls voice={voice} />
+          {showComposer && <TerminalComposer sessionId={sessionId} send={(d) => sendKey.current(d)}
+            external={composerDrain} linkState={link.state} queue={queue}
+            voiceAppend={voiceAppend} onDraft={setDraft} />}
+          {showKeys && canWrite && <TerminalKeys onKey={(seq) => sendOuter.current(seq)} />}
+        </div>
+      )}
+      {dialog}
+    </div>
+  );
+}
+
+// Isi ⋯ "Opsi dikte suara" di dock ringkas: bahasa dikte dan keterangan bahwa audionya diproses
+// layanan suara browser. Keduanya tetap terlihat; hanya tempatnya yang pindah dari baris dikte.
+function VoiceOptions({ voice }: { voice: VoiceInput }) {
+  return (
+    <div className="hn-terminal-voice-options">
+      <label className="hn-terminal-voice-options-field">
+        <span>Bahasa dikte</span>
+        <select className="hn-terminal-voice-lang" data-testid="voice-lang" value={voice.lang}
+          onChange={(e) => voice.setLang(e.target.value)}>
+          {LANGS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+        </select>
+      </label>
+      <p>Audio diproses oleh layanan suara browser Anda (di Chrome: Google).</p>
     </div>
   );
 }
@@ -856,9 +1020,14 @@ function TerminalPaneImpl({ sessionId, onExit, onPhases, fontSize = FONT_DEFAULT
 // SPEC-800 · keyboard virtual ponsel tak punya panah/Esc/Tab, dan Esc adalah satu-satunya jalan
 // keluar dari copy-mode tmux. SPEC-452 · tiap tekan mengirim SATU keystroke: dialog AskUserQuestion
 // adalah daftar Ink yang menelan burst >1 karakter bulat-bulat.
-function TerminalKeys({ onKey }: { onKey: (seq: string) => void }) {
+export function TerminalKeys({ onKey }: { onKey: (seq: string) => void }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  // Tepi yang masih menyimpan kunci tersembunyi diberi gradasi (app.css `.hn-terminal-keys[data-fade-*]`),
+  // supaya "Enter" di ujung papan di 320 px tak lenyap tanpa tanda bahwa papannya bisa digeser.
+  const edges = useScrollEdges(ref);
   return (
-    <div className="hn-terminal-keys" role="group" aria-label="Tombol terminal">
+    <div ref={ref} className="hn-terminal-keys" role="group" aria-label="Tombol terminal"
+      data-fade-start={edges.start ? "true" : undefined} data-fade-end={edges.end ? "true" : undefined}>
       {TERMINAL_KEYS.map((key) => (
         <button key={key.id} type="button" className="hn-terminal-key" aria-label={key.aria}
           title={key.aria} onClick={() => onKey(key.seq)}>{key.label}</button>

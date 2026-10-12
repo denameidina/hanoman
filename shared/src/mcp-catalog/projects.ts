@@ -2,7 +2,7 @@
 // `shared/src/mcp-catalog.ts` yang lama; perilakunya identik.
 import { PAGE_PARAMS, bool, enumStr, obj, str } from "../mcp-schema";
 import { shapeProject, shapeProjectDetail } from "../mcp-shape";
-import { enc, localPage, s } from "./helpers";
+import { enc, localPage, query, s } from "./helpers";
 import type { McpToolDef } from "./types";
 
 const CORE: readonly McpToolDef[] = [
@@ -10,10 +10,24 @@ const CORE: readonly McpToolDef[] = [
     name: "hanoman_projects_list",
     title: "Daftar proyek",
     description:
-      "Daftar seluruh proyek yang dikelola hanoman, dipadatkan ke field yang dipakai agen: id, nama, jenis, jumlah backlog, stage tertinggi, coverage docs, dan opt-in scheduler/lead. Untuk detail satu proyek pakai hanoman_project_get.",
-    inputSchema: obj({ properties: { ...PAGE_PARAMS } }),
+      "Daftar seluruh proyek yang dikelola hanoman, dipadatkan ke field yang dipakai agen: id, nama, jenis, jumlah backlog, stage tertinggi, coverage docs, dan opt-in scheduler/lead. Untuk detail satu proyek pakai hanoman_project_get. `sort=attention` mengurutkan proyek yang dokumennya rusak lebih dulu, lalu drift, lalu sisanya; `attention=true` hanya menampilkan proyek yang perlu perhatian (ADR-0212).",
+    inputSchema: obj({
+      properties: {
+        sort: enumStr(["attention"], "`attention` = urutan perhatian lintas seluruh proyek: rusak dulu, lalu drift, lalu sisanya; dalam tiap kelompok menurut nama. Kosongkan untuk urutan default."),
+        attention: bool("true = hanya proyek yang dokumennya drift atau rusak. false / tak diisi = semua proyek."),
+        ...PAGE_PARAMS,
+      },
+    }),
     mode: "read", capability: "projects:read", samplePath: "/projects", sampleMethod: "GET",
-    build: () => ({ method: "GET", path: "/projects" }),
+    build: (a) => ({
+      method: "GET", path: "/projects",
+      query: query({
+        sort: s(a.sort),
+        // Server hanya menerima "true"/"1" untuk parameter ini; `false` menghilangkan parameternya
+        // (sama seperti `startable` di backlog), jadi nilai salah tak pernah sampai ke server.
+        attention: a.attention === true ? "true" : undefined,
+      }),
+    }),
     shape: (raw, a) => localPage(raw, a, shapeProject),
   },
   {

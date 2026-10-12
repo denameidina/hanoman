@@ -1,0 +1,160 @@
+/* Skills (master-detail) dan Agen (katalog custom agent). Audit UI/UX 2026-10 · redesign 3K.
+   Chip, toggle, dan helper bersama ada di projects.css. */
+
+.hn-skills-workspace { display: flex; flex-direction: column; flex: 1 1 0%; min-height: 0; min-width: 0; gap: var(--space-3); }
+
+/* ---------------------------------------------------------------- Skill · daftar (kiri) */
+
+.hn-skill-master {
+  display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; min-width: 0;
+  background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-lg); overflow: hidden;
+}
+.hn-skill-master-foot { display: flex; justify-content: flex-end; padding: var(--space-2); border-top: 1px solid var(--border-hair); }
+
+.hn-skill-list { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.hn-skill-list-tools {
+  display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-hair);
+}
+.hn-skill-list-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--space-1) var(--space-2) var(--space-2); }
+.hn-skill-list-error { padding: 4px 8px; font-size: var(--text-xs); color: var(--clay-600); }
+.hn-skill-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.hn-skill-row {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box; min-height: 44px;
+  padding: 8px 10px; border: 0; border-radius: var(--radius-sm); background: transparent;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; min-width: 0;
+}
+.hn-skill-row:hover { background: var(--bone-200); }
+.hn-skill-row.is-selected { background: var(--brass-100); box-shadow: inset 3px 0 0 var(--brass-500); }
+.hn-skill-row:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.hn-skill-row-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.hn-skill-row-name {
+  flex: 1 1 auto; min-width: 0; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-strong);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-skill-row-desc {
+  font-size: var(--text-xs); color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-skill-row-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--text-2xs); color: var(--text-subtle); }
+
+/* ---------------------------------------------------------------- Skill · detail (kanan) */
+
+.hn-skill-detail {
+  display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; min-width: 0;
+  background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-lg); overflow: hidden;
+}
+.hn-skill-detail-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-hair); min-width: 0;
+}
+.hn-skill-detail-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hn-skill-detail-name {
+  font-family: var(--font-mono); font-size: var(--text-md); font-weight: var(--weight-semibold);
+  color: var(--text-strong); overflow-wrap: anywhere;
+}
+.hn-skill-detail-desc { font-size: var(--text-sm); color: var(--text-muted); }
+.hn-skill-detail-body { display: flex; flex-wrap: wrap; flex: 1 1 auto; min-height: 0; align-items: stretch; }
+.hn-skill-detail-structure { flex: 0 1 240px; min-width: 200px; min-height: 200px; display: flex; }
+.hn-skill-detail-editor { flex: 1 1 420px; min-width: 0; min-height: 320px; display: flex; }
+
+/* Struktur berkas (pohon) di sisi kiri detail. */
+.hn-skill-structure {
+  display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0;
+  border-right: 1px solid var(--border-hair);
+}
+.hn-skill-structure-head { padding: 10px 14px; border-bottom: 1px solid var(--border-hair); }
+.hn-skill-structure-name { font-size: var(--text-xs); color: var(--text-strong); }
+.hn-skill-structure-tree { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px; }
+.hn-skill-structure-foot { display: flex; gap: 8px; padding: 8px; border-top: 1px solid var(--border-hair); flex-wrap: wrap; }
+.hn-skill-error-text { color: var(--clay-600); }
+
+/* Editor berkas. */
+.hn-skill-editor { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; }
+.hn-skill-editor-head {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: 10px 16px; border-bottom: 1px solid var(--border-hair);
+}
+.hn-skill-editor-path { flex: 1 1 auto; min-width: 0; font-size: var(--text-sm); overflow-wrap: anywhere; }
+.hn-skill-frontmatter { padding: 10px 16px; border-bottom: 1px solid var(--border-hair); background: var(--bone-200); }
+.hn-skill-fm-name { font-family: var(--font-mono); font-size: var(--text-xs); }
+.hn-skill-fm-desc { font-size: var(--text-sm); color: var(--text-muted); }
+.hn-skill-editor-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: var(--space-4); }
+.hn-skill-editor-body.is-edit { padding: 0; }
+.hn-skill-textarea {
+  display: block; width: 100%; height: 100%; min-height: 320px; box-sizing: border-box; resize: none;
+  border: 0; padding: var(--space-4); background: transparent; color: var(--text-body);
+  font-family: var(--font-mono); font-size: var(--text-sm);
+}
+.hn-skill-textarea:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.hn-skill-pre { margin: 0; font-family: var(--font-mono); font-size: var(--text-sm); white-space: pre-wrap; }
+
+/* Footer Simpan: selalu terlihat dan sticky di bawah editor. */
+.hn-skill-savebar {
+  position: sticky; bottom: 0; z-index: 1; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border-hair); background: var(--bone-100);
+}
+.hn-skill-conflict {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
+  font-size: var(--text-xs); color: var(--clay-600);
+}
+
+/* ---------------------------------------------------------------- Agen */
+
+.hn-agents { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.hn-agents-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.hn-agents-scope { flex: 1 1 280px; min-width: 0; margin: 0; font-size: var(--text-xs); color: var(--text-subtle); }
+
+/* Lipatan "Bukti" (panel dan per kartu). */
+.hn-agent-evidence {
+  border: 1px solid var(--border-hair); border-radius: var(--radius-sm); padding: 0 var(--space-3);
+  background: var(--surface-card); min-width: 0;
+}
+.hn-agent-evidence-summary {
+  display: flex; align-items: center; min-height: 36px; cursor: pointer;
+  font-size: var(--text-xs); color: var(--text-muted);
+}
+.hn-agent-evidence-summary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.hn-agent-evidence-body { display: flex; flex-direction: column; gap: var(--space-2); padding-bottom: var(--space-3); min-width: 0; }
+
+.hn-agent-card {
+  display: flex; flex-direction: column; gap: 6px; padding: 14px; min-width: 0;
+  background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-lg);
+}
+.hn-agent-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-width: 0; }
+.hn-agent-name { font-family: var(--font-mono); font-weight: var(--weight-semibold); color: var(--text-strong); overflow-wrap: anywhere; }
+.hn-agent-desc { margin: 0; font-size: var(--text-xs); color: var(--text-muted); }
+.hn-agent-note { margin: 0; font-size: var(--text-xs); color: var(--text-muted); line-height: 1.5; }
+.hn-agent-error { display: block; margin-top: 3px; color: var(--clay-600); }
+.hn-agent-meta {
+  display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0;
+  font-size: var(--text-xs); color: var(--text-subtle);
+}
+.hn-agent-meta > div { display: flex; gap: 4px; min-width: 0; }
+.hn-agent-meta dt { color: var(--text-subtle); }
+.hn-agent-meta dd { margin: 0; color: var(--text-body); overflow-wrap: anywhere; }
+.hn-agent-card > .hn-agent-evidence { margin-top: var(--space-1); }
+.hn-agent-samples { display: flex; flex-direction: column; gap: var(--space-2); }
+.hn-agent-sample { padding: var(--space-2); border: 1px solid var(--border-hair); border-radius: var(--radius-sm); }
+.hn-agent-sample-meta { font-size: var(--text-xs); color: var(--text-subtle); margin-bottom: 6px; }
+.hn-agent-sample-form { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.hn-agent-metrics {
+  display: flex; gap: 14px; flex-wrap: wrap; padding-top: 9px; border-top: 1px solid var(--border-hair);
+  font-size: var(--text-xs); color: var(--text-subtle);
+}
+.hn-agent-stat { display: flex; flex-direction: column; gap: 2px; max-width: 280px; }
+.hn-agent-stat-caption { color: var(--text-muted); }
+.hn-agent-stat-line { font-size: var(--text-xs); }
+.hn-agent-variants { margin-top: var(--space-2); }
+.hn-agent-variants summary { cursor: pointer; font-size: var(--text-xs); min-height: 32px; display: flex; align-items: center; }
+.hn-agent-variants ul { font-size: var(--text-xs); color: var(--text-muted); padding-left: 20px; }
+
+/* Field ganda di modal agen (Model|Aktivasi, Maks giliran|Timeout). */
+.hn-agent-grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-3); }
+
+@media (max-width: 767px) {
+  .hn-skill-detail-structure, .hn-skill-detail-editor { flex-basis: 100%; min-width: 0; }
+  .hn-skill-detail-structure { min-height: 0; max-height: 220px; }
+  .hn-skill-detail-editor { min-height: 320px; }
+  .hn-agent-grid2 { grid-template-columns: minmax(0, 1fr); }
+}

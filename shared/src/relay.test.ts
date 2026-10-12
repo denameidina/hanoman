@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
-  RELAY_PART_MAX_BYTES, REMOTE_CAPABILITIES, relayBodyAllowed, relayRouteAllowed, remoteCapabilityFor,
-  splitUtf8, utf8Bytes, validateRemoteGrant, zClientToHubFrame, zHubToClientFrame,
+  REQUEST_TIER_GRANTS, REQUEST_TIERS, RELAY_PART_MAX_BYTES, REMOTE_CAPABILITIES, isAccessRequestRoute, relayBodyAllowed,
+  relayRouteAllowed, remoteCapabilityFor, splitUtf8, utf8Bytes, validateRemoteGrant, zAccessRequestCreate,
+  zClientToHubFrame, zHubToClientFrame,
 } from "./relay";
 
 const actor = { hubOrigin: "https://hub.example", userId: "u1", email: "op@hub.example" };
@@ -146,5 +147,46 @@ describe("frame relay .strict()", () => {
     const big = "x".repeat(RELAY_PART_MAX_BYTES + 1);
     expect(zClientToHubFrame.safeParse({ t: "res", id: "r1", status: 200, part: "ok", end: true }).success).toBe(true);
     expect(zClientToHubFrame.safeParse({ t: "res", id: "r1", part: big, end: true }).success).toBe(false);
+  });
+});
+
+// ADR-0217 · permintaan tingkat akses (opsi C dari ADR-0216). Pagar murni: allowlist, kosakata tingkat, dan
+// fakta bahwa tingkat bertingkat dan selalu memuat `sessions:read` (lolos validateRemoteGrant).
+describe("permintaan tingkat akses (ADR-0217)", () => {
+  it("allowlist hanya membuka POST & GET permintaan — persetujuan, penolakan, dan turunannya tetap tertutup", () => {
+    expect(relayRouteAllowed("POST", "/api/remote-control/access-requests")).toBe(true);
+    expect(relayRouteAllowed("GET", "/api/remote-control/access-requests")).toBe(true);
+    expect(relayRouteAllowed("POST", "/api/remote-control/access-requests/ar1/approve")).toBe(false);
+    expect(relayRouteAllowed("POST", "/api/remote-control/access-requests/ar1/reject")).toBe(false);
+    expect(relayRouteAllowed("PUT", "/api/remote-control/access-requests")).toBe(false);
+    expect(relayRouteAllowed("DELETE", "/api/remote-control/access-requests")).toBe(false);
+    expect(relayRouteAllowed("PUT", "/api/remote-control")).toBe(false);
+  });
+
+  it("isAccessRequestRoute: hanya POST/GET ke koleksi permintaan (query diabaikan), bukan persetujuan", () => {
+    expect(isAccessRequestRoute("POST", "/api/remote-control/access-requests")).toBe(true);
+    expect(isAccessRequestRoute("get", "/api/remote-control/access-requests?x=1")).toBe(true);
+    expect(isAccessRequestRoute("POST", "/api/remote-control/access-requests/ar1/approve")).toBe(false);
+    expect(isAccessRequestRoute("PUT", "/api/remote-control/access-requests")).toBe(false);
+  });
+
+  it("tingkat bertingkat: lihat ⊂ kerja ⊂ tulis; tiap tingkat lolos validateRemoteGrant", () => {
+    expect(REQUEST_TIERS).toEqual(["lihat", "kerja", "tulis"]);
+    const [lihat, kerja, tulis] = REQUEST_TIERS.map((t) => REQUEST_TIER_GRANTS[t]);
+    for (const t of REQUEST_TIERS) expect(validateRemoteGrant(REQUEST_TIER_GRANTS[t]), t).toBeNull();
+    for (const c of lihat!) expect(kerja).toContain(c);
+    for (const c of kerja!) expect(tulis).toContain(c);
+    expect(lihat).not.toContain("backlog:write");
+    expect(kerja).toContain("sessions:spawn");
+    expect(kerja).not.toContain("sessions:write");
+    expect(tulis).toContain("sessions:write");
+    for (const t of REQUEST_TIERS) for (const c of REQUEST_TIER_GRANTS[t]) expect(REMOTE_CAPABILITIES).toContain(c);
+  });
+
+  it("zAccessRequestCreate: hanya { tier } dengan tingkat yang dikenal", () => {
+    expect(zAccessRequestCreate.safeParse({ tier: "kerja" }).success).toBe(true);
+    expect(zAccessRequestCreate.safeParse({ tier: "admin" }).success).toBe(false);
+    expect(zAccessRequestCreate.safeParse({ tier: "kerja", capabilities: ["sessions:write"] }).success).toBe(false);
+    expect(zAccessRequestCreate.safeParse({}).success).toBe(false);
   });
 });

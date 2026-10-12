@@ -62,6 +62,9 @@ export function useResetOnChange(key: string, reset: () => void): void {
 // loop abadi.
 const RESTORE_FRAMES = 20;
 
+// Jeda tulis posisi scroll ke storage selama bergulir (lihat effect di useScrollRestore).
+const SCROLL_WRITE_MS = 200;
+
 /** Ref callback untuk elemen bergulir: menyimpan `scrollTop` dan memulihkannya SETELAH
     `ready` (mis. data selesai dimuat). Ref callback, bukan RefObject — container daftar
     sering baru muncul sesudah state `loading` selesai. */
@@ -78,15 +81,28 @@ export function useScrollRestore<E extends HTMLElement = HTMLDivElement>(
 
   React.useEffect(() => {
     if (!el) return;
-    let frame = 0;
+    // Audit UI/UX 2026-10 · tulis ke localStorage di-throttle: menggulir sebelumnya menulis (sinkron) tiap
+    // frame, ±60×/dtk. Sekarang satu tulisan per SCROLL_WRITE_MS selama bergulir, plus flush saat
+    // `scrollend` dan saat unmount supaya posisi terakhir tak pernah tertinggal.
+    let timer = 0;
+    let latest: number | null = null;
+    const flush = () => {
+      if (timer) { clearTimeout(timer); timer = 0; }
+      if (latest === null) return;
+      writeUiState(key, latest);
+      latest = null;
+    };
     const onScroll = () => {
-      if (restoring.current || frame) return;
-      frame = requestAnimationFrame(() => { frame = 0; writeUiState(key, el.scrollTop); });
+      if (restoring.current) return;
+      latest = el.scrollTop;
+      if (!timer) timer = window.setTimeout(flush, SCROLL_WRITE_MS);
     };
     el.addEventListener("scroll", onScroll);
+    el.addEventListener("scrollend", flush);
     return () => {
       el.removeEventListener("scroll", onScroll);
-      if (frame) cancelAnimationFrame(frame);
+      el.removeEventListener("scrollend", flush);
+      flush();
     };
   }, [el, key]);
 

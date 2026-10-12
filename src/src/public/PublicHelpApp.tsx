@@ -2,13 +2,19 @@
    diawali /help/ (tanpa login, tanpa Shell dashboard). Dua rute:
      /help/:slug                 → form lapor keluhan + akses cek status
      /help/:slug/status/:key     → status publik tiket (terpetakan otomatis)
-   Same-origin: form men-submit multipart ke /api/help/:slug/tickets. */
+   Same-origin: form men-submit multipart ke /api/help/:slug/tickets.
+
+   Audit UI/UX 2026-10 · Fase 3 (3M): status memakai linimasa dan kalimat keadaan yang sama dengan
+   Beranda Klien (komponen portal bersama), kosakata kategori dari portal/labels. */
 import React from "react";
-import { Card, Button, Select, StateBlock, Badge } from "../ds";
+import { Card, Button, Select, StateBlock, StatusPill } from "../ds";
 import { helpApi } from "../api/help";
 import type { HelpInfo, PublicTicketStatus } from "@hanoman/shared";
+import { kategoriLabel, jaringanAtauPesan } from "../portal/labels";
+import { ticketPill } from "../portal/status-pill";
+import { TicketNote, TicketTimeline } from "../portal/TicketTimeline";
+import "../portal/portal.css";
 
-const CAT_LABEL: Record<string, string> = { bug: "Bug", fitur: "Permintaan fitur", pertanyaan: "Pertanyaan", lainnya: "Lainnya" };
 const MAX_FILES = 3;
 
 // Parse /help/<slug>[/status/<key>].
@@ -19,12 +25,14 @@ function parseRoute(pathname: string): { slug: string; key?: string } | null {
   return { slug: decodeURIComponent(parts[1]) };
 }
 
+// Scroller dan padding tetap inline: tes memverifikasi dvh dan gulir vertikal di sini (dikunci
+// `public-help.test.tsx`), dan jendela sempit dikunci oleh inline style, bukan oleh berkas CSS.
 function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <div data-testid="public-help-scroll" className="hn-dynamic-viewport" style={{ height: "100dvh", minHeight: 0, overflowY: "auto",
+    <div data-testid="public-help-scroll" className="hn-dynamic-viewport hn-public" style={{ height: "100dvh", minHeight: 0, overflowY: "auto",
       overscrollBehavior: "contain", boxSizing: "border-box", background: "var(--bone-100)",
       padding: "max(40px, var(--safe-top)) max(16px, var(--safe-right)) max(40px, var(--safe-bottom)) max(16px, var(--safe-left))" }}>
-      <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="hn-public-page">
         {children}
       </div>
     </div>
@@ -35,6 +43,7 @@ function StatusView({ slug, statusKey }: { slug: string; statusKey: string }) {
   const [st, setSt] = React.useState<PublicTicketStatus | null>(null);
   const [state, setState] = React.useState<"loading" | "ready" | "error">("loading");
   const load = React.useCallback(() => {
+    setState("loading");
     helpApi.status(slug, statusKey).then((d) => { setSt(d); setState("ready"); }).catch(() => setState("error"));
   }, [slug, statusKey]);
   React.useEffect(() => { load(); }, [load]);
@@ -43,15 +52,16 @@ function StatusView({ slug, statusKey }: { slug: string; statusKey: string }) {
     <Layout>
       <Card eyebrow="status keluhan" title={st ? `Tiket #${st.number}` : "Status tiket"}>
         {state === "loading" ? <StateBlock kind="loading" />
-          : state === "error" || !st ? <StateBlock kind="error" title="Tiket tidak ditemukan" hint="Periksa kembali link status Anda." action={load} actionLabel="Coba lagi" />
-          : <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Status</span>
-                <Badge tone="ok">{st.status}</Badge>
-              </div>
-              <div><span className="hn-eyebrow">Kategori</span><div>{CAT_LABEL[st.category] ?? st.category}</div></div>
-              <div><span className="hn-eyebrow">Judul</span><div style={{ color: "var(--text-body)" }}>{st.title}</div></div>
-              <div style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>Dilaporkan {new Date(st.createdAt).toLocaleString("id-ID")}</div>
+          : state === "error" || !st ? <StateBlock kind="error" title="Status belum bisa dimuat" hint="Periksa kembali link status Anda, lalu coba lagi." action={load} actionLabel="Coba lagi" />
+          : <div className="hn-public-form">
+              <div><StatusPill status={ticketPill(st.status)} size="sm">{st.status}</StatusPill></div>
+              <TicketTimeline status={st.status} />
+              <TicketNote status={st.status} />
+              <dl className="hn-public-status-dl">
+                <div><dt>Kategori</dt><dd>{kategoriLabel(st.category)}</dd></div>
+                <div><dt>Judul</dt><dd>{st.title}</dd></div>
+                <div><dt>Dilaporkan</dt><dd>{new Date(st.createdAt).toLocaleString("id-ID")}</dd></div>
+              </dl>
             </div>}
       </Card>
     </Layout>
@@ -70,18 +80,30 @@ function ReportForm({ slug }: { slug: string }) {
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
   const [done, setDone] = React.useState<{ number: number; statusUrl: string } | null>(null);
+  const [copied, setCopied] = React.useState(false);
 
   const load = React.useCallback(() => {
+    setState("loading");
     helpApi.getInfo(slug).then((d) => { setInfo(d); setCategory(d.categories[0] ?? "bug"); setState("ready"); }).catch(() => setState("error"));
   }, [slug]);
   React.useEffect(() => { load(); }, [load]);
 
-  // Rute cek status: user menempel link → arahkan.
+  // Rute cek status: user menempel link atau kode → arahkan.
   const [checkKey, setCheckKey] = React.useState("");
-  function goCheck() {
+  function goCheck(e: React.FormEvent) {
+    e.preventDefault();
     const key = checkKey.trim().split("/").pop() ?? checkKey.trim();
     if (key) window.location.href = `/help/${encodeURIComponent(slug)}/status/${encodeURIComponent(key)}`;
   }
+
+  const copyLink = async (url: string) => {
+    if (!navigator.clipboard) { setErr("Salin tidak tersedia di browser ini. Pilih linknya lalu salin manual."); return; }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch (e) { setErr(jaringanAtauPesan(e, "Link belum bisa disalin. Pilih linknya lalu salin manual.")); }
+  };
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -94,24 +116,26 @@ function ReportForm({ slug }: { slug: string }) {
       const r = await helpApi.submit(slug, form);
       const statusUrl = `${window.location.origin}${r.statusPath}`;
       setDone({ number: r.number, statusUrl });
-    } catch (e) { setErr((e as Error).message); }
+    } catch (e) { setErr(jaringanAtauPesan(e, "Keluhan belum terkirim. Coba lagi sebentar.")); }
     finally { setBusy(false); }
   }
 
   if (state === "loading") return <Layout><StateBlock kind="loading" /></Layout>;
-  if (state === "error" || !info) return <Layout><Card title="Help Center"><StateBlock kind="error" title="Tidak tersedia" hint="Help Center untuk project ini tidak aktif." /></Card></Layout>;
+  if (state === "error" || !info) return <Layout><Card title="Help Center"><StateBlock kind="error" title="Belum bisa dibuka" hint="Coba lagi sebentar. Jika tetap gagal, Help Center untuk project ini mungkin tidak aktif." action={load} actionLabel="Coba lagi" /></Card></Layout>;
 
   if (done) return (
     <Layout>
       <Card eyebrow="terkirim" title={`Terima kasih — tiket #${done.number}`}>
-        <div style={{ color: "var(--text-body)", marginBottom: 12 }}>
-          Keluhan Anda sudah kami terima. Simpan link berikut untuk memantau statusnya:
-        </div>
-        <div style={{ padding: 12, border: "1px solid var(--brass-300)", borderRadius: "var(--radius-sm)", background: "var(--brass-100)" }}>
-          <code style={{ display: "block", wordBreak: "break-all", fontSize: 12.5 }}>{done.statusUrl}</code>
-          <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-            <Button size="sm" leftIcon="copy" onClick={() => void navigator.clipboard?.writeText(done.statusUrl)}>Salin link</Button>
-            <Button size="sm" variant="ghost" onClick={() => window.location.assign(done.statusUrl)}>Buka status</Button>
+        <div className="hn-public-form">
+          <p className="hn-public-lead">
+            Keluhan Anda sudah kami terima. Simpan link berikut untuk memantau perkembangannya.
+          </p>
+          <div className="hn-public-linkbox">
+            <code className="hn-public-code">{done.statusUrl}</code>
+            <div className="hn-public-actions">
+              <Button size="sm" leftIcon="copy" onClick={() => void copyLink(done.statusUrl)}>{copied ? "Tersalin" : "Salin link"}</Button>
+              <Button size="sm" variant="ghost" onClick={() => window.location.assign(done.statusUrl)}>Buka status</Button>
+            </div>
           </div>
         </div>
       </Card>
@@ -121,32 +145,39 @@ function ReportForm({ slug }: { slug: string }) {
   return (
     <Layout>
       <Card eyebrow="help center" title={`Lapor keluhan · ${info.projectName}`}>
-        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div>
-            <label htmlFor="hc-cat" className="hn-eyebrow">Kategori</label>
-            <Select id="hc-cat" value={category} onChange={(e) => setCategory(e.target.value)}
-              options={info.categories.map((c) => ({ value: c, label: CAT_LABEL[c] ?? c }))} />
+        <form onSubmit={submit} className="hn-public-form">
+          <div className="hn-public-field">
+            <label htmlFor="hc-cat" className="hn-public-label">Kategori</label>
+            <Select id="hc-cat" size="lg" value={category} onChange={(e) => setCategory(e.target.value)}
+              options={info.categories.map((c) => ({ value: c, label: kategoriLabel(c) }))} />
           </div>
-          <div>
-            <label htmlFor="hc-title" className="hn-eyebrow">Judul</label>
-            <input id="hc-title" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200}
-              style={inputStyle} placeholder="mis. Tombol Simpan tak berfungsi di HP" />
+          <div className="hn-public-field">
+            <label htmlFor="hc-title" className="hn-public-label">Judul</label>
+            <input id="hc-title" className="hn-public-input" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={200}
+              placeholder="mis. Tombol Simpan tidak berfungsi di HP" />
           </div>
-          <div>
-            <label htmlFor="hc-detail" className="hn-eyebrow">Detail</label>
-            <textarea id="hc-detail" value={detail} onChange={(e) => setDetail(e.target.value)} required maxLength={10_000} rows={6}
-              style={{ ...inputStyle, resize: "vertical" }} placeholder="mis. Buka halaman Pesanan di HP, tekan Simpan — layar diam dan datanya tak tersimpan. Jangan sertakan data sensitif (kata sandi, dsb)." />
+          <div className="hn-public-field">
+            <label htmlFor="hc-detail" className="hn-public-label">Detail</label>
+            <textarea id="hc-detail" className="hn-public-input" value={detail} onChange={(e) => setDetail(e.target.value)} required maxLength={10_000} rows={6}
+              placeholder="mis. Buka halaman Pesanan di HP, tekan Simpan — layar diam dan datanya tidak tersimpan. Jangan sertakan data sensitif (kata sandi, dsb)." />
           </div>
-          <div>
-            <label htmlFor="hc-email" className="hn-eyebrow">Email Anda</label>
-            <input id="hc-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={200}
-              style={inputStyle} placeholder="nama@contoh.id" />
+          <div className="hn-public-field">
+            <label htmlFor="hc-email" className="hn-public-label">Email Anda</label>
+            <input id="hc-email" className="hn-public-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={200}
+              placeholder="nama@contoh.id" />
           </div>
-          <div>
-            <label htmlFor="hc-files" className="hn-eyebrow">Lampiran gambar (opsional, maks {MAX_FILES})</label>
-            <input id="hc-files" className="hn-touch-target" type="file" accept="image/png,image/jpeg,image/webp" multiple
-              onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, MAX_FILES))} />
-            {files.length > 0 && <div style={{ fontSize: 12, color: "var(--text-subtle)", marginTop: 4 }}>{files.map((f) => f.name).join(", ")}</div>}
+          <div className="hn-public-field">
+            <label htmlFor="hc-files" className="hn-public-label">Lampiran gambar (opsional, maks {MAX_FILES})</label>
+            {/* Input native disembunyikan tetapi tetap fokusabel; nama aksesibelnya dari label di atas.
+                Tombol yang tampak adalah label yang menunjuk input itu, jadi tak dibacakan dua kali. */}
+            <div className="hn-public-file">
+              <input id="hc-files" className="hn-public-file-input" type="file" accept="image/png,image/jpeg,image/webp" multiple
+                onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, MAX_FILES))} />
+              <label htmlFor="hc-files" className="hn-public-file-btn" aria-hidden="true">Pilih berkas</label>
+              <span className="hn-public-files" aria-live="polite">
+                {files.length > 0 ? files.map((f) => f.name).join(", ") : "Belum ada berkas dipilih"}
+              </span>
+            </div>
           </div>
           {/* honeypot — disembunyikan dari manusia; bot cenderung mengisinya. SPEC-352: namanya
               WAJIB netral dan autocomplete-nya WAJIB `new-password`. Versi lama bernama `hp`
@@ -156,26 +187,25 @@ function ReportForm({ slug }: { slug: string }) {
           {/* placeholder-exempt: honeypot SPEC-352 — sengaja tak terlihat manusia; placeholder justru memandu bot */}
           <input tabIndex={-1} autoComplete="new-password" aria-hidden value={trap} onChange={(e) => setTrap(e.target.value)}
             name="hc_trap" style={{ position: "absolute", left: "-9999px", width: 1, height: 1 }} />
-          {err && <div style={{ color: "var(--clay-600)", fontSize: 13 }}>{err}</div>}
-          <Button type="submit" disabled={busy} leftIcon="send">Kirim keluhan</Button>
+          {err && <p role="alert" className="hn-portal-error">{err}</p>}
+          <div className="hn-portal-foot">
+            <Button type="submit" disabled={busy} loading={busy} leftIcon="send">Kirim keluhan</Button>
+          </div>
         </form>
       </Card>
-      <Card eyebrow="sudah pernah lapor?" title="Cek status tiket">
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input value={checkKey} onChange={(e) => setCheckKey(e.target.value)} placeholder="mis. a1b2c3d4e5f6 — atau tempel link statusnya"
-            style={{ ...inputStyle, flex: 1, minWidth: 200 }} />
-          <Button variant="secondary" onClick={goCheck}>Cek</Button>
-        </div>
+      <Card eyebrow="sudah pernah lapor?" title="Cek status keluhan">
+        <form onSubmit={goCheck} className="hn-public-check">
+          <div className="hn-public-field">
+            <label htmlFor="hc-check" className="hn-public-label">Kode status atau link</label>
+            <input id="hc-check" className="hn-public-input" value={checkKey} onChange={(e) => setCheckKey(e.target.value)}
+              placeholder="mis. a1b2c3d4e5f6, atau tempel link statusnya" />
+          </div>
+          <Button type="submit" variant="secondary" disabled={!checkKey.trim()}>Cek status</Button>
+        </form>
       </Card>
     </Layout>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  display: "block", width: "100%", minHeight: "var(--touch-target)", boxSizing: "border-box", marginTop: 4, padding: "8px 10px",
-  border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)",
-  background: "var(--surface-card)", color: "var(--text-body)", fontSize: 14, fontFamily: "var(--font-ui)",
-};
 
 export function PublicHelpApp() {
   const route = parseRoute(window.location.pathname);

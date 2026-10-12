@@ -1,0 +1,517 @@
+/* Scheduler · hub Otonom (Audit UI/UX 2026-10 · Fase 3I).
+   Susunan layar Scheduler, Cron, Setelan, dan Orkestrasi. Diimpor dari SchedulerScreen, SchedulerCrons,
+   OrchestrationPanel, dan sched-lead-shared (yang juga dipakai LeadScreen). Warna dan jarak memakai token DS;
+   tak ada nilai mentah di sini selain persentase lebar dan piksel garis. Breakpoint mobile = 767px,
+   sama dengan `ds/responsive.tsx`. */
+
+.hn-sched {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* ---- Strip status: satu baris di atas tab ---------------------------------------------------- */
+
+.hn-sched-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-card);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md);
+}
+
+.hn-sched-capacity {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 200px;
+  min-width: 150px;
+}
+
+.hn-sched-limits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.hn-sched-strip-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* Pemisah sebelum Hentikan: rem darurat tampil terpisah dari kontrol biasa. */
+.hn-sched-strip-divider {
+  align-self: stretch;
+  width: 1px;
+  background: var(--border-hair);
+}
+
+/* ---- Tab: panel, baris, chip ------------------------------------------------------------------ */
+
+.hn-sched-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.hn-sched-empty {
+  margin: 0;
+  padding: var(--space-2) 0;
+  font-size: var(--text-sm);
+  color: var(--text-subtle);
+}
+
+.hn-sched-preview-warn {
+  color: var(--clay-600);
+}
+
+.hn-sched-caption,
+.hn-sched-note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  line-height: 1.5;
+}
+
+.hn-sched-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hn-sched-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.hn-sched-row-title {
+  color: var(--text-strong);
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.hn-sched-row-meta {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  overflow-wrap: anywhere;
+}
+
+.hn-sched-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.hn-sched-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 30px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  color: var(--text-body);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.hn-sched-chip[aria-pressed="true"] {
+  background: var(--brass-100);
+  border-color: var(--brass-600);
+  color: var(--brass-700);
+}
+
+.hn-sched-chip:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.hn-sched-chip-count {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text-subtle);
+}
+
+.hn-sched-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.hn-sched-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.hn-sched-notice-text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+/* Galat muat: tampil sebagai galat dengan Coba lagi (bukan daftar kosong). */
+.hn-sched-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  font-size: var(--text-sm);
+  color: var(--clay-600);
+}
+
+.hn-sched-error-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ---- Cron: tabel di desktop, kartu di mobile (satu markup) ----------------------------------- */
+
+.hn-sched-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.hn-sched-table th {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-hair);
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-subtle);
+}
+
+.hn-sched-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-hair);
+  vertical-align: middle;
+  color: var(--text-body);
+}
+
+.hn-sched-cell-actions {
+  width: 1%;
+  text-align: right;
+}
+
+.hn-sched-runs > td {
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+}
+
+.hn-sched-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+/* ---- Setelan: kelompok bahasa biasa dengan draft + Simpan ------------------------------------- */
+
+.hn-sched-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--surface-card);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md);
+}
+
+.hn-sched-group-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-strong);
+}
+
+.hn-sched-group-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.hn-sched-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.hn-sched-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+}
+
+.hn-sched-spacer {
+  flex: 1 1 0;
+}
+
+.hn-sched-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-body);
+}
+
+.hn-sched-inline-field input {
+  width: 84px;
+}
+
+.hn-sched-source-facts {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.hn-sched-guard-status {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.hn-sched-savebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* ---- Orkestrasi: satu baris per flow yang bisa dibuka ---------------------------------------- */
+
+.hn-sched-flow {
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+}
+
+.hn-sched-flow + .hn-sched-flow {
+  margin-top: var(--space-2);
+}
+
+.hn-sched-flow-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-3);
+  background: transparent;
+  border: none;
+  color: var(--text-strong);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.hn-sched-flow-head:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
+.hn-sched-flow-state {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  color: var(--text-muted);
+}
+
+.hn-sched-flow-body {
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.hn-sched-flow-body[hidden] {
+  display: none;
+}
+
+.hn-sched-matrix {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.hn-sched-matrix th,
+.hn-sched-matrix td {
+  padding: 6px 8px;
+  border-top: 1px solid var(--border-hair);
+  vertical-align: top;
+  text-align: left;
+}
+
+.hn-sched-matrix thead th {
+  border-top: none;
+}
+
+.hn-sched-matrix th {
+  text-align: left;
+}
+
+.hn-sched-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hn-sched-pick-model {
+  min-width: 150px;
+}
+
+.hn-sched-pick-effort {
+  min-width: 96px;
+}
+
+.hn-sched-flow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.hn-sched-flow-status {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.hn-sched-flow-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.hn-sched-flow-mode-label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-strong);
+}
+
+.hn-sched-flow-mode-select {
+  min-width: 260px;
+  max-width: 100%;
+}
+
+.hn-sched-flow-mode-note {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* ---- Mobile: strip menyusun ulang, tabel menjadi kartu --------------------------------------- */
+
+@media (max-width: 767px) {
+  .hn-sched-strip-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .hn-sched-strip-actions > * {
+    flex: 1 1 auto;
+  }
+
+  .hn-sched-strip-divider {
+    display: none;
+  }
+
+  .hn-sched-capacity {
+    flex: 1 1 100%;
+  }
+
+  .hn-sched-table {
+    min-width: 0;
+  }
+
+  .hn-sched-table thead {
+    display: none;
+  }
+
+  .hn-sched-table tbody tr:not(.hn-sched-runs) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    padding: var(--space-3);
+    background: var(--surface-card);
+    border: 1px solid var(--border-hair);
+    border-radius: var(--radius-sm);
+  }
+
+  .hn-sched-table td {
+    display: block;
+    padding: 0;
+    border: none;
+  }
+
+  .hn-sched-table td:not(.hn-sched-cell-actions) {
+    grid-column: 1 / -1;
+  }
+
+  /* Nama cron di kolom 1, tombol ⋯ di kolom 2; spesifisitas di atas `td:not(…)` agar tak tertimpa. */
+  .hn-sched-table td:first-child:not(.hn-sched-cell-actions) {
+    grid-column: 1;
+  }
+
+  .hn-sched-table td[data-label]:not(:first-child)::before {
+    content: attr(data-label);
+    display: block;
+    font-size: var(--text-2xs);
+    color: var(--text-subtle);
+  }
+
+  .hn-sched-cell-actions {
+    grid-column: 2;
+    grid-row: 1;
+    width: auto;
+  }
+
+  .hn-sched-runs {
+    display: block;
+    margin-bottom: var(--space-2);
+  }
+
+  .hn-sched-runs > td {
+    display: block;
+    padding: var(--space-3);
+  }
+
+  .hn-sched-grid,
+  .hn-sched-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

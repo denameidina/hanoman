@@ -1,6 +1,7 @@
 // SPEC-847 · AC-1..AC-3 untuk apply remediasi VPS — mutasi server produksi, salah satu dari
 // empat flow yang diminta issue diuji lewat RTL (batal, konfirmasi, Escape, focus restore,
 // klik ganda). Fixture-nya cermin `vps-checklist.test.tsx`; jaga tetap sinkron.
+// Fase 3J: Terapkan hanya bisa dipakai dari pratinjau untuk pilihan yang sama (alur tiga langkah).
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ChecklistView, ChecklistItem } from "@hanoman/shared";
@@ -19,6 +20,7 @@ const VIEW: ChecklistView = {
   sections: [
     { id: "firewall", title: "Firewall & Network", icon: "🔥", score: 0, items: [
       item({ id: "fw-b1", title: "Aktifkan UFW", mode: "AUTO", severity: "critical", status: "pass" }),
+      item({ id: "fw-b2", title: "Tutup port lama", mode: "AUTO", severity: "high", status: "fail" }),
     ] },
   ],
 };
@@ -27,7 +29,7 @@ const { vpsChecklist, markNa, attestItem, remediatePreview, remediate, markNaBul
   vpsChecklist: vi.fn(),
   markNa: vi.fn(async () => ({ ok: true })),
   attestItem: vi.fn(async () => ({ ok: true })),
-  remediatePreview: vi.fn(async () => ({ steps: [] })),
+  remediatePreview: vi.fn(async () => ({ steps: [{ item: "fw-b1", status: "would", detail: "akan" }] })),
   remediate: vi.fn(async () => ({ steps: [], audit: null, scoreTotal: 5, scoreBySection: {} })),
   markNaBulk: vi.fn(async () => ({ ok: true, count: 1 })),
 }));
@@ -37,21 +39,34 @@ vi.mock("../src/api/client", () => ({
 }));
 import { VpsChecklistModal } from "../src/screens/VpsChecklist";
 
-beforeEach(() => { vpsChecklist.mockResolvedValue(VIEW); remediate.mockClear(); });
+beforeEach(() => {
+  vpsChecklist.mockResolvedValue(VIEW);
+  remediate.mockClear();
+  remediatePreview.mockClear();
+});
 
 // Checklist sendiri hidup di dalam Modal, jadi `role="dialog"` ada DUA saat konfirmasi
 // terbuka — yang teratas (terakhir di DOM) adalah ConfirmDialog-nya.
 const confirmDialog = () => screen.getAllByRole("dialog").at(-1)!;
 const TITLE = "Terapkan 1 item AUTO ke VPS ini?";
 
-// Buka checklist, pilih satu item AUTO, tekan Apply, tunggu dialognya.
-async function openApply() {
+// Buka tab Checklist, pilih satu item AUTO, buat pratinjau, lalu kembalikan tombol Terapkan di toolbar.
+async function previewReady() {
   render(<VpsChecklistModal vpsId="v1" onClose={() => {}} onToast={() => {}} />);
   await screen.findByTestId("score-total");
+  fireEvent.click(screen.getByRole("tab", { name: "Checklist" }));
   fireEvent.click(screen.getByTestId("section-firewall"));
   fireEvent.click(within(screen.getByTestId("item-fw-b1")).getByRole("checkbox"));
-  const trigger = screen.getByRole("button", { name: /^apply/i });
+  fireEvent.click(screen.getByRole("button", { name: /^pratinjau$/i }));
+  await screen.findByTestId("remediate-preview");
+  const trigger = screen.getByRole("button", { name: /^terapkan$/i });
   trigger.focus();
+  return trigger;
+}
+
+// Pemicu sampai dialog konfirmasinya terbuka.
+async function openApply() {
+  const trigger = await previewReady();
   fireEvent.click(trigger);
   await screen.findByText(TITLE);
   return trigger;
@@ -62,7 +77,9 @@ describe("VPS apply remediasi · konfirmasi aplikasi (SPEC-847)", () => {
     await openApply();
     const dialog = within(confirmDialog());
     expect(dialog.getByText(TITLE)).toBeTruthy();
+    // Item yang akan dijalankan disebut namanya, sebelum catatan dampaknya.
     expect(dialog.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "fw-b1 · Aktifkan UFW",
       "Langkahnya idempoten dan anti-lockout.", "Checklist diaudit ulang setelah selesai.",
     ]);
   });
@@ -83,7 +100,7 @@ describe("VPS apply remediasi · konfirmasi aplikasi (SPEC-847)", () => {
   });
 
   // Fokus TIDAK diuji di jalur konfirmasi: apply yang sukses memanggil `clearSel()`, dan
-  // toolbar Apply hanya dirender saat `selected.size > 0` — pemicunya sudah tak ada lagi
+  // toolbar Terapkan hanya dirender saat `selected.size > 0` — pemicunya sudah tak ada lagi
   // untuk dikembalikan. Jalur batal di atas yang menguji focus restore.
   it("konfirmasi memanggil remediate tepat sekali walau diklik dua kali", async () => {
     await openApply();
@@ -92,5 +109,24 @@ describe("VPS apply remediasi · konfirmasi aplikasi (SPEC-847)", () => {
     await waitFor(() => expect(remediate).toHaveBeenCalledTimes(1));
     expect(remediate).toHaveBeenCalledWith("v1", ["fw-b1"]);
     await waitFor(() => expect(screen.queryByText(TITLE)).toBeNull());
+  });
+
+  // Alur tiga langkah: tanpa pratinjau, Terapkan dinonaktifkan dan alasannya tertulis.
+  it("Terapkan nonaktif sebelum pratinjau dibuat, dengan alasannya", async () => {
+    render(<VpsChecklistModal vpsId="v1" onClose={() => {}} onToast={() => {}} />);
+    await screen.findByTestId("score-total");
+    fireEvent.click(screen.getByRole("tab", { name: "Checklist" }));
+    fireEvent.click(screen.getByTestId("section-firewall"));
+    fireEvent.click(within(screen.getByTestId("item-fw-b1")).getByRole("checkbox"));
+    expect(screen.getByRole("button", { name: /^terapkan$/i })).toBeDisabled();
+    expect(screen.getByText(/buat pratinjau dulu/i)).toBeInTheDocument();
+  });
+
+  // Mengubah pilihan membatalkan pratinjau: Terapkan kembali nonaktif sampai pratinjau baru dibuat.
+  it("mengubah pilihan membatalkan pratinjau dan mengunci Terapkan", async () => {
+    await previewReady();
+    fireEvent.click(within(screen.getByTestId("item-fw-b2")).getByRole("checkbox"));
+    expect(screen.queryByTestId("remediate-preview")).toBeNull();
+    expect(screen.getByRole("button", { name: /^terapkan$/i })).toBeDisabled();
   });
 });

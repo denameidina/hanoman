@@ -1,4 +1,5 @@
 import { TASK_STATUSES, type TaskStatus, type TaskView } from "@hanoman/shared";
+import { TASK_STATUS_LABEL } from "../lib/labels";
 
 // SPEC-946 · aturan papan tim sebagai fungsi MURNI: nol React, nol I/O, jadi ia bisa diuji tanpa
 // jsdom dan tak bisa diam-diam menumbuhkan state. Dipisah karena `from`/`to` yang tertukar LOLOS
@@ -8,9 +9,9 @@ import { TASK_STATUSES, type TaskStatus, type TaskView } from "@hanoman/shared";
 /** Label kolom. `Record<TaskStatus, …>` supaya status baru = galat kompilasi, bukan kolom tanpa
     judul. Kolomnya lahir dari `TASK_STATUSES`, BUKAN daftar literal baru: `COLUMNS` milik
     `BacklogScreen` sudah jadi cermin kedua, dan yang ketiga akan drift. */
-const COLUMN_LABEL: Record<TaskStatus, string> = {
-  backlog: "Backlog", doing: "Dikerjakan", review: "Review", done: "Selesai",
-};
+// Audit 2026-10: kolom pertama "Menunggu", bukan "Backlog" — kata itu milik papan Backlog (item
+// sesi agen), dan dua papan dengan kolom bernama sama membuat operator salah pindah.
+const COLUMN_LABEL = TASK_STATUS_LABEL;
 
 export const TEAM_COLUMNS: { key: TaskStatus; label: string }[] =
   TASK_STATUSES.map((key) => ({ key, label: COLUMN_LABEL[key] }));

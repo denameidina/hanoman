@@ -69,7 +69,8 @@ describe("revert stage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Simpan status" }));
 
     expect(await screen.findByText("Status saat ini: Objective")).toBeTruthy();
-    expect(screen.getAllByLabelText("Status Objective")).toHaveLength(2);
+    // Progres penuh hanya di detail (daftar memakai pil tahap), jadi satu progressbar.
+    expect(screen.getAllByLabelText("Status Objective")).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Simpan status" })).toBeTruthy();
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
 vi.mock("../src/api/client", () => ({
   api: {
@@ -76,9 +76,8 @@ describe("BacklogScreen · item goal (SPEC-407)", () => {
   it("badge Goal muncul dan detail mengeja goal, selesai bila, batasan", async () => {
     render(<BacklogScreen backlog={[goalSpec]} projects={[{ id: "p1", name: "P1" }] as never}
       projectFilter="all" onProjectFilter={() => {}} />);
-    // SPEC-521 · "Goal" kini muncul di tab filter DAN badge kartu → findByText cocok ganda
-    // dan melempar. Pola yang sama dipakai untuk "Audit" di backlog-board.test.tsx.
-    await waitFor(() => expect(screen.getAllByText("Goal").length).toBeGreaterThan(1));
+    // Asal item tampil sebagai teks meta "Goal" di baris (tab sumber kini di popover Filter).
+    await waitFor(() => expect(screen.getByText("Goal")).toBeTruthy());
     fireEvent.click(screen.getByText("Turunkan latensi"));
     await waitFor(() => expect(screen.getByText("Selesai bila")).toBeTruthy());
     expect(screen.getByText("benchmark < 200 ms")).toBeTruthy();
@@ -114,34 +113,33 @@ describe("BacklogScreen · tab Goal (SPEC-521)", () => {
     render(<BacklogScreen backlog={[briefSpec]} projects={[{ id: "p1", name: "P1" }] as never}
       projectFilter="all" onProjectFilter={() => {}} />);
   };
-  // getByRole("tab") — BUKAN getByText: badge kartu item goal berlabel "Goal" juga
-  // (SOURCE_META.goal), jadi pencarian berbasis teks cocok ganda begitu ada item goal di layar.
-  const tab = (name: string) => screen.getByRole("tab", { name });
+  // Sumber kini pilihan di popover "Filter" (Filter sumber). Buka dulu, lalu pilih lewat select-nya.
+  const pickSource = (value: string) => {
+    if (!screen.queryByRole("dialog", { name: "Filter" })) fireEvent.click(screen.getByRole("button", { name: /^Filter/ }));
+    fireEvent.change(screen.getByLabelText("Filter sumber"), { target: { value } });
+  };
   const lastCall = () => vi.mocked(api.listSpecs).mock.calls.at(-1)![0]!;
 
-  it("tab Goal ada di deret tab sumber", () => {
+  it("sumber Goal ada di daftar filter sumber, bersama sumber lama", () => {
     mount();
-    expect(tab("Goal")).toBeTruthy();
-    // Tab lama tak boleh hilang.
-    expect(tab("Semua spec")).toBeTruthy();
-    expect(tab("Dari brief")).toBeTruthy();
-    expect(tab("Dari QA")).toBeTruthy();
-    expect(tab("Audit")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Filter/ }));
+    const options = within(screen.getByLabelText("Filter sumber")).getAllByRole("option").map((o) => o.textContent);
+    expect(options).toEqual(expect.arrayContaining(["Goal", "Semua sumber", "Dari brief", "Dari QA", "Audit"]));
   });
 
-  it("mengklik tab Goal mengirim source=goal ke server", async () => {
+  it("memilih sumber Goal mengirim source=goal ke server", async () => {
     mount();
     await waitFor(() => expect(api.listSpecs).toHaveBeenCalled());
     expect(lastCall().source).toBeUndefined();
-    fireEvent.click(tab("Goal"));
+    pickSource("goal");
     await waitFor(() => expect(lastCall().source).toBe("goal"));
   });
 
-  it("kembali ke Semua spec mengirim source undefined, bukan sentinel \"all\"", async () => {
+  it("kembali ke Semua sumber mengirim source undefined, bukan sentinel \"all\"", async () => {
     mount();
-    fireEvent.click(tab("Goal"));
+    pickSource("goal");
     await waitFor(() => expect(lastCall().source).toBe("goal"));
-    fireEvent.click(tab("Semua spec"));
+    pickSource("all");
     await waitFor(() => expect(lastCall().source).toBeUndefined());
   });
 });

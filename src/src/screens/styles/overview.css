@@ -1,0 +1,90 @@
+/* OverviewScreen "Hari ini" (Audit UI/UX 2026-10 · Fase 3B). Dimuat dari OverviewScreen.tsx.
+   Satu kolom; susunan lewat kelas ini, bukan inline grid. Warna, ukuran, dan jarak dari token DS. */
+
+.hn-ov { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+
+/* Seksi = kartu tipis dengan judul <h3> (judul Card DS adalah div, tak bisa dirujuk aria-labelledby). */
+.hn-ov-section {
+  min-width: 0; padding: var(--space-4) var(--space-5);
+  background: var(--surface-card); border: 1px solid var(--border-hair);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+}
+.hn-ov-head {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--space-2) var(--space-3); margin-bottom: var(--space-2); min-width: 0;
+}
+.hn-ov-head-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); min-width: 0; }
+.hn-ov-title {
+  margin: 0; font-family: var(--font-display); font-size: var(--text-xl); font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight); line-height: 1.2; color: var(--text-strong);
+}
+.hn-ov-head-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
+.hn-ov-meta { font-family: var(--font-ui); font-size: var(--text-xs); color: var(--text-muted); }
+
+/* Teks baris: satu baris, terpotong dengan elipsis, tak pernah melebarkan induknya. Nama punya lantai 8ch
+   supaya tak menyusut jadi satu huruf ("r…") saat aktivitas di sebelahnya memakan ruang (QA P2, 320/390).
+   Lantai, bukan grow: nama tak melebar ke ruang kosong, jadi meta baris lain tetap di tempatnya. */
+.hn-ov-name {
+  min-width: 8ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--text-strong);
+}
+.hn-ov-activity {
+  flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--text-xs); color: var(--text-body);
+}
+.hn-ov-mono { font-family: var(--font-mono); font-size: var(--text-2xs); color: var(--text-subtle); white-space: nowrap; }
+
+/* Daftar project: nama | cakupan | status | backlog terbuka, sebagai satu grid per baris. */
+.hn-ov-prj .hn-row-main {
+  display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto;
+  align-items: center; column-gap: var(--space-3);
+}
+.hn-ov-cov { min-width: 0; display: flex; align-items: center; gap: var(--space-2); }
+.hn-ov-bar { flex: 1 1 auto; min-width: 0; }
+.hn-ov-pct { flex: 0 0 auto; min-width: 3ch; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); text-align: right; }
+.hn-ov-prj-meta { white-space: nowrap; }
+
+.hn-ov-foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--space-2) var(--space-3); margin-top: var(--space-3); padding-top: var(--space-3);
+  border-top: 1px solid var(--border-hair);
+}
+/* Tautan ringkas ke Backlog. Bukan `Button` DS: tombol itu menaruh `white-space: nowrap` dan tinggi tetap
+   sebagai inline, dan inline tak bisa dikalahkan kelas tanpa !important. Tekstur dan warnanya tetap token DS. */
+.hn-ov-foot-link {
+  min-width: 0; max-width: 100%; min-height: 30px; margin: 0; padding: var(--space-1) var(--space-3);
+  display: inline-flex; align-items: center; gap: var(--space-2); text-align: left;
+  border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent;
+  color: var(--text-body); font: var(--weight-medium) var(--text-sm)/1.35 var(--font-ui); white-space: normal; cursor: pointer;
+}
+.hn-ov-foot-link:hover { background: var(--bone-200); }
+.hn-ov-foot-link > svg { flex: 0 0 auto; }
+
+.hn-ov-limit { margin-top: var(--space-2); min-width: 0; }
+
+@media (max-width: 767px) {
+  .hn-ov-section { padding: var(--space-4); }
+  /* Ponsel: nama + status di baris pertama, bar cakupan di baris kedua, backlog di baris ketiga. */
+  .hn-ov-prj .hn-row-main { grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--space-1); }
+  .hn-ov-prj .hn-ov-cov { grid-column: 1 / -1; order: 3; }
+  .hn-ov-prj .hn-ov-prj-status { order: 2; }
+  .hn-ov-prj .hn-ov-prj-meta { order: 4; grid-column: 1 / -1; }
+  /* Perlu perhatian (ponsel): nama project di baris sendiri dan boleh turun dua baris; status dan alasan di
+     bawahnya, alasan terpotong dua baris. Nama tak lagi terpotong jadi "repo…" (QA P3). */
+  .hn-ov-attn .hn-row-main { flex-wrap: wrap; align-items: center; row-gap: var(--space-1); column-gap: var(--space-2); }
+  .hn-ov-attn .hn-row-main > :first-child { order: 2; }
+  .hn-ov-attn .hn-ov-name {
+    order: 1; flex: 1 1 100%; white-space: normal; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .hn-ov-attn .hn-ov-meta {
+    order: 2; flex: 1 1 0; min-width: 0;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  /* Aktivitas terbaru (ponsel): nama dan status di baris pertama, aktivitas di baris sendiri, commit menyusul.
+     Baris boleh membungkus; nama tak lagi berebut ruang dengan aktivitas di 320px. */
+  .hn-ov-act .hn-row-main { flex-wrap: wrap; row-gap: var(--space-1); }
+  .hn-ov-act .hn-ov-activity { flex: 1 1 100%; white-space: normal; overflow-wrap: anywhere; }
+  /* Backlog: tautan memakai lebar penuh dan boleh membungkus, tak melewati tepi kartu. */
+  .hn-ov-foot-link { width: 100%; min-height: var(--touch-target); padding-inline: var(--space-2); }
+}

@@ -39,7 +39,7 @@ describe("grid capability — kolom berbahaya", () => {
     render(<AgentAccessPanel />);
     expect(await screen.findByText((t, el) => el?.tagName === "DIV" && t === "berbahaya")).toBeInTheDocument();
     for (const id of ["sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "sessions:decide", "telegram:admin", "access:admin", "remote:control", "relay:exec", "sync:resolve", "instance:admin"])
-      expect(screen.getByLabelText(id), id).toBeInTheDocument();
+      expect(screen.getByLabelText(CAPABILITIES.find((c) => c.id === id)!.label), id).toBeInTheDocument();
   });
 
   it("domain tanpa capability danger tak mendapat checkbox liar di kolom itu", async () => {
@@ -64,7 +64,7 @@ describe("grid capability — kolom berbahaya", () => {
       { items: [token({ capabilities: ["qa:read", "qa:write"] })] } as any);
     render(<AgentAccessPanel />);
     expect((await screen.findByText(/dulu bisa menghapus laporan, test case, temuan & lampiran QA/i))).toBeInTheDocument();
-    expect(screen.getByLabelText("qa:delete")).toBeInTheDocument();
+    expect(screen.getByLabelText("QA — hapus")).toBeInTheDocument();
   });
 
   it("token yang sudah dicentang spawn TIDAK diperingatkan", async () => {

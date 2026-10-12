@@ -42,12 +42,12 @@ describe("create existing via clone (SPEC-218)", () => {
     await act(async () => { await Promise.resolve(); });
     fireEvent.click(screen.getAllByText("Projects")[0]!);
     fireEvent.click((await screen.findAllByText("Project baru"))[0]!);
-    fireEvent.click(await screen.findByText("Existing codebase"));
-    fireEvent.click(await screen.findByText("Clone dari URL git"));
+    fireEvent.click(await screen.findByText("Kode yang sudah ada"));
+    fireEvent.click(await screen.findByText("Salin dari URL git"));
     fireEvent.change(await screen.findByPlaceholderText("https://github.com/org/repo.git"),
       { target: { value: "https://github.com/org/repo.git" } });
     fireEvent.change(screen.getByPlaceholderText("/path/ke/repo"), { target: { value: "/tmp/clone" } });
-    fireEvent.click(screen.getByText("Clone → reverse-engineer docs"));
+    fireEvent.click(screen.getByText("Salin repo dan susun dokumen"));
     await waitFor(() => expect((api.cloneProject as any)).toHaveBeenCalledWith("repo", "/tmp/clone"));
     const arg = (api.createProject as any).mock.calls[0][0];
     expect(arg).toMatchObject({ kind: "existing", gitRemote: "https://github.com/org/repo.git" });
@@ -63,12 +63,12 @@ describe("create existing via clone (SPEC-218)", () => {
     await act(async () => { await Promise.resolve(); });
     fireEvent.click(screen.getAllByText("Projects")[0]!);
     fireEvent.click((await screen.findAllByText("Project baru"))[0]!);
-    fireEvent.click(await screen.findByText("Existing codebase"));
-    fireEvent.click(await screen.findByText("Clone dari URL git"));
+    fireEvent.click(await screen.findByText("Kode yang sudah ada"));
+    fireEvent.click(await screen.findByText("Salin dari URL git"));
     fireEvent.change(await screen.findByPlaceholderText("https://github.com/org/repo.git"),
       { target: { value: "https://github.com/org/repo.git" } });
     fireEvent.change(screen.getByPlaceholderText("/path/ke/repo"), { target: { value: "/tmp/clone" } });
-    fireEvent.click(screen.getByText("Clone → reverse-engineer docs"));
+    fireEvent.click(screen.getByText("Salin repo dan susun dokumen"));
     const toast = await screen.findByText(/clone gagal/);
     expect(toast.textContent).toContain("git clone gagal");
     expect(toast.textContent).toContain("detail project");

@@ -47,7 +47,7 @@ beforeEach(() => {
 
 const openModel = () => {
   render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
+  fireEvent.click(screen.getByRole("button", { name: "Agen & model" }));
 };
 
 describe("SPEC-488 · kartu agen hanoman-lead", () => {

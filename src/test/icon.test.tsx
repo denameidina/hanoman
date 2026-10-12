@@ -41,3 +41,31 @@ describe("Icon", () => {
     expect(warn.mock.calls[0]![0]).toContain("tak-ada-ikon-begini");
   });
 });
+
+// Audit UI/UX 2026-10 · Fase 2B · ikon dekoratif disembunyikan dari pembaca layar secara default.
+describe("Icon · aksesibilitas (Fase 2B)", () => {
+  const node = (container: HTMLElement, name: string) => container.querySelector<SVGElement>(`[data-icon="${name}"]`)!;
+
+  it("tanpa aria-label/aria-labelledby/title: aria-hidden=true", () => {
+    const { container } = render(<Icon name="check" />);
+    expect(node(container, "check").getAttribute("aria-hidden")).toBe("true");
+    expect(node(container, "check").getAttribute("role")).toBeNull();
+  });
+
+  it("dengan aria-label: tak disembunyikan dan berperan sebagai img bernama", () => {
+    const { container } = render(<Icon name="alert-triangle" aria-label="Peringatan" />);
+    expect(node(container, "alert-triangle").getAttribute("aria-hidden")).toBeNull();
+    expect(node(container, "alert-triangle").getAttribute("role")).toBe("img");
+    expect(node(container, "alert-triangle").getAttribute("aria-label")).toBe("Peringatan");
+  });
+
+  it("dengan aria-labelledby juga bernama; aria-hidden eksplisit tetap dihormati", () => {
+    const { container } = render(<>
+      <Icon name="info" aria-labelledby="teks-info" />
+      <Icon name="x" aria-hidden={false} />
+    </>);
+    expect(node(container, "info").getAttribute("role")).toBe("img");
+    expect(node(container, "info").getAttribute("aria-hidden")).toBeNull();
+    expect(node(container, "x").getAttribute("aria-hidden")).toBe("false");
+  });
+});

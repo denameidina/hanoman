@@ -267,6 +267,8 @@ Tool MCP-nya (semua tulis bermode `danger`, hanya tampil dengan `--danger`):
 | `hanoman_remote_control_get` | baca | `remote:read` |
 | `hanoman_remote_control_set` | danger | `remote:control` |
 | `hanoman_device_relay` | danger | `relay:exec` |
+| `hanoman_device_access_request` | danger | `relay:exec` |
+| `hanoman_device_access_requests` | danger | `relay:exec` |
 | `hanoman_logs_search`, `hanoman_log_transcript`, `hanoman_logs_retention_get` | baca | `logs:read` |
 | `hanoman_logs_retention_set` | danger | `logs:write` |
 | `hanoman_presence_get` | baca | `presence:read` |
@@ -285,15 +287,19 @@ Tool MCP-nya (semua tulis bermode `danger`, hanya tampil dengan `--danger`):
 | `POST /api/specs` | `backlog:write` | buat backlog item — bentuk payload di §7. |
 | `PATCH /api/specs/:id` | `backlog:write` | ubah item; konten hanya selagi belum dimulai. |
 | `POST /api/specs/:id/done` | `backlog:write` | tandai item **selesai** tanpa menjalankan sesi — untuk pekerjaan yang beres di luar hanoman. Body `{ reason?: string (≤280), confirm?: boolean }`, keduanya opsional; balasannya `Spec` yang sudah `stage:"done"`. Tak menjalankan maupun menghentikan sesi apa pun. |
+| `POST /api/specs/:id/reviewed` | `backlog:write` | tandai atau batalkan **sudah ditinjau** pada item yang sudah **selesai** (tool `hanoman_backlog_mark_reviewed`, ADR-0218). Body `{ reviewed?: boolean }`, default `true`; `false` membatalkan. Idempoten: menandai ulang tak mengubah stempelnya. Balasannya `Spec` dengan `reviewedAt`. 409 bila item belum selesai. Tak mengubah stage, diff, atau berkas. |
 | `GET /api/specs/:id/attachments` | `backlog:read` | lampiran backlog item — gambar & dokumen yang dilampirkan manusia sebagai konteks kerja. |
 | `POST /api/specs/:id/attachments` | `backlog:write` | unggah lampiran (`multipart/form-data`, beberapa berkas per request). Berkas yang ditolak **tak** menggagalkan yang lain — periksa `rejected[]`. |
 | `GET /api/specs/:id/attachments/:attId` | `backlog:read` | byte satu lampiran. |
 | `DELETE /api/specs/:id/attachments/:attId` | `backlog:write` | hapus satu lampiran. |
 | `GET /api/specs/:id/docs` | `backlog:read` | dokumen yang ditulis sesi item itu. |
-| `GET /api/specs/:id/review` | `backlog:read` | diff hasil kerja sesi. |
+| `GET /api/specs/:id/review` | `backlog:read` | diff hasil kerja sesi. Bila belum ada worktree maupun commit: **200** dengan `empty: true` dan `reason` — `no-worktree` (belum pernah dimulai) atau `no-commit` (worktree sudah lenyap tanpa commit); `base`, `files`, dan `changed` kosong. Itu keadaan, bukan galat (ADR-0213). Sesi memakai pola yang sama (ADR-0215). |
+| `DELETE /api/specs/:id/worktree` | `ide:git` (danger) | hapus worktree satu item (tool `hanoman_backlog_worktree_delete`, ADR-0213). Perubahan yang belum di-commit di dalamnya **hilang** dan sesi yang berjalan di sana ditutup; cabang dan commit tetap. Balasan **200** `{ name, ok, cleanup, closedSession?, error? }` — `ok: false` bila worktree tak ditemukan atau tak bisa dihapus. Capability-nya sama dengan `POST /api/projects/:id/worktrees/delete`, bukan `backlog:write`. |
 | `GET /api/projects/:id/docs` | `docs:read` | index Source of Truth project. |
 | `GET /api/projects/:id/docs/<path>` | `docs:read` | isi satu dokumen. |
 | `GET /api/terminal/sessions` | `sessions:read` | sesi yang sedang hidup. |
+| `GET /api/terminal/sessions/:id/review` | `sessions:read` | diff worktree sesi project-level (PRD). Bentuknya sama dengan review backlog item. Bila sesi tak punya worktree (`no-worktree`) atau worktree-nya sudah lenyap tanpa commit (`no-commit`): **200** dengan `empty: true` dan `reason`; `base`, `files`, dan `changed` kosong. Itu keadaan, bukan galat (ADR-0215, amandemen ADR-0213). Tool `hanoman_session_review`. |
+| `GET /api/terminal/sessions/:id/review/<path>` | `sessions:read` | isi diff satu berkas. **409** bila tak ada sumber sama sekali (tak ada berkas untuk dibaca); 404 bila path di luar daftar. |
 | `GET /api/notifications` | `notifications:read` | notifikasi. **Tanpa `limit` → 50 teratas**, bukan seluruhnya (lihat jebakan di §10). |
 | `GET /api/tickets` | `support:read` | tiket Help Center. |
 | `GET /api/lead/decisions` | `lead:read` | jejak keputusan hanoman-lead. Menerima `page`/`limit`; `take`/`skip` lama tetap jalan. |
@@ -354,8 +360,8 @@ capability-nya. Capability menjawab "boleh?", bukan "sebaiknya?".
 | `POST /api/update/apply`, `POST /api/restart` | memasang paket npm dan **me-restart server** (ADR-0200): dashboard & koneksi MCP putus beberapa detik; pane tmux selamat. Selalu `confirm: false` dulu untuk membaca jumlah sesi hidup. |
 | `POST /api/sync/conflicts/:entity/:recordId/resolve` | **membuang data satu sisi** (lokal atau hub) tanpa jalan pulang (ADR-0199). Baca `differs` dari `hanoman_sync_conflicts` dulu. |
 
-Perlakukan `POST /api/specs/:id/integrate`, `DELETE /api/specs/:id`, dan perubahan `stage` dengan
-disiplin yang sama: ketiganya mengubah sejarah git atau membuang pekerjaan. `POST /api/specs/:id/done`
+Perlakukan `POST /api/specs/:id/integrate`, `DELETE /api/specs/:id`, `DELETE /api/specs/:id/worktree`,
+dan perubahan `stage` dengan disiplin yang sama: keempatnya mengubah sejarah git atau membuang pekerjaan. `POST /api/specs/:id/done`
 tak menyentuh git, tetapi ia **menyatakan pekerjaan orang lain selesai** — pakai hanya bila kamu punya
 buktinya, dan tulis buktinya di `reason`.
 
@@ -535,6 +541,8 @@ Panduan siap salin untuk keempat klien, berikut tabel tool → capability, ada d
 | `hanoman_lead_decisions_list` | baca | `lead:read` |
 | `hanoman_backlog_create`, `hanoman_backlog_update` | tulis | `backlog:write` |
 | `hanoman_notifications_mark_read` | tulis | `notifications:write` |
+| `hanoman_notification_mark_read` | tulis | `notifications:write` — satu notifikasi berdasarkan `id` (ADR-0204), idempoten |
+| `hanoman_scheduler_queue_cancel`, `hanoman_scheduler_queue_requeue` | tulis | `settings:write`; requeue baris `failed` juga menuntut `sessions:spawn` (ADR-0204, 403 bila tak ada) |
 | `hanoman_lead_ask` | tulis | `lead:write` |
 | `hanoman_health`, `hanoman_models`, `hanoman_codex_version`, `hanoman_methods_status` | baca | — (`GLOBAL_READ`, ADR-0187) |
 | `hanoman_activity_list` | baca | `activity:read` |

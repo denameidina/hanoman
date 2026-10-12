@@ -43,11 +43,14 @@ vi.mock("../src/api/client", () => ({
 }));
 import { VpsChecklistModal } from "../src/screens/VpsChecklist";
 
+// Modal terbuka di tab Ringkasan. Checklist dibuka lewat tabnya, seperti pengguna sungguhan.
 async function open() {
   render(<VpsChecklistModal vpsId="v1" onClose={() => {}} onToast={() => {}} />);
   await screen.findByTestId("score-total");
+  fireEvent.click(screen.getByRole("tab", { name: "Checklist" }));
 }
 const expand = (id: string) => fireEvent.click(screen.getByTestId(`section-${id}`));
+const openFilters = () => fireEvent.click(screen.getByRole("button", { name: /^filter/i }));
 
 describe("VpsChecklistModal (SPEC-220/221 · UI modal)", () => {
   beforeEach(() => { vpsChecklist.mockResolvedValue(VIEW); markNa.mockClear(); attestItem.mockClear(); markNaBulk.mockClear(); });
@@ -71,13 +74,14 @@ describe("VpsChecklistModal (SPEC-220/221 · UI modal)", () => {
     expect(screen.queryByTestId("item-ssh-b2")).toBeNull();
   });
 
-  it("header collapsed menampilkan hitungan status + badge drift", async () => {
+  // Ringkasan seksi memakai label glosarium (lib/labels), bukan enum mentah.
+  it("header collapsed menampilkan hitungan status dalam bahasa Indonesia + badge drift", async () => {
     await open();
     const header = screen.getByTestId("section-ssh");
-    expect(header.textContent).toMatch(/2 fail/);
-    expect(header.textContent).toMatch(/1 unknown/);
+    expect(header.textContent).toMatch(/2 gagal/);
+    expect(header.textContent).toMatch(/1 belum diketahui/);
     expect(within(header).getByText(/drift/i)).toBeTruthy();
-    expect(screen.getByTestId("section-firewall").textContent).toMatch(/semua pass/);
+    expect(screen.getByTestId("section-firewall").textContent).toMatch(/semua lulus/);
   });
 
   it("search memfilter + auto-expand; dikosongkan → collapse lagi", async () => {
@@ -91,17 +95,20 @@ describe("VpsChecklistModal (SPEC-220/221 · UI modal)", () => {
     expect(screen.queryByText("Nonaktifkan login root")).toBeNull();       // collapse lagi
   });
 
-  it("filter mode=INFO menyembunyikan non-INFO + auto-expand (AC-12)", async () => {
+  // Fase 3J: seksi, mode, status, severity pindah ke popover Filter; filter aktif jadi chip.
+  it("filter mode=INFO ada di popover dan menyembunyikan non-INFO + auto-expand (AC-12)", async () => {
     await open();
+    openFilters();
     fireEvent.change(screen.getByLabelText("mode"), { target: { value: "INFO" } });
     expect(screen.getByText("SSH Certificate Authority")).toBeTruthy(); // INFO tampil
     expect(screen.queryByText("Nonaktifkan login root")).toBeNull();    // AUDIT tersembunyi
+    expect(screen.getByRole("button", { name: /Mode: Info/ })).toBeInTheDocument();
   });
 
-  it("tombol Attest hanya untuk item INFO (AC-11)", async () => {
+  it("tombol Tandai terpenuhi hanya untuk item INFO (AC-11)", async () => {
     await open(); expand("ssh");
-    expect(within(screen.getByTestId("item-ssh-a1")).queryByRole("button", { name: /attest/i })).toBeTruthy();
-    expect(within(screen.getByTestId("item-ssh-b2")).queryByRole("button", { name: /attest/i })).toBeNull();
+    expect(within(screen.getByTestId("item-ssh-a1")).queryByRole("button", { name: /tandai terpenuhi/i })).toBeTruthy();
+    expect(within(screen.getByTestId("item-ssh-b2")).queryByRole("button", { name: /tandai terpenuhi/i })).toBeNull();
   });
 
   it("klik N/A memanggil api.markNa (AC-10)", async () => {
@@ -110,9 +117,9 @@ describe("VpsChecklistModal (SPEC-220/221 · UI modal)", () => {
     await vi.waitFor(() => expect(markNa).toHaveBeenCalledWith("v1", "ssh-b2", true, expect.any(String)));
   });
 
-  it("klik Attest memanggil api.attestItem (AC-11)", async () => {
+  it("klik Tandai terpenuhi memanggil api.attestItem (AC-11)", async () => {
     await open(); expand("ssh");
-    fireEvent.click(within(screen.getByTestId("item-ssh-a1")).getByRole("button", { name: /attest/i }));
+    fireEvent.click(within(screen.getByTestId("item-ssh-a1")).getByRole("button", { name: /tandai terpenuhi/i }));
     await vi.waitFor(() => expect(attestItem).toHaveBeenCalledWith("v1", "ssh-a1"));
   });
 
@@ -123,20 +130,24 @@ describe("VpsChecklistModal (SPEC-220/221 · UI modal)", () => {
     expect(within(screen.getByTestId("item-ssh-a1")).queryByRole("checkbox")).toBeNull();
   });
 
-  it("pilih AUTO → Preview memanggil api.remediatePreview + tampil would (AC-13)", async () => {
+  it("pilih AUTO → Pratinjau memanggil api.remediatePreview + tampil would (AC-13)", async () => {
     await open(); expand("firewall");
     fireEvent.click(within(screen.getByTestId("item-fw-b1")).getByRole("checkbox"));
-    fireEvent.click(screen.getByRole("button", { name: /preview/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^pratinjau$/i }));
     await vi.waitFor(() => expect(remediatePreview).toHaveBeenCalledWith("v1", ["fw-b1"]));
     expect(within(await screen.findByTestId("remediate-preview")).getByText(/fw-b1/)).toBeTruthy();
   });
 
-  it("Apply memanggil api.remediate (AC-14)", async () => {
+  // Alur tiga langkah: Terapkan hanya dari pratinjau yang sudah dibuat untuk pilihan yang sama.
+  it("Apply memanggil api.remediate setelah pratinjau (AC-14)", async () => {
     await open(); expand("firewall");
     fireEvent.click(within(screen.getByTestId("item-fw-b1")).getByRole("checkbox"));
-    fireEvent.click(screen.getByRole("button", { name: /^apply/i }));
-    // SPEC-847 · konfirmasi kini dialog aplikasi, bukan window.confirm yang di-mock.
-    fireEvent.click(await screen.findByRole("button", { name: "Terapkan" }));
+    fireEvent.click(screen.getByRole("button", { name: /^pratinjau$/i }));
+    await screen.findByTestId("remediate-preview");
+    fireEvent.click(screen.getByRole("button", { name: /^terapkan$/i }));
+    // SPEC-847 · konfirmasi kini dialog aplikasi; tombol "Terapkan" ada juga di toolbar, jadi cari di dialog.
+    const dialog = within(screen.getAllByRole("dialog").at(-1)!);
+    fireEvent.click(await dialog.findByRole("button", { name: "Terapkan" }));
     await vi.waitFor(() => expect(remediate).toHaveBeenCalledWith("v1", ["fw-b1"]));
   });
 
@@ -161,8 +172,8 @@ describe("VpsChecklistModal (SPEC-220/221 · UI modal)", () => {
     expect(screen.queryByTestId("suggestion-ssh")).toBeNull();
   });
 
-  // UI 2026-07-18 · detail VPS (bekas side panel) pindah ke dalam modal ini.
-  it("menampilkan detail VPS (last audit + health) di header modal", async () => {
+  // UI 2026-07-18 · detail VPS (bekas side panel) ada di tab Ringkasan, tab pertama.
+  it("menampilkan detail VPS (last audit + health) di Ringkasan", async () => {
     render(<VpsChecklistModal vpsId="v1" vpsName="web-1"
       lastAuditAt="2026-07-17T10:00:00Z" health={{ uptime: "3d", disk: "42%", mem: "1.2G", load: "0.30" }}
       onClose={() => {}} onToast={() => {}} />);
@@ -178,5 +189,22 @@ describe("VpsChecklistModal (SPEC-220/221 · UI modal)", () => {
     const detail = await screen.findByTestId("vps-detail");
     expect(detail.textContent).toMatch(/Belum pernah diaudit/);
     expect(detail.textContent).not.toMatch(/disk/);
+  });
+
+  // Fase 3J: empat tab tetap ada, dan panel yang tak aktif tak ikut terbaca pembaca layar.
+  it("empat tab detail: Ringkasan · Checklist · Pemasangan · Akses", async () => {
+    render(<VpsChecklistModal vpsId="v1" onClose={() => {}} onToast={() => {}} />);
+    await screen.findByTestId("vps-detail");
+    for (const name of ["Ringkasan", "Checklist", "Pemasangan", "Akses"]) {
+      expect(screen.getByRole("tab", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("tab", { name: "Ringkasan" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("onScore dipanggil dengan skor saat checklist termuat (dipakai daftar VPS)", async () => {
+    const onScore = vi.fn();
+    render(<VpsChecklistModal vpsId="v1" onScore={onScore} onClose={() => {}} onToast={() => {}} />);
+    await screen.findByTestId("vps-detail");
+    await vi.waitFor(() => expect(onScore).toHaveBeenCalledWith(42));
   });
 });

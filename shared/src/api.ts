@@ -34,13 +34,19 @@ export const paths = {
   specSource: (id: string) => `${API}/specs/${id}/source`,
   // SPEC-804 · ADR-0120 · tandai item selesai manual (operasi khusus, bukan field PATCH).
   specDone: (id: string) => `${API}/specs/${id}/done`,
+  // ADR-0218 · tandai/batalkan "sudah ditinjau" pada item selesai (operasi khusus, bukan field PATCH).
+  specReviewed: (id: string) => `${API}/specs/${id}/reviewed`,
   // SPEC-843 · ADR-0124 · lampiran backlog item (multi-berkas per request).
   specAttachments: (id: string) => `${API}/specs/${id}/attachments`,
   specAttachment: (id: string, attId: string) => `${API}/specs/${id}/attachments/${attId}`,
   specReview: (id: string) => `${API}/specs/${id}/review`,
   specReviewFile: (id: string, path: string) => `${API}/specs/${id}/review/${path}`,
+  // ADR-0213 · hapus worktree satu backlog item (cabang & commit tetap).
+  specWorktree: (id: string) => `${API}/specs/${id}/worktree`,
   settings: `${API}/settings`,
   notifications: `${API}/notifications`,
+  // ADR-0204 · tandai satu notifikasi terbaca (POST, idempoten).
+  notificationRead: (id: string) => `${API}/notifications/${encodeURIComponent(id)}/read`,
   limits: `${API}/limits`,
   // SPEC-339 · versi codex CLI (peringatan lunak model GPT-5.6).
   codexVersion: `${API}/codex/version`,
@@ -177,6 +183,12 @@ export const paths = {
   deviceToken: (id: string) => `${API}/device-tokens/${id}`,
   // SPEC-1215 · ADR-0165 · grant kendali jarak jauh mesin ini (cookie-only)
   remoteControl: `${API}/remote-control`,
+  // ADR-0217 · permintaan tingkat akses: daftar + keputusan lokal (cookie-only) di perangkat ini;
+  // kirim/status lewat hub untuk perangkat remote (relay:exec).
+  remoteAccessRequests: `${API}/remote-control/access-requests`,
+  remoteAccessRequestDecide: (id: string, action: "approve" | "reject") =>
+    `${API}/remote-control/access-requests/${encodeURIComponent(id)}/${action}`,
+  deviceAccessRequests: (deviceId: string) => `${API}/devices/${encodeURIComponent(deviceId)}/access-requests`,
   // SPEC-1217 · ADR-0166 · log terpusat — pencarian, transkrip remote, retensi.
   logs: `${API}/logs`,
   logTranscript: (id: number) => `${API}/logs/${id}/transcript`,

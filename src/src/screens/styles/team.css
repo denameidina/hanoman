@@ -1,0 +1,189 @@
+/* Tim · redesign Audit UI/UX 2026-10 · Fase 3D. Papan tugas manusia (kolom = Task.status).
+   Susunan memakai kelas `hn-tm-*`; nilai hanya dari token. Prefiks sengaja tak meminjam
+   `.hn-team-*` di app.css (aturan !important di sana milik toolbar lama). */
+
+.hn-tm-screen { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; min-width: 0; }
+
+/* Toolbar: baris pengalih (mode, lensa, hitungan) lalu FilterBar. ≤6 kontrol terlihat. */
+.hn-tm-toolbar { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); min-width: 0; }
+.hn-tm-switches { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); min-width: 0; }
+.hn-tm-count { font: var(--weight-medium) var(--text-xs)/1 var(--font-mono); color: var(--text-muted); white-space: nowrap; }
+.hn-tm-count[title] { color: var(--status-warn); }
+.hn-tm-hint { margin: 0; font: var(--weight-regular, 400) var(--text-xs)/1.5 var(--font-ui); color: var(--text-muted); }
+.hn-tm-alert { color: var(--status-warn); }
+
+/* Titik prioritas: bentuk membawa makna, sama dengan papan Backlog. */
+.hn-tm-prio { display: inline-flex; flex: 0 0 auto; width: 10px; height: 10px; }
+.hn-tm-prio::before {
+  content: ""; display: block; width: 100%; height: 100%; border-radius: 50%;
+  box-sizing: border-box; border: 1.5px solid var(--ink-400); background: transparent;
+}
+.hn-tm-prio-high::before { background: var(--brass-600); border-color: var(--brass-600); }
+.hn-tm-prio-mid::before { background: var(--ink-400); border-color: var(--ink-400); }
+.hn-tm-prio-low::before { background: transparent; border-color: var(--ink-400); }
+
+/* Papan: kolom = status. Kartu hanya judul, prioritas, penanggung jawab, dan satu menu. */
+/* Kolom lentur: empat kolom muat di 1280 (sidebar 248 + gutter) tanpa terpotong; di bawah 200 px per
+   kolom papan menggulir mendatar. Papan HARUS flex mendatar. Di ponsel papan ini tak dirender (lihat `hn-tm-mobile`). */
+.hn-tm-board { display: flex; overflow-x: auto; flex: 1 1 auto; min-height: 0; gap: var(--space-2); align-items: stretch; padding-bottom: var(--space-1); }
+.hn-tm-col {
+  flex: 1 1 220px; min-width: 200px; display: flex; flex-direction: column; min-height: 0; padding: var(--space-2);
+  border-radius: var(--radius-lg); background: var(--bone-100); border: 1px solid var(--border-hair);
+  transition: var(--transition-fast);
+}
+.hn-tm-col[data-active] { border-style: dashed; }
+.hn-tm-col[data-hot] { background: var(--brass-100); border-color: var(--brass-500); }
+.hn-tm-col[data-dimmed] { opacity: 0.5; }
+/* Tablet (768–1199 px): empat kolom HARUS muat, tanpa kolom terakhir terpotong di luar layar. Di 820 px papan
+   selebar 708 px; 4 × 200 px + 3 × 8 px gap = 824 px meluap, dan "Selesai" terpotong tanpa penanda. Kolom di sini
+   berbagi lebar sama dengan minimum 150 px: 4 × 150 + 3 × 8 = 624 px muat di 656 px, lebar papan terkecil tablet
+   (768 − rail 72 − gutter 2 × 20). Desktop tetap basis 220 px. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .hn-tm-col { flex: 1 1 0; min-width: 150px; }
+}
+.hn-tm-col-head { display: flex; align-items: center; gap: var(--space-1); margin-bottom: var(--space-2); min-height: 20px; }
+.hn-tm-col-count { margin-left: auto; font: var(--weight-regular, 400) var(--text-2xs)/1 var(--font-mono); color: var(--text-subtle); }
+.hn-tm-col-body { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; flex: 1 1 auto; overflow-y: auto; }
+.hn-tm-hidden-note { margin-top: var(--space-2); font: var(--weight-regular, 400) var(--text-xs)/1.4 var(--font-ui); color: var(--status-warn); }
+
+.hn-tm-card {
+  flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) var(--space-3);
+  background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs); cursor: grab;
+}
+.hn-tm-card[data-dragging] { opacity: 0.4; }
+.hn-tm-card-head { display: flex; align-items: flex-start; gap: var(--space-2); min-width: 0; }
+/* Area klik judul minimal 24×24 (WCAG 2.5.8): padding vertikal menambah tinggi teks ~19 px jadi ≥24 px;
+   pointer kasar/ponsel 44 px (--touch-target). */
+.hn-tm-title {
+  flex: 1 1 auto; min-width: 0; padding: var(--space-1) 0; border: 0; background: transparent; cursor: pointer; text-align: left;
+  font: var(--weight-medium) var(--text-md)/1.35 var(--font-ui); color: var(--text-strong); overflow-wrap: anywhere;
+}
+.hn-tm-title:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-tm-title { min-height: var(--touch-target); display: inline-flex; align-items: center; }
+}
+.hn-tm-card-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
+.hn-tm-assignee-wrap { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.hn-tm-assignee {
+  font: var(--weight-regular, 400) var(--text-xs)/1.2 var(--font-ui); color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.hn-tm-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 22px; height: 22px; border-radius: 50%; background: var(--bone-300); color: var(--text-body);
+  font: var(--weight-semibold) var(--text-2xs)/1 var(--font-mono);
+}
+.hn-tm-avatar-empty { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-subtle); }
+
+.hn-tm-empty-col { font: var(--weight-regular, 400) var(--text-xs)/1.4 var(--font-ui); color: var(--text-subtle); padding: var(--space-2) var(--space-1); }
+
+/* Mobile (≤767px): satu kolom per layar lewat pemilih; papan ditumpuk, tanpa geser mendatar. */
+.hn-tm-mobile { display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; min-width: 0; }
+.hn-tm-col-stack { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; }
+@media (max-width: 767px) {
+  .hn-tm-switches { align-items: stretch; }
+  .hn-tm-card-foot { align-items: center; }
+}
+
+/* ── Linimasa (SPEC-948/949) · kelas `hn-tl-*`. Nilai yang berubah per render hidup sebagai CSS var
+   yang diset sekali di akar kanvas (`.hn-tl`) dan diwarisi turunannya: --tl-label-w (kolom label),
+   --tl-cell (lebar satu tick), --tl-ticks (jumlah tick), --tl-track-w (lebar trek), --tl-canvas-w
+   (lebar kanvas utuh). Per batang: --tl-left, --tl-width. Garis hari ini: --tl-today-x.
+   Aturan TOMBOL memakai konteks `.hn-tl` karena `.hn-shell button` dan `button:not(...)` di app.css
+   (spesifisitas 0,1,1) memberi min-height/min-width 44 px di layar sentuh. `.hn-tl button.hn-tl-*`
+   (0,2,1) mengalahkannya, sama seperti inline dulu. Konstanta TSX: ROW_H 34, BAR_INSET 6. */
+.hn-tl-scroll { flex: 1 1 auto; min-height: 0; min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: auto; }
+.hn-tl { position: relative; width: var(--tl-canvas-w); min-width: var(--tl-canvas-w); }
+.hn-tl-head {
+  display: flex; position: sticky; top: 0; z-index: 2;
+  background: var(--bone-100); border-bottom: 1px solid var(--border-hair);
+}
+.hn-tl-label {
+  position: sticky; left: 0; z-index: 1; flex: 0 0 var(--tl-label-w); width: var(--tl-label-w);
+  box-sizing: border-box; padding: 5px 10px; min-width: 0;
+  background: var(--surface-card); border-right: 1px solid var(--border-hair);
+}
+/* Kolom label di header tetap sticky, dan warnanya bone (bukan card) agar tak tembus saat digulir. */
+.hn-tl-head .hn-tl-label { z-index: 3; background: var(--bone-100); }
+.hn-tl-ticks {
+  display: grid; grid-template-columns: repeat(var(--tl-ticks), var(--tl-cell));
+  width: var(--tl-track-w); flex: 0 0 var(--tl-track-w);
+}
+.hn-tl-tick {
+  border-left: 1px solid var(--border-hair); padding: 5px 4px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-subtle);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-tl-tick[data-major="true"] { border-left-color: var(--border-strong); color: var(--text-body); }
+.hn-tl-row { display: flex; border-bottom: 1px solid var(--border-hair); }
+.hn-tl-label-text {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; font-weight: var(--weight-medium); color: var(--text-strong);
+}
+.hn-tl-label-meta {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10px; color: var(--text-subtle);
+}
+.hn-tl-track {
+  position: relative; width: var(--tl-track-w); height: 34px; flex: 0 0 var(--tl-track-w);
+  background-image: repeating-linear-gradient(to right, var(--border-hair) 0 1px, transparent 1px var(--tl-cell));
+}
+/* Batang: posisi dan lebar dari CSS var per batang. Nada lewat atribut `data-tone`. */
+.hn-tl-bar {
+  position: absolute; top: 6px; left: var(--tl-left); width: var(--tl-width);
+  height: 22px; min-width: 3px; min-height: 22px; display: flex; align-items: center; padding: 0; overflow: hidden;
+  cursor: default; border: 1px solid var(--border-hair); border-radius: var(--radius-sm);
+}
+.hn-tl button.hn-tl-bar { min-width: 3px; min-height: 22px; cursor: pointer; }
+.hn-tl-bar[data-clipped-start="true"] { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.hn-tl-bar[data-clipped-end="true"] { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.hn-tl-bar[data-tone="brass"], .hn-tl-swatch[data-tone="brass"] { background: var(--brass-300); border-color: var(--brass-500); }
+.hn-tl-bar[data-tone="err"], .hn-tl-swatch[data-tone="err"] { background: var(--status-err-tint); border-color: var(--status-err); }
+.hn-tl-bar[data-tone="muted"], .hn-tl-swatch[data-tone="muted"] { background: var(--bone-300); border-color: var(--border-strong); }
+.hn-tl-bar[data-tone="envelope"], .hn-tl-swatch[data-tone="envelope"] { background: var(--bone-200); border-color: var(--border-hair); }
+.hn-tl-today {
+  position: absolute; top: 0; bottom: 0; left: var(--tl-today-x); width: 2px; pointer-events: none;
+  background: var(--brass-500); opacity: 0.5;
+}
+.hn-tl-empty {
+  position: sticky; left: 0; width: var(--tl-label-w); padding: 18px 10px;
+  font-size: var(--text-xs); color: var(--text-muted);
+}
+/* Legenda. Swatch menerima warnanya dari nada yang sama dengan batang. */
+.hn-tl-legend {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 0 0 8px; padding: 0;
+  font-size: var(--text-xs); color: var(--text-muted);
+}
+.hn-tl-legend-item { display: flex; align-items: center; gap: 6px; }
+.hn-tl-swatch {
+  display: inline-block; width: 14px; height: 9px; border-radius: 2px; border: 1px solid transparent;
+}
+/* Baris project (mode lintas project): tombol pembuka tak boleh setinggi tombol sentuh (44 px) di baris 34 px. */
+.hn-tl button.hn-tl-expand { min-height: 0; }
+.hn-tl-expand {
+  display: flex; align-items: center; gap: 5px; width: 100%; padding: 0;
+  background: none; border: none; cursor: pointer; text-align: left;
+  font-family: var(--font-ui); font-size: 12px; font-weight: var(--weight-medium); color: var(--text-strong);
+}
+.hn-tl-expand-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hn-tl-expand-count { font-family: var(--font-mono); font-size: 10px; color: var(--text-subtle); }
+.hn-tl-child {
+  display: block; padding-left: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Daftar di bawah kanvas: "Belum dijadwalkan" dan "Di luar jendela", serta catatan plafon. */
+.hn-tl-aside {
+  flex: 0 0 auto; margin-top: 10px; padding: 10px;
+  background: var(--bone-100); border: 1px solid var(--border-hair); border-radius: var(--radius-lg);
+}
+.hn-tl-aside-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+.hn-tl-aside-hint { font-size: var(--text-xs); color: var(--text-muted); }
+.hn-tl-aside-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.hn-tl-chip {
+  padding: 3px 10px; background: var(--surface-card); border: 1px solid var(--border-hair);
+  border-radius: var(--radius-pill); font-family: var(--font-ui); font-size: 12px;
+  color: var(--text-body); cursor: pointer;
+}
+.hn-tl-note {
+  flex: 0 0 auto; margin-top: 8px; font-size: var(--text-xs); color: var(--status-warn);
+}

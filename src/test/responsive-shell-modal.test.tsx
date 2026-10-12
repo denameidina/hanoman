@@ -4,7 +4,8 @@ import { eventsStub } from "./helpers/events-stub";
 import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HN_NAV, Modal, NavGate, Shell } from "../src/ds";
+import { Modal, NavGate, Shell } from "../src/ds";
+import { HN_HUBS } from "../src/nav-hubs";
 
 vi.mock("../src/api/client", async () => {
   const actual = await vi.importActual<any>("../src/api/client");
@@ -65,11 +66,11 @@ describe("responsive Shell", () => {
 
     const nav = screen.getByRole("navigation", { name: "Navigasi utama" });
     const buttons = Array.from(nav.querySelectorAll("button"));
-    // SPEC-919 · entri ber-`gate` hanya muncul saat gerbangnya disediakan (context `NavGate`,
-    // default kosong). Drawer tetap wajib memuat SELURUH entri yang berlaku bagi instance ini.
-    const visible = HN_NAV.filter((n) => !n.gate);
-    expect(buttons).toHaveLength(visible.length);
-    for (const item of visible) expect(screen.getByRole("button", { name: item.label })).toBeInTheDocument();
+    // ADR-0205 · sidebar memuat delapan HUB (bukan 17 layar), dan tiap hub duduk di grupnya. Drawer
+    // mobile wajib memuat SELURUH hub, dan ketiga grup berlabel supaya pembaca layar mendengar konteksnya.
+    expect(buttons).toHaveLength(HN_HUBS.length);
+    for (const hub of HN_HUBS) expect(screen.getByRole("button", { name: hub.label })).toBeInTheDocument();
+    for (const name of ["Kerja", "Otomasi", "Sistem"]) expect(screen.getByRole("group", { name })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Overview" })).toHaveAttribute("aria-current", "page");
 
     fireEvent.click(screen.getByRole("button", { name: "Projects" }));
@@ -78,24 +79,27 @@ describe("responsive Shell", () => {
     expect(toggle).toHaveFocus();
   });
 
-  it("SPEC-919 · entri bergerbang muncul hanya saat gerbangnya menyala", () => {
+  // ADR-0205 · gerbang `clients` kini menyembunyikan TAB "Perangkat" di dalam hub Sesi, bukan entri
+  // sidebar. Hub Sesi tetap tampil dan mendarat di Terminal, dengan atau tanpa gerbang.
+  it("SPEC-919 · tab bergerbang tak pernah jadi tombol sidebar, hub Sesi tetap ada", () => {
     mobileViewport();
-    const gated = HN_NAV.filter((n) => n.gate);
-    expect(gated.length).toBeGreaterThan(0);
-
     const { unmount } = render(<Shell active="overview" title="Overview" onNavigate={() => {}}>Isi</Shell>);
     fireEvent.click(screen.getByRole("button", { name: "Buka navigasi" }));
-    for (const item of gated) expect(screen.queryByRole("button", { name: item.label })).toBeNull();
+    expect(screen.getByRole("button", { name: "Sesi" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Perangkat" })).toBeNull();
     unmount();
 
-    const gates = Object.fromEntries(gated.map((n) => [n.gate!, true]));
+    const onNavigate = vi.fn();
     render(
-      <NavGate.Provider value={gates}>
-        <Shell active="overview" title="Overview" onNavigate={() => {}}>Isi</Shell>
+      <NavGate.Provider value={{ clients: true }}>
+        <Shell active="overview" title="Overview" onNavigate={onNavigate}>Isi</Shell>
       </NavGate.Provider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Buka navigasi" }));
-    for (const item of gated) expect(screen.getByRole("button", { name: item.label })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sesi" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Perangkat" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Sesi" }));
+    expect(onNavigate).toHaveBeenCalledWith("terminal");
   });
 
   it("closes the drawer with Escape and returns focus to its toggle", () => {

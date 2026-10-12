@@ -1,0 +1,32 @@
+/* Warna tone Callout dan ProgressBar (feedback.tsx). Dulu tersebar sebagai style inline per tone;
+   sekarang satu definisi per tone di sini, dipilih lewat `data-tone`. `danger` dan `err` berbagi nilai:
+   keduanya memakai token status galat (--status-err = --clay-600), jadi nama kanonik lintas DS
+   (Button, ConfirmDialog, Field) dan nama lama tetap tampil sama. */
+
+/* ---------- Callout ---------- */
+.hn-callout { border: 1px solid; border-left-width: 3px; }
+
+.hn-callout[data-tone="info"] {
+  color: var(--wind-700); background: var(--wind-050); border-color: var(--wind-500); border-left-color: var(--wind-700);
+}
+.hn-callout[data-tone="ok"] {
+  color: var(--leaf-600); background: var(--leaf-100); border-color: var(--leaf-500); border-left-color: var(--leaf-600);
+}
+.hn-callout[data-tone="warn"] {
+  color: var(--status-warn); background: var(--status-warn-tint); border-color: var(--amber-500); border-left-color: var(--status-warn);
+}
+.hn-callout[data-tone="err"],
+.hn-callout[data-tone="danger"] {
+  color: var(--clay-600); background: var(--status-err-tint); border-color: var(--clay-500); border-left-color: var(--status-err);
+}
+.hn-callout[data-tone="brass"] {
+  color: var(--brass-700); background: var(--brass-050); border-color: var(--brass-400); border-left-color: var(--brass-700);
+}
+
+/* ---------- ProgressBar: isian per tone (lebar tetap inline, karena nilainya dinamis) ---------- */
+.hn-progress-fill[data-tone="brass"] { background: var(--accent); }
+.hn-progress-fill[data-tone="ok"] { background: var(--leaf-600); }
+.hn-progress-fill[data-tone="warn"] { background: var(--amber-600); }
+.hn-progress-fill[data-tone="info"] { background: var(--wind-600); }
+.hn-progress-fill[data-tone="err"],
+.hn-progress-fill[data-tone="danger"] { background: var(--status-err); }

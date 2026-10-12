@@ -64,32 +64,43 @@ export function parseCron(expr: string): CronSpec | null {
   };
 }
 
-function dayMatches(spec: CronSpec, d: Date): boolean {
-  if (!spec.month.has(d.getMonth() + 1)) return false;
-  const dom = spec.dom.has(d.getDate());
-  const dow = spec.dow.has(d.getDay());
+/** Hari kalender (bukan instan): bulan 1–12, tanggal, dan hari-pekan 0–6 (0 = Minggu). */
+type CalDay = { mo: number; dom: number; dow: number };
+
+function dayMatches(spec: CronSpec, day: CalDay): boolean {
+  if (!spec.month.has(day.mo)) return false;
+  const dom = spec.dom.has(day.dom);
+  const dow = spec.dow.has(day.dow);
   return spec.domRestricted && spec.dowRestricted ? dom || dow : dom && dow;
 }
 
+const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
+
 /**
- * Jatuh tempo pertama SESUDAH `after`, dalam zona waktu LOKAL.
+ * Jatuh tempo pertama SESUDAH `after`.
  *
- * Kandidatnya dibangun `new Date(y, mo, d, h, mi)` — konstruktor komponen-lokal, bukan geseran
- * dari UTC. Itulah yang membuatnya aman DST: jam lokal yang tak ada (lompat maju) dinormalkan JS
- * ke depan dan tetap lolos gerbang `> after`, sementara jam ganda (mundur) memberi kemunculan
+ * Tanpa `tz` → zona LOKAL proses (perilaku lama, dipakai server). Dengan `tz` (nama zona IANA,
+ * mis. `Asia/Jakarta`) → jam dinding dihitung dalam zona itu, lepas dari zona proses; lihat
+ * `nextRunInZone` untuk perilaku DST-nya.
+ *
+ * Kandidat zona-lokal dibangun `new Date(y, mo, d, h, mi)` — konstruktor komponen-lokal, bukan
+ * geseran dari UTC. Itulah yang membuatnya aman DST: jam lokal yang tak ada (lompat maju) dinormalkan
+ * JS ke depan dan tetap lolos gerbang `> after`, sementara jam ganda (mundur) memberi kemunculan
  * pertama sehingga jadwalnya jalan SEKALI. Menghitung dari komponen UTC lalu menggesernya justru
  * yang akan salah dua kali setahun.
  *
  * `limitDays` = 400 supaya jadwal setahun sekali (mis. `0 0 1 1 *`) tetap terjangkau, dan jadwal
  * yang mustahil (`0 0 30 2 *`) berhenti alih-alih beriterasi selamanya.
  */
-export function nextRun(spec: CronSpec, after: Date, limitDays = 400): Date | null {
+export function nextRun(spec: CronSpec, after: Date, limitDays = 400, tz?: string): Date | null {
+  if (tz !== undefined) return nextRunInZone(spec, after.getTime(), limitDays, tz);
   const hours = [...spec.hour].sort((a, b) => a - b);
   const minutes = [...spec.minute].sort((a, b) => a - b);
   const t = after.getTime();
   for (let d = 0; d <= limitDays; d++) {
     const day = new Date(after.getFullYear(), after.getMonth(), after.getDate() + d);
-    if (!dayMatches(spec, day)) continue;
+    if (!dayMatches(spec, { mo: day.getMonth() + 1, dom: day.getDate(), dow: day.getDay() })) continue;
     for (const h of hours) {
       for (const mi of minutes) {
         const cand = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, mi, 0, 0);
@@ -100,9 +111,107 @@ export function nextRun(spec: CronSpec, after: Date, limitDays = 400): Date | nu
   return null;
 }
 
-export function nextRunFor(expr: string, after: Date): Date | null {
+/**
+ * `nextRun` dalam zona IANA `tz`. Jam dinding dipecah lewat `Intl.DateTimeFormat` (hourCycle h23,
+ * jadi tengah malam selalu 00, bukan 24), lalu dikonversi balik ke instan.
+ *
+ * Perilaku DST (sengaja sama dengan zona lokal JS, diuji di `cron-expr.test.ts`):
+ * - Musim semi, jam yang TAK ADA (mis. 02:30 saat 02:00 → 03:00): jatuh tempo bergeser ke jam
+ *   sesudah celah (03:30), sekali. Tak dilewati, tak dijalankan dua kali.
+ * - Musim gugur, jam GANDA (mis. 01:30 saat 02:00 → 01:00): dihitung di kemunculan PERTAMA. Jadwal
+ *   berjalan sekali; kemunculan kedua tak pernah jadi jatuh tempo.
+ * - Hari yang melintasi transisi memakai pemindaian penuh (kandidatnya boleh tak monoton saat
+ *   celah); hari lain memakai satu offset dan tak perlu konversi per kandidat.
+ *
+ * Zona tak dikenal → null (sama seperti ekspresi tak sah).
+ */
+function nextRunInZone(spec: CronSpec, t0: number, limitDays: number, tz: string): Date | null {
+  if (!isValidTimeZone(tz)) return null;
+  const hours = [...spec.hour].sort((a, b) => a - b);
+  const minutes = [...spec.minute].sort((a, b) => a - b);
+  const start = partsIn(tz, t0);
+  for (let d = 0; d <= limitDays; d++) {
+    const cal = new Date(Date.UTC(start.y, start.mo - 1, start.d + d));
+    const y = cal.getUTCFullYear(), mo = cal.getUTCMonth() + 1, dom = cal.getUTCDate();
+    if (!dayMatches(spec, { mo, dom, dow: cal.getUTCDay() })) continue;
+    const dayWall = Date.UTC(y, mo - 1, dom);
+    // Tanpa transisi di jendela ±2 hari, satu offset berlaku untuk seluruh hari: kandidat monoton
+    // terhadap jam dinding, jadi kandidat pertama yang > t0 adalah yang terkecil.
+    if (offsetAt(tz, dayWall - 2 * DAY_MS) === offsetAt(tz, dayWall + 2 * DAY_MS)) {
+      const off = offsetAt(tz, dayWall + 12 * HOUR_MS);
+      for (const h of hours) for (const mi of minutes) {
+        const t = Date.UTC(y, mo - 1, dom, h, mi) - off;
+        if (t > t0) return new Date(t);
+      }
+      continue;
+    }
+    let best: number | null = null;
+    for (const h of hours) for (const mi of minutes) {
+      const t = wallToInstant(tz, y, mo, dom, h, mi);
+      if (t > t0 && (best === null || t < best)) best = t;
+    }
+    if (best !== null) return new Date(best);
+  }
+  return null;
+}
+
+const zoneFormats = new Map<string, Intl.DateTimeFormat>();
+function zoneFormat(tz: string): Intl.DateTimeFormat {
+  let f = zoneFormats.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric",
+      hour: "numeric", minute: "numeric", second: "numeric",
+    });
+    zoneFormats.set(tz, f);
+  }
+  return f;
+}
+
+type WallParts = { y: number; mo: number; d: number; h: number; mi: number; s: number };
+function partsIn(tz: string, t: number): WallParts {
+  const got: Record<string, string> = {};
+  for (const p of zoneFormat(tz).formatToParts(new Date(Math.floor(t / 1000) * 1000))) got[p.type] = p.value;
+  return { y: +got.year!, mo: +got.month!, d: +got.day!, h: +got.hour!, mi: +got.minute!, s: +got.second! };
+}
+
+/** Jam dinding zona pada instan `t`, dinyatakan sebagai ms UTC; selisihnya terhadap `t` = offset. */
+function offsetAt(tz: string, t: number): number {
+  const p = partsIn(tz, t);
+  return Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s) - Math.floor(t / 1000) * 1000;
+}
+
+/**
+ * Jam dinding (y-mo-d h:mi) dalam `tz` → instan. Kandidat dicoba dengan offset di dua sisi hari
+ * (sebelum/sesudah transisi), dan hanya yang jam dindingnya kembali persis dipakai. Dua-duanya
+ * valid = jam ganda → yang terkecil (kemunculan pertama). Tak satu pun valid = jam tak ada →
+ * offset SEBELUM transisi, sehingga jatuh tempo bergeser ke sesudah celah.
+ */
+function wallToInstant(tz: string, y: number, mo: number, d: number, h: number, mi: number): number {
+  const wall = Date.UTC(y, mo - 1, d, h, mi, 0);
+  const valid: number[] = [];
+  for (const off of new Set([offsetAt(tz, wall - DAY_MS), offsetAt(tz, wall + DAY_MS)])) {
+    const t = wall - off;
+    const p = partsIn(tz, t);
+    if (Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s) === wall) valid.push(t);
+  }
+  if (valid.length) return Math.min(...valid);
+  return wall - offsetAt(tz, wall - DAY_MS);
+}
+
+/** Zona IANA yang dikenali runtime ini. Dipakai `nextRunFor` untuk menolak zona tak dikenal. */
+export function isValidTimeZone(tz: string): boolean {
+  try { zoneFormat(tz); return true; } catch { return false; }
+}
+
+/**
+ * Jatuh tempo berikutnya untuk ekspresi `expr` sesudah `after`. `tz` opsional (ADR-0212): tanpa
+ * `tz`, zona lokal proses; dengan `tz`, jam dinding dihitung di zona itu. Ekspresi tak sah, atau
+ * `tz` tak dikenal, menghasilkan null.
+ */
+export function nextRunFor(expr: string, after: Date, tz?: string): Date | null {
   const spec = parseCron(expr);
-  return spec ? nextRun(spec, after) : null;
+  return spec ? nextRun(spec, after, 400, tz) : null;
 }
 
 export type CronPreset =

@@ -39,15 +39,26 @@ beforeEach(() => {
 });
 afterEach(resetViewport);
 
+// Dua langkah sheet "Lapor masalah": langkah 1 (apa yang terjadi), lalu langkah 2 (kirim).
+function kirimKeluhan(judul: string, detail: string) {
+  fireEvent.click(screen.getByRole("button", { name: /lapor masalah/i }));
+  fireEvent.change(screen.getByLabelText("Judul"), { target: { value: judul } });
+  fireEvent.change(screen.getByLabelText("Detail"), { target: { value: detail } });
+  fireEvent.click(screen.getByRole("button", { name: /^lanjut$/i }));
+  fireEvent.click(screen.getByRole("button", { name: /^kirim$/i }));
+}
+
 describe("ClientPortal (SPEC-617)", () => {
   it("uses a mobile-safe viewport and native row controls while keeping every row datum", async () => {
     mockViewport(390);
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     const title = await screen.findByText("Checkout gagal");
     const row = title.closest("button");
     expect(row).not.toBeNull();
     expect(row).toHaveClass("hn-portal-row");
-    expect(row).toHaveTextContent("SPEC-1");
+    expect(row).toHaveTextContent("Checkout gagal");
+    expect(row).not.toHaveTextContent("SPEC-1");
     expect(row).toHaveTextContent("Sedang dikerjakan");
     expect(row).toHaveTextContent("tinggi");
     expect(screen.getByTestId("portal-root")).toHaveStyle({ height: "100dvh" });
@@ -56,14 +67,16 @@ describe("ClientPortal (SPEC-617)", () => {
   it("menampilkan project yang ditugaskan, backlog, dan tiketnya", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     expect(await screen.findByText("Toko Mekar")).toBeTruthy();
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     expect(await screen.findByText("Checkout gagal")).toBeTruthy();
-    fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keluhan/i }));
     expect(await screen.findByText("Tombol bayar mati")).toBeTruthy();
     expect(screen.getByText("Sedang dikerjakan")).toBeTruthy();
   });
 
   it("detail backlog terbuka baca-saja", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     fireEvent.click(await screen.findByText("Checkout gagal"));
     expect(await screen.findByText("Checkout kembali jalan")).toBeTruthy();
     await waitFor(() => expect(portalApi.getSpec).toHaveBeenCalledWith("p1", "SPEC-1"));
@@ -104,9 +117,9 @@ describe("ClientPortal (SPEC-617)", () => {
   it("badge tiket berwarna sama di baris daftar dan di modal detail", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     await screen.findByText("Toko Mekar");
-    fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keluhan/i }));
     const row = await screen.findByText("Tombol bayar mati");
-    const rowPill = within(row.closest("button") as HTMLElement)
+    const rowPill = within(row.closest("li") as HTMLElement)
       .getByText("Sedang dikerjakan");
     fireEvent.click(row);
     await waitFor(() => expect(screen.getByTestId("modal-body")).toBeInTheDocument());
@@ -123,10 +136,7 @@ describe("ClientPortal (SPEC-617)", () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     await screen.findByText("Toko Mekar");
 
-    fireEvent.click(screen.getByRole("button", { name: /kirim keluhan/i }));
-    fireEvent.change(screen.getByLabelText("Judul"), { target: { value: "Struk tak keluar" } });
-    fireEvent.change(screen.getByLabelText("Detail"), { target: { value: "Setelah bayar, struk kosong" } });
-    fireEvent.click(screen.getByRole("button", { name: /^kirim$/i }));
+    kirimKeluhan("Struk tak keluar", "Setelah bayar, struk kosong");
 
     await waitFor(() => expect(portalApi.createTicket).toHaveBeenCalled());
     const [projectId, form] = (portalApi.createTicket as any).mock.calls[0];
@@ -146,8 +156,8 @@ describe("ClientPortal (SPEC-617)", () => {
       items: [{ id: "p1", name: "Toko Mekar" }, { id: "p3", name: "Warung Sari" }],
       total: 2, page: 1, pageSize: 2 });
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
-    await screen.findByText("Toko Mekar");
-    fireEvent.click(screen.getByRole("button", { name: /kirim keluhan/i }));
+    await screen.findAllByText("Toko Mekar");
+    fireEvent.click(screen.getByRole("button", { name: /lapor masalah/i }));
     const opts = Array.from((screen.getByLabelText("Project") as HTMLSelectElement).options).map((o) => o.value);
     expect(opts).toEqual(["p1", "p3"]);
   });
@@ -156,12 +166,10 @@ describe("ClientPortal (SPEC-617)", () => {
     (portalApi.createTicket as any).mockRejectedValue(new Error("boom"));
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     await screen.findByText("Toko Mekar");
-    fireEvent.click(screen.getByRole("button", { name: /kirim keluhan/i }));
-    fireEvent.change(screen.getByLabelText("Judul"), { target: { value: "x" } });
-    fireEvent.change(screen.getByLabelText("Detail"), { target: { value: "y" } });
-    fireEvent.click(screen.getByRole("button", { name: /^kirim$/i }));
+    kirimKeluhan("x", "y");
     expect(await screen.findByText(/gagal mengirim/i)).toBeTruthy();
-    expect(screen.getByLabelText("Judul")).toBeTruthy();
+    // Form tetap terbuka di langkah kedua: tombol Kirim masih ada untuk dicoba lagi.
+    expect(screen.getByRole("button", { name: /^kirim$/i })).toBeTruthy();
   });
 });
 
@@ -196,6 +204,7 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
 
   it("hanya satu halaman yang dirender, dengan page+limit terkirim", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     await screen.findByText("Pekerjaan 1");
     expect(rows()).toHaveLength(PAGE);                 // 20 baris, bukan 25
     expect(screen.queryByText("Pekerjaan 21")).toBeNull();
@@ -204,6 +213,7 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
 
   it("klik halaman 2 memuat halaman 2 dan menggantinya di layar", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     await screen.findByText("Pekerjaan 1");
     fireEvent.click(screen.getByRole("button", { name: "Halaman 2" }));
     expect(await screen.findByText("Pekerjaan 21")).toBeTruthy();
@@ -211,11 +221,12 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
     expect(rows()).toHaveLength(TOTAL - PAGE);         // halaman terakhir: 5 baris
     expect(screen.queryByText("Pekerjaan 1")).toBeNull();
     // Tab & project tak bergeser — perpindahan halaman mempertahankan konteks lain.
-    expect(screen.getByRole("tab", { name: /pekerjaan/i }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: /progres/i }).getAttribute("aria-selected")).toBe("true");
   });
 
   it("halaman terakhir tak menyisakan tombol Berikutnya yang aktif", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     await screen.findByText("Pekerjaan 1");
     expect((screen.getByRole("button", { name: "Sebelumnya" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Halaman 2" }));
@@ -225,19 +236,21 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
 
   it("angka di tab adalah TOTAL, bukan jumlah baris satu halaman", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     await screen.findByText("Pekerjaan 1");
-    expect(screen.getByRole("tab", { name: /pekerjaan/i }).textContent).toContain(String(TOTAL));
+    expect(screen.getByRole("tab", { name: /progres/i }).textContent).toContain(String(TOTAL));
     fireEvent.click(screen.getByRole("button", { name: "Halaman 2" }));
     await screen.findByText("Pekerjaan 21");
-    expect(screen.getByRole("tab", { name: /pekerjaan/i }).textContent).toContain(String(TOTAL));
+    expect(screen.getByRole("tab", { name: /progres/i }).textContent).toContain(String(TOTAL));
   });
 
   it("ganti tab kembali ke halaman 1", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     await screen.findByText("Pekerjaan 1");
     fireEvent.click(screen.getByRole("button", { name: "Halaman 2" }));
     await screen.findByText("Pekerjaan 21");
-    fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keluhan/i }));
     expect(await screen.findByText("Keluhan 1")).toBeTruthy();
     await waitFor(() => expect(portalApi.listBacklog).toHaveBeenLastCalledWith("p1", { page: 1, limit: PAGE }));
   });
@@ -247,6 +260,7 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
       items: [{ id: "p1", name: "Toko Mekar" }, { id: "p3", name: "Warung Sari" }],
       total: 2, page: 1, pageSize: 2 });
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     await screen.findByText("Pekerjaan 1");
     fireEvent.click(screen.getByRole("button", { name: "Halaman 2" }));
     await screen.findByText("Pekerjaan 21");
@@ -257,6 +271,7 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
   it("daftar kosong tak menampilkan kontrol halaman", async () => {
     (portalApi.listBacklog as any).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: PAGE });
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     expect(await screen.findByText(/belum ada pekerjaan/i)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Berikutnya" })).toBeNull();
   });
@@ -266,16 +281,14 @@ describe("ClientPortal paginasi (SPEC-647)", () => {
   it("kirim keluhan mengembalikan daftar tiket ke halaman 1", async () => {
     (portalApi.createTicket as any).mockResolvedValue(ticketOf(99));
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     await screen.findByText("Pekerjaan 1");
-    fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keluhan/i }));
     await screen.findByText("Keluhan 1");
     fireEvent.click(screen.getByRole("button", { name: "Halaman 2" }));
     await screen.findByText("Keluhan 21");
 
-    fireEvent.click(screen.getByRole("button", { name: /kirim keluhan/i }));
-    fireEvent.change(screen.getByLabelText("Judul"), { target: { value: "Struk tak keluar" } });
-    fireEvent.change(screen.getByLabelText("Detail"), { target: { value: "Setelah bayar, struk kosong" } });
-    fireEvent.click(screen.getByRole("button", { name: /^kirim$/i }));
+    kirimKeluhan("Struk tak keluar", "Setelah bayar, struk kosong");
 
     await waitFor(() => expect(portalApi.listTickets).toHaveBeenLastCalledWith("p1", { page: 1, limit: PAGE }));
     expect(await screen.findByText("Keluhan 1")).toBeTruthy();

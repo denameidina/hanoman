@@ -1,14 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
-import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, grantsCapability, type Stage } from "@hanoman/shared";
+import { basename } from "node:path";
+import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, zMarkSpecReviewed, grantsCapability, type Stage } from "@hanoman/shared";
 import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { integrate, sourceBranch } from "../services/integrate";
+import { deleteProjectWorktrees } from "../services/worktree-delete";
 import { listSessions } from "../services/pty";
 import { createAgentSession } from "../services/session-launch-gate";
 import { conflictSessionDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { prisma } from "../db";
-import { specReview, reviewFile, worktreeDir, specCommitRange, specReviewRange, reviewFileRange, shaResolvable } from "../services/spec-review";
+import { specReview, reviewFile, worktreeDir, specCommitRange, specReviewRange, reviewFileRange, shaResolvable, emptySpecReview } from "../services/spec-review";
 import { nextSpecId } from "../services/id";
 // SPEC-546 · turunan priority/objective dipakai TIGA route sekarang (POST /specs, PATCH, dan
 // POST /specs/:id/source), jadi ia tak lagi fungsi lokal berkas ini.
@@ -22,6 +24,7 @@ import { recordSourceChange } from "../services/notifications";
 import { notifySynced } from "../services/sync-notify";
 import { deleteSynced } from "../services/sync-delete";
 import { completeSpecManually } from "../services/spec-complete";
+import { markSpecReviewed } from "../services/spec-reviewed";
 import { presenceView } from "../services/presence/view";
 import { remoteSessionVerdict } from "../services/presence/remote-session";
 import { recentlyOffline } from "../services/presence/registry";
@@ -254,12 +257,14 @@ export default async function (app: FastifyInstance) {
         return reply.send({ pending: true, stage, wouldDelete });
       for (const rel of wouldDelete) await deleteDoc(spec.projectId, rel).catch(() => { });
     }
-    const data: { branchFrom?: string | null; stage?: string; title?: string; priority?: string; objective?: string; payload?: any; dependsOn?: string[]; autoMerge?: any } = {};
+    const data: { branchFrom?: string | null; stage?: string; title?: string; priority?: string; objective?: string; payload?: any; dependsOn?: string[]; autoMerge?: any; reviewedAt?: null } = {};
     if (branchFrom !== undefined) data.branchFrom = branchFrom;
     if (depIds !== undefined) data.dependsOn = depIds;   // SPEC-447 · ADR-0093
     // SPEC-486 · Prisma `Json?` menolak `null` polos — `Prisma.DbNull` yang mengosongkan kolomnya.
     if ("autoMerge" in parsed.data) data.autoMerge = autoMerge === null ? Prisma.DbNull : autoMerge;
-    if (stage !== undefined) data.stage = stage;
+    // ADR-0218 · stage hanya mundur (422 di atas), jadi setiap penulisan stage di sini meninggalkan
+    // `done` bila ia dulu `done`. Tanda "sudah ditinjau" lama tak berlaku untuk penyelesaian berikutnya.
+    if (stage !== undefined) { data.stage = stage; data.reviewedAt = null; }
     if (editingContent) {
       const effPayload = payload ?? spec.payload;
       const { priority, objective } = deriveSpecFields(spec.source, effPayload, newPriority ?? spec.priority);
@@ -333,7 +338,8 @@ export default async function (app: FastifyInstance) {
         // penanda RESUME, dan `PATCH /specs/:id` sebagai kunci edit konten SPEC-186.
         // Meninggalkannya berarti item "yang sudah kembali ke brainstorming" tetap melanjutkan
         // worktree lama dan tetap tak bisa diedit isinya — reset yang cuma kelihatan.
-        ...(plan ? { stage: "brainstorming", baseSha: null, headSha: null, startedAt: null } : {}),
+        // ADR-0218 · reset ini juga mengembalikan item dari `done`, jadi tanda ditinjau ikut dibuang.
+        ...(plan ? { stage: "brainstorming", baseSha: null, headSha: null, startedAt: null, reviewedAt: null } : {}),
       },
     });
     await recordSourceChange(spec.id, spec.projectId, spec.title, spec.source, to, history.length);
@@ -383,6 +389,21 @@ export default async function (app: FastifyInstance) {
     });
     // count 0 = sesi/overlay menyelesaikannya di bawah kita antara findUnique dan CAS.
     if (!res.ok) return reply.code(409).send({ error: "backlog item sudah selesai" });
+    return res.spec;
+  });
+
+  // ADR-0218 · tandai/batalkan "sudah ditinjau" pada item selesai (tombol "Tandai ditinjau" di Review
+  // dan di menu item Backlog). Operasi khusus, bukan field PATCH: ia tak mengubah stage, diff, atau
+  // berkas apa pun. Idempoten (lihat services/spec-reviewed.ts). Capability-nya jatuh ke
+  // `rw("backlog")` → `backlog:write`, cermin `POST /specs/:id/done`.
+  app.post("/specs/:id/reviewed", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = zMarkSpecReviewed.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const res = await markSpecReviewed(id, parsed.data.reviewed !== false);
+    if (!res.ok) return res.reason === "not-found"
+      ? reply.code(404).send({ error: "not found" })
+      : reply.code(409).send({ error: "backlog item belum selesai" });
     return res.spec;
   });
 
@@ -548,10 +569,10 @@ export default async function (app: FastifyInstance) {
   // Worktree hidup <repoDir>/.worktrees/<specid> → diff atas working tree. Worktree lenyap
   // (item selesai) → diff `baseSha..headSha` tersimpan (SPEC-176, ADR-0030), atau fallback
   // range commit `oldest(spec-N)^..newest` di history untuk spec lama tanpa SHA. Tak ada
-  // sumber apa pun → 409. Gerbang path ada di reviewFile*.
+  // sumber apa pun → null: keadaan kosong (ADR-0213), bukan 409. Gerbang path ada di reviewFile*.
   const specWithProject = (id: string) =>
     prisma.spec.findUnique({ where: { id }, include: { project: true } });
-  // wt hidup > SHA tersimpan (bila objeknya masih terjangkau) > grep pesan commit. Null = 409.
+  // wt hidup > SHA tersimpan (bila objeknya masih terjangkau) > grep pesan commit. Null = kosong.
   const resolveReview = async (
     repoDir: string, spec: { id: string; baseSha: string | null; headSha: string | null },
   ) => {
@@ -570,9 +591,28 @@ export default async function (app: FastifyInstance) {
     const repoDir = await resolveRepoDir(spec.projectId);
     if (!repoDir) return reply.code(409).send({ error: "project belum punya repoDir" });
     const r = await resolveReview(repoDir, spec);
-    if (!r) return reply.code(409).send({ error: "belum ada worktree atau commit untuk di-review — jalankan/lanjutkan sesi backlog dulu" });
+    // ADR-0213 · tanpa worktree maupun commit = KEADAAN, bukan galat: 200 dengan `empty` + `reason`.
+    // `base`/`files`/`changed` ikut kosong supaya klien lama (yang hanya mengenal bentuk SpecReview)
+    // menampilkan daftar kosong, tak crash. `no-worktree`: belum pernah dimulai (tanpa baseSha).
+    // `no-commit`: sudah dimulai, worktree-nya lenyap, dan tak ada commit untuk ditinjau.
+    if (!r) return emptySpecReview(spec.baseSha ? "no-commit" : "no-worktree");
     return r.wt ? specReview(repoDir, id, spec.baseSha, spec.branchFrom)
       : specReviewRange(repoDir, r.base, r.head);
+  });
+  // ADR-0213 · hapus worktree satu backlog item (tombol "Hapus worktree" di Review). Service dan
+  // capability SAMA dengan `POST /projects/:id/worktrees/delete` (`ide:git`, lihat
+  // agent-capabilities). Cabang dan commit tetap: tak ada penghapusan branch di sini. Selalu 200 bila
+  // spec ada — galat hidup di `ok`/`error` (cermin worktrees/delete); 404 hanya bila spec-nya tak ada.
+  app.delete("/specs/:id/worktree", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const spec = await prisma.spec.findUnique({ where: { id }, select: { id: true, projectId: true } });
+    if (!spec) return reply.code(404).send({ error: "not found" });
+    // SPEC-217 · path efektif, sama dengan GET review: worktree hidup di repoDir yang sama.
+    const repoDir = await resolveRepoDir(spec.projectId);
+    if (!repoDir) return reply.code(409).send({ error: "project belum punya repoDir" });
+    const { results } = await deleteProjectWorktrees(spec.projectId, repoDir,
+      [basename(worktreeDir(repoDir, id))], { withBranch: false });
+    return results[0]!;
   });
   app.get("/specs/:id/review/*", async (req, reply) => {
     const { id } = req.params as { id: string };

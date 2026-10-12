@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { hashPassword } from "../src/services/auth";
-import { PORTAL_SPEC_KEYS, PORTAL_TICKET_KEYS } from "@hanoman/shared";
+import { PORTAL_CHAT_DEFAULTS, PORTAL_PROJECT_KEYS, PORTAL_SPEC_KEYS, PORTAL_TICKET_KEYS } from "@hanoman/shared";
+import { makeSetting } from "./factory";
 
 const app = buildApp();
 const clean = async () => {
@@ -236,5 +237,52 @@ describe("GET /api/portal (SPEC-617)", () => {
       ["POST", "/api/portal/projects/p1/chat/sessions"],
       ["POST", "/api/portal/projects/p1/chat/sessions/s1/messages"],
     ] as const) expect(capabilityForRoute(m, p), `${m} ${p}`).toBe("COOKIE_ONLY");
+  });
+});
+
+// ADR-0211 · `chatEnabled` di proyeksi daftar project = gerbang yang SAMA dengan route chat
+// (master switch ∧ akses). Flag dan 404/200 route chat tak boleh berselisih.
+describe("GET /api/portal/projects — chatEnabled (ADR-0211)", () => {
+  const setMasterChat = (enabled: boolean) =>
+    makeSetting({ portalChat: { ...PORTAL_CHAT_DEFAULTS, enabled } });
+  // Baris Setting itu dipakai bersama satu DB lintas berkas: kembalikan ke "belum ada baris" (default).
+  afterAll(async () => { await prisma.setting.deleteMany(); });
+
+  it("master switch mati → chatEnabled false, dan route chat menjawab 404", async () => {
+    const { cookie } = await seed();
+    await setMasterChat(false);
+    const list = await app.inject({ method: "GET", url: "/api/portal/projects", headers: { cookie } });
+    expect(list.json().items).toEqual([{ id: "p1", name: "P1", chatEnabled: false }]);
+    const chat = await app.inject({ method: "GET", url: "/api/portal/projects/p1/chat", headers: { cookie } });
+    expect(chat.statusCode).toBe(404);
+  });
+
+  it("master switch menyala → chatEnabled true, dan route chat menjawab 200", async () => {
+    const { cookie } = await seed();
+    await setMasterChat(true);
+    const list = await app.inject({ method: "GET", url: "/api/portal/projects", headers: { cookie } });
+    expect(list.json().items).toEqual([{ id: "p1", name: "P1", chatEnabled: true }]);
+    const chat = await app.inject({ method: "GET", url: "/api/portal/projects/p1/chat", headers: { cookie } });
+    expect(chat.statusCode).toBe(200);
+  });
+
+  // Allowlist: flag ini satu-satunya setelan chat yang ikut terpancar ke klien.
+  it("proyeksi project hanya memuat kunci allowlist — tak ada setelan chat lain yang bocor", async () => {
+    const { cookie } = await seed();
+    await setMasterChat(true);
+    const body = (await app.inject({ method: "GET", url: "/api/portal/projects", headers: { cookie } })).json();
+    expect(Object.keys(body.items[0]).sort()).toEqual([...PORTAL_PROJECT_KEYS].sort());
+    expect(JSON.stringify(body)).not.toContain("askPerMonth");
+    expect(JSON.stringify(body)).not.toContain("model");
+  });
+
+  it("flag bersifat per-akun: klien tanpa akses ke p1 tak melihat p1 sama sekali", async () => {
+    await seed();
+    await setMasterChat(true);
+    await prisma.user.create({ data: {
+      email: "klien2@x.co", passwordHash: await hashPassword("password3"), role: "client" } });
+    const cookie2 = await login("klien2@x.co", "password3");
+    const body = (await app.inject({ method: "GET", url: "/api/portal/projects", headers: { cookie: cookie2 } })).json();
+    expect(body.items).toEqual([]);
   });
 });

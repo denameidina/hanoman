@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { RemoteInstanceView } from "../src/screens/RemoteInstanceView";
 import * as LocalTerminalPane from "../src/screens/TerminalPane";
@@ -53,6 +53,17 @@ describe("RemoteInstanceView (SPEC-1218 · AC-C1/AC-C7)", () => {
       control: { state: "available", protocol: 1, version: "0.6.0", capabilities: ["sessions:read"], since: "" } } as any;
     render(<RemoteInstanceView device={device} hubVersion="0.5.0" onClose={() => {}} />);
     expect(screen.getByTestId("remote-banner")).toHaveTextContent(/berbeda/);
+  });
+
+  // Fase 3G: bar identitas brass yang menempel, dengan keadaan baca-saja dan tombol Keluar.
+  it("banner baca-saja memuat versi dan status, dan Keluar memanggil onClose", () => {
+    const onClose = vi.fn();
+    const device = { deviceId: "d1", name: "laptop", local: false, online: true, lastSeenAt: null, sessions: [],
+      control: { state: "available", protocol: 1, version: "0.5.0", capabilities: ["sessions:read"], since: "" } } as any;
+    render(<RemoteInstanceView device={device} hubVersion="0.5.0" onClose={onClose} />);
+    expect(screen.getByTestId("remote-banner")).toHaveTextContent("Baca-saja · v0.5.0 · online");
+    fireEvent.click(screen.getByRole("button", { name: "Keluar" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("identitas modul: TerminalPane dalam RemoteInstanceView adalah IMPORT YANG SAMA dengan layar lokal", async () => {

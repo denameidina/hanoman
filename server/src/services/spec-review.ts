@@ -4,6 +4,7 @@ import { mkdtemp, copyFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { readRepoFile as readSafeRepoFile } from "./safe-repo-path";
+import type { ChangedFile, SpecReview, ReviewFile, ReviewEmptyReason } from "@hanoman/shared";
 
 // SPEC-171 · review worktree backlog item: all files (ls-files) + file changed
 // (diff atas merge-base). Diturunkan dari git tiap request, tak disimpan. Mekanik
@@ -15,12 +16,14 @@ const exec = promisify(execFile);
 const GIT = { maxBuffer: 1 << 24 } as const;
 const MAX = 256 * 1024;
 
-export type ChangedFile = { path: string; add: number; del: number; status: "A" | "M" | "D"; binary: boolean };
-export type SpecReview = { base: string; files: string[]; changed: ChangedFile[] };
-export type ReviewFile = {
-  path: string; status: "A" | "M" | "D" | null; binary: boolean;
-  truncated: boolean; diff: string | null; content: string | null;
-};
+// ADR-0213 · kontrak respons dipusatkan di shared (satu definisi untuk server, klien, dan MCP).
+export type { ChangedFile, SpecReview, ReviewFile } from "@hanoman/shared";
+
+// ADR-0213/0215 · keadaan kosong (belum ada worktree maupun commit) = 200, bukan 409. Dipakai route
+// backlog item dan route sesi agar bentuknya tak bisa berselisih: base/files/changed kosong, `empty`
+// dan `reason` diisi. Field kosong ikut supaya klien lama yang hanya mengenal SpecReview tak crash.
+export const emptySpecReview = (reason: ReviewEmptyReason): SpecReview =>
+  ({ base: "", files: [], changed: [], empty: true, reason });
 
 // ponytail: normalisasi id sama dengan pty.ts idFor & terminal.ts; ekstrak kalau muncul consumer keempat.
 export const worktreeDir = (repoDir: string, specId: string): string =>

@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import "./ds/styles.css";
 import "./app.css";
+import "./palette/palette.css";
 import App from "./App";
 import { PublicHelpApp } from "./public/PublicHelpApp";
 

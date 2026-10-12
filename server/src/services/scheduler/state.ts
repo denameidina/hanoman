@@ -4,6 +4,7 @@ import { listPanesAsync } from "../pty";
 import { getScheduler } from "./config";
 import { getLastRun } from "./registry";
 import { listQueue, queueCounts } from "./queue";
+import { serverTimeZone } from "./cron";
 
 // SPEC-908 · satu definisi untuk GET /scheduler/state dan topik siar `schedulerState`.
 // `listPanesAsync`, BUKAN `listSessions`: hub berbagi event loop dengan PTY terminal dan
@@ -36,5 +37,5 @@ export async function buildSchedulerState(): Promise<SchedulerStateView> {
   const sessions = live.filter((s): s is typeof s & { specId: string } =>
     !!s.specId && launchedSpecs.has(s.specId)).map((s) => zSchedulerSessionView.parse(s));
   return { config: cfg, cap: cfg.maxConcurrent, liveCount: live.length, sources, queueCounts: counts,
-    sessions, admission: await currentLaunchStatus(live, cfg) };
+    sessions, admission: await currentLaunchStatus(live, cfg), serverTimeZone: serverTimeZone() };
 }

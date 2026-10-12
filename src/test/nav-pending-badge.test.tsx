@@ -31,7 +31,17 @@ describe("SPEC-961 · badge butuh pengajuan di sidebar", () => {
 
   it("merender angka hanya pada permukaan yang punya antrean", () => {
     renderNav({ ...EMPTY_PENDING, triage: 3, backlog: 12, prd: 0, lead: 0 });
-    expect(badges()).toEqual(["12", "3"]);   // urutan HN_NAV: PRD · Backlog · … · Triase
+    expect(badges()).toEqual(["12", "3"]);   // urutan HN_HUBS: Backlog · Triase
+  });
+
+  // ADR-0205 · angka menempel di HUB, bukan di layar: PRD ditanggung hub Projects, Lead ditanggung
+  // hub Otonom. Hub yang tak punya antrean tak merender apa pun.
+  it("badge hub = antrean tab-tab-nya: PRD di Projects, Lead di Otonom", () => {
+    renderNav({ ...EMPTY_PENDING, prd: 2, lead: 1 });
+    expect(badges()).toEqual(["2", "1"]);   // urutan HN_HUBS: Projects sebelum Otonom
+    expect(screen.getByRole("button", { name: "Projects, 2 butuh pengajuan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Otonom, 1 butuh pengajuan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Backlog" })).toBeInTheDocument();
   });
 
   // Nol adalah keadaan paling sering; badge "0" di seluruh sidebar membuat kolom angka itu berisik

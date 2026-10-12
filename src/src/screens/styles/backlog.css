@@ -1,0 +1,202 @@
+/* Backlog · redesign Audit UI/UX 2026-10 · Fase 3D.
+   Susunan layar memakai kelas `hn-bl-*` (bukan inline style). Nilai hanya dari token. Prefiks
+   `hn-bl-` sengaja berbeda dari `.hn-backlog-*` di app.css, yang aturan !important-nya tak lagi
+   dipakai layar ini. Mobile (≤767px): satu kolom, papan ditumpuk vertikal. */
+
+.hn-bl-screen { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; min-width: 0; }
+
+/* Toolbar: FilterBar + segmen tahap + keterangan. Satu baris utama, sisanya menurun. */
+.hn-bl-toolbar { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); min-width: 0; }
+.hn-bl-stage-tabs { max-width: 100%; overflow-x: auto; }
+.hn-bl-status-line { display: flex; flex-wrap: wrap; gap: var(--space-2); min-height: 0; }
+.hn-bl-status-line:empty { display: none; }
+.hn-bl-stale { font: var(--weight-medium) var(--text-xs)/1.5 var(--font-ui); color: var(--status-warn); }
+.hn-bl-muted { font: var(--weight-regular, 400) var(--text-xs)/1.5 var(--font-ui); color: var(--text-muted); }
+.hn-bl-hint {
+  margin: 0; font: var(--weight-regular, 400) var(--text-xs)/1.5 var(--font-ui); color: var(--text-muted);
+}
+.hn-bl-gap-top { margin-top: var(--space-2); }
+.hn-bl-gap-bottom { margin-bottom: var(--space-2); }
+
+.hn-bl-view-toggle {
+  display: inline-flex; gap: 2px; padding: 2px; background: var(--bone-200);
+  border-radius: var(--radius-sm);
+}
+.hn-bl-view-btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.hn-bl-view-btn:hover { color: var(--text-strong); }
+.hn-bl-view-btn[aria-pressed="true"] { background: var(--surface-card); color: var(--text-strong); box-shadow: var(--shadow-xs); }
+.hn-bl-view-btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* Kontrol selebar kolomnya (formulir detail). */
+.hn-bl-full { width: 100%; }
+
+/* Popover Filter: rentang tanggal dalam satu baris yang membungkus. */
+.hn-bl-date-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+
+/* Body: daftar atau papan. Daftar menggulir sendiri; pager tetap di bawah. */
+.hn-bl-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; min-width: 0; }
+.hn-bl-list-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  border: 1px solid var(--border-hair); border-radius: var(--radius-lg); background: var(--surface-card);
+}
+.hn-bl-pager { margin-top: var(--space-3); border: 1px solid var(--border-hair); border-radius: var(--radius-lg); overflow: hidden; }
+
+/* Titik prioritas: bentuk membawa makna, warna hanya penguat. */
+.hn-bl-prio { display: inline-flex; flex: 0 0 auto; width: 10px; height: 10px; }
+.hn-bl-prio::before {
+  content: ""; display: block; width: 100%; height: 100%; border-radius: 50%;
+  box-sizing: border-box; border: 1.5px solid var(--ink-400); background: transparent;
+}
+.hn-bl-prio-high::before { background: var(--brass-600); border-color: var(--brass-600); }
+.hn-bl-prio-mid::before { background: var(--ink-400); border-color: var(--ink-400); }
+.hn-bl-prio-low::before { background: transparent; border-color: var(--ink-400); }
+.hn-bl-prio-text { display: inline-flex; align-items: center; gap: var(--space-2); font: var(--weight-medium) var(--text-sm)/1 var(--font-ui); color: var(--text-strong); }
+
+.hn-bl-stage-pill { flex: 0 0 auto; }
+.hn-bl-id { font: var(--weight-regular, 400) var(--text-2xs)/1 var(--font-mono); color: var(--text-subtle); white-space: nowrap; }
+.hn-bl-source {
+  display: inline-flex; align-items: center; gap: var(--space-1); white-space: nowrap;
+  font: var(--weight-regular, 400) var(--text-2xs)/1 var(--font-ui); color: var(--text-muted);
+}
+
+/* Baris daftar: judul + meta, lalu aksi primer ⋯ di luar elemen klik (DenseRow). */
+.hn-bl-row-body { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; flex: 1 1 auto; text-align: left; }
+.hn-bl-row-title {
+  font: var(--weight-medium) var(--text-md)/1.35 var(--font-ui); color: var(--text-strong);
+  overflow-wrap: anywhere; min-width: 0;
+}
+.hn-bl-row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; }
+
+.hn-bl-actions { display: inline-flex; align-items: center; gap: var(--space-1); flex: 0 0 auto; }
+.hn-bl-title {
+  display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left;
+  font: var(--weight-semibold) var(--text-md)/1.35 var(--font-ui); color: var(--text-strong); overflow-wrap: anywhere;
+}
+.hn-bl-title:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* Papan: kolom = tahap. Kartu hanya judul, prioritas, dan satu aksi primer. Kolom bertetap lebar
+   (248px), jadi papan HARUS flex mendatar; tanpa display:flex kolom menumpuk full-width (QA P1).
+   Kelebihan lebar digulir mendatar di papan itu sendiri. */
+.hn-bl-board { display: flex; overflow-x: auto; gap: var(--space-2); align-items: stretch; }
+.hn-bl-col {
+  flex: 0 0 248px; display: flex; flex-direction: column; min-height: 0; padding: var(--space-2);
+  border-radius: var(--radius-lg); background: var(--bone-100); border: 1px solid var(--border-hair);
+  transition: var(--transition-fast);
+}
+.hn-bl-col[data-active] { border-style: dashed; }
+.hn-bl-col[data-hot] { background: var(--brass-100); border-color: var(--brass-500); }
+.hn-bl-col[data-dimmed] { opacity: 0.5; }
+.hn-bl-col-head { display: flex; align-items: center; gap: var(--space-1); margin-bottom: var(--space-2); min-height: 20px; }
+.hn-bl-col-count { margin-left: auto; font: var(--weight-regular, 400) var(--text-2xs)/1 var(--font-mono); color: var(--text-subtle); }
+.hn-bl-col-body { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; overflow-y: auto; }
+.hn-bl-card {
+  flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) var(--space-3);
+  background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs); cursor: default;
+}
+.hn-bl-card[data-draggable] { cursor: grab; }
+.hn-bl-card[data-dragging] { opacity: 0.4; }
+.hn-bl-card-head { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.hn-bl-card-badges { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.hn-bl-card-foot { display: flex; justify-content: flex-end; }
+
+/* Pemilih tahap di detail: progres penuh dengan titik dan garis penghubung. */
+.hn-bl-stagebar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.hn-bl-stage {
+  position: relative; display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 2px var(--space-2); border-radius: var(--radius-pill);
+}
+.hn-bl-stage[data-state="active"] { background: var(--brass-100); }
+.hn-bl-stage:not(:last-child)::after {
+  content: ""; display: inline-block; width: 12px; height: 2px; margin-left: var(--space-1);
+  background: var(--bone-300); border-radius: 1px;
+}
+.hn-bl-stage[data-state="done"]::after { background: var(--leaf-500); }
+.hn-bl-stage-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bone-400); flex: 0 0 auto; }
+.hn-bl-stage[data-state="done"] .hn-bl-stage-dot { background: var(--leaf-500); }
+.hn-bl-stage[data-state="active"] .hn-bl-stage-dot { background: var(--brass-500); }
+.hn-bl-stage-label { font: var(--weight-medium) var(--text-2xs)/1 var(--font-mono); color: var(--brass-700); }
+
+/* Detail: alur linier. Ringkasan → CTA → Review/dokumen/lampiran → Lanjutan → Zona berbahaya. */
+.hn-bl-detail { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.hn-bl-section { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.hn-bl-section-title {
+  margin: 0; font: var(--weight-semibold) var(--text-xs)/1.2 var(--font-mono); color: var(--text-muted);
+  letter-spacing: var(--tracking-wide, 0.04em); text-transform: uppercase;
+}
+.hn-bl-summary-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.hn-bl-facts {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); margin: 0;
+}
+.hn-bl-facts > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hn-bl-facts dt { font: var(--weight-regular, 400) var(--text-2xs)/1.2 var(--font-mono); color: var(--text-subtle); text-transform: uppercase; }
+.hn-bl-facts dd { margin: 0; font: var(--weight-regular, 400) var(--text-sm)/1.4 var(--font-ui); color: var(--text-body); overflow-wrap: anywhere; }
+.hn-bl-field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.hn-bl-field-value {
+  font: var(--weight-regular, 400) var(--text-sm)/1.5 var(--font-ui); color: var(--text-strong);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.hn-bl-inline-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.hn-bl-end { justify-content: flex-end; }
+.hn-bl-cta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.hn-bl-subsection { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.hn-bl-stack-list { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.hn-bl-dep { display: flex; align-items: center; gap: var(--space-2); font: var(--weight-regular, 400) var(--text-sm)/1.4 var(--font-ui); }
+.hn-bl-trail { font: var(--weight-regular, 400) var(--text-sm)/1.4 var(--font-ui); color: var(--text-muted); overflow-wrap: anywhere; }
+.hn-bl-checklist {
+  display: flex; flex-direction: column; gap: var(--space-2); max-height: 132px; overflow-y: auto;
+  padding: var(--space-2); border: 1px solid var(--border-hair); border-radius: var(--radius-sm);
+}
+.hn-bl-status-now { font: var(--weight-semibold) var(--text-sm)/1.4 var(--font-ui); color: var(--text-strong); }
+.hn-bl-callout {
+  padding: var(--space-2) var(--space-3); border: 1px solid var(--border-hair); border-radius: var(--radius-sm);
+  background: var(--bone-100); font: var(--weight-regular, 400) var(--text-xs)/1.5 var(--font-ui); color: var(--text-muted);
+}
+.hn-bl-callout-title { font: var(--weight-semibold) var(--text-xs)/1.5 var(--font-ui); color: var(--text-strong); }
+.hn-bl-confirm-lead { font: var(--weight-regular, 400) var(--text-sm)/1.5 var(--font-ui); color: var(--text-strong); margin-bottom: var(--space-3); }
+.hn-bl-file-list {
+  margin: 0 0 var(--space-4); padding-left: var(--space-4); font: var(--weight-regular, 400) var(--text-xs)/1.6 var(--font-mono); color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Lanjutan: terlipat. Ringkasnya tampak seperti baris kepala, bukan tombol aksi. */
+.hn-bl-advanced { border-top: 1px solid var(--border-hair); padding-top: var(--space-3); min-width: 0; }
+.hn-bl-advanced > summary {
+  cursor: pointer; list-style: none; font: var(--weight-semibold) var(--text-xs)/1.2 var(--font-mono);
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: var(--tracking-wide, 0.04em);
+  padding: var(--space-1) 0; min-height: var(--touch-target);
+}
+.hn-bl-advanced > summary::-webkit-details-marker { display: none; }
+.hn-bl-advanced > summary::before { content: "+ "; }
+.hn-bl-advanced[open] > summary::before { content: "− "; }
+.hn-bl-advanced > summary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.hn-bl-advanced-body { display: flex; flex-direction: column; gap: var(--space-4); padding-top: var(--space-3); min-width: 0; }
+
+/* Zona berbahaya: dipisah garis dan diberi warna clay, hanya untuk satu aksi hapus. */
+.hn-bl-danger { display: flex; flex-direction: column; gap: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--border-hair); }
+.hn-bl-danger .hn-bl-section-title { color: var(--clay-600); }
+
+/* Lebar satu kolom di layar sempit: daftar tetap satu kolom; papan ditumpuk vertikal. */
+@media (max-width: 767px) {
+  .hn-bl-toolbar { gap: var(--space-2); }
+  /* Di mobile daftar TAK menjadi scroller bersarang. Gulir dipegang satu scroller (.hn-shell-main), jadi
+     daftar dan pager mengalir sebagai satu tumpukan: tak ada kotak 633px yang digulir di dalam halaman
+     dengan area kosong di bawahnya (Audit 2026-10 QA P1/P2). Posisi gulir tetap dipulihkan Shell. */
+  .hn-bl-screen { min-height: auto; }
+  .hn-bl-body { flex: 0 0 auto; min-height: auto; }
+  .hn-bl-list-scroll { flex: 0 0 auto; min-height: auto; overflow: visible; }
+  /* Tab tahap membungkus ke baris berikutnya, tidak digulir mendatar: tiap segmen tampil utuh
+     ("Dikerjakan" tak lagi terpotong "Dikerja…"). Labelnya tetap istilah glosarium, sama dengan pil tahap. */
+  .hn-bl-screen .hn-bl-stage-tabs { overflow: visible; flex-wrap: wrap; }
+  .hn-bl-board { flex-direction: column; overflow-x: hidden; }
+  .hn-bl-col { flex: 0 0 auto; width: 100%; }
+  .hn-bl-col-body { overflow-y: visible; }
+  .hn-bl-facts { grid-template-columns: minmax(0, 1fr); }
+  .hn-bl-list-scroll { border-radius: var(--radius-md); }
+  .hn-bl-row-title { white-space: normal; }
+  .hn-bl-card-foot { justify-content: stretch; }
+  .hn-bl-card-foot .hn-bl-actions { width: 100%; justify-content: space-between; }
+}

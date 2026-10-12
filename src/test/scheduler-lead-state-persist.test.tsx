@@ -29,14 +29,21 @@ const props = { projects, onProjectChanged: () => {}, onToast: () => {}, onGotoT
 
 beforeEach(() => localStorage.clear());
 
+// Audit UI/UX 2026-10 · Fase 3F: penyaring project pindah ke popover "Project" (FilterBar). Test membukanya
+// lebih dulu, seperti pengguna, lalu membaca/mengubah select di dalamnya.
+const openProjectFilter = async () => {
+  fireEvent.click(await screen.findByRole("button", { name: /^Project/ }));
+  return (await screen.findByLabelText("saring project")) as HTMLSelectElement;
+};
+
 describe("state tampilan Lead", () => {
   it("penyaring project bertahan lintas unmount/remount", async () => {
     render(<LeadScreen {...(props as any)} />);
-    fireEvent.change(await screen.findByLabelText("saring project"), { target: { value: "erp" } });
+    fireEvent.change(await openProjectFilter(), { target: { value: "erp" } });
     await waitFor(() => expect(readUiState(uiKey("lead", "filter"), "all")).toBe("erp"));
     cleanup();
     render(<LeadScreen {...(props as any)} />);
-    expect(((await screen.findByLabelText("saring project")) as HTMLSelectElement).value).toBe("erp");
+    expect((await openProjectFilter()).value).toBe("erp");
   });
 
   it("nomor halaman kedua daftar bertahan lintas remount — mount bukan ganti penyaring", async () => {
@@ -45,7 +52,6 @@ describe("state tampilan Lead", () => {
     vi.mocked(api.getLeadDecisions).mockClear();
     vi.mocked(api.getLeadFlows).mockClear();
     render(<LeadScreen {...(props as any)} />);
-    await screen.findByLabelText("saring project");
     await waitFor(() => expect(api.getLeadDecisions).toHaveBeenCalled());
     expect(vi.mocked(api.getLeadDecisions).mock.calls.at(-1)![0]).toMatchObject({ page: 2 });
     expect(vi.mocked(api.getLeadFlows).mock.calls.at(-1)![0]).toMatchObject({ page: 3 });
@@ -58,7 +64,7 @@ describe("state tampilan Lead", () => {
     writeUiState(uiKey("lead", "flowPage"), 3);
     vi.mocked(api.getLeadDecisions).mockClear();
     render(<LeadScreen {...(props as any)} />);
-    fireEvent.change(await screen.findByLabelText("saring project"), { target: { value: "erp" } });
+    fireEvent.change(await openProjectFilter(), { target: { value: "erp" } });
     await waitFor(() =>
       expect(vi.mocked(api.getLeadDecisions).mock.calls.at(-1)![0]).toMatchObject({ page: 1, projectId: "erp" }));
     expect(readUiState(uiKey("lead", "flowPage"), 99)).toBe(1);
@@ -66,10 +72,12 @@ describe("state tampilan Lead", () => {
 
   it("Reset tampilan mengembalikan penyaring ke semua project", async () => {
     render(<LeadScreen {...(props as any)} />);
-    fireEvent.change(await screen.findByLabelText("saring project"), { target: { value: "erp" } });
+    fireEvent.change(await openProjectFilter(), { target: { value: "erp" } });
     // Ganti penyaring memicu load() non-silent → layar sempat kembali ke state "loading".
     expect(await screen.findByText("1 filter aktif")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Reset tampilan" }));
-    expect(((await screen.findByLabelText("saring project")) as HTMLSelectElement).value).toBe("all");
+    // Chip project lenyap dan penanda jumlah filter ikut hilang: penyaring kembali ke "semua project".
+    await waitFor(() => expect(screen.queryByText("Project: ERP")).toBeNull());
+    expect(screen.queryByText("1 filter aktif")).toBeNull();
   });
 });

@@ -33,7 +33,7 @@ export const PORTAL_TOOLS: readonly McpToolDef[] = [
     name: "hanoman_portal_projects",
     title: "Portal: project yang dilihat klien",
     description:
-      "Daftar project yang boleh dilihat satu akun klien — proyeksi sempit (id, nama, deskripsi), bukan data project operator." + SUFFIX,
+      "Daftar project yang boleh dilihat satu akun klien — proyeksi sempit (id, nama, `chatEnabled`), bukan data project operator. `chatEnabled` = chat portal menyala untuk akun ini di project itu (ADR-0211); false berarti route chat-nya 404." + SUFFIX,
     inputSchema: obj({ properties: { asClient: AS_CLIENT, ...PAGE_PARAMS }, required: ["asClient"] }),
     mode: "read", capability: CAP,
     samplePath: "/portal/projects", sampleMethod: "GET",

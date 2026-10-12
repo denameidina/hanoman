@@ -1,0 +1,101 @@
+/* Dalang Hanoman sebagai papan status senyap (Audit UI/UX 2026-10 · Fase 3B). Dimuat dari
+   DalangHanomanScreen.tsx. Pengecualian gelap yang terdokumentasi: satu-satunya layar gelap penuh, karena
+   seluruh layarnya adalah kerja aktif. Tanpa animasi dan tanpa timer; pet tetap satu-satunya elemen yang
+   bergerak. Warna hanya dari token terminal (--term-*) dan aksen brass/amber. Aturan di app.css milik
+   bersama; yang ditimpa di sini cukup ditulis ulang dengan kelas yang sama. */
+
+.hn-dlg {
+  position: fixed; inset: 0; z-index: 100; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--term-bg); color: var(--term-fg);
+  padding: calc(var(--space-5) + var(--safe-top)) var(--space-6) calc(var(--space-4) + var(--safe-bottom));
+}
+
+/* ---- Kepala: judul, ringkasan satu baris, status koneksi; tombol di kanan. ---- */
+.hn-dlg-top {
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+.hn-dlg-head { flex: 1 1 260px; min-width: 0; }
+.hn-dlg-title {
+  margin: 0; font-family: var(--font-display); font-size: var(--text-2xl); font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight); color: var(--term-fg);
+}
+.hn-dlg-summary { margin: var(--space-1) 0 0; font-size: var(--text-md); color: var(--term-fg); }
+.hn-dlg-link {
+  display: inline-flex; align-items: center; gap: var(--space-2); margin: var(--space-1) 0 0;
+  font-size: var(--text-xs); color: var(--term-dim);
+}
+.hn-dlg-dot { flex: none; width: 7px; height: 7px; margin: 0; border-radius: 50%; background: var(--term-dim); }
+.hn-dlg-link--ok .hn-dlg-dot { background: var(--leaf-500); }
+.hn-dlg-link--err .hn-dlg-dot { background: var(--clay-500); }
+
+.hn-dlg-actions { display: flex; align-items: center; gap: var(--space-2); flex: 0 0 auto; }
+.hn-dlg-btn {
+  appearance: none; min-height: var(--touch-target); padding: 0 var(--space-4);
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--term-line); border-radius: var(--radius-md); background: none;
+  color: var(--brass-300); font: var(--weight-medium) var(--text-sm)/1 var(--font-ui); cursor: pointer;
+}
+.hn-dlg-btn:hover { border-color: var(--brass-700); }
+
+/* Jalan keluar selalu 44×44 (sentuh), di semua ukuran layar. */
+.hn-dlg-exit {
+  appearance: none; flex: none; width: var(--touch-target); height: var(--touch-target); padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--term-line); border-radius: var(--radius-md); background: none;
+  color: var(--term-dim); cursor: pointer;
+}
+.hn-dlg-exit:hover { color: var(--term-fg); border-color: var(--brass-700); }
+
+.hn-dlg-btn:focus-visible,
+.hn-dlg-exit:focus-visible,
+.hn-dlg-row:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* ---- Seksi: judul kecil mono, daftar berbaris dengan garis tipis. ---- */
+.hn-dlg-section { margin-top: var(--space-6); min-width: 0; }
+.hn-dlg-rt {
+  margin: 0 0 var(--space-2); font-family: var(--font-mono); font-size: var(--text-2xs);
+  font-weight: var(--weight-medium); letter-spacing: var(--tracking-caps); text-transform: uppercase;
+  color: var(--brass-300);
+}
+.hn-dlg-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--term-line); }
+.hn-dlg-list > li { border-bottom: 1px solid var(--term-line); }
+
+/* Baris = satu <button>; seluruh baris membuka tujuannya, label aksi terlihat di kanan. */
+.hn-dlg-row {
+  appearance: none; width: 100%; min-height: var(--touch-target); margin: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-2); border: 0; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.hn-dlg-row:hover { background: color-mix(in srgb, var(--term-fg) 4%, transparent); }
+
+/* Wayang sebagai ikon kecil (24px tinggi), warnanya ikut keadaan baris. */
+.hn-dlg-glyph { flex: 0 0 24px; display: inline-flex; justify-content: center; }
+.hn-dlg-name {
+  flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--term-fg);
+}
+.hn-dlg-fase { font-size: var(--text-xs); color: var(--term-fg); }
+.hn-dlg-sesi { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--term-dim); }
+.hn-dlg-aksi {
+  margin-left: auto; font-size: var(--text-xs); font-weight: var(--weight-medium);
+  color: var(--brass-300); white-space: nowrap;
+}
+
+/* Menunggu jawabanmu: aksi amber (teks amber-500 lolos di atas --term-bg; warna wayang diberi lewat prop). */
+.hn-dlg-row--wait .hn-dlg-aksi { color: var(--amber-500); }
+
+/* Project tanpa sesi hidup: redup, tetap terbaca. */
+.hn-dlg-row--off .hn-dlg-name,
+.hn-dlg-row--off .hn-dlg-fase,
+.hn-dlg-row--off .hn-dlg-aksi { color: var(--term-dim); }
+
+/* Panggung sunyi (belum ada project). */
+.hn-dlg-empty { margin-top: var(--space-6); font-size: var(--text-md); color: var(--term-fg); }
+.hn-dlg-empty-hint { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--term-dim); }
+
+@media (max-width: 767px) {
+  .hn-dlg { padding-inline: var(--page-gutter-x, var(--space-4)); }
+  .hn-dlg-aksi { margin-left: 0; }
+}

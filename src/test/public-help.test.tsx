@@ -34,8 +34,13 @@ describe("SPEC-253 · PublicHelpApp routing", () => {
       new Response(JSON.stringify({ number: 3, category: "bug", title: "T", status: "Diterima", createdAt: new Date().toISOString() }), { status: 200 }),
     );
     render(<PublicHelpApp />);
-    await waitFor(() => expect(screen.getByText(/Diterima/)).toBeTruthy());
-    expect(screen.getByText(/Tiket #3/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(/Tiket #3/)).toBeTruthy());
+    // Status "Diterima" tampil sebagai pill dan sebagai langkah pertama linimasa (dua teks sama).
+    expect(screen.getAllByText("Diterima").length).toBeGreaterThanOrEqual(2);
+    // Linimasa: langkah pertama sudah lewat, langkah ketiga (Dikerjakan) yang sedang menunggu giliran.
+    const timeline = screen.getByRole("list", { name: /Perkembangan laporan: Diterima/ });
+    expect(timeline.querySelector('[data-state="done"]')?.textContent).toMatch(/Diterima/);
+    expect(timeline.querySelector('[aria-current="step"]')?.textContent).toMatch(/Dikerjakan/);
   });
 
   it("submit valid → tampilkan nomor tiket + link status", async () => {
@@ -86,6 +91,26 @@ describe("SPEC-253 · PublicHelpApp routing", () => {
 
   // SPEC-352 · akar masalah: honeypot bernama `hp` (= "handphone") di form berbahasa Indonesia
   // diisi autofill browser. Nama netral + autocomplete yang benar-benar dihormati browser.
+  it("label Kategori menunjuk select-nya dan label lampiran menunjuk input berkas (kelas kontrol portal)", async () => {
+    setPath("/help/demo");
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ projectName: "Demo", categories: ["bug", "fitur"] }), { status: 200 }),
+    );
+    render(<PublicHelpApp />);
+    await waitFor(() => screen.getByLabelText(/judul/i));
+    const kategori = screen.getByLabelText("Kategori");
+    expect(kategori.tagName).toBe("SELECT");
+    expect(kategori.closest(".hn-public-field")).toBeTruthy();
+    const berkas = screen.getByLabelText(/Lampiran gambar/);
+    expect(berkas.tagName).toBe("INPUT");
+    expect(berkas.classList.contains("hn-public-file-input")).toBe(true);
+    // Tombol yang tampak memakai teks Indonesia dan disembunyikan dari pembaca layar (nama tetap dari label).
+    const wadah = berkas.parentElement!;
+    expect(wadah.querySelector(".hn-public-file-btn")).toHaveTextContent("Pilih berkas");
+    expect(wadah.querySelector(".hn-public-file-btn")).toHaveAttribute("aria-hidden", "true");
+    expect(wadah).toHaveTextContent("Belum ada berkas dipilih");
+  });
+
   it("field honeypot tak bernama `hp` dan memakai autocomplete yang dihormati browser", async () => {
     setPath("/help/demo");
     vi.spyOn(global, "fetch").mockResolvedValue(

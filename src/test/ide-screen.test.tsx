@@ -12,13 +12,22 @@ beforeEach(() => {
   vi.spyOn(api, "listBranches").mockResolvedValue({ branches: ["main", "dev"], remotes: ["main"] });
   vi.spyOn(api, "ideFile").mockResolvedValue({ path: "README.md", content: "# hi", binary: false, truncated: false });
   vi.spyOn(api, "ideWorkingStatus").mockResolvedValue({ branch: "main", staged: [], unstaged: [] });
+  vi.spyOn(api, "worktrees").mockResolvedValue({ repoDir: "/r", worktrees: [] });
+  vi.spyOn(api, "branchesUnused").mockResolvedValue({ base: "main", baseRemote: null, current: "main", branches: [] });
 });
 afterEach(resetViewport);
 
-describe("IdeScreen Explorer", () => {
+/** Pindah ke salah satu tab IDE. Tab Perubahan adalah default; tab bernama sama di panel mobile dilewati. */
+async function openTab(name: RegExp) {
+  const list = await screen.findByRole("tablist", { name: "Bagian IDE" });
+  fireEvent.click(within(list).getByRole("tab", { name }));
+}
+
+describe("IdeScreen · Berkas (tab kedua)", () => {
   it("keeps Files/Viewer mounted and opens the viewer after a mobile file selection", async () => {
     mockViewport(390);
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openTab(/berkas/i);
     await screen.findByRole("tablist", { name: "Panel IDE" });
     expect(document.querySelector('[data-panel="files"]')).toHaveAttribute("aria-hidden", "false");
     fireEvent.click(await screen.findByText("README.md"));
@@ -27,15 +36,18 @@ describe("IdeScreen Explorer", () => {
   });
   it("menampilkan pohon file dari ideTree", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openTab(/berkas/i);
     expect(await screen.findByText("README.md")).toBeInTheDocument();
   });
   it("klik file memuat isinya", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openTab(/berkas/i);
     fireEvent.click(await screen.findByText("README.md"));
     await waitFor(() => expect(api.ideFile).toHaveBeenCalledWith("p1", "README.md", ""));
   });
   it("mengelompokkan file per folder, folder collapse default", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openTab(/berkas/i);
     // folder src/ tampil sebagai header…
     expect(await screen.findByText("src/")).toBeInTheDocument();
     // …tapi isinya (a.ts) tersembunyi sampai di-expand
@@ -44,21 +56,26 @@ describe("IdeScreen Explorer", () => {
     fireEvent.click(screen.getByText("src/"));
     expect(await screen.findByText("a.ts")).toBeInTheDocument();
   });
-  it("tombol Checkout memanggil ideGit", async () => {
+});
+
+describe("IdeScreen · toolbar: Checkout di menu ⋯", () => {
+  it("Checkout dari menu ⋯ memanggil ideGit untuk ref yang dipilih", async () => {
     vi.spyOn(api, "ideGit").mockResolvedValue({ ok: true, stdout: "", stderr: "", current: "dev" });
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
-    await screen.findByText("README.md");
+    await screen.findByRole("tablist", { name: "Bagian IDE" });
     // pilih ref "dev" agar Checkout aktif
     fireEvent.change(screen.getByDisplayValue("· working tree ·"), { target: { value: "dev" } });
-    fireEvent.click(screen.getByRole("button", { name: /checkout/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Aksi lain IDE" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /checkout dev/i }));
     await waitFor(() => expect(api.ideGit).toHaveBeenCalledWith("p1", { op: "checkout", ref: "dev" }));
   });
   it("checkout 409 memunculkan dialog Paksa", async () => {
     vi.spyOn(api, "ideGit").mockRejectedValueOnce(new ApiError(409, "sesi aktif"));
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
-    await screen.findByText("README.md");
+    await screen.findByRole("tablist", { name: "Bagian IDE" });
     fireEvent.change(screen.getByDisplayValue("· working tree ·"), { target: { value: "dev" } });
-    fireEvent.click(screen.getByRole("button", { name: /checkout/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Aksi lain IDE" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /checkout dev/i }));
     expect(await screen.findByRole("button", { name: /paksa/i })).toBeInTheDocument();
   });
 });
@@ -71,7 +88,7 @@ describe("IdeScreen merge git graph", () => {
     ] });
   });
   const openMergeMenu = async () => {
-    fireEvent.click(await screen.findByRole("tab", { name: /git graph/i }));
+    await openTab(/riwayat/i);
     fireEvent.contextMenu(await screen.findByText("c1"));
     fireEvent.click(await screen.findByText("Merge (fast-forward bila bisa)"));
   };
@@ -104,8 +121,8 @@ describe("IdeScreen merge git graph", () => {
   });
 });
 
-// SPEC-234 · section Staged & Changed dari status working tree, klik → diff.
-describe("IdeScreen Staged & Changed", () => {
+// SPEC-234 · section Staged & Changed dari status working tree, klik → diff. Kini tab Perubahan (default).
+describe("IdeScreen · Perubahan (Staged & Changed)", () => {
   it("merender section Staged & Changed dari ideWorkingStatus", async () => {
     vi.spyOn(api, "ideWorkingStatus").mockResolvedValue({ branch: "main",
       staged: [{ path: "src/app.ts", add: 12, del: 3, status: "M", binary: false }],
@@ -138,6 +155,7 @@ describe("IdeScreen preview .md (SPEC-240)", () => {
   it("memilih .md → render preview (.hn-md), bukan raw source", async () => {
     vi.spyOn(api, "ideFile").mockResolvedValue({ path: "README.md", content: "# Judul Preview", binary: false, truncated: false });
     const { container } = render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openTab(/berkas/i);
     fireEvent.click(await screen.findByText("README.md"));
     // preview terender: heading <h1> di dalam wrapper .hn-md
     await waitFor(() => {
@@ -153,6 +171,7 @@ describe("IdeScreen preview .md (SPEC-240)", () => {
   it("toggle Source → raw source; balik Preview → terender", async () => {
     vi.spyOn(api, "ideFile").mockResolvedValue({ path: "README.md", content: "# Judul Preview", binary: false, truncated: false });
     const { container } = render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openTab(/berkas/i);
     fireEvent.click(await screen.findByText("README.md"));
     await screen.findByRole("button", { name: /^Source$/i });
     fireEvent.click(screen.getByRole("button", { name: /^Source$/i }));
@@ -168,6 +187,7 @@ describe("IdeScreen preview .md (SPEC-240)", () => {
   it("file non-.md → tak ada toggle Preview|Source, source tampil", async () => {
     vi.spyOn(api, "ideFile").mockResolvedValue({ path: "src/a.ts", content: "const x = 1;", binary: false, truncated: false });
     const { container } = render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openTab(/berkas/i);
     fireEvent.click(await screen.findByText("src/")); // buka folder
     fireEvent.click(await screen.findByText("a.ts"));
     await waitFor(() => expect(container.querySelector("code.hljs")).not.toBeNull());
@@ -181,6 +201,7 @@ describe("IdeScreen preview .md (SPEC-240)", () => {
     vi.spyOn(api, "putIdeFile").mockResolvedValue({ path: "README.md", content: "# Judul Baru" });
     vi.spyOn(api, "ideWorkingStatus").mockResolvedValue({ branch: "main", staged: [], unstaged: [] });
     const { container } = render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openTab(/berkas/i);
     fireEvent.click(await screen.findByText("README.md"));
     fireEvent.click(await screen.findByRole("button", { name: /^Edit$/i }));
     const ta = await screen.findByRole("textbox");
@@ -194,8 +215,8 @@ describe("IdeScreen preview .md (SPEC-240)", () => {
   });
 });
 
-describe("IdeScreen tab Branches (SPEC-360)", () => {
-  it("tab Branches merender panel branch ter-merge", async () => {
+describe("IdeScreen · tab Cabang (SPEC-360)", () => {
+  it("tab Cabang merender branch ter-merge dalam daftar gabungan", async () => {
     vi.spyOn(api, "branchesUnused").mockResolvedValue({
       base: "main", baseRemote: "origin/main", current: "main",
       branches: [{ name: "hanoman/spec-9", local: true, remote: true, merged: true,
@@ -204,7 +225,7 @@ describe("IdeScreen tab Branches (SPEC-360)", () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
     // `Tabs` merender <button role="tab">; role eksplisit menimpa role implisit "button",
     // jadi query WAJIB role "tab" — bukan "button".
-    fireEvent.click(await screen.findByRole("tab", { name: /branches/i }));
+    await openTab(/cabang/i);
     expect(await screen.findByText("hanoman/spec-9")).toBeInTheDocument();
   });
 });
@@ -218,6 +239,7 @@ describe("IdeScreen preview .md (SPEC-385)", () => {
   // sebagai lulus/gagal karena alasan yang salah.
   it("mode file: Preview lebar membuka modal berisi markdown terender + unduh berkas itu", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openTab(/berkas/i);
     fireEvent.click(await screen.findByText("README.md"));
     fireEvent.click(await screen.findByRole("button", { name: /preview lebar/i }));
     const modal = within(await screen.findByTestId("modal-panel"));
@@ -228,6 +250,7 @@ describe("IdeScreen preview .md (SPEC-385)", () => {
 
   it("toggle inline Preview|Source SPEC-240 tetap ada", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openTab(/berkas/i);
     fireEvent.click(await screen.findByText("README.md"));
     expect(await screen.findByText("Source")).toBeInTheDocument();
     expect(screen.getByText("Preview")).toBeInTheDocument();
@@ -254,6 +277,7 @@ describe("IdeScreen preview .md (SPEC-385)", () => {
   it("berkas non-.md tak menawarkan Preview lebar di mode file", async () => {
     vi.spyOn(api, "ideFile").mockResolvedValue({ path: "src/a.ts", content: "const x = 1", binary: false, truncated: false });
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openTab(/berkas/i);
     fireEvent.click(await screen.findByText("src/"));
     fireEvent.click(await screen.findByText("a.ts"));
     await waitFor(() => expect(api.ideFile).toHaveBeenCalledWith("p1", "src/a.ts", ""));

@@ -58,10 +58,10 @@ describe("status koneksi events (SPEC-897)", () => {
     const conn = FakeWS.instances[0]!;
     conn.onopen?.();
     expect(eventsStatus().connected).toBe(false);   // socket terbuka ≠ frame tiba
-    expect(seen).toEqual([]);
+    expect(seen.every((c) => !c)).toBe(true);       // subscribe (idle → aktif) hanya mengubah `idle`
     conn.emit({ t: "specs", specs: [] });
     expect(eventsStatus().connected).toBe(true);
-    expect(seen).toEqual([true]);
+    expect(seen.at(-1)).toBe(true);
   });
 
   it("frame kedua tak memanggil handler lagi (status yang tak berubah tak memicu render)", async () => {
@@ -72,8 +72,9 @@ describe("status koneksi events (SPEC-897)", () => {
     await vi.waitFor(() => expect(FakeWS.instances.length).toBe(1));
     const conn = FakeWS.instances[0]!;
     conn.emit({ t: "specs", specs: [] });
+    const afterFirst = seen.length;
     conn.emit({ t: "specs", specs: [] });
-    expect(seen).toEqual([true]);
+    expect(seen).toHaveLength(afterFirst);
   });
 
   it("onclose mematikan `connected` dan mencap ulang `since`", async () => {
@@ -120,7 +121,8 @@ describe("status koneksi events (SPEC-897)", () => {
     subscribe(() => { });
     await vi.waitFor(() => expect(FakeWS.instances.length).toBe(1));
     off();
+    const n = seen.length;
     FakeWS.instances[0]!.emit({ t: "specs", specs: [] });
-    expect(seen).toEqual([]);
+    expect(seen).toHaveLength(n);
   });
 });

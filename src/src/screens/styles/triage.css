@@ -1,0 +1,186 @@
+/* Triase · kotak masuk keputusan (Audit UI/UX 2026-10 · Fase 3F).
+   Susunan semua di kelas ini; inline hanya untuk nilai token. Sentuh ≥44px pada pointer kasar. */
+
+.hn-triage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* Status: segmented "Belum ditinjau (N) · Diterima · Ditutup" — pengganti select status. */
+.hn-triage-segment {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  flex-wrap: wrap;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  overflow: hidden;
+}
+.hn-triage-segment-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.hn-triage-segment-btn + .hn-triage-segment-btn { border-left: 1px solid var(--border-hair); }
+.hn-triage-segment-btn:hover { background: var(--surface-sunken); color: var(--text-strong); }
+.hn-triage-segment-btn[aria-pressed="true"] {
+  background: var(--brass-050);
+  color: var(--text-strong);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--brass-600);
+}
+
+.hn-triage-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.hn-triage-bulk {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md);
+  background: var(--bone-100);
+}
+.hn-triage-bulk-count { flex: 1 1 auto; font-size: var(--text-sm); color: var(--text-strong); font-weight: 600; }
+
+/* Pembungkus checkbox adalah <label>: seluruh kotak sentuh (44px di mobile) ikut memilih baris. */
+.hn-triage-check { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; cursor: pointer; }
+.hn-triage-title-line { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.hn-triage-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.hn-triage-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.hn-triage-acts { display: flex; align-items: center; flex: 0 0 auto; gap: var(--space-1); flex-wrap: wrap; justify-content: flex-end; }
+
+.hn-triage-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--border-hair);
+  background: var(--bone-100);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* Detail: decision bar menempel di bawah; aksi sekunder di ⋯. */
+.hn-triage-detail { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+.hn-triage-detail-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.hn-triage-detail-body { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-3) 0; }
+.hn-triage-detail-title { margin: var(--space-1) 0 0; font-size: var(--text-lg); font-weight: 600; color: var(--text-strong); line-height: 1.3; overflow-wrap: anywhere; }
+.hn-triage-section-title { margin: 0 0 var(--space-1); }
+.hn-triage-body-text { white-space: pre-wrap; font-size: var(--text-sm); line-height: 1.55; color: var(--text-body); overflow-wrap: anywhere; }
+/* Wadah ukuran untuk susunan baris (@container triage-list di bawah): lebar daftar, bukan viewport. */
+.hn-triage-list-panel {
+  display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; flex: 1 1 auto;
+  container: triage-list / inline-size;
+}
+.hn-triage-scroll { overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+.hn-triage-decision {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-hair);
+  background: var(--surface-card);
+}
+.hn-triage-decision-spacer { flex: 1 1 auto; }
+.hn-triage-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.hn-triage-facts b { color: var(--text-body); font-weight: 500; }
+.hn-triage-disclosure { border-top: 1px solid var(--border-hair); padding-top: var(--space-2); }
+.hn-triage-disclosure > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--text-strong);
+  font-weight: 500;
+}
+.hn-triage-disclosure[open] > summary { margin-bottom: var(--space-2); }
+.hn-triage-attachments { display: flex; flex-wrap: wrap; gap: var(--space-2); list-style: none; margin: 0; padding: 0; }
+.hn-triage-attachments img {
+  display: block;
+  max-width: 180px;
+  max-height: 140px;
+  object-fit: cover;
+}
+.hn-triage-attachment-link {
+  display: block;
+  border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-triage-segment-btn { min-height: 44px; }
+}
+
+/* Baris daftar jadi dua tingkat ketika PANEL DAFTAR sempit (di bawah 900px), tanpa mengubah logika atau
+   urutan DOM. Ukurannya lebar panel, bukan viewport: mobile, tablet dengan panel split (master 360px), dan
+   tablet penuh (820px, panel ~708px) semuanya terpotong ("Mohon ...", "Tombo...") karena pil, judul, dan
+   meta berdampingan dalam satu baris flex. Desktop 1280 (panel ~1000px) tetap satu baris.
+   Tingkat 1 = pil status di atas, judul selebar penuh (clamp 2 baris), meta di bawahnya;
+   tingkat 2 = checkbox di kiri, lencana sumber, lalu Terima/Tolak di kanan. */
+@container triage-list (max-width: 899px) {
+  .hn-triage-scroll .hn-row-main { flex: 1 1 100%; flex-direction: column; align-items: stretch; gap: 4px; }
+  .hn-triage-scroll .hn-triage-title-line { flex-wrap: wrap; row-gap: 4px; }
+  .hn-triage-scroll .hn-triage-title {
+    flex: 1 1 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.35;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+  }
+  .hn-triage-scroll .hn-triage-meta { white-space: normal; overflow-wrap: anywhere; }
+  .hn-triage-scroll .hn-row-actions { flex: 1 1 100%; width: 100%; padding-bottom: var(--space-2); }
+  /* Checkbox mendorong lencana dan tombol ke kanan; untuk baris tanpa checkbox, lencana tetap di kiri. */
+  .hn-triage-scroll .hn-triage-check { margin-right: auto; }
+}

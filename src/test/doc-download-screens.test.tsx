@@ -1,6 +1,12 @@
 /* SPEC-361 · tombol unduh .md/.pdf terpasang di SETIAP pratinjau Markdown.
    SpecDocsModal sengaja diuji sekali saja: komponen yang sama dipakai Backlog dan Terminal. */
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
+
+// Audit UI/UX 2026-10 (3H): berkas IDE di tab Berkas (default-nya Perubahan).
+async function openBerkas() {
+  const list = await screen.findByRole("tablist", { name: "Bagian IDE" });
+  fireEvent.click(within(list).getByRole("tab", { name: "Berkas" }));
+}
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { paths } from "@hanoman/shared";
 
@@ -56,7 +62,10 @@ describe("tombol unduh pada pratinjau dokumen", () => {
   });
 
   it("DocsWorkspace menaut dokumen Source of Truth yang terpilih", async () => {
+    // Redesign 3P: unduh ada di menu ⋯ kepala dokumen (mode Baca).
     render(<DocsWorkspace projectId="p1" projectName="P1" docStatus="ok" />);
+    const menu = await screen.findByRole("button", { name: "Aksi untuk dokumen" });
+    fireEvent.click(menu);
     await waitFor(() => expect(mdLink()).toBeInTheDocument());
     expect(mdLink()).toHaveAttribute("href", "/api/projects/p1/docs/internal/docs/product/prd.md?download=md");
     expect(pdfLink()).toHaveAttribute("href", "/api/projects/p1/docs/internal/docs/product/prd.md?download=pdf");
@@ -67,6 +76,8 @@ describe("tombol unduh pada pratinjau dokumen", () => {
       onNewPrd={() => {}} onTakeToBacklog={() => {}}
       onStartBreakdown={() => {}} onMaterialize={async () => 0} />);
     fireEvent.click(await screen.findByText("PRD X"));
+    // Redesign 3P: unduh PRD ada di menu ⋯ bar aksi sticky, bukan tombol terpisah.
+    fireEvent.click(await screen.findByRole("button", { name: "Aksi lain PRD" }));
     await waitFor(() => expect(mdLink()).toBeInTheDocument());
     expect(mdLink()).toHaveAttribute("href", "/api/projects/p1/prds/docs/prd/x.md?download=md");
     expect(pdfLink()).toHaveAttribute("href", "/api/projects/p1/prds/docs/prd/x.md?download=pdf");
@@ -74,6 +85,7 @@ describe("tombol unduh pada pratinjau dokumen", () => {
 
   it("IdeScreen menaut berkas yang dibuka di Explorer", async () => {
     render(<IdeScreen projects={projects} projectId="p1" onProject={() => {}} />);
+    await openBerkas();
     fireEvent.click(await screen.findByText("README.md"));
     await waitFor(() => expect(mdLink()).toBeInTheDocument());
     expect(mdLink()).toHaveAttribute("href", "/api/projects/p1/file?path=README.md&download=md");

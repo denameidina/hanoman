@@ -18,15 +18,25 @@ import {
   PET_ATLAS_URL, PET_MANIFEST, POSE_ROW, durationMs, rowIndex, rowOf, thenOf, type PetRowKey,
 } from "./pet-sprite";
 import {
-  initialWalkState, isHandled, stepWalk, type PetEase, type PetMove, type PetWalkState,
+  clampMove, fitWalk, initialWalkState, isHandled, stepWalk, type PetEase, type PetMove, type PetWalkState,
 } from "./pet-walk";
 import { PetAnswer } from "./PetAnswer";
+import { usePetEnabled } from "../ui-state/pet-pref";
 
 // Tinggi karakter berdiri di layar (band "pet" 80–128 px, amandemen sistem maskot). Skala sel
 // diturunkan dari `character.h` manifest, bukan dari tinggi sel — sel menyisakan ruang ekor/lompat.
 const PET_HEIGHT: Record<"mobile" | "tablet" | "desktop", number> = { mobile: 96, tablet: 112, desktop: 112 };
 // SPEC-763 · hanya 44×44 px di kaki yang menangkap tap; sisa panggung cuma seni.
 const HIT = 44;
+// Tombol bangkitkan saat pet disembunyikan: 44 px, berjarak 22 px dari tepi bawah. Jarak itu juga
+// dipakai untuk memesan ruang di layout (`--pet-h`), jadi keduanya tak boleh berbeda.
+const REVEAL_EDGE = 22;
+const REVEAL_RESERVE = REVEAL_EDGE + HIT;
+// Lajur tablet dan ponsel (Audit UI/UX 2026-10 · P3): pet duduk sebagai chip setinggi 56 px, rata kanan, dan lajurnya
+// tak pernah lebih tinggi dari itu. Pet yang dibangkitkan melayang di atas lajur sebagai overlay sementara (Esc atau
+// klik di luar menutupnya) — ia tak memesan ruang. Tombol chip 44 px, 6 px dari tepi bawah lajur.
+const LANE_CHIP_H = 56;
+const LANE_CHIP_EDGE = 6;
 const PANEL_W = 268;
 const PANEL_GAP = 10;
 const PANEL_EDGE = 12;
@@ -82,16 +92,45 @@ function useDocumentHidden(): boolean {
   return hidden;
 }
 
-// Lebar jalur = lebar viewport; dibaca saat mount dan resize (debounce), bukan per frame.
-function useLaneWidth(): number {
-  const [width, setWidth] = React.useState(() => (typeof window !== "undefined" ? window.innerWidth : 1024));
+// Lebar jalur = lebar SLOT tempat pet duduk (footer sidebar di desktop, lajur di bawah kolom di tablet dan
+// ponsel), dibaca dari root-nya: root selebar slot (`width: 100%`). Dibaca saat root pertama ada, saat tier
+// berganti, dan tiap kali kotaknya berubah ukuran (ResizeObserver; tanpa itu, resize jendela dengan debounce).
+// TAK ADA fallback ke lebar viewport: sidebar 248 px, bukan 1280 px. Rencana yang dibuat dari lebar palsu itulah
+// yang membuat pet melayang keluar dari sidebar. Belum terukur = 0, dan pet tak dirender sampai ada lebar.
+function useLaneWidth(rootRef: React.RefObject<HTMLDivElement>, tier: ReturnType<typeof useResponsiveTier>, ready: boolean): number {
+  const measure = React.useCallback((): number => Math.round(rootRef.current?.getBoundingClientRect().width ?? 0), [rootRef]);
+  const [width, setWidth] = React.useState(0);
+  React.useLayoutEffect(() => { if (ready) setWidth(measure()); }, [measure, tier, ready]);
   React.useEffect(() => {
+    const el = rootRef.current;
+    if (!ready || !el) return;
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(() => setWidth(measure()));
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
     let t: ReturnType<typeof setTimeout> | undefined;
-    const on = () => { clearTimeout(t); t = setTimeout(() => setWidth(window.innerWidth), 150); };
+    const on = () => { clearTimeout(t); t = setTimeout(() => setWidth(measure()), 150); };
     window.addEventListener("resize", on);
     return () => { clearTimeout(t); window.removeEventListener("resize", on); };
-  }, []);
+  }, [measure, ready, rootRef]);
   return width;
+}
+
+// Viewport pendek di desktop: sidebar tak muat daftar hub + pet setinggi sprite (±147 px). Di bawah ambang ini
+// pet menciut menjadi chip (tombol bangkitkan) dan daftar hub dapat ruang. Ambang sama dengan `app.css`
+// (`@media (min-width: 1200px) and (max-height: 760px)`), yang merapatkan jarak sidebar di rentang yang sama.
+const PET_COMPACT_QUERY = "(min-width: 1200px) and (max-height: 760px)";
+function useMediaMatch(query: string): boolean {
+  const subscribe = React.useCallback((onChange: () => void) => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return () => {};
+    const mq = window.matchMedia(query);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, [query]);
+  const snapshot = React.useCallback(() => typeof window !== "undefined"
+    && typeof window.matchMedia === "function" && window.matchMedia(query).matches, [query]);
+  return React.useSyncExternalStore(subscribe, snapshot, () => false);
 }
 
 export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
@@ -110,12 +149,36 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
   // Satu gelembung pada satu waktu; yang baru menggantikan yang lama beserta timer-nya.
   const [speech, setSpeech] = React.useState<(PetSpeech & { id: number }) | null>(null);
   const reduced = usePrefersReducedMotion();
+  // Pet bukan bagian dari first paint: ia dipasang saat browser sudah sempat menggambar layar
+  // (idle), supaya atlas sprite — ±1 MB — tak bersaing dengan konten utama dan tak diunduh sebelum
+  // pet benar-benar tampil.
+  const [mountReady, setMountReady] = React.useState(false);
+  React.useEffect(() => {
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(() => setMountReady(true), { timeout: 1500 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = window.setTimeout(() => setMountReady(true), 1);
+    return () => window.clearTimeout(t);
+  }, []);
   const tier = useResponsiveTier();
   const documentHidden = useDocumentHidden();
-  const laneWidth = useLaneWidth();
+  // Desktop pendek: pet menciut ke chip sampai dibangkitkan (`peek`, tak dipersist — tinggi layar bisa berubah).
+  const compact = useMediaMatch(PET_COMPACT_QUERY) && tier === "desktop";
+  // Tablet dan ponsel: lajurnya selalu setinggi chip. Di sana `peek` berarti pet sedang dibangkitkan sebagai overlay.
+  const lanePet = tier !== "desktop";
+  const [peek, setPeek] = React.useState(false);
   const rootRef = React.useRef<HTMLDivElement>(null);
   const actorRef = React.useRef<HTMLDivElement>(null);
   const panelRef = React.useRef<HTMLDivElement>(null);
+  const laneWidth = useLaneWidth(rootRef, tier, mountReady);
+  // Sembunyikan di tablet dan ponsel MEMATIKAN pet lewat preferensi bersama (default-nya memang mati di
+  // sana, jadi tak ada chip yang memakan lajur). Di desktop ia tetap menciut menjadi chip seperti dulu.
+  const [, setPetEnabled] = usePetEnabled();
 
   const connection = useEventsStatus();
   // Denyut kehidupan dashboard; `quietSince` dicap ulang tiap kali ia berubah. Dibandingkan SAAT
@@ -204,33 +267,64 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
     return actor && root && actor.width > 0 ? actor.left - root.left : walkRef.current.x;
   }, []);
 
-  // Plafon angkat = tinggi jalur yang SUDAH melebar; jalur itu sendiri dibatasi `var(--safe-top)` /
-  // `var(--safe-bottom)`, jadi ia dibaca dari elemen yang memakainya alih-alih memparsing custom
-  // property (yang mengembalikan token `env(...)` yang belum di-resolve). Sebelum jalur melebar —
-  // dan di jsdom yang memberi rect nol — viewport dipakai apa adanya; di sana `y` masih 0 sehingga
-  // clamp-nya memang tak berpengaruh.
-  const laneHeight = React.useCallback((): number => {
-    const rect = rootRef.current?.getBoundingClientRect();
-    if (rect && rect.height > cellH) return rect.height;
-    return typeof window !== "undefined" ? window.innerHeight : cellH;
-  }, [cellH]);
+  // Plafon angkat. Lajur TAK melebar lagi saat pet diangkat (ia di alur layout dan melebar berarti konten
+  // bergeser), jadi sprite yang terangkat melayang di atas konten, tanpa mengubah tata letak. Batasnya
+  // tinggi viewport; `y` = 0 di lantai jalur, jadi clamp ini tak berpengaruh saat tak diseret.
+  const laneHeight = React.useCallback((): number =>
+    typeof window !== "undefined" ? window.innerHeight : cellH, [cellH]);
 
   // Gelembung hidup DI DALAM actor supaya ia ikut posisi pet tanpa kode posisi; yang dihitung di
-  // sini hanya pergeseran agar ia tak keluar viewport saat pet berada di tepi.
+  // sini hanya pergeseran agar ia tetap di dalam jalur (sidebar atau kolom), bukan keluar dari slotnya.
   const bubbleLeft = React.useMemo(() => {
-    const vw = typeof window !== "undefined" ? window.innerWidth : laneWidth;
     const want = move.x + anchor.x * cellW - BUBBLE_W / 2;
-    const clamped = Math.min(Math.max(want, BUBBLE_EDGE), Math.max(BUBBLE_EDGE, vw - BUBBLE_W - BUBBLE_EDGE));
+    const clamped = Math.min(Math.max(want, BUBBLE_EDGE), Math.max(BUBBLE_EDGE, laneWidth - BUBBLE_W - BUBBLE_EDGE));
     return Math.round(anchor.x * cellW - BUBBLE_W / 2 + (clamped - want));
   }, [move.x, cellW, anchor.x, laneWidth]);
 
+  // Gelembung bicara adalah overlay sementara: Esc atau klik di luar pet menutupnya lebih cepat daripada
+  // TTL-nya. Panel dan kotak jawaban punya penutupnya sendiri, jadi keduanya tak dipakai di sini.
+  React.useEffect(() => {
+    if (!speech || open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setSpeech(null);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSpeech(null); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [speech, open]);
+
+  // Lebar jalur tempat rencana terakhir dibuat; 0 = belum pernah terukur. Dibandingkan di sini, bukan di
+  // stepWalk: keadaannya tak membawa lebar, dan lebar yang berubah harus menghentikan rencana lama.
+  const laneRef = React.useRef(0);
   const tick = React.useCallback(() => {
-    const step = stepWalk(walkRef.current, {
-      now: Date.now(), currentX: currentX(), laneWidth, laneHeight: laneHeight(),
-      petWidth: cellW, petHeight: cellH, pose: view.pose,
-      hovered, panelOpen: open, documentHidden, roam, reduced, tier,
-      dragging: drag !== null, pointerX: drag?.x ?? 0, pointerY: drag?.y ?? 0,
-    }, Math.random);
+    // Slot belum terukur: tak ada jalur, jadi tak ada langkah. Tak ada tujuan yang bisa keluar dari sidebar.
+    if (laneWidth <= 0) return;
+    const now = Date.now();
+    if (laneRef.current === 0) {
+      // Pertama kali terukur: mulai di rumah tanpa transisi, persis seperti keadaan awal.
+      laneRef.current = laneWidth;
+      const init = initialWalkState(laneWidth, cellW, now);
+      walkRef.current = init;
+      setWalk(init);
+      setRow(POSE_ROW[view.pose]);
+      setMove({ x: init.x, y: 0, durationMs: 0, ease: "linear" });
+      return;
+    }
+    const laneChanged = laneRef.current !== laneWidth;
+    laneRef.current = laneWidth;
+    const cur = currentX();
+    const step = laneChanged && drag === null && !isHandled(walkRef.current.mode)
+      ? fitWalk(walkRef.current, { now, currentX: cur, laneWidth, petWidth: cellW, pose: view.pose })
+      : stepWalk(walkRef.current, {
+        now, currentX: cur, laneWidth, laneHeight: laneHeight(),
+        petWidth: cellW, petHeight: cellH, pose: view.pose,
+        hovered, panelOpen: open, documentHidden, roam, reduced, tier,
+        dragging: drag !== null, pointerX: drag?.x ?? 0, pointerY: drag?.y ?? 0,
+      }, Math.random);
     walkRef.current = step.state;
     setWalk(step.state);
     setRow(step.row);
@@ -302,12 +396,15 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
 
   function showPanel() {
     // Dijangkar ke posisi pet SAAT buka; pet berhenti selama panel terbuka (mesin §7), jadi cukup
-    // sekali. Di-clamp ke viewport supaya panel di pojok kiri tak terpotong.
+    // sekali. Di-clamp ke VIEWPORT (bukan ke jalur) supaya panel di sidebar yang sempit tak terpotong,
+    // lalu dikonversi ke koordinat induknya (root), karena `left` panel relatif terhadap root.
     const vw = typeof window !== "undefined" ? window.innerWidth : laneWidth;
     const actor = actorRef.current?.getBoundingClientRect();
-    const left = actor && actor.width > 0 ? actor.left : walkRef.current.x;
+    const rootLeft = rootRef.current?.getBoundingClientRect().left ?? 0;
+    const left = actor && actor.width > 0 ? actor.left : rootLeft + walkRef.current.x;
     const center = left + anchor.x * cellW;
-    setPanelLeft(Math.round(Math.min(Math.max(center - PANEL_W / 2, PANEL_EDGE), Math.max(PANEL_EDGE, vw - PANEL_W - PANEL_EDGE))));
+    const viewportLeft = Math.min(Math.max(center - PANEL_W / 2, PANEL_EDGE), Math.max(PANEL_EDGE, vw - PANEL_W - PANEL_EDGE));
+    setPanelLeft(Math.round(viewportLeft - rootLeft));
     setPanelMounted(true);
     setOpen(true);
   }
@@ -380,35 +477,74 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
     }
   }
 
+  // Sembunyikan: desktop menciutkan pet ke chip (ia selalu ada di sidebar); tablet dan ponsel mematikannya
+  // sepenuhnya, karena di sana pet memesan lajur dan default-nya memang mati.
+  function dismiss() {
+    if (tier === "desktop" && compact) { setOpen(false); setPanelMounted(false); setPeek(false); return; }
+    if (tier === "desktop") setVisibility(true);
+    else { setOpen(false); setPanelMounted(false); setPetEnabled(false); }
+  }
+
   function setRoaming(next: boolean) {
     setRoam(next);
     savePetRoam(next);
   }
 
-  // Jalur: selebar viewport di tepi bawah, setinggi satu sel. z 80: di bawah header (90), overlay
-  // terminal fullscreen (100), Modal (150), Toast (200). `pointerEvents: none` di seluruh jalur —
-  // konten di bawah jalur tetap menerima tap; yang `auto` hanya tombol 44 px, pegangan, dan panel.
-  // SPEC-905 · selagi pet terangkat jalur memanjang ke atas sampai `var(--safe-top)`, dan HANYA
-  // selagi itu. Tepi BAWAHnya tak bergerak, jadi sprite, panel, dan gelembung tak bergeser satu
-  // piksel pun saat ia melebar. Bukan soal clipping (`pet-root` tak punya `overflow`): yang dibeli
-  // adalah plafon angkat yang bisa DIUKUR dari CSS-nya sendiri, plus hit-test yang tetap benar bila
-  // kelak sebuah ancestor memperoleh `transform`/`contain`.
+  // Jalur pet = ALUR LAYOUT, bukan overlay. Root duduk di dalam slot yang disediakan Shell (footer sidebar
+  // di desktop, lajur di bawah kolom di tablet/ponsel), setinggi satu sel. Ia tak pernah melebar dan tak
+  // memakai `position: fixed`, sehingga tak ada kontrol yang tertutup. `pointerEvents: none` di seluruh
+  // root: yang `auto` hanya tombol 44 px di kaki, pegangan, panel, dan tombol gelembung.
+  // Overlay yang disengaja: gelembung bicara dan panel status (keduanya sementara, bisa ditutup), serta pet yang
+  // dibangkitkan di tablet/ponsel (sprite di atas lajur, lihat LANE_CHIP_H). Pet yang sedang diangkat boleh
+  // melayang di atas konten: itu manipulasi langsung.
   const lifted = walk.mode === "held" || walk.mode === "falling";
-  const root: React.CSSProperties = {
-    position: "fixed", left: 0, right: 0, bottom: "max(0px, var(--safe-bottom))",
-    ...(lifted ? { top: "max(0px, var(--safe-top))" } : { height: cellH }),
-    zIndex: 80, pointerEvents: "none",
-  };
+  // Chip = pet tak tampil: disembunyikan pengguna (`hidden`), tablet/ponsel yang belum dibangkitkan, atau desktop
+  // pendek yang belum dibangkitkan.
+  const collapsed = hidden || ((compact || lanePet) && !peek);
+  const rootH = lanePet ? LANE_CHIP_H : collapsed ? REVEAL_RESERVE : cellH;
+  // Posisi yang DIGAMBAR di-clamp ke slot setiap render: keadaan yang dibuat sebelum lebar berubah tak boleh
+  // membuat pet tampil di luar sidebar (QA run3: pet melayang di atas konten).
+  const shown = clampMove(move, laneWidth, laneHeight(), cellW, cellH);
+  // Viewport mengecil saat panel terbuka: pet menjadi chip dan panelnya ikut menutup, tak tertinggal `open` di belakangnya.
+  React.useEffect(() => { if (collapsed && open) { setOpen(false); setPanelMounted(false); } }, [collapsed, open]);
+  // Overlay tablet/ponsel ditutup Esc atau klik di luar root, seperti gelembung. Saat panel terbuka, Esc menutup
+  // panel lebih dulu (lewat handlernya sendiri), jadi overlay tetap sampai Esc berikutnya.
+  React.useEffect(() => {
+    if (!lanePet || !peek) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setPeek(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !open) setPeek(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [lanePet, peek, open]);
+  const root: React.CSSProperties = { position: "relative", width: "100%", height: rootH, zIndex: 80, pointerEvents: "none" };
 
-  if (hidden) {
+  // Tinggi lajur dipublikasikan sebagai `--pet-h` di <html> HANYA setelah pet benar-benar tampil (`mountReady`),
+  // dan dipakai bar fixed di ponsel (aksi QA) supaya naik di atas lajur. Layout-effect: nilainya sudah
+  // terpasang sebelum paint pertama. Hook ini wajib sebelum `return null` di bawah.
+  const petReserve = mountReady ? rootH : 0;
+  React.useLayoutEffect(() => {
+    const el = document.documentElement;
+    el.style.setProperty("--pet-h", `${petReserve}px`);
+    return () => { el.style.removeProperty("--pet-h"); };
+  }, [petReserve]);
+
+  if (!mountReady) return null;
+  if (collapsed) {
     return (
       <div data-testid="pet-root" ref={rootRef} style={root}>
-        <button aria-label="Tampilkan pet Hanoman" onClick={() => setVisibility(false)} style={{
-          pointerEvents: "auto", position: "absolute", width: 44, height: 44, padding: 0,
-          right: "max(22px, var(--safe-right))", bottom: 22,
+        <button aria-label="Tampilkan pet Hanoman" onClick={() => { if (hidden) setVisibility(false); setPeek(true); }} style={{
+          pointerEvents: "auto", position: "absolute", width: HIT, height: HIT, padding: 0,
+          right: lanePet ? "max(var(--page-gutter-x), var(--safe-right))" : "max(22px, var(--safe-right))",
+          bottom: lanePet ? LANE_CHIP_EDGE : REVEAL_EDGE,
           display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-          border: "1px solid var(--border-hair)", borderRadius: "var(--radius-pill)",
-          background: "var(--surface-card)", opacity: 0.55, boxShadow: "var(--shadow-sm)",
+          border: "1px solid var(--text-muted)", borderRadius: "var(--radius-pill)",
+          background: "var(--surface-card)", color: "var(--text-strong)", boxShadow: "var(--shadow-sm)",
         }}>
           <Mark id="buntut" size={15} />
         </button>
@@ -513,20 +649,22 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
             )}
             <Button size="sm" variant="ghost"
               style={reduced ? { transition: "none", transform: "none" } : undefined}
-              onClick={() => setVisibility(true)}>Sembunyikan</Button>
+              onClick={dismiss}>Sembunyikan</Button>
           </div>
         </div>
       )}
-      <div data-testid="pet-actor" ref={actorRef} data-facing={walk.facing} data-mode={walk.mode}
+      {/* Aktor baru dirender setelah lebar lajur terukur: sebelum itu tak ada slot untuk ditempati. */}
+      {laneWidth > 0 && <div data-testid="pet-actor" ref={actorRef} data-facing={walk.facing} data-mode={walk.mode}
         onTransitionEnd={(event) => { if (event.propertyName === "transform") tick(); }} style={{
           position: "absolute", left: 0, bottom: 0, width: cellW, height: cellH,
           // Satu properti untuk kedua sumbu, JUGA saat y = 0: daftar properti yang di-transisi tak
           // boleh berganti di tengah rantai berjalan → diangkat → jatuh → mendarat.
-          transform: `translate(${move.x}px, ${-move.y}px)`,
+          transform: `translate(${shown.x}px, ${-shown.y}px)`,
           transition: reduced || move.durationMs === 0
             ? "none"
             : `transform ${move.durationMs}ms ${PET_EASE_CSS[move.ease]}`,
-          willChange: "transform",
+          // will-change hanya selama bergerak — permanen di setiap pet memakan lapisan GPU saat diam.
+          willChange: !reduced && move.durationMs > 0 ? "transform" : undefined,
         }}>
         {speech && !open && (
           // SPEC-899 · gelembung `waiting` menumbuhkan satu aksi, dan elemen di dalam `aria-hidden`
@@ -564,12 +702,13 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
         )}
         {/* Live region membungkus kalimat status + panggung; atlas berisi 80 frame sehingga tak bisa
             diberi alt bermakna — kalimatnya hidup di span visually-hidden, satu sumber. */}
-        <div data-testid="pet-stage" role="status" aria-live="polite"
+        <div data-testid="pet-stage"
           className="hn-pet-stage" data-reduced-motion={reduced ? "true" : undefined} style={{
             position: "relative", width: cellW, height: cellH,
             animation: reduced ? "none" : "hn-pet-reveal var(--dur-slow) var(--ease-out) both",
           }}>
-          <span className="hn-sr-only" data-testid="pet-status">{status}</span>
+          {/* Satu-satunya region live: hanya TEKS statusnya, bukan seluruh panggung (atlas, lencana, tombol). */}
+          <span className="hn-sr-only" role="status" aria-live="polite" data-testid="pet-status">{status}</span>
           {view.count > 1 && (
             <span data-testid="pet-badge" aria-hidden="true" title={`${view.count} ${KIND_NOUN[view.kind]}`}
               style={{
@@ -633,7 +772,7 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
                   }}
                   style={{
                     display: "block", width: cellW * columns, height: cellH * rows.length,
-                    animation: frames, willChange: "transform",
+                    animation: frames,
                   }} />
               </div>
             </div>
@@ -661,7 +800,7 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
               cursor: lifted ? "grabbing" : "grab",
             }} />
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

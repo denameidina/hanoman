@@ -1,0 +1,92 @@
+/* Z3 · Panel pendukung yang dirender dari layar lain: LogsPanel (Klien), MembersPanel (Tim), dan
+   UpdateBadge + ReloadBadge (topbar, selalu dimuat). Ketiganya tak boleh bergantung pada settings.css,
+   yang hanya dimuat saat layar Pengaturan dibuka. Nilainya dipindah dari gaya inline dengan angka yang sama. */
+
+/* ── LogsPanel ──────────────────────────────────────────────────────────── */
+.hn-logs-panel { display: grid; gap: 12px; }
+.hn-logs-filter { display: flex; flex-wrap: wrap; gap: 8px; }
+.hn-logs-list { list-style: none; margin: 0; padding: 0; }
+/* `.hn-logs-msg` sengaja bukan `.hn-grow`: `.hn-dense-row > .hn-grow` di mobile memberi min-width 220px,
+   sedangkan baris ini memegang min-width 0 (sama seperti inline sebelumnya). */
+.hn-logs-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; padding: 6px 8px; cursor: default; }
+.hn-logs-row--open { cursor: pointer; }
+.hn-logs-ts { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-subtle); }
+.hn-logs-meta { font-size: 11.5px; color: var(--text-subtle); }
+.hn-logs-msg { flex: 1 1 0%; min-width: 0; font-size: 13px; color: var(--text-strong); }
+.hn-logs-retention { border-top: 1px solid var(--border-hair); padding-top: 10px; }
+.hn-logs-h3 { font-size: 13px; margin: 0 0 6px; }
+.hn-logs-transcript { max-height: 320px; overflow: auto; }
+
+/* ── MembersPanel ───────────────────────────────────────────────────────── */
+.hn-mem-alert { margin-bottom: 12px; }
+.hn-mem-add {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end;
+  margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-hair);
+}
+.hn-mem-in-name { flex: 1 1 140px; }
+.hn-mem-in-email { flex: 1 1 180px; }
+.hn-mem-in-role { flex: 1 1 130px; }
+/* `.hn-mem-main` sengaja bukan `.hn-grow`, alasannya sama dengan `.hn-logs-msg`. */
+.hn-mem-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 8px;
+  border: 1px solid var(--border-hair); border-radius: var(--radius-md); background: var(--surface-card);
+}
+.hn-mem-row--off { opacity: 0.6; }
+.hn-mem-main { flex: 1 1 0%; min-width: 0; }
+.hn-mem-name-row { display: flex; align-items: center; gap: 8px; }
+.hn-mem-name { font-weight: var(--weight-semibold); color: var(--text-strong); }
+.hn-mem-email {
+  display: block; font-family: var(--font-mono); font-size: var(--text-xs);
+  color: var(--text-subtle); margin-top: 2px;
+}
+.hn-mem-edit {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; margin-bottom: 8px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface-card);
+}
+.hn-mem-note { font-size: var(--text-xs); color: var(--text-subtle); }
+.hn-mem-actions { display: flex; gap: 8px; }
+
+/* ── Badge update topbar (UpdateBadge, ReloadBadge) ─────────────────────── */
+.hn-upd-root { position: relative; }
+.hn-upd-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+  border-radius: var(--radius-pill, 999px); cursor: pointer;
+  font-family: var(--font-mono); font-size: 12px;
+}
+/* Brass = "ada yang harus kaulakukan". Versi terkini memakai bone/hair agar tak bersaing. */
+.hn-upd-pill--update {
+  border: 1px solid var(--brass-300, var(--border-hair));
+  background: var(--brass-100); color: var(--brass-700);
+}
+.hn-upd-pill--version {
+  border: 1px solid var(--border-hair);
+  background: var(--bone-100); color: var(--text-subtle);
+}
+.hn-upd-popover {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40; width: 320px;
+  background: var(--surface-card); border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 14px;
+}
+.hn-upd-eyebrow { margin-bottom: 8px; }
+.hn-upd-headline { font-size: var(--text-sm); color: var(--text-body); margin-bottom: 10px; }
+.hn-upd-cmd { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.hn-upd-code {
+  flex: 1; font-family: var(--font-mono); font-size: 11px; background: var(--bone-100);
+  padding: 6px 8px; border-radius: var(--radius-sm); overflow-x: auto; white-space: nowrap;
+}
+.hn-upd-btn {
+  padding: 5px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-hair);
+  background: var(--bone-100); cursor: pointer; font-size: 11px;
+}
+.hn-upd-btn--primary {
+  border: 1px solid var(--brass-300, var(--border-hair));
+  background: var(--brass-100); color: var(--brass-700);
+}
+.hn-upd-block { margin-bottom: 8px; }
+.hn-upd-row { display: flex; gap: 8px; }
+.hn-upd-note { font-size: 11px; color: var(--text-subtle); }
+.hn-upd-note--gap { margin-top: 4px; }
+.hn-upd-text { font-size: 11px; color: var(--text-body); }
+.hn-upd-text--gap { margin-bottom: 8px; }
+.hn-upd-err { font-size: 11px; color: var(--status-err); margin-bottom: 8px; }
+.hn-upd-restart { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-hair); }

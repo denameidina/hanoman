@@ -62,7 +62,7 @@ describe("SPEC-908 · TriageScreen live", () => {
     await screen.findByText("Tak bisa login");
     await act(async () => {
       emitTopic({
-        t: "tickets", key: subKey("tickets", { page: 1, limit: 20 }),
+        t: "tickets", key: subKey("tickets", { status: "new", page: 1, limit: 20 }),
         data: page([PUSHED]) as never,
       });
     });
@@ -101,7 +101,7 @@ describe("SPEC-908 · TriageScreen live", () => {
 
     await act(async () => {
       emitTopic({
-        t: "tickets", key: subKey("tickets", { page: 2, limit: 20 }),
+        t: "tickets", key: subKey("tickets", { status: "new", page: 2, limit: 20 }),
         data: page(rows(2), { total: 60, page: 2 }) as never,
       });
     });
@@ -118,7 +118,7 @@ describe("SPEC-908 · TriageScreen live", () => {
     await screen.findByText("Tak bisa login");
     await act(async () => {
       emitTopic({
-        t: "tickets", key: subKey("tickets", { page: 9, limit: 20 }),
+        t: "tickets", key: subKey("tickets", { status: "new", page: 9, limit: 20 }),
         data: page([PUSHED]) as never,
       });
     });

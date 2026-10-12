@@ -15,7 +15,7 @@
 // `POST /session-events` (token HMAC turunan per sesi), `terminal/workspace` (tata letak browser
 // per akun), WebSocket relay `/devices/:id/relay/**/ws`.
 import { CAPABILITY_IDS } from "../agent";
-import { RELAY_METHODS, REMOTE_CAPABILITIES } from "../relay";
+import { REQUEST_TIERS, RELAY_METHODS, REMOTE_CAPABILITIES } from "../relay";
 import { LOG_LANES, LOG_LEVELS } from "../logs";
 import { PAGE_PARAMS, bool, enumStr, int, obj, str } from "../mcp-schema";
 import { enc, localPage, n, query, s } from "./helpers";
@@ -284,6 +284,40 @@ const REMOTE: readonly McpToolDef[] = [
         ...(withBody ? { body: a.body } : {}),
       };
     },
+    shape: (raw) => raw,
+  },
+
+  // ADR-0217 · opsi C (ADR-0216). Permintaan tingkat ke mesin lain lewat hub. Ia TAK mengubah grant mesin
+  // tujuan: permintaan hanya mengantre, dan operator LOKAL mesin itu yang menyetujui (cookie-only di sana).
+  {
+    name: "hanoman_device_access_request",
+    title: "Minta tingkat akses ke mesin lain (BERBAHAYA)",
+    description:
+      "BERBAHAYA — meminta tingkat akses (`lihat`, `kerja`, atau `tulis`) ke mesin lain lewat relay hub. PERMINTAAN SAJA: tak mengubah grant mesin itu. Mesin tujuan menyimpannya sebagai permintaan tertunda (satu sekaligus, kedaluwarsa 10 menit, maks 3 per 10 menit) dan baru berlaku bila OPERATOR LOKAL mesin itu menyetujui di layarnya. Mesin yang belum memuat dukungan ini → 409 `unsupported-message`. Status permintaan dibaca lewat hanoman_device_access_requests. Hanya muncul saat tingkat `--danger` menyala.",
+    inputSchema: obj({
+      properties: {
+        device: str("Id device (device token), dari hanoman_device_tokens_list."),
+        tier: enumStr(REQUEST_TIERS, "Tingkat yang diminta: lihat (baca), kerja (+ mulai sesi & tandai selesai), tulis (+ mengetik ke terminal)."),
+      },
+      required: ["device", "tier"],
+    }),
+    mode: "danger", capability: "relay:exec",
+    samplePath: "/devices/d1/access-requests", sampleMethod: "POST",
+    build: (a) => ({ method: "POST", path: `/devices/${enc(String(a.device))}/access-requests`, body: { tier: String(a.tier) } }),
+    shape: (raw) => raw,
+  },
+  {
+    name: "hanoman_device_access_requests",
+    title: "Status permintaan tingkat ke mesin lain",
+    description:
+      "BERBAHAYA — membaca status permintaan tingkat akses yang sudah dikirim ke satu mesin lewat hub: `pending` (menunggu operator mesin itu), `approved`, `rejected`, atau `expired`. Tak mengubah apa pun, tetapi lewat relay yang sama dengan hanoman_device_relay (capability `relay:exec`). Hanya muncul saat tingkat `--danger` menyala.",
+    inputSchema: obj({
+      properties: { device: str("Id device (device token), dari hanoman_device_tokens_list.") },
+      required: ["device"],
+    }),
+    mode: "danger", capability: "relay:exec",
+    samplePath: "/devices/d1/access-requests", sampleMethod: "GET",
+    build: (a) => ({ method: "GET", path: `/devices/${enc(String(a.device))}/access-requests` }),
     shape: (raw) => raw,
   },
 ];

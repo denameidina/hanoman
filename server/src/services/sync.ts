@@ -83,7 +83,10 @@ const FIELDS: Record<Entity, string[]> = {
   // SPEC-804 · ADR-0120 · manualDone ikut menyeberang: "item ini ditandai selesai manusia" adalah
   // bagian keadaan yang harus dilihat sama oleh semua mesin — di antaranya gerbang auto-merge.
   // BUKAN DATE_FIELDS, alasan yang sama dengan sourceHistory.
-  spec: ["projectId", "title", "source", "stage", "priority", "author", "objective", "payload", "branchFrom", "baseSha", "headSha", "dependsOn", "sourceHistory", "manualDone", "createdAt", "startedAt", "doneAt", "updatedAt"],
+  // ADR-0218 · reviewedAt ikut menyeberang: "sudah ditinjau" yang tak sampai ke mesin lain membuat
+  // item yang sama tampil "perlu ditinjau" di dua tempat. Tanpa ia di FIELDS, kolomnya mendarat
+  // sebagai null palsu di tiap client tanpa satu pun error (kelas ADR-0090/0093/0105).
+  spec: ["projectId", "title", "source", "stage", "priority", "author", "objective", "payload", "branchFrom", "baseSha", "headSha", "dependsOn", "sourceHistory", "manualDone", "createdAt", "startedAt", "doneAt", "reviewedAt", "updatedAt"],
   vps: ["name", "host", "port", "user", "health", "audit", "hardened", "lastSeenAt", "lastAuditAt", "updatedAt"],
   sessionResult: ["projectId", "specId", "oldStage", "newStage", "commitSha", "branch", "prUrl", "status", "deviceId", "author", "createdAt", "updatedAt"],
   // SPEC-268 · ADR-0066 · metadata tiket (lampiran biner tak disync). accessKeyHash wajib
@@ -127,7 +130,7 @@ const FIELDS: Record<Entity, string[]> = {
 };
 // Field yang JSONB-nya string ISO tapi kolomnya DateTime — dikonversi balik saat menulis.
 const DATE_FIELDS: Record<Entity, string[]> = {
-  project: ["updatedAt"], spec: ["createdAt", "startedAt", "doneAt", "updatedAt"], vps: ["lastSeenAt", "lastAuditAt", "updatedAt"],
+  project: ["updatedAt"], spec: ["createdAt", "startedAt", "doneAt", "reviewedAt", "updatedAt"], vps: ["lastSeenAt", "lastAuditAt", "updatedAt"],
   sessionResult: ["createdAt", "updatedAt"],
   ticket: ["createdAt", "updatedAt"],
   ticketAttachment: ["createdAt", "updatedAt"],
@@ -654,7 +657,13 @@ export async function upsertLocal(entity: Entity, id: string, version: number, d
     }
     // else: fall-through ke upsert biasa (row baru sudah ada, atau tak ada oldId → insert).
   }
-  const writeData = coerce(entity, data);
+  // ADR-0218 · peer versi lama tak mengirim `reviewedAt` sama sekali. Untuk item yang stage-nya bukan `done`,
+  // penanda lokal yang tersisa dikosongkan: kalau tidak, penyelesaian berikutnya tampil "sudah ditinjau"
+  // tanpa tinjauan. Peer baru selalu mengirim kuncinya (null pada item bukan-done), jadi jalur itu tak tersentuh.
+  const incoming = entity === "spec" && typeof data.stage === "string" && data.stage !== "done" && !("reviewedAt" in data)
+    ? { ...data, reviewedAt: null }
+    : data;
+  const writeData = coerce(entity, incoming);
   // SPEC-270 · pertahankan updatedAt asal (jam LWW) bila dikirim; else stempel now.
   const stamp = (writeData.updatedAt as Date | undefined) ?? new Date();
   const existedBefore = entity !== "qaAttachment" || !!(await DELEGATE.qaAttachment.findUnique({ where: { id }, select: { version: true } }));

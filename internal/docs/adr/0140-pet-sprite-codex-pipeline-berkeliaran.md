@@ -1,5 +1,9 @@
 # ADR-0140 — Pet dashboard sebagai sprite beranimasi: aset dibuat AI lewat Codex, pipeline registrasi, renderer frame, berkeliaran di tepi bawah
 
+> **Sebagian digantikan oleh [ADR-0206](0206-pet-footer-sidebar-default-per-tier.md)** (2026-10-11): lokasi jalur di
+> keputusan 5 ("berkeliaran di jalur tepi bawah") kini footer sidebar di desktop dan lajur di bawah konten di tablet
+> dan ponsel; pet mati default di tablet dan ponsel. Perilaku mesin berkeliaran tidak diubah oleh ADR-0206.
+
 Tanggal: 2026-08-22 · Status: diterima · Sumber: spec `docs/superpowers/specs/2026-08-22-pet-hidup-atlas-sprite-design.md`
 Menegakkan ADR-0039 (tanpa channel realtime baru); menjadikan konvensi SPEC-585/648 (pet tanpa ADR)
 keputusan arsitektur karena kini ada keluarga aset, pipeline, dan skrip baru; mengamandemen sistem

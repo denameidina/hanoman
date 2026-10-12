@@ -130,7 +130,9 @@ describe("app flows", () => {
     vi.mocked(api.startSession).mockReset().mockResolvedValue({ id: "terminal-spec-341" });
     render(<App />);
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Ambil backlog" })).toBeInTheDocument());
+    // Fase 3E: "Ambil backlog" pindah ke menu "Buka…" di toolbar Terminal.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Buka…" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Buka…" }));
     fireEvent.click(await screen.findByRole("button", { name: "Ambil backlog" }));
     fireEvent.click(await screen.findByText("Tetap di backlog"));
 

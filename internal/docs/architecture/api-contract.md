@@ -17,6 +17,7 @@ snapshot sesi hidupnya di atas socket yang sama.
 > `/vps*`) berikut `integrate`, `DELETE /specs/:id`, dan `PATCH /specs/:id {stage}` sengaja **tak
 > punya tool**. SPEC-804/ADR-0120 menambah `POST /specs/:id/done` (memindahkan stage) — ia **juga
 > tak punya tool MCP**, alasan yang sama; agen memakainya lewat REST dengan `backlog:write`.
+> ADR-0218 · `POST /specs/:id/reviewed` **punya** tool `hanoman_backlog_mark_reviewed` (mode `write`).
 
 > **Host matrix (SPEC-761, ADR-0117):** host di `HANOMAN_PUBLIC_ORIGINS` hanya melayani static UI,
 > `GET /health`, dan `/help/**`; request API lain ditolak sebelum auth. Host di
@@ -48,6 +49,9 @@ GET  /auth/status         -> { needsSetup: bool, user: {id,email,role,createdAt}
 POST /auth/setup          { email, password, setupToken? } # control host; 403 proof salah/expired;
 #   HANYA saat 0 user; tepat satu create atomik menang; set cookie; token one-use 15 mnt; 409 sesudah tertutup
 #   SPEC-884 · `setupToken` WAJIB hanya saat hardening menyala; /auth/status membawa setupTokenRequired
+#   ADR-0204 · /auth/status membawa `setupTokenPath` (lokasi berkas setup.token di HANOMAN_HOME) HANYA saat
+#   hardening menyala DAN belum ada akun; berkasnya hilang bersama token yang sudah dikonsumsi. Yang terbuka
+#   lokasinya, bukan isinya. AuthScreen memakainya untuk menunjukkan di mana token dibaca.
 
 # SPEC-884 · ADR-0139 · wizard setup awal. Publik BERSYARAT: hanya selama 0 user; sesudah itu cookie.
 GET  /setup/status        -> { needed, deployment: "local"|"public", hardening, hardeningLocked,
@@ -80,7 +84,9 @@ tanpa itu **400**, bukan akun ber-role klien **404**, dan sesi cookie klien **se
 cookie-only: itu bertindak SEBAGAI klien.
 
 ```
-GET /portal/projects[?page=&limit=]         -> { items: [{ id, name }], total, page, pageSize }   # HANYA project yang ditugaskan
+GET /portal/projects[?page=&limit=]         -> { items: [{ id, name, chatEnabled }], total, page, pageSize }   # HANYA project yang ditugaskan
+#   chatEnabled (ADR-0211) = gerbang chat (master switch ∧ akses), SAMA dengan route chat di bawah. Boolean saja:
+#   model, effort, batas, dan kuota TIDAK ikut. Klien memakainya untuk menampilkan tab chat tanpa probe.
 GET /portal/projects/:id/backlog?page=&limit=  -> { items: PortalSpec[], total, page, pageSize }
 GET /portal/projects/:id/backlog/:specId    -> PortalSpec
 GET /portal/projects/:id/tickets?page=&limit=  -> { items: PortalTicket[], total, page, pageSize }
@@ -180,10 +186,15 @@ DELETE /client-accounts/:id    # 204; sesi & baris akses ikut cascade
 
 ## Projects
 ```
-GET  /projects?q=&handledBy=&page=&limit=   # -> { items: ProjectView[], total, page, pageSize } (SPEC-198)
+GET  /projects?q=&handledBy=&sort=&attention=&page=&limit=   # -> { items: ProjectView[], total, page, pageSize } (SPEC-198)
 #   q menyaring name+desc+stack; tanpa page/limit → seluruh item. coverage/docStatus tetap live-scan tiap panggil.
 #   SPEC-880 · ADR-0135 · `handledBy=<deviceId>` menyaring ke project yang penandanya memuat device
 #   itu — "apa saja yang dipegang mesin X" dalam satu klik. Bergabung dengan `q`, bukan menggantikannya.
+#   ADR-0212 · `sort=attention` mengurutkan SELURUH hasil sebelum dipotong: rusak → drift → sisanya, lalu nama
+#   (huruf kecil), lalu id. Urutan total: paginasi lintas halaman konsisten. `attention=1|true` menyaring ke
+#   project dengan docStatus ≠ ok (`0|false`/kosong = tanpa penyaring). Urutan: q → handledBy → attention → sort → paginasi.
+#   Nilai `sort` selain `attention`, dan `attention` selain 0/1/true/false → 400 `{ error }`. Tanpa kedua param = perilaku lama.
+#   MCP: `hanoman_projects_list` menerima `sort` dan `attention` (param aditif, `projects:read`, tanpa tool baru).
 POST /projects            { name, kind, repoDir?, desc, gitRemote?, handledBy? }   # repoDir OPSIONAL (SPEC-217)
 #   SPEC-222 · kind "from-scratch" + repoDir → hanoman `git init` + commit awal (siap scaffold); gagal init → 400
 GET  /projects/:id        # view memuat `repoDir` (default project) + `binding` (override per-mesin | null)
@@ -363,6 +374,22 @@ POST /specs/:id/done      { reason?: string(≤280), confirm?: boolean }   -> Sp
 #   (activity log ADR-0047, author = pemanggil), `notifySynced`, webhook `spec.stage_changed`.
 #   Sweep auto-merge (ADR-0103) MELEWATI item ber-`manualDone`: "beres di luar sesi" berarti tak ada
 #   yang perlu di-merge, dan branch sesi lama yang ditinggalkan tak boleh ter-merge setengah jadi.
+POST /specs/:id/reviewed  { reviewed?: boolean(default true) }   -> Spec
+#   ADR-0218 · tandai/batalkan "sudah ditinjau" pada item SELESAI (penanda untuk filter "Perlu ditinjau",
+#   tombol "Tandai ditinjau" di Review dan menu item Backlog). Operasi khusus, bukan field PATCH: tak
+#   mengubah stage, baseSha/headSha, diff, atau berkas. Capability `backlog:write` (turunan prefix /specs
+#   per method). Tool MCP `hanoman_backlog_mark_reviewed` (mode write, bukan danger: bisa dibalik).
+#   IDEMPOTEN: menandai ulang tak menggeser `reviewedAt` (tinjauan pertama yang dicatat); membatalkan
+#   yang sudah kosong tak menulis apa-apa.
+#   200 = Spec sesudah penulisan (`reviewedAt` ISO atau null).
+#   400 = `reviewed` bukan boolean.
+#   404 = spec tak ada.
+#   409 { error:"backlog item belum selesai" } = menandai item yang stage-nya bukan `done`. Membatalkan
+#         (`reviewed:false`) tak pernah 409.
+#   Efek samping: `notifySynced` (antre sync). TIDAK memancarkan webhook (`reviewedAt` tak ada di allowlist
+#   `WEBHOOK_ENTITIES`). `reviewedAt` di-reset ke null oleh PATCH stage mundur dan POST /specs/:id/source
+#   yang mereset ke brainstorming (ADR-0218 keputusan 5); TIDAK oleh integrasi, dan TIDAK oleh
+#   `recordCompletion` (reconcile memanggilnya ulang untuk item selesai).
 DELETE /specs/:id
 #   SPEC-447 · ADR-0093 · id yang dihapus juga DICABUT dari `dependsOn` seluruh spec lain di project
 #   yang sama (+ antre sync per baris yang berubah). Tanpa itu, dependent-nya terkunci selamanya
@@ -407,9 +434,21 @@ GET  /specs/:id/escalation             # SPEC-340 · ADR-0076 · { escalation, d
 GET  /specs/:id/review                 # { base, files:string[], changed:{path,add,del,status,binary}[] }  (SPEC-171)
 #   worktree hidup <repoDir>/.worktrees/<specid> → diff working tree, base = merge-base(branchFrom‖main, HEAD).
 #   worktree lenyap (done) → diff baseSha..headSha tersimpan (SPEC-176, ADR-0030), fallback grep (spec-N) utk spec lama.
-#   files = git ls-files (tracked ∪ untracked-tak-ignored, minus --deleted). 409 bila tak ada sumber apa pun.
+#   files = git ls-files (tracked ∪ untracked-tak-ignored, minus --deleted).
+#   ADR-0213 · tak ada sumber apa pun → 200 { base:"", files:[], changed:[], empty:true, reason }, BUKAN 409.
+#   reason: `no-worktree` (item belum pernah dimulai, tanpa baseSha) | `no-commit` (baseSha tercatat, worktree
+#   lenyap, tak ada commit). Field aditif: klien lama tetap jalan (membaca daftar kosong, tak crash), dan
+#   klien yang mengenal `empty` menampilkan keadaan kosong. Bentuk tervalidasi: `zSpecReview` (shared).
+#   409 pada route ini tinggal untuk `project belum punya repoDir`.
 GET  /specs/:id/review/*path           # { path, status, binary, truncated, diff, content }  isi 1 file (256 KB)
-#   404 bila path di luar (files ∪ changed) — sekaligus gerbang path traversal.
+#   404 bila path di luar (files ∪ changed) — sekaligus gerbang path traversal. ADR-0213: tanpa sumber sama
+#   sekali tetap 409 (tak ada berkas untuk dibaca; layar Review tak pernah memanggilnya dalam keadaan kosong).
+DELETE /specs/:id/worktree             # { name, ok, cleanup|null, closedSession?, error? }  (ADR-0213)
+#   Hapus worktree SATU backlog item. Service sama dengan `POST /projects/:id/worktrees/delete`
+#   (services/worktree-delete.ts), capability `ide:git` (danger), tool MCP `hanoman_backlog_worktree_delete`.
+#   Cabang & commit tetap (tak ada deleteBranch). Sesi hidup di worktree ditutup lebih dulu. 200 bila spec
+#   ada — `ok:false` + `error` ("worktree tak ditemukan", "tak bisa dihapus: …") ada di balasan, cermin
+#   worktrees/delete. 404 bila spec tak ada; 409 `project belum punya repoDir`.
 POST /specs/:id/integrate     { op:"merge"|"rebase", target:"local:<b>"|"origin:<b>" }  (SPEC-175 · ADR-0031)
 #   Rebase/merge branch hasil done spec `hanoman/<id>`. Hanya stage `done` (else 409). Server jalankan git
 #   di worktree isolasi <repoDir>/.worktrees/merge-<id>, TAK menyentuh working tree utama.
@@ -754,6 +793,9 @@ GET      /notifications  ?page&limit    # { items:Notification[], unread:int, to
 #   idempotensi durable — `key` unik itulah yang membuat sweep tak pernah mencoba item yang sama dua kali,
 #   lintas restart sekalipun. Ber-`specId`, jadi `notifTarget` mengarahkannya ke Backlog tanpa perubahan UI.
 POST     /notifications/read            # 204; tandai semua unread jadi terbaca
+POST     /notifications/:id/read        # 204; ADR-0204 · tandai SATU notifikasi terbaca. Idempoten (readAt pertama
+#                                         dipertahankan). 404 { error } bila id tak ada. Read-state global: tak ada
+#                                         pemeriksaan kepemilikan. MCP: hanoman_notification_mark_read (notifications:write).
 DELETE   /notifications                 # 204; clear semua
 GET      /limits                        # { …usage } dari OAuth usage API Anthropic (cache 30s, stale/unavailable fallback) — SPEC-181/ADR-0024
 GET      /update                        # UpdateStatus — status update dari registry npm. SPEC-214/398/405
@@ -1181,9 +1223,13 @@ POST   /terminal/sessions/:id/dialog/takeover
 #   Capability `sessions:write`. SENGAJA DI LUAR katalog MCP (shared/src/mcp-catalog.ts): agen yang
 #     bisa memanggilnya bisa menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang
 #     memutuskan" runtuh lewat pintu itu (memperluas ADR-0099 & SPEC-646/ADR-0112).
-GET    /terminal/sessions/:id/review        # (SPEC-230, ADR-0054) diff worktree HIDUP sesi project-level (PRD);
-#   bentuk = /specs/:id/review; kunci worktree = id sesi; 409 bila worktree lenyap (sesi ditutup) — bukan 500
+GET    /terminal/sessions/:id/review        # (SPEC-230, ADR-0054, ADR-0215) diff worktree HIDUP sesi project-level (PRD);
+#   bentuk = /specs/:id/review (`zSpecReview`); kunci worktree = id sesi.
+#   ADR-0215 (amandemen ADR-0213) · sesi tanpa worktree / worktree lenyap → 200 { base:"", files:[], changed:[], empty:true, reason }
+#   (`no-worktree`: cwd bukan `.worktrees/…`; `no-commit`: cwd worktree tercatat tetapi direktorinya lenyap), BUKAN 409.
+#   409 hanya `project belum punya repoDir` (galat konfigurasi); 404 bila sesi tak ada.
 GET    /terminal/sessions/:id/review/*path  # { path, status, binary, truncated, diff, content } · 404 · 409
+#   ADR-0215: tanpa sumber (no-worktree/no-commit) tetap 409 — tak ada berkas untuk dibaca. Layar Review tak memanggilnya dalam keadaan kosong.
 POST   /terminal/sessions/:id/attachments   # multipart/form-data, field `file` → 200 { path }
 #   (SPEC-816) lampiran gambar sesi. `path` = path ABSOLUT berkas di server; pane mengetikkannya ke
 #   prompt (+ satu spasi, TANPA Enter) dan agen membacanya sendiri dengan Read. Berkas + path,
@@ -1422,6 +1468,10 @@ POST   /session-events               # dipanggil HOOK sesi, bukan manusia dan bu
 > `GET /logs`, `GET /logs/:id/transcript`, `GET|PUT /logs/retention` (semua COOKIE_ONLY), dan
 > `GET|PUT /remote-control` kini membawa `logs:{event,server,transcript}` (toggle lajur pengiriman
 > shipper klien, dipasang/dicabut tanpa restart — D4/AC-S3).
+> **Dilayani sejak ADR-0217 (opsi C dari ADR-0216):** permintaan tingkat akses. Hub hanya MEMINTA
+> tingkat lewat relay (`POST /remote-control/access-requests`, allowlist diperluas dua entri); grant
+> baru berlaku bila operator LOKAL perangkat itu menyetujui (`…/approve`, COOKIE_ONLY). Tanpa skema,
+> tanpa perubahan frame hello. Antrean di memori: 1 tertunda, 3 per 10 menit, kedaluwarsa 10 menit.
 
 ```
 # ── HUB ──────────────────────────────────────────────────────────────────────────────────────────
@@ -1440,6 +1490,15 @@ GET|POST|PUT|PATCH|DELETE /devices/:deviceId/relay/*    # COOKIE_ONLY. Diteruska
                                          # · 502 protocol · 504 timeout (30 dtk; 120 dtk POST …/terminal/sessions)
 GET    /devices/:deviceId/relay/{terminal/sessions/:id/ws | events/ws}   # WS, tiket relay:<deviceId>:<target>
 POST   /ws-tickets { target:"relay:<deviceId>:events" | "relay:<deviceId>:terminal:<id>" }  # hanya cookie
+POST   /devices/:deviceId/access-requests   # ADR-0217 · { tier:"lihat"|"kerja"|"tulis" } (.strict()) → diteruskan lewat relay ke
+                                         # /api/remote-control/access-requests perangkat itu. Principal cookie atau agen ber-relay:exec
+                                         # (danger; tool hanoman_device_access_request). 201 { request } · 400 tingkat asing ·
+                                         # 409 relay "unsupported-message" (perangkat belum memuat ADR-0217) · 409 "pending" dari perangkat
+                                         # (tanpa `request` bila milik hub lain) · 409 kendali mati di perangkat → lihat 403 di bawah ·
+                                         # 502 "device-unauthorized" bila perangkat menjawab 401 (dulu diteruskan dan dibaca klien sebagai sesi habis) ·
+                                         # 429 · 404 unknown-device · 503 offline · 504 timeout. Hanya PERMINTAAN: tak mengubah grant.
+GET    /devices/:deviceId/access-requests   # ADR-0217 · status: GET relay ke perangkat itu → { items: AccessRequestView[] }
+                                         # status pending|approved|rejected|expired. Galat sama seperti POST. Tool hanoman_device_access_requests (danger).
 GET    /presence                         # + devices[].control {state,protocol,version,capabilities,since}|null
                                          #   + devices[].capacity LaunchStatus|null (frame naik `capacity` di /sync/ws)
 POST   /sync/logs                        # Bearer device. { lane:"event"|"server"|"transcript",
@@ -1456,9 +1515,25 @@ GET|PUT /logs/retention                  # COOKIE_ONLY · { eventDays, serverDay
 DELETE /device-tokens/:id                # BERUBAH: socket sync + relay device itu ditutup 1008 SEBELUM 204
 
 # ── KLIEN ────────────────────────────────────────────────────────────────────────────────────────
-GET|PUT /remote-control                  # COOKIE_ONLY. { control:{enabled,capabilities⊆REMOTE_CAPABILITIES},
+GET|PUT /remote-control                  # GET remote:read · PUT remote:control (danger), ADR-0197. { control:{enabled,capabilities⊆REMOTE_CAPABILITIES},
                                          #   logs:{event,server,transcript} } + status relay/pengiriman + audit 50 terbaru.
                                          # PUT /settings TAK menulis remoteControl/logShipping/logRetention.
+                                         # Grant hanya untuk mesin INI. Tak ada `PUT /remote-control/devices/:id` — grant per
+                                         #   perangkat remote lewat PUT tak ada; permintaan tingkat lewat POST /remote-control/access-requests
+                                         #   (ADR-0217, opsi C dari ADR-0216). Relay PUT ini tetap ditolak (ADR-0165 §4).
+GET    /remote-control/access-requests   # ADR-0217 · cookie lokal → { items: AccessRequestView[] } (semua, terbaru dulu, ≤10).
+                                         # Relay (principal remote) → hanya permintaan dari hub-nya. Agen → 403 (COOKIE_ONLY).
+POST   /remote-control/access-requests   # ADR-0217 · HANYA dari relay (principal remote, rute di allowlist). { tier } .strict().
+                                         # 201 { request } · 400 · 403 bila bukan relay · 409 masih ada yang menunggu (`request` hanya bila milik
+                                         # hub ini) · 429 + retry-after (>3 per 10 menit) · 403 "kendali jarak jauh mati" bila master mati (BUKAN 401:
+                                         # hub meneruskan 401 dan klien mengiranya sesi habis). TIDAK memeriksa grant: tak mengubah apa pun.
+POST   /remote-control/access-requests/:id/approve   # ADR-0217 · COOKIE_ONLY (sesi cookie lokal; relay & agen ditolak). Body WAJIB
+                                         #   { tier, from } (.strict()) = tingkat & hub yang dilihat operator di kartu; tanpa body/field lain → 400.
+                                         # Id acak (randomUUID). Menerapkan tingkat lewat updateRemoteControl (validasi zod PUT yang sama) → 200 { request }.
+                                         # 409 "Permintaan berubah, periksa lagi" bila id/tingkat/hub tak cocok dengan permintaan tertunda
+                                         #   (mis. kartu basi setelah restart) — grant tak disentuh. 409 sudah diputuskan / kedaluwarsa /
+                                         #   kendali jarak jauh mati (permintaan kembali pending). 404 tak dipakai untuk approve.
+POST   /remote-control/access-requests/:id/reject    # ADR-0217 · COOKIE_ONLY · 200 { request }; tak mengubah grant. 404 · 409.
 POST   /terminal/sessions                # BERUBAH: `force` dari principal remote → 403; body +confirmRemote?;
                                          # 409 { error:"remote-session"|"confirm-required", remoteSession } (gerbang presence di hub)
 POST   /specs/:id/done                   # BERUBAH: 409 confirm-required juga saat presence menunjukkan sesi di device lain
@@ -1475,7 +1550,11 @@ POST   /specs/:id/done                   # BERUBAH: 409 confirm-required juga sa
 ## VPS (SPEC-164 · ADR-0025 · SPEC-211/ADR-0042)
 ```
 GET    /vps                          # [{ id, name, host, port, user, keyPath, lastSeenAt,
-                                     #    health, lastAuditAt, audit, hardened }]
+                                     #    health, lastAuditAt, audit, hardened, scoreTotal }]
+#   scoreTotal (ADR-0211) = skor kepatuhan dari snapshot audit TERSIMPAN terbaru + keputusan N/A/attest
+#   terkini (hitungan yang sama dengan checklist). null = belum pernah diaudit di mesin ini. Listing
+#   TIDAK menjalankan audit atau SSH. Field ini turunan: tak disimpan, tak ikut sync. Siaran grup `vps`
+#   memakai bentuk yang sama.
 POST   /vps  {name,host,user,port?,keyPath?,password?}  # 201 · 400 host/user cacat
                                      # password (SPEC-165) = bootstrap key sekali pakai:
                                      # dipasang ke authorized_keys, diverifikasi key-only,
@@ -1888,11 +1967,14 @@ POST   /api/projects/:id/qa/import    (multipart: file .xlsx/.zip/.md + attachme
 ## Scheduler (SPEC-294 · ADR-0072) — LOCAL per-instance
 ```
 # Fondasi scheduler otonom (cookie; agent-token → domain settings). Otomasi default mati, launchGuard default aktif.
-GET  /api/scheduler/config   -> Scheduler (zScheduler: enabled, paused, maxConcurrent, launchGuard, autonomy, sources.{backlog,triase})
+GET  /api/scheduler/config   -> Scheduler & { serverTimeZone }   # ADR-0204 · + zona waktu server (aditif); PUT tetap polos
 PUT  /api/scheduler/config   { Scheduler }  -> Scheduler   # ganti blok penuh (pola PUT /settings). Pause = { paused:true }. 400 invalid.
 GET  /api/scheduler/state    -> { config, cap, liveCount, sources:[{id,enabled,everyMin,minCount?,lastRunAt,nextRunAt}],
 #                                  queueCounts:{queued,launched,done,failed,canceled}, sessions:[sesi live ber-item 'launched'],
-#                                  admission:{enabled,liveCount,liveAgentCount,maxConcurrent,loadPerCore,maxLoadPerCore,loadStatus} }
+#                                  admission:{enabled,liveCount,liveAgentCount,maxConcurrent,loadPerCore,maxLoadPerCore,loadStatus},
+#                                  serverTimeZone }
+# ADR-0204 · `serverTimeZone` = Intl resolvedOptions().timeZone server, zona tempat cron dihitung.
+# ADR-0212 · Preview cron di UI kini memakai zona ini (`nextRunFor(expr, now, serverTimeZone)`), tanpa batasan zona browser.
 # SPEC-1108: launchGuard={enabled:true,maxLoadPerCore:2.5}, angka finite positif. Baris lama diisi default.
 # Switch baru mematikan kedua check peluncuran; batching governor tetap memakai maxConcurrent.
 # State admission juga dikirim melalui topik schedulerState; metrik Windows null/unsupported.
@@ -1902,7 +1984,11 @@ GET  /api/scheduler/queue    ?status=queued|launched|done|failed|canceled&page&l
 #                               `status` disaring di query DB, bukan di klien. Tanpa `limit` → seluruh item.
 POST /api/scheduler/queue/:id/cancel  { reason? } -> SchedulerQueueItem   # SPEC-522 · queued→canceled (CAS). 404 baris tak ada;
 #                                     409 { error, status } bila statusnya bukan `queued` (launched → "tutup dari Terminal"); 400 reason >200 char.
-POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # canceled→queued, note dikosongkan. 404 / 409 { error, status }.
+POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # canceled|failed→queued; note, sessionId, launchedAt dikosongkan.
+#                                     ADR-0204 (memperluas SPEC-522/ADR-0106): `failed` ikut. Baris `failed` juga menuntut
+#                                     `sessions:spawn` bagi token agen (403 { need:"sessions:spawn", reason:"requeue-executes" }),
+#                                     karena peluncuran ulangnya membuka sesi agen. Status lain 409 { error, status } dengan
+#                                     pesan yang menyebut yang bisa dikembalikan; requeue ulang atas `queued` = 409, tanpa efek.
 ```
 > Engine in-process (di-start dari `server.ts`, timer `.unref`; `app.ts` bebas-timer — **membalik sebagian
 > ADR-0024**): per source enable+cadence → checker terdaftar (`registerSchedulerSource`) enqueue kandidat;

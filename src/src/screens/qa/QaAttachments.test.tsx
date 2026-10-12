@@ -1,7 +1,8 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { QaReportDetail } from "@hanoman/shared";
+import { mockViewport, resetViewport } from "../../../test/viewport";
 import { QaAttachments } from "./QaAttachments";
 
 const at = "2026-10-01T10:00:00.000Z";
@@ -75,5 +76,39 @@ describe("QaAttachments", () => {
     render(<QaAttachments {...props({ locked: true })} />);
     expect(screen.queryByText("Lampirkan")).toBeNull();
     expect(screen.queryByLabelText(/Hapus lampiran/)).toBeNull();
+  });
+});
+
+describe("QaAttachments · konfirmasi hapus dan hint sesuai perangkat (Fase 1H)", () => {
+  afterEach(() => resetViewport());
+
+  it("hapus lampiran: dikonfirmasi dulu, baru DELETE ke server", async () => {
+    const calls: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
+      calls.push(`${init?.method ?? "GET"} ${String(url)}`);
+      return init?.method === "DELETE" ? json({ ok: true }) : json(detail);
+    });
+    const onChange = vi.fn();
+    render(<QaAttachments {...props({ onChange })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Hapus lampiran layar.png" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Berkas tidak ikut diekspor lagi.")).toBeTruthy();
+    expect(calls.some((c) => c.startsWith("DELETE"))).toBe(false);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Hapus" }));
+    await waitFor(() => expect(calls.some((c) => c.startsWith("DELETE") && c.includes("/attachments/a1"))).toBe(true));
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+  });
+
+  it("layar sentuh: hint menunjuk tombol Lampirkan, bukan seret-dan-tempel", () => {
+    mockViewport(390);
+    render(<QaAttachments {...props()} />);
+    expect(screen.getByText(/Pilih berkas lewat tombol Lampirkan\./)).toBeTruthy();
+    expect(screen.queryByText(/Ctrl\/Cmd\+V/)).toBeNull();
+  });
+
+  it("perangkat berkursor: hint menyebut seret-dan-tempel", () => {
+    mockViewport(1440);
+    render(<QaAttachments {...props()} />);
+    expect(screen.getByText(/Ctrl\/Cmd\+V/)).toBeTruthy();
   });
 });

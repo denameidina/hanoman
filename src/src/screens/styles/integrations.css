@@ -1,0 +1,96 @@
+/* Z3 · Integrasi (Pengaturan › Integrasi, Pengaturan › Akses AI Agent).
+   Dokumentasi webhook (WebhookDocs), daftar endpoint webhook (WebhooksPanel), dan panduan MCP (McpPanel).
+   Nilainya dipindah dari gaya inline dengan angka yang sama. Ketiga komponen mengimpor berkas ini sendiri,
+   karena settings.css hanya dimuat oleh layar Pengaturan. */
+
+/* ── Spasi vertikal bersama ─────────────────────────────────────────────── */
+.hn-wh-mt4 { margin-top: 4px; }
+.hn-wh-mt6 { margin-top: 6px; }
+.hn-wh-mt8 { margin-top: 8px; }
+.hn-wh-mt10 { margin-top: 10px; }
+.hn-wh-mt12 { margin-top: 12px; }
+.hn-wh-mt14 { margin-top: 14px; }
+.hn-wh-mb10 { margin-bottom: 10px; }
+.hn-wh-mb12 { margin-bottom: 12px; }
+
+/* ── Susunan kolom & baris ──────────────────────────────────────────────── */
+.hn-wh-col-10 { display: flex; flex-direction: column; gap: 10px; }
+.hn-wh-col-12 { display: flex; flex-direction: column; gap: 12px; }
+.hn-wh-col-16 { display: flex; flex-direction: column; gap: 16px; }
+.hn-wh-row { display: flex; gap: 8px; }
+.hn-wh-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+.hn-wh-history-head { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.hn-wh-type-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.hn-wh-event-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ── Teks ────────────────────────────────────────────────────────────────── */
+.hn-wh-prose { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+.hn-wh-muted { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+.hn-wh-label { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+.hn-wh-step { font-weight: 600; font-size: 13px; }
+.hn-wh-mono { font-family: var(--font-mono); }
+.hn-wh-type { font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; }
+.hn-wh-event-label { font-size: 12.5px; }
+.hn-wh-name { font-weight: 600; }
+.hn-wh-url { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+.hn-wh-secret { font-family: var(--font-mono); font-size: 12px; word-break: break-all; }
+/* Harus setelah .hn-wh-muted: warnanya menimpa warna muted untuk pesan galat endpoint. */
+.hn-wh-err { color: var(--status-err); }
+
+/* ── Dokumentasi webhook (WebhookDocs) ──────────────────────────────────── */
+.hn-wh-code {
+  font-family: var(--font-mono); font-size: 12px; white-space: pre; overflow-x: auto;
+  background: var(--bone-200); border: 1px solid var(--border-hair);
+  border-radius: var(--radius-sm); padding: 12px; margin: 0;
+}
+.hn-wh-copy { position: relative; }
+.hn-wh-back { display: flex; gap: 8px; margin-bottom: 12px; }
+.hn-wh-fold-summary { cursor: pointer; padding: 20px; font-family: var(--font-ui); }
+.hn-wh-fold-title { display: block; margin-top: 2px; font-size: 15px; font-weight: 600; color: var(--text-strong); }
+.hn-wh-fold-body { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.hn-wh-group { font-weight: 700; font-size: 13.5px; margin-bottom: 8px; }
+.hn-wh-event { padding-left: 10px; border-left: 2px solid var(--border-hair); }
+.hn-wh-list { padding-left: 20px; }
+
+/* ── Tabel (amplop, backoff, riwayat, daftar tool MCP) ──────────────────── */
+.hn-wh-table { border-collapse: collapse; font-size: 12.5px; }
+.hn-wh-table--full { width: 100%; }
+.hn-wh-tr { border-top: 1px solid var(--border-hair); }
+.hn-wh-thead { text-align: left; color: var(--text-muted); }
+.hn-wh-cell { padding: 6px 8px; }
+.hn-wh-cell--tight { padding: 4px 10px; }
+.hn-wh-cell--top { vertical-align: top; }
+.hn-wh-cell--nowrap { white-space: nowrap; }
+.hn-wh-cell--muted { color: var(--text-muted); }
+.hn-wh-cell--mono { font-family: var(--font-mono); }
+.hn-wh-cell--mono12 { font-family: var(--font-mono); font-size: 12px; }
+
+/* ── Endpoint webhook (WebhooksPanel) ───────────────────────────────────── */
+.hn-wh-endpoint { border: 1px solid var(--border-hair); border-radius: var(--radius-sm); padding: 12px; }
+.hn-wh-endpoint-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hn-wh-endpoint-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.hn-wh-tree { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.hn-wh-family-types { padding-left: 22px; display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* ── Panduan MCP (McpPanel) ─────────────────────────────────────────────── */
+.hn-mcp-muted { font-size: 12.5px; color: var(--text-muted); line-height: 1.55; margin-bottom: 10px; }
+/* Harus setelah .hn-mcp-muted: menimpa margin-bottom 10 px menjadi 8 px untuk baris "klien". */
+.hn-mcp-hint { margin-bottom: 8px; }
+.hn-mcp-clients { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.hn-mcp-pre {
+  margin: 0; padding: 12px; font-size: 12px; line-height: 1.5; overflow-x: auto;
+  background: var(--bone-100); border: 1px solid var(--ink-200);
+  border-radius: var(--radius-sm); white-space: pre;
+}
+.hn-mcp-copy { margin-top: 10px; }
+.hn-mcp-table { border-collapse: collapse; width: 100%; }
+.hn-mcp-th {
+  padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border-hair); vertical-align: top;
+  font-size: 11.5px; text-align: left; color: var(--text-subtle);
+}
+.hn-mcp-td {
+  padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border-hair); vertical-align: top;
+  font-size: 12.5px;
+}
+.hn-mcp-sub { font-size: 11.5px; color: var(--text-subtle); }
+.hn-mcp-dash { color: var(--text-subtle); }

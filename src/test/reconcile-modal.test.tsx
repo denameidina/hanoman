@@ -29,14 +29,15 @@ describe("ReconcileModal (SPEC-270)", () => {
     expect(screen.getByTestId("default-side").textContent).toContain("Lokal");
   });
 
-  // Cacat C · route membalas HTTP 200 ber-`{ ok: false, reason }` saat hub menolak, dan modal
+  // Cacat C · route membalas HTTP 200 ber-`{ ok: false, reason }` saat server pusat menolak, dan modal
   // membuang hasilnya. Operator mengklik, tak ada yang berubah, tak ada pesan apa pun.
   it("menampilkan alasan saat resolusi ditolak, bukan diam", async () => {
     resolveConflict.mockResolvedValue({ ok: false, reason: "still-conflict" });
     render(<ReconcileModal open onClose={() => {}} onResolved={() => {}} />);
     await waitFor(() => screen.getByText(/judul lokal/));
     fireEvent.click(screen.getByRole("button", { name: /Pakai Lokal/i }));
-    await waitFor(() => expect(screen.getByTestId("resolve-error").textContent).toMatch(/hub/i));
+    fireEvent.click(await screen.findByRole("button", { name: "Pakai data Lokal" }));
+    await waitFor(() => expect(screen.getByTestId("resolve-error").textContent).toMatch(/server pusat/i));
   });
 
   it("klik Pakai Server memanggil resolveConflict(server)", async () => {
@@ -44,6 +45,30 @@ describe("ReconcileModal (SPEC-270)", () => {
     render(<ReconcileModal open onClose={() => {}} onResolved={onResolved} />);
     await waitFor(() => screen.getByText(/judul lokal/));
     fireEvent.click(screen.getByRole("button", { name: /Pakai Server/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Pakai data Server" }));
     await waitFor(() => expect(resolveConflict).toHaveBeenCalledWith("spec", "SPEC-1", "server"));
+  });
+
+  // Gagal memuat bukan "Tak ada konflik. Semua sinkron." — galat tampil dengan Coba lagi.
+  it("gagal memuat = galat + Coba lagi, bukan kondisi sinkron", async () => {
+    listConflicts.mockRejectedValueOnce(new Error("jaringan putus"));
+    render(<ReconcileModal open onClose={() => {}} onResolved={() => {}} />);
+    await waitFor(() => expect(screen.getByText("Daftar konflik gagal dimuat")).toBeTruthy());
+    expect(screen.getByText(/jaringan putus/)).toBeTruthy();
+    expect(screen.queryByText(/Semua sinkron/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Coba lagi" }));
+    await waitFor(() => expect(screen.getByText(/judul lokal/)).toBeTruthy());
+  });
+
+  // Konfirmasi merinci field yang berubah, dan dibatalkan tanpa mengirim keputusan.
+  it("konfirmasi merinci field yang berbeda dan batal tanpa mengirim", async () => {
+    resolveConflict.mockClear();
+    render(<ReconcileModal open onClose={() => {}} onResolved={() => {}} />);
+    await waitFor(() => screen.getByText(/judul lokal/));
+    fireEvent.click(screen.getByRole("button", { name: /Pakai Server/i }));
+    expect(await screen.findByText(/title: "judul lokal" → "judul server"/)).toBeTruthy();
+    expect(screen.getByText(/stage: "review" → "planned"/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
+    expect(resolveConflict).not.toHaveBeenCalled();
   });
 });

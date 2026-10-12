@@ -1,19 +1,27 @@
 /* SetupWizard — SPEC-884 · ADR-0139 · setup awal di browser.
 
-   DUA langkah, bukan tiga: akun pertama tetap lahir di `AuthScreen`, supaya hanya ada SATU jalur
-   yang membuat akun (`POST /api/auth/setup` beserta aturan token, limiter, dan 409-nya). Urutan
-   yang dilihat operator tetap peruntukan → keamanan → buat akun. */
+   Audit UI/UX 2026-10 · Fase 3 (3N): SATU layar. Peruntukan (default "Perangkat ini") dan
+   pengakuan risiko bila perlu ada di layar utama; hardening dan prasyaratnya tertutup di "Lanjutan".
+   Pada setup pertama, langkah berikutnya adalah pembuatan akun di `AuthScreen`; penomoran jujur:
+   "setup 1/2" di sini (akun = 2/2 di layar sesudahnya). Dari Pengaturan, tanpa akun, tak ada nomor.
+   Akun tetap lahir di `AuthScreen` supaya hanya ada SATU jalur yang membuat akun
+   (`POST /api/auth/setup` beserta aturan token, limiter, dan 409-nya). */
 import React from "react";
-import { Card, Button, Field } from "../ds";
+import { Card, Button, Radio, RadioGroup, ProductStateIllustration } from "../ds";
 import { Wordmark } from "../ds/marks";
 import { api } from "../api/client";
 import type { SetupStatus } from "@hanoman/shared";
+import { failureMessage } from "../lib/report-error";
+import "./styles/auth.css";
 
-type Step = "purpose" | "security";
-
-export function SetupWizard({ status, onDone }: { status: SetupStatus; onDone: () => void }) {
-  const [step, setStep] = React.useState<Step>("purpose");
-  const [deployment, setDeployment] = React.useState<"local" | "public">(status.deployment);
+export function SetupWizard({ status, onDone, onCancel }: {
+  status: SetupStatus; onDone: () => void;
+  /** Hanya pada mode diulang (dari Pengaturan): tombol Batal menutup wizard tanpa menyimpan. */
+  onCancel?: () => void;
+}) {
+  const firstRun = status.needed;
+  // Setup pertama selalu mulai dari "Perangkat ini"; diulang dari Pengaturan, nilai yang berlaku tampil.
+  const [deployment, setDeployment] = React.useState<"local" | "public">(firstRun ? "local" : status.deployment);
   const [hardening, setHardening] = React.useState(status.hardening);
   const [ack, setAck] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -26,6 +34,9 @@ export function SetupWizard({ status, onDone }: { status: SetupStatus; onDone: (
   const toggleDisabled = status.hardeningLocked || (!hardening && missing.length > 0);
   const needsAck = deployment === "public" && !hardening;
   const canSave = !busy && (!needsAck || ack);
+  const saveReason = busy ? null
+    : needsAck && !ack ? "Centang pernyataan risiko untuk melanjutkan tanpa hardening."
+    : null;
 
   // Memilih "diakses orang lain" MENYODORKAN hardening — tapi tak memaksanya (keputusan operator).
   function choose(next: "local" | "public") {
@@ -41,73 +52,86 @@ export function SetupWizard({ status, onDone }: { status: SetupStatus; onDone: (
     try {
       await api.applySetup({ deployment, hardening, ...(needsAck ? { acknowledgedUnhardened: true } : {}) });
       onDone();
-    } catch { setErr("Gagal menyimpan setup. Coba lagi."); setBusy(false); }
+    } catch (e) {
+      setErr(failureMessage("menyimpan setup", e));
+      setBusy(false);
+    }
   }
 
+  // Lanjutan: apa yang dilindungi hardening, prasyaratnya, dan kenapa toggle bisa terkunci.
+  const hardeningBlock = (
+    <>
+      <p>
+        Hardening memperketat sesi agen: sesi berjalan di dalam kontainer tanpa hak root, lalu lintas
+        keluar lewat proxy, dan setiap upload diperiksa pemindai. Tanpa hardening, sesi agen berjalan
+        langsung di mesin ini dan satu-satunya penghalangnya adalah password akun.
+      </p>
+      <label className="hn-choice-target hn-setup-check">
+        <input type="checkbox" checked={hardening} disabled={toggleDisabled}
+          onChange={(e) => setHardening(e.target.checked)} aria-describedby="hardening-note" />
+        Aktifkan hardening
+      </label>
+      <div id="hardening-note" className="hn-setup-hardening-note">
+        {status.hardeningLocked
+          ? "Hardening dipasang lewat env di host ini — dashboard tidak bisa mematikannya."
+          : missing.length > 0
+            ? `Belum bisa dinyalakan: selesaikan prasyarat yang belum lengkap (${missing.map((p) => p.label).join(", ")}).`
+            : "Semua prasyarat lengkap."}
+      </div>
+      <ul className="hn-setup-prereq">
+        {status.prerequisites.map((p) => (
+          <li key={p.id} data-ok={p.ok ? "true" : "false"}>
+            <strong>{p.ok ? "Lengkap" : "Belum"}</strong> · {p.label}{p.detail ? ` — ${p.detail}` : ""}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+
   return (
-    <div className="hn-dynamic-viewport" style={{ minHeight: "100dvh", display: "flex", overflowY: "auto",
-      background: "var(--bone-100)", boxSizing: "border-box",
-      padding: "max(24px, var(--safe-top)) max(16px, var(--safe-right)) max(24px, var(--safe-bottom)) max(16px, var(--safe-left))" }}>
-      <div style={{ width: "100%", maxWidth: 460, margin: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}><Wordmark /></div>
-        {step === "purpose" ? (
-          <Card eyebrow="hanoman · setup 1/2" title="Instance ini untuk apa?">
-            <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 16, lineHeight: 1.5 }}>
-              Pilihan ini hanya mengubah default dan peringatan. Ia tak memaksa apa pun.
-            </div>
-            <Field label="Peruntukan">
-              <label style={{ display: "block", marginBottom: 10, fontSize: 13 }}>
-                <input type="radio" name="deployment" aria-label="Device saya sendiri"
-                  checked={deployment === "local"} onChange={() => choose("local")} />
-                {" "}Device saya sendiri
-              </label>
-              <label style={{ display: "block", fontSize: 13 }}>
-                <input type="radio" name="deployment" aria-label="Diakses orang lain"
-                  checked={deployment === "public"} onChange={() => choose("public")} />
-                {" "}Diakses orang lain
-              </label>
-            </Field>
-            <Button onClick={() => setStep("security")} fullWidth>Lanjut</Button>
-          </Card>
-        ) : (
-          <Card eyebrow="hanoman · setup 2/2" title="Keamanan">
-            <Field label="Hardening">
-              <label style={{ display: "block", fontSize: 13 }}>
-                <input type="checkbox" aria-label="Aktifkan hardening" checked={hardening}
-                  disabled={toggleDisabled} onChange={(e) => setHardening(e.target.checked)} />
-                {" "}Aktifkan hardening
-              </label>
-            </Field>
-            {status.hardeningLocked && (
-              <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12, lineHeight: 1.5 }}>
-                Hardening dipasang lewat env di host ini — dashboard tak bisa mematikannya.
+    <div className="hn-dynamic-viewport hn-setup-root">
+      <div className="hn-setup-wrap">
+        <div className="hn-auth-mark"><Wordmark /></div>
+        <Card eyebrow={firstRun ? "hanoman · setup 1/2" : "hanoman · setup"} title="Instance ini untuk apa?">
+          <div className="hn-setup-card">
+            {firstRun && (
+              <ProductStateIllustration id="PST-001" decorative className="hn-setup-illus" />
+            )}
+            <p className="hn-setup-lead">
+              Pilihan ini hanya mengubah default dan peringatan. Tidak ada yang dipaksakan.
+            </p>
+
+            <RadioGroup aria-label="Peruntukan" value={deployment} onChange={(v) => choose(v as "local" | "public")}>
+              <Radio value="local" label="Perangkat ini" description="Hanya saya yang memakai instance ini. Ini pilihan awal." />
+              <Radio value="public" label="Diakses orang lain" description="Instance terbuka untuk orang lain. Hardening disarankan." />
+            </RadioGroup>
+
+            {needsAck && (
+              <div className="hn-setup-warn" role="note">
+                <p>Instance terbuka tanpa hardening: sesi agen berjalan langsung di mesin ini. Nyalakan hardening di Lanjutan, atau akui risikonya di bawah.</p>
+                <label className="hn-choice-target hn-setup-check">
+                  <input type="checkbox" aria-label="Saya paham risikonya" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+                  Saya paham instance ini menjalankan perintah penuh di mesin ini, dan tanpa hardening satu-satunya
+                  penghalangnya adalah password akun hanoman.
+                </label>
               </div>
             )}
-            <ul style={{ fontSize: 12.5, listStyle: "none", padding: 0, margin: "0 0 14px" }}>
-              {status.prerequisites.map((p) => (
-                <li key={p.id} style={{ color: p.ok ? "var(--text-muted)" : "var(--status-err)", marginBottom: 4 }}>
-                  {p.ok ? "✓" : "✗"} {p.label}{p.detail ? ` — ${p.detail}` : ""}
-                </li>
-              ))}
-            </ul>
-            {needsAck && (
-              <label style={{ display: "block", fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
-                <input type="checkbox" aria-label="Saya paham risikonya" checked={ack}
-                  onChange={(e) => setAck(e.target.checked)} />
-                {" "}Saya paham instance ini menjalankan perintah penuh di mesin ini, dan tanpa
-                hardening satu-satunya penghalangnya adalah password akun hanoman.
-              </label>
-            )}
-            {err && <div style={{ fontSize: 12.5, color: "var(--status-err)", marginBottom: 12 }}>{err}</div>}
-            <div style={{ display: "flex", gap: 8 }}>
-              <Button variant="ghost" onClick={() => setStep("purpose")}>Kembali</Button>
-              <Button onClick={save} disabled={!canSave}
-                style={{ flex: 1, justifyContent: "center" }}>
-                {busy ? "Menyimpan…" : "Simpan & lanjut"}
+
+            <details className="hn-setup-advanced">
+              <summary>Lanjutan · keamanan (hardening)</summary>
+              <div className="hn-setup-advanced-body">{hardeningBlock}</div>
+            </details>
+
+            {err && <div role="alert" className="hn-auth-error">{err}</div>}
+            {saveReason && <p className="hn-auth-reason">{saveReason}</p>}
+            <div className="hn-setup-foot">
+              {onCancel && <Button variant="ghost" onClick={onCancel}>Batal</Button>}
+              <Button onClick={save} disabled={!canSave} loading={busy}>
+                {busy ? "Menyimpan…" : firstRun ? "Simpan & lanjut" : "Simpan"}
               </Button>
             </div>
-          </Card>
-        )}
+          </div>
+        </Card>
       </div>
     </div>
   );
@@ -120,10 +144,7 @@ export function SetupWizard({ status, onDone }: { status: SetupStatus; onDone: (
 export function UnhardenedBanner({ status }: { status: SetupStatus | null }) {
   if (!status || status.deployment !== "public" || status.hardening) return null;
   return (
-    <div data-testid="unhardened-banner" style={{
-      background: "var(--status-warn-bg, #fff4e0)", color: "var(--text-strong, #3a2c12)",
-      fontSize: 12.5, padding: "6px 14px", borderBottom: "1px solid var(--rule)",
-    }}>
+    <div data-testid="unhardened-banner" className="hn-unhardened">
       Instance ini terbuka tanpa hardening — sesi agen berjalan langsung di mesin ini.
     </div>
   );

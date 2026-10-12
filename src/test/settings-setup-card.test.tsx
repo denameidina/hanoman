@@ -22,7 +22,11 @@ vi.mock("../src/api/client", () => ({
 
 // Tanda tangan nyata: SettingsScreen({ onToast?, me, onLoggedOut }) — SettingsScreen.tsx:542
 const props = { me: { id: "u1", email: "a@b.c", role: "admin", createdAt: "" } as never, onLoggedOut: () => {} };
-const openTab = () => fireEvent.click(screen.getByRole("button", { name: /Setup awal/ }));
+// Setup awal ada di niat "Lanjutan" (tertutup default): buka dulu niatnya.
+const openTab = () => {
+  fireEvent.click(screen.getByRole("button", { name: "Lanjutan" }));
+  fireEvent.click(screen.getByRole("button", { name: /Setup awal/ }));
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -34,7 +38,7 @@ describe("kartu Setup awal (SPEC-884)", () => {
     render(<SettingsScreen {...props} />);
     openTab();
     await waitFor(() => expect(screen.getByTestId("setup-card")).toBeTruthy());
-    expect(screen.getByText(/Device saya sendiri/)).toBeTruthy();
+    expect(screen.getByText(/Perangkat ini/)).toBeTruthy();
     expect(screen.getByText(/Hardening mati/)).toBeTruthy();
     expect(api.setupStatus).toHaveBeenCalled();
   });
@@ -44,6 +48,16 @@ describe("kartu Setup awal (SPEC-884)", () => {
     openTab();
     await waitFor(() => expect(screen.getByTestId("setup-card")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: /Jalankan ulang setup/ }));
-    expect(screen.getByLabelText("Device saya sendiri")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /Perangkat ini/ })).toBeTruthy();
+  });
+
+  // Batal di wizard yang diulang harus kembali ke kartu, bukan membiarkan operator terkunci di wizard.
+  it("Batal di wizard yang diulang kembali ke kartu Setup awal", async () => {
+    render(<SettingsScreen {...props} />);
+    openTab();
+    await waitFor(() => expect(screen.getByTestId("setup-card")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /Jalankan ulang setup/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
+    expect(await screen.findByTestId("setup-card")).toBeTruthy();
   });
 });

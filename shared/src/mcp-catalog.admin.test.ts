@@ -54,17 +54,19 @@ describe("exceedingCapabilities — himpunan-bagian milik pemanggil", () => {
 
 describe("katalog admin", () => {
   it("setiap tool menuntut capability admin, dan nama-namanya unik", () => {
-    expect(admin.length).toBe(22);
+    expect(admin.length).toBe(24); // +2 ADR-0217: hanoman_device_access_request(s) (relay:exec)
     expect(new Set(admin.map((t) => t.name)).size).toBe(admin.length);
   });
 
   it("SEMUA tool tulis bermode danger; semua tool baca bermode read", () => {
     for (const t of admin) {
-      const writes = t.sampleMethod !== "GET";
-      expect(t.mode, t.name).toBe(writes ? "danger" : "read");
+      // ADR-0197 · `relay:exec` adalah SATU capability untuk SEMUA method: baca isi mesin lain pun
+      // sensitif, jadi GET lewat relay ikut danger (sama dengan hanoman_device_relay).
+      const danger = t.sampleMethod !== "GET" || t.capability === "relay:exec";
+      expect(t.mode, t.name).toBe(danger ? "danger" : "read");
     }
     const def = new Set(mcpToolsFor("default").map((t) => t.name));
-    for (const t of admin.filter((x) => x.sampleMethod !== "GET")) expect(def.has(t.name), t.name).toBe(false);
+    for (const t of admin.filter((x) => x.mode === "danger")) expect(def.has(t.name), t.name).toBe(false);
   });
 
   it("revealsSecret hanya pada dua tool pencetak kredensial", () => {

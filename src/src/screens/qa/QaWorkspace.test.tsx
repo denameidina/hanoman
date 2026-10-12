@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QaWorkspace } from "./QaWorkspace";
 
@@ -38,10 +38,11 @@ function mockFetch(extra: (u: string, init?: RequestInit) => Promise<Response> |
 }
 const renderWs = (over: Partial<React.ComponentProps<typeof QaWorkspace>> = {}) =>
   render(<QaWorkspace projects={projects} projectId="p1" onSelectProject={() => {}} {...over} />);
+const openReport = async () => fireEvent.click(await screen.findByText("Smoke 0.9"));
 afterEach(() => vi.restoreAllMocks());
 
 describe("QaWorkspace", () => {
-  it("daftar: nomor, judul, status, pass-rate, dan temuan open", async () => {
+  it("daftar: nomor, judul, status, pass-rate, temuan open, dan pintu ekspor ZIP", async () => {
     mockFetch();
     renderWs();
     expect(await screen.findByText("QA-001")).toBeTruthy();
@@ -50,6 +51,7 @@ describe("QaWorkspace", () => {
     expect(screen.getByText(/1 belum ditangani/)).toBeTruthy();
     expect(screen.getByText("Laporan baru")).toBeTruthy();
     expect(screen.getByText("Unduh template Excel")).toBeTruthy();
+    expect((screen.getByRole("link", { name: "Unduh ZIP QA-001" })).getAttribute("href")).toBe("/api/projects/p1/qa/reports/r1/export");
   });
 
   it("tanpa project: keadaan kosong, tanpa memanggil API", async () => {
@@ -62,14 +64,33 @@ describe("QaWorkspace", () => {
   it("membuka laporan menampilkan editor; tab Temuan memuat F-01 beserta severity/prioritas", async () => {
     mockFetch();
     renderWs();
-    fireEvent.click(await screen.findByText("Smoke 0.9"));
-    expect(await screen.findByDisplayValue("Smoke 0.9")).toBeTruthy();
-    expect(screen.getByDisplayValue("Login")).toBeTruthy();   // tab Test case aktif lebih dulu (judul = nilai Input)
+    await openReport();
+    expect(await screen.findByRole("heading", { name: "Smoke 0.9" })).toBeTruthy();
+    expect(screen.getByDisplayValue("Login")).toBeTruthy();   // tab Langkah uji aktif lebih dulu
     fireEvent.click(screen.getByRole("tab", { name: /Temuan/ }));
     expect(await screen.findByText("F-01")).toBeTruthy();
     expect(screen.getByText("Tombol mati")).toBeTruthy();
-    expect(screen.getByText("major")).toBeTruthy();
+    expect(screen.getByText("Fitur terganggu")).toBeTruthy();
     expect(screen.getByText("P1")).toBeTruthy();
+  });
+
+  it("header editor: pill memakai label status laporan yang dikenal (Draf)", async () => {
+    mockFetch();
+    renderWs();
+    await openReport();
+    await screen.findByRole("heading", { name: "Smoke 0.9" });
+    const bar = document.querySelector(".hn-qa-bar-title") as HTMLElement;
+    expect(within(bar).getByText("Draf")).toBeTruthy();
+  });
+
+  it("header editor: status kosong atau tak dikenal tak tampil sebagai '—' (pill disembunyikan)", async () => {
+    mockFetch((u) => (u.endsWith("/api/projects/p1/qa/reports/r1") ? json({ ...detail, status: null }) : null));
+    renderWs();
+    await openReport();
+    await screen.findByRole("heading", { name: "Smoke 0.9" });
+    const bar = document.querySelector(".hn-qa-bar-title") as HTMLElement;
+    expect(bar.textContent).not.toContain("—");
+    expect(within(bar).queryByText("Draf")).toBeNull();
   });
 
   it("menambah test case: POST ke /cases lalu menampilkan hasil jawaban server", async () => {
@@ -82,8 +103,8 @@ describe("QaWorkspace", () => {
       return null;
     });
     renderWs();
-    fireEvent.click(await screen.findByText("Smoke 0.9"));
-    const input = await screen.findByLabelText("Judul test case baru");
+    await openReport();
+    const input = await screen.findByLabelText("Nama pengujian baru");
     fireEvent.change(input, { target: { value: "Checkout" } });
     fireEvent.click(screen.getByText("Tambah"));
     expect(await screen.findByDisplayValue("Checkout")).toBeTruthy();
@@ -91,16 +112,57 @@ describe("QaWorkspace", () => {
     expect(posted[0]!.body).toMatchObject({ title: "Checkout" });
   });
 
-  it("laporan closed: tombol Buka kembali ada, Simpan dan Tambah tak ada", async () => {
-    mockFetch((u) => (u.endsWith("/qa/reports/r1") ? json({ ...detail, status: "closed", verdict: "go" }) : null));
+  it("status test case: satu ketukan 'Lulus' menyimpan status pass dan menampilkan Tersimpan", async () => {
+    const bodies: unknown[] = [];
+    mockFetch((u, init) => {
+      if (u.endsWith("/cases/c1") && init?.method === "PATCH") {
+        bodies.push(JSON.parse(String(init.body)));
+        return json({ ...detail, cases: [{ ...detail.cases[0]!, status: "pass" }] });
+      }
+      return null;
+    });
     renderWs();
-    fireEvent.click(await screen.findByText("Smoke 0.9"));
-    expect(await screen.findByText("Buka kembali")).toBeTruthy();
-    expect(screen.queryByText("Tambah")).toBeNull();
-    expect((screen.getByText("Simpan").closest("button") as HTMLButtonElement).disabled).toBe(true);
+    await openReport();
+    fireEvent.click(await screen.findByRole("radio", { name: "Lulus" }));
+    await waitFor(() => expect(bodies).toEqual([{ status: "pass" }]));
+    expect(await screen.findByText("Tersimpan")).toBeTruthy();
   });
 
-  it("temuan open: Kirim ke backlog → POST /backlog, lencana SPEC muncul, tombol hilang; tetap tersedia di laporan closed", async () => {
+  it("laporan closed: Buka kembali ada; Simpan, Ajukan, dan Tambah tak ada", async () => {
+    mockFetch((u) => (u.endsWith("/qa/reports/r1") ? json({ ...detail, status: "closed", verdict: "go" }) : null));
+    renderWs();
+    await openReport();
+    expect(await screen.findByText("Buka kembali")).toBeTruthy();
+    expect(screen.queryByText("Tambah")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Simpan" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Ajukan" })).toBeNull();
+  });
+
+  it("alur ajukan: Tinjau dan ajukan menampilkan checklist; konfirmasi aktif setelah keputusan dipilih lalu PATCH status submitted", async () => {
+    const patched: Record<string, unknown>[] = [];
+    mockFetch((u, init) => {
+      if (u.endsWith("/qa/reports/r1") && init?.method === "PATCH") {
+        patched.push(JSON.parse(String(init.body)));
+        return json({ ...detail, status: "submitted", verdict: "go" });
+      }
+      return null;
+    });
+    renderWs();
+    await openReport();
+    fireEvent.click(await screen.findByRole("button", { name: "Ajukan" }));
+    const dialog = await screen.findByRole("dialog", { name: "Tinjau dan ajukan" });
+    expect(within(dialog).getByText("Pilih satu keputusan. Wajib sebelum laporan diajukan.")).toBeTruthy();
+    expect(within(dialog).getByText("1 temuan belum ditangani. Ini tidak menghalangi pengajuan.")).toBeTruthy();
+    const confirm = within(dialog).getByRole("button", { name: "Ajukan laporan" }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Siap digunakan" }));
+    expect(confirm.disabled).toBe(false);
+    fireEvent.click(confirm);
+    await waitFor(() => expect(patched).toHaveLength(1));
+    expect(patched[0]).toMatchObject({ status: "submitted", verdict: "go" });
+  });
+
+  it("temuan open: Kirim ke backlog → POST /backlog, Buka backlog muncul, tombol kirim hilang; tetap tersedia di laporan closed", async () => {
     const sentDetail = { ...detail, findings: [{ ...detail.findings[0]!, status: "sent", backlogId: "SPEC-212", spec: { id: "SPEC-212", stage: "brainstorming", priority: "tinggi" } }] };
     const posted: string[] = [];
     mockFetch((u, init) => {
@@ -112,27 +174,28 @@ describe("QaWorkspace", () => {
     });
     const toast = vi.fn();
     renderWs({ onToast: toast });
-    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    await openReport();
     fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
     fireEvent.click(await screen.findByText("Kirim ke backlog"));
-    expect(await screen.findByText(/SPEC-212 · brainstorming/)).toBeTruthy();
+    expect(await screen.findByText(/SPEC-212 · Brainstorm/)).toBeTruthy();
     expect(posted).toHaveLength(1);
     expect(screen.queryByText("Kirim ke backlog")).toBeNull();
     expect(toast).toHaveBeenCalledWith(expect.stringMatching(/F-01 → SPEC-212 dibuat/));
-    expect((screen.getByText(/SPEC-212 · brainstorming/).closest("a") as HTMLAnchorElement).getAttribute("href")).toBe("/backlog/SPEC-212");
+    expect((screen.getByRole("link", { name: "Buka backlog" })).getAttribute("href")).toBe("/backlog/SPEC-212");
+    expect(screen.getByText("Sudah di backlog")).toBeTruthy();   // label status, bukan "sent" mentah
   });
 
-  it("laporan closed tetap menampilkan Kirim ke backlog (pengecualian read-only); tautan putus ditandai", async () => {
+  it("laporan closed tetap menampilkan Kirim ke backlog (pengecualian read-only); Temuan baru tersembunyi", async () => {
     const closed = { ...detail, status: "closed", verdict: "go" };
     mockFetch((u) => (u.endsWith("/qa/reports/r1") ? json(closed) : null));
     renderWs();
-    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    await openReport();
     fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
     expect(await screen.findByText("Kirim ke backlog")).toBeTruthy();
     expect(screen.queryByText("Temuan baru")).toBeNull();   // sisanya tetap terkunci
   });
 
-  it("Kirim semua yang open: tombol bertanda jumlah; hasil massal dilaporkan lewat toast", async () => {
+  it("Kirim semua yang open: konfirmasi menyebut dampak; hasil per temuan dilaporkan lewat toast", async () => {
     const posted: string[] = [];
     mockFetch((u, init) => {
       if (u.endsWith("/qa/reports/r1/backlog") && init?.method === "POST") {
@@ -143,25 +206,34 @@ describe("QaWorkspace", () => {
     });
     const toast = vi.fn();
     renderWs({ onToast: toast });
-    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    await openReport();
     fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
     fireEvent.click(await screen.findByText("Kirim semua ke backlog (1)"));
+    // Dampaknya disebut dulu: tak ada item backlog sebelum dikonfirmasi.
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Membuat 1 item backlog.")).toBeTruthy();
+    expect(within(dialog).getByText("F-01 · Tombol mati")).toBeTruthy();
+    expect(posted).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Kirim 1 temuan" }));
     await waitFor(() => expect(posted).toHaveLength(1));
     expect(toast).toHaveBeenCalledWith(expect.stringMatching(/1 temuan dikirim/));
   });
 
-  it("Pratinjau: enam tautan unduh (ZIP, DOCX, PDF, XLSX, CSV, .md) ber-format benar", async () => {
+  it("menu ⋯: enam format ekspor sebagai tautan; Pratinjau membuka dialog pratinjau", async () => {
     mockFetch();
     renderWs();
-    fireEvent.click(await screen.findByText("Smoke 0.9"));
-    fireEvent.click(await screen.findByRole("tab", { name: /Pratinjau/ }));
-    const href = (label: string) => (screen.getByText(label).closest("a") as HTMLAnchorElement).getAttribute("href");
+    await openReport();
+    fireEvent.click(await screen.findByRole("button", { name: "Menu laporan" }));
+    const menu = await screen.findByRole("dialog", { name: "Ekspor dan tindakan lain" });
+    const href = (label: string) => (within(menu).getByText(label).closest("a") as HTMLAnchorElement).getAttribute("href");
     expect(href("Unduh ZIP (laporan + lampiran)")).toBe("/api/projects/p1/qa/reports/r1/export");
     expect(href("Unduh DOCX")).toBe("/api/projects/p1/qa/reports/r1/export?format=docx");
     expect(href("Unduh PDF")).toBe("/api/projects/p1/qa/reports/r1/export?format=pdf");
     expect(href("Unduh XLSX")).toBe("/api/projects/p1/qa/reports/r1/export?format=xlsx");
     expect(href("Unduh CSV (test case)")).toBe("/api/projects/p1/qa/reports/r1/export?format=csv");
     expect(href("Unduh .md")).toBe("/api/projects/p1/qa/reports/r1/export?format=md");
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Pratinjau laporan" }));
+    expect(await screen.findByRole("dialog", { name: "Pratinjau QA-001" })).toBeTruthy();
   });
 
   it("Impor matriks: unggah ke /cases/import lalu memuat ulang laporan dan melaporkan hitungan lewat toast", async () => {
@@ -172,7 +244,7 @@ describe("QaWorkspace", () => {
     });
     const toast = vi.fn();
     renderWs({ onToast: toast });
-    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    await openReport();
     const input = await screen.findByLabelText("Berkas matriks test case");
     fireEvent.change(input, { target: { files: [new File(["Judul\nx"], "matriks.csv", { type: "text/csv" })] } });
     await waitFor(() => expect(toast).toHaveBeenCalledWith("Matriks diimpor: 2 diperbarui, 1 dibuat, 3 tak berubah"));
@@ -182,19 +254,22 @@ describe("QaWorkspace", () => {
   it("laporan closed: matriks tetap bisa diunduh, tetapi tak bisa diimpor", async () => {
     mockFetch((u) => (u.endsWith("/qa/reports/r1") ? json({ ...detail, status: "closed", verdict: "go" }) : null));
     renderWs();
-    fireEvent.click(await screen.findByText("Smoke 0.9"));
+    await openReport();
     expect(await screen.findByText("Unduh matriks (XLSX)")).toBeTruthy();
     expect(screen.queryByText("Impor matriks")).toBeNull();
   });
 
-  it("galat server (409/400) ditampilkan lewat onToast, bukan ditelan", async () => {
+  it("galat server saat mengajukan tampil di dialog tinjau (bukan toast) dan dialog tetap terbuka", async () => {
     const toast = vi.fn();
     mockFetch((u, init) => (u.endsWith("/qa/reports/r1") && init?.method === "PATCH"
       ? json({ error: "verdict wajib diisi sebelum laporan di-submit atau di-close" }, 400) : null));
     renderWs({ onToast: toast });
-    fireEvent.click(await screen.findByText("Smoke 0.9"));
-    fireEvent.click(await screen.findByText("Ajukan laporan"));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Pilih keputusan hasil pengujian");
+    await openReport();
+    fireEvent.click(await screen.findByRole("button", { name: "Ajukan" }));
+    const dialog = await screen.findByRole("dialog", { name: "Tinjau dan ajukan" });
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Siap dengan catatan" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Ajukan laporan" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Gagal mengajukan laporan: verdict wajib diisi");
     expect(toast).not.toHaveBeenCalled();
   });
 });
@@ -206,11 +281,11 @@ it("mengimpor Excel bersama lampiran sebagai multipart dan membuka laporan hasil
     return null;
   });
   renderWs();
-  fireEvent.click(await screen.findByText("Impor Excel / ZIP"));
-  fireEvent.change(screen.getByLabelText("Berkas impor laporan"), { target: { files: [new File(["excel"], "report.xlsx")] } });
-  fireEvent.change(screen.getByLabelText("Berkas lampiran impor"), { target: { files: [new File(["png"], "layar.png")] } });
+  fireEvent.click(await screen.findByText("Impor Excel, ZIP, atau .md"));
+  fireEvent.change(screen.getByLabelText("Berkas laporan (wajib)"), { target: { files: [new File(["excel"], "report.xlsx")] } });
+  fireEvent.change(screen.getByLabelText("Berkas lampiran (opsional)"), { target: { files: [new File(["png"], "layar.png")] } });
   fireEvent.click(screen.getByText("Impor laporan"));
-  expect(await screen.findByDisplayValue("Smoke 0.9")).toBeTruthy();
+  expect(await screen.findByRole("heading", { name: "Smoke 0.9" })).toBeTruthy();
   expect((body!.get("file") as File).name).toBe("report.xlsx");
   expect((body!.get("attachments") as File).name).toBe("layar.png");
 });
@@ -224,9 +299,12 @@ it("menyimpan input lingkungan sederhana tanpa membuang metadata tambahan", asyn
     }
     return null;
   });
-  renderWs(); fireEvent.click(await screen.findByText("Smoke 0.9"));
+  renderWs();
+  await openReport();
+  fireEvent.click(await screen.findByRole("button", { name: "Ubah info" }));
   fireEvent.change(await screen.findByDisplayValue("macOS"), { target: { value: "Windows 11" } });
-  fireEvent.click(screen.getByText("Simpan"));
+  fireEvent.click(screen.getByRole("button", { name: "Selesai" }));
+  fireEvent.click(screen.getByRole("button", { name: "Simpan" }));
   await waitFor(() => expect(saved.environment).toEqual({ os: "Windows 11", jaringan: "Wi-Fi" }));
 });
 
@@ -236,20 +314,21 @@ it("menyimpan langkah pengujian ketika keluar dari textarea", async () => {
     if (u.endsWith("/cases/c1") && init?.method === "PATCH") { saved = JSON.parse(String(init.body)); return json({ ...detail, cases: [{ ...detail.cases[0], ...saved }] }); }
     return null;
   });
-  renderWs(); fireEvent.click(await screen.findByText("Smoke 0.9"));
-  const input = await screen.findByLabelText("Langkah TC-01");
+  renderWs();
+  await openReport();
+  const input = await screen.findByLabelText("Langkah pengujian TC-01");
   fireEvent.change(input, { target: { value: "Buka halaman login" } }); fireEvent.blur(input);
   await waitFor(() => expect(saved).toEqual({ steps: "Buka halaman login" }));
 });
 
-
-it("kerjakan langsung opens the returned session and leaves backlog option available", async () => {
+it("kerjakan langsung dari menu ⋯ membuka sesi yang dikembalikan dan tautan backlog tetap tersedia", async () => {
   const openSession = vi.fn();
-  const fetch = mockFetch((url, init) => url.endsWith("/findings/f1/session") ? json({ id: "qa-f1", reused: false }, 201) : null);
+  const fetch = mockFetch((url) => url.endsWith("/findings/f1/session") ? json({ id: "qa-f1", reused: false }, 201) : null);
   renderWs({ onOpenSession: openSession });
-  fireEvent.click(await screen.findByText("Smoke 0.9"));
+  await openReport();
   fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
-  fireEvent.click(await screen.findByRole("button", { name: "Kerjakan langsung" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Menu F-01" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Kerjakan langsung" }));
   await waitFor(() => expect(openSession).toHaveBeenCalledWith("qa-f1"));
   expect(screen.getByRole("button", { name: "Kirim ke backlog" })).toBeTruthy();
   expect(fetch.mock.calls.some(([url, init]) => String(url).endsWith("/session") && init?.method === "POST")).toBe(true);
@@ -260,9 +339,145 @@ it("sync QA refreshes open report and reports configuration or network errors", 
   let calls = 0;
   mockFetch((url) => url.endsWith("/sync/now") ? json(++calls === 1 ? { ok: false, reason: "not-configured" } : { ok: true }) : null);
   renderWs({ onToast: toast });
-  fireEvent.click(await screen.findByText("Smoke 0.9"));
+  await openReport();
   fireEvent.click(screen.getByRole("button", { name: "Sinkronkan QA" }));
   await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("konfigurasi")));
   fireEvent.click(screen.getByRole("button", { name: "Sinkronkan QA" }));
   await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining("QA disinkronkan")));
+});
+
+describe("QaWorkspace · konfirmasi, galat yang tampil, dan info laporan (Fase 1H + 3L)", () => {
+  it("Kirim semua: hasil per temuan tampil di dialog, sukses dan gagal dengan alasannya", async () => {
+    const f2 = { ...detail.findings[0]!, id: "f2", code: "F-02", title: "Gambar rusak", backlogId: null, spec: null, status: "open" };
+    const twoFindings = { ...detail, findings: [detail.findings[0]!, f2] };
+    mockFetch((u, init) => {
+      if (u.endsWith("/qa/reports/r1") && (!init?.method || init.method === "GET")) return json(twoFindings);
+      if (u.endsWith("/qa/reports/r1/backlog") && init?.method === "POST") {
+        return json({
+          results: [
+            { findingId: "f1", code: "F-01", created: true, spec: { id: "SPEC-5", stage: "brainstorming", priority: "tinggi" }, attachments: { saved: 0, rejected: [] } },
+            { findingId: "f2", code: "F-02", created: false, spec: null, attachments: { saved: 0, rejected: [] }, error: "backlog penuh" },
+          ],
+          sent: 1, report: twoFindings,
+        }, 201);
+      }
+      return null;
+    });
+    renderWs({ onToast: vi.fn() });
+    await openReport();
+    fireEvent.click(await screen.findByRole("tab", { name: /Temuan/ }));
+    fireEvent.click(await screen.findByText("Kirim semua ke backlog (2)"));
+    const confirm = await screen.findByRole("dialog");
+    expect(within(confirm).getByText("Membuat 2 item backlog.")).toBeTruthy();
+    expect(within(confirm).getByText("F-02 · Gambar rusak")).toBeTruthy();
+    fireEvent.click(within(confirm).getByRole("button", { name: "Kirim 2 temuan" }));
+    const result = await screen.findByRole("dialog", { name: "1 terkirim, 1 gagal" });
+    expect(within(result).getByText("F-02 · Gambar rusak")).toBeTruthy();
+    expect(within(result).getByText(/backlog penuh/)).toBeTruthy();
+    expect(within(result).getByText(/SPEC-5 · item baru dibuat/)).toBeTruthy();
+  });
+
+  it("Kembali dengan isian yang belum disimpan meminta konfirmasi; Batal tetap di editor", async () => {
+    mockFetch();
+    renderWs();
+    await openReport();
+    fireEvent.click(await screen.findByRole("button", { name: "Ubah info" }));
+    fireEvent.change(await screen.findByDisplayValue("Smoke 0.9"), { target: { value: "Smoke 1.0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Selesai" }));
+    fireEvent.click(screen.getByText("Kembali"));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Perubahan pada informasi laporan belum disimpan/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Batal" }));
+    expect(screen.getByText("Smoke 1.0")).toBeTruthy();
+    expect(screen.getByText("Ada perubahan belum disimpan.")).toBeTruthy();
+    fireEvent.click(screen.getByText("Kembali"));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Buang perubahan" }));
+    expect(await screen.findByText("Smoke 0.9")).toBeTruthy();   // kembali ke daftar
+  });
+
+  it("hapus test case dari menu ⋯: konfirmasi dulu, baru DELETE ke server", async () => {
+    const calls: string[] = [];
+    mockFetch((u, init) => {
+      if (init?.method === "DELETE") { calls.push(u); return json({ ...detail, cases: [] }); }
+      return null;
+    });
+    renderWs();
+    await openReport();
+    fireEvent.click(await screen.findByRole("button", { name: "Menu TC-01" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Hapus test case" }));
+    const dialog = await screen.findByRole("dialog", { name: "Hapus TC-01?" });
+    expect(within(dialog).getByText("Lampiran milik test case ini ikut terhapus.")).toBeTruthy();
+    expect(calls).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Hapus" }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toContain("/qa/reports/r1/cases/c1");
+  });
+
+  it("simpan langkah yang gagal tampil sebagai galat di kartu; simpan ulang yang berhasil menampilkan Tersimpan", async () => {
+    let fail = true;
+    mockFetch((u, init) => {
+      if (u.endsWith("/cases/c1") && init?.method === "PATCH") {
+        if (fail) return json({ error: "langkah melebihi batas" }, 400);
+        return json({ ...detail, cases: [{ ...detail.cases[0]!, steps: "Buka" }] });
+      }
+      return null;
+    });
+    renderWs();
+    await openReport();
+    const steps = await screen.findByLabelText("Langkah pengujian TC-01");
+    fireEvent.change(steps, { target: { value: "Buka" } });
+    fireEvent.blur(steps);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Gagal menyimpan test case: langkah melebihi batas");
+    fail = false;
+    fireEvent.blur(steps);
+    expect(await screen.findByText("Tersimpan")).toBeTruthy();
+  });
+
+  it("laporan yang sudah ada tampil dengan kartu Info ringkas (drawer tertutup); laporan baru langsung membuka drawer Info", async () => {
+    mockFetch((u, init) => {
+      if (u.endsWith("/api/projects/p1/qa/reports") && init?.method === "POST") {
+        return json({ ...detail, id: "r9", code: "QA-009", title: "Regresi besar" }, 201);
+      }
+      return null;
+    });
+    renderWs();
+    await openReport();
+    await screen.findByRole("heading", { name: "Smoke 0.9" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("0.9.12")).toBeTruthy();          // versi di kartu ringkas
+    expect(screen.getByText("Belum dipilih")).toBeTruthy();   // keputusan belum dipilih
+    fireEvent.click(screen.getByText("Kembali"));
+    fireEvent.click(await screen.findByText("Laporan baru"));
+    fireEvent.change(screen.getByLabelText("Judul"), { target: { value: "Regresi besar" } });
+    fireEvent.click(screen.getByText("Buat"));
+    expect(await screen.findByRole("dialog", { name: "Info laporan" })).toBeTruthy();
+    expect(await screen.findByDisplayValue("Regresi besar")).toBeTruthy();
+  });
+
+  it("peringatan lampiran impor bisa ditutup", async () => {
+    mockFetch((u) => (u.endsWith("/qa/import")
+      ? json({ reportId: "r1", created: true, cases: 1, findings: 1, attachments: { saved: 0, rejected: [{ filename: "log.exe", reason: "type" }] } })
+      : null));
+    renderWs();
+    fireEvent.click(await screen.findByText("Impor Excel, ZIP, atau .md"));
+    fireEvent.change(screen.getByLabelText("Berkas laporan (wajib)"), { target: { files: [new File(["excel"], "report.xlsx")] } });
+    fireEvent.click(screen.getByText("Impor laporan"));
+    expect(await screen.findByText(/Beberapa lampiran perlu ditambahkan/)).toBeTruthy();
+    expect(screen.getByText(/log\.exe: Tipe berkas tidak didukung\./)).toBeTruthy();
+    fireEvent.click(screen.getByText("Tutup"));
+    expect(screen.queryByText(/Beberapa lampiran perlu ditambahkan/)).toBeNull();
+  });
+});
+
+describe("Field · label dan hint di drawer Info laporan", () => {
+  it("hint terhubung lewat aria-describedby, tak masuk nama aksesibel kontrol", async () => {
+    mockFetch();
+    renderWs();
+    await openReport();
+    fireEvent.click(await screen.findByRole("button", { name: "Ubah info" }));
+    const summary = await screen.findByLabelText("Ringkasan hasil");
+    expect(summary.getAttribute("aria-describedby")).toBeTruthy();
+    expect(document.getElementById(summary.getAttribute("aria-describedby")!)).toHaveTextContent("Boleh diisi setelah langkah uji");
+    expect(summary.getAttribute("aria-label")).toBeNull();
+  });
 });

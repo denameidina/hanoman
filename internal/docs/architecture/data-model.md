@@ -216,6 +216,13 @@ tiap berkas.
   `WEBHOOK_ENTITIES.fields`: penerima harus bisa membedakan "selesai lewat sesi" dari "ditandai
   manusia" tanpa mendiff dua amplop. Dibaca gerbang sweep auto-merge ADR-0103 — item ber-`manualDone`
   dilewati, karena "beres di luar sesi" berarti tak ada yang perlu di-merge.
+- `reviewedAt` (DateTime?, [ADR-0218](../adr/0218-penanda-sudah-ditinjau-item-selesai.md)) — **kapan operator
+  menandai item selesai ini sudah ditinjau**. `null` = belum ditinjau, atau item belum selesai. Ditulis
+  HANYA lewat `POST /specs/:id/reviewed` (idempoten; stempel pertama dipertahankan). Di-reset ke `null` saat
+  stage dimundurkan dari `done` (PATCH stage, atau reset ke brainstorming oleh POST source), **bukan** oleh
+  `recordCompletion` (reconcile memanggilnya ulang untuk item selesai) dan **bukan** oleh integrasi. Baris
+  `done` pra-migrasi di-backfill dengan `updatedAt`: penanda hanya berlaku untuk penyelesaian setelah
+  migrasi. Ikut `FIELDS.spec` dan `DATE_FIELDS` sync (cermin `doneAt`); **tidak** masuk allowlist webhook.
 - `dependsOn` (Json?, SPEC-447/[ADR-0093](../adr/0093-dependency-antar-backlog.md)) — **array id spec**
   yang harus **selesai (`stage=done`) DAN commit-nya sudah ada di branch basis item ini** sebelum
   sesinya boleh diluncurkan. `null`/`[]` = berdiri sendiri; pembaca menormalkannya (`dependsOnOf`,
@@ -641,7 +648,9 @@ overlay sesi live — status live (running/done/failed) tetap diturunkan dari `p
   barisnya justru membuat pembatalan membatalkan dirinya sendiri dalam ≤1 cadence (spec-nya masih cocok
   `UNSTARTED_SPEC_WHERE`). Mekanisme yang sama dipakai SPEC-431 (`markDone` + `ALREADY_DONE_NOTE`).
   Transisinya `queued → canceled` (`POST /api/scheduler/queue/:id/cancel`, `note` = `dibatalkan operator`
-  ± `: <reason>`) dan `canceled → queued` (`…/requeue`, `note` dikosongkan), keduanya **CAS**
+  ± `: <reason>`) dan `canceled → queued` (`…/requeue`, `note` dikosongkan) — ADR-0204 memperluasnya ke
+  `failed → queued` (`sessionId`, `launchedAt`, `note` ikut dikosongkan; token agen menuntut `sessions:spawn`),
+  keduanya **CAS**
   (`updateMany` ber-`where` status) — itulah yang membuat "item yang sudah punya sesi aktif tak boleh
   dibunuh diam-diam" tak bisa dilanggar balapan. Governor punya **dua gerbang** sepasang: `isQueued`
   di puncak badan loop `drain` (snapshot `queued()` bisa berumur puluhan detik, dan posisi paling atas

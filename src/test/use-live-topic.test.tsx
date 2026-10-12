@@ -139,4 +139,17 @@ describe("SPEC-908 · LiveConnectionBadge", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(7_000); });
     expect(screen.getByText(/koneksi terputus/i)).toBeTruthy();
   });
+
+  // Audit UI/UX 2026-10 · wilayah status SELALU terpasang supaya perubahan isinya diumumkan.
+  it("wilayah aria-live polite selalu ada, kosong saat terhubung dan berisi saat putus", async () => {
+    setStatus({ connected: true, since: Date.now(), paused: false });
+    const { container } = render(<LiveConnectionBadge />);
+    const region = container.querySelector('[role="status"]');
+    expect(region).not.toBeNull();
+    expect(region).toHaveAttribute("aria-live", "polite");
+    expect(region).toBeEmptyDOMElement();
+    await act(async () => { setStatus({ connected: false, since: Date.now(), paused: false }); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(7_000); });
+    expect(container.querySelector('[role="status"]')).toHaveTextContent(/koneksi terputus/i);
+  });
 });

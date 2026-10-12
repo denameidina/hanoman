@@ -6,6 +6,7 @@ import {
   useServerRestartedTo, reloadNoticeLabel, reloadNoticeText, reloadPage, waitForServerBack,
 } from "../api/update";
 import { usePopoverFocus } from "../ds/popover";
+import "./styles/panels.css";
 
 // Badge topbar dengan dua wajah dalam satu pil (SPEC-906): saat versi sudah terkini ia pil netral
 // `v<versi>` yang membuka popover ringkas, saat ada versi baru ia pil brass + popover lengkap.
@@ -21,30 +22,6 @@ type Phase =
   | { t: "confirming"; message: string }
   | { t: "applying" }
   | { t: "failed"; message: string };
-
-const btn: React.CSSProperties = {
-  padding: "5px 10px", borderRadius: "var(--radius-sm)", border: "1px solid var(--border-hair)",
-  background: "var(--bone-100)", cursor: "pointer", fontSize: 11,
-};
-const btnPrimary: React.CSSProperties = {
-  ...btn, background: "var(--brass-100)", color: "var(--brass-700)",
-  border: "1px solid var(--brass-300, var(--border-hair))",
-};
-const pill: React.CSSProperties = {
-  display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px",
-  borderRadius: "var(--radius-pill, 999px)", cursor: "pointer",
-  fontFamily: "var(--font-mono)", fontSize: 12,
-};
-// Brass = "ada yang harus kaulakukan". Keadaan up-to-date tak meminta apa pun, jadi ia bone/hair —
-// terbaca, tapi tak pernah bersaing dengan pil update yang menggantikannya di slot yang sama.
-const pillUpdate: React.CSSProperties = {
-  ...pill, border: "1px solid var(--brass-300, var(--border-hair))",
-  background: "var(--brass-100)", color: "var(--brass-700)",
-};
-const pillVersion: React.CSSProperties = {
-  ...pill, border: "1px solid var(--border-hair)",
-  background: "var(--bone-100)", color: "var(--text-subtle)",
-};
 
 export function UpdateBadge() {
   const u = useUpdate();
@@ -84,7 +61,7 @@ export function UpdateBadge() {
   const label = u.updateAvailable ? updateBadgeLabel(u) : `v${u.currentVersion}`;
   const labelShort = u.updateAvailable ? updateBadgeLabelShort(u) : u.currentVersion;
   return (
-    <div style={{ position: "relative" }}>
+    <div className="hn-upd-root">
       {/* SPEC-763 · label dibungkus span supaya mobile bisa menjatuhkannya (`.hn-topbar-label`):
           pil update penuh 296px dari ~358px lebar tools, jadi ia sendirian yang memaksa topbar jadi
           tiga baris (terukur 161–211px = 19–25% viewport 844px). Kontrolnya TIDAK hilang —
@@ -92,7 +69,7 @@ export function UpdateBadge() {
           popover. Pil versi mengikuti kontrak yang sama: di layar sempit tersisa nomornya saja. */}
       <button ref={popover.triggerRef} onClick={() => setOpen((v) => !v)} aria-haspopup="dialog" aria-controls={popover.panelId} aria-expanded={open} title={name}
         aria-label={`${name} · ${label}`}
-        style={u.updateAvailable ? pillUpdate : pillVersion}>
+        className={`hn-upd-pill ${u.updateAvailable ? "hn-upd-pill--update" : "hn-upd-pill--version"}`}>
         <Icon name={u.updateAvailable ? "arrow-up-circle" : "package"} size={13}
           color={u.updateAvailable ? "var(--brass-700)" : "var(--text-subtle)"} />
         <span className="hn-topbar-label">{label}</span>
@@ -100,81 +77,78 @@ export function UpdateBadge() {
       </button>
       {open && (
         <div ref={popover.panelRef} id={popover.panelId} role="dialog" aria-label={name} tabIndex={-1}
-          onKeyDown={popover.onKeyDown} className="hn-viewport-popover" style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 40, width: 320,
-          background: "var(--surface-card)", border: "1px solid var(--border-hair)",
-          borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-pop, 0 8px 24px rgba(0,0,0,.12))", padding: 14 }}>
-          <div className="hn-eyebrow" style={{ marginBottom: 8 }}>{name}</div>
-          <div style={{ fontSize: "var(--text-sm)", color: "var(--text-body)", marginBottom: 10 }}>{updateHeadline(u)}</div>
+          onKeyDown={popover.onKeyDown} className="hn-viewport-popover hn-upd-popover">
+          <div className="hn-eyebrow hn-upd-eyebrow">{name}</div>
+          <div className="hn-upd-headline">{updateHeadline(u)}</div>
           {u.updateAvailable && (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <code style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 11, background: "var(--bone-100)",
-                  padding: "6px 8px", borderRadius: "var(--radius-sm)", overflowX: "auto", whiteSpace: "nowrap" }}>{u.command}</code>
-                <button onClick={copy} title="Salin perintah" style={btn}>{copied ? "Tersalin" : "Salin"}</button>
+              <div className="hn-upd-cmd">
+                <code className="hn-upd-code">{u.command}</code>
+                <button onClick={copy} title="Salin perintah" className="hn-upd-btn">{copied ? "Tersalin" : "Salin"}</button>
               </div>
               {u.canApply && (
-                <div style={{ marginBottom: 8 }}>
+                <div className="hn-upd-block">
                   {phase.t === "idle" && (
-                    <button onClick={() => void send(false)} style={btnPrimary}>Pasang &amp; mulai ulang</button>
+                    <button onClick={() => void send(false)} className="hn-upd-btn hn-upd-btn--primary">Pasang &amp; mulai ulang</button>
                   )}
                   {phase.t === "asking" && (
-                    <div style={{ fontSize: 11, color: "var(--text-subtle)" }}>Memeriksa sesi yang berjalan…</div>
+                    <div className="hn-upd-note">Memeriksa sesi yang berjalan…</div>
                   )}
                   {phase.t === "confirming" && (
                     <>
-                      <div style={{ fontSize: 11, color: "var(--text-body)", marginBottom: 8 }}>{phase.message}</div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={() => void send(true)} style={btnPrimary}>Ya, pasang</button>
-                        <button onClick={() => setPhase({ t: "idle" })} style={btn}>Batal</button>
+                      <div className="hn-upd-text hn-upd-text--gap">{phase.message}</div>
+                      <div className="hn-upd-row">
+                        <button onClick={() => void send(true)} className="hn-upd-btn hn-upd-btn--primary">Ya, pasang</button>
+                        <button onClick={() => setPhase({ t: "idle" })} className="hn-upd-btn">Batal</button>
                       </div>
                     </>
                   )}
                   {phase.t === "applying" && (
-                    <div style={{ fontSize: 11, color: "var(--text-body)" }}>
+                    <div className="hn-upd-text">
                       Memasang dari npm lalu menjalankan ulang — dashboard tersambung lagi sendiri.
                     </div>
                   )}
                   {phase.t === "failed" && (
                     <>
-                      <div style={{ fontSize: 11, color: "var(--status-err-text, var(--text-body))", marginBottom: 8 }}>{phase.message}</div>
-                      <button onClick={() => setPhase({ t: "idle" })} style={btn}>Coba lagi</button>
+                      <div className="hn-upd-err">{phase.message}</div>
+                      <button onClick={() => setPhase({ t: "idle" })} className="hn-upd-btn">Coba lagi</button>
                     </>
                   )}
                 </div>
               )}
             </>
           )}
-          <div style={{ fontSize: 11, color: "var(--text-subtle)" }}>{updateVersionLine(u)}</div>
+          <div className="hn-upd-note">{updateVersionLine(u)}</div>
           {u.canApply && (
-            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border-hair)" }}>
+            <div className="hn-upd-restart">
               {rPhase.t === "idle" && (
-                <button onClick={() => void restart(false)} style={btn} title="Untuk server yang macet atau troubleshooting">
+                <button onClick={() => void restart(false)} className="hn-upd-btn" title="Untuk server yang macet atau troubleshooting">
                   <Icon name="refresh-cw" size={12} /> Mulai ulang hanoman
                 </button>
               )}
-              {rPhase.t === "asking" && <div style={{ fontSize: 11, color: "var(--text-subtle)" }}>Memeriksa sesi yang berjalan…</div>}
+              {rPhase.t === "asking" && <div className="hn-upd-note">Memeriksa sesi yang berjalan…</div>}
               {rPhase.t === "confirming" && (
                 <>
-                  <div style={{ fontSize: 11, color: "var(--text-body)", marginBottom: 8 }}>{rPhase.message}</div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => void restart(true)} style={btnPrimary}>Ya, mulai ulang</button>
-                    <button onClick={() => setRPhase({ t: "idle" })} style={btn}>Batal</button>
+                  <div className="hn-upd-text hn-upd-text--gap">{rPhase.message}</div>
+                  <div className="hn-upd-row">
+                    <button onClick={() => void restart(true)} className="hn-upd-btn hn-upd-btn--primary">Ya, mulai ulang</button>
+                    <button onClick={() => setRPhase({ t: "idle" })} className="hn-upd-btn">Batal</button>
                   </div>
                 </>
               )}
               {rPhase.t === "applying" && (
-                <div style={{ fontSize: 11, color: "var(--text-body)" }}>Menjalankan ulang — dashboard tersambung lagi sendiri.</div>
+                <div className="hn-upd-text">Menjalankan ulang — dashboard tersambung lagi sendiri.</div>
               )}
               {rPhase.t === "failed" && (
                 <>
-                  <div style={{ fontSize: 11, color: "var(--status-err-text, var(--text-body))", marginBottom: 8 }}>{rPhase.message}</div>
-                  <button onClick={() => setRPhase({ t: "idle" })} style={btn}>Coba lagi</button>
+                  <div className="hn-upd-err">{rPhase.message}</div>
+                  <button onClick={() => setRPhase({ t: "idle" })} className="hn-upd-btn">Coba lagi</button>
                 </>
               )}
             </div>
           )}
           {!u.updateAvailable && (
-            <div style={{ fontSize: 11, color: "var(--text-subtle)", marginTop: 4 }}>{updateRegistryLine(u)}</div>
+            <div className="hn-upd-note hn-upd-note--gap">{updateRegistryLine(u)}</div>
           )}
         </div>
       )}
@@ -190,10 +164,7 @@ export function ReloadBadge() {
   if (!version) return null;
   return (
     <button onClick={reloadPage} title={reloadNoticeText(version)} aria-label={reloadNoticeLabel(version)}
-      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px",
-        borderRadius: "var(--radius-pill, 999px)", border: "1px solid var(--brass-300, var(--border-hair))",
-        background: "var(--brass-100)", color: "var(--brass-700)", cursor: "pointer",
-        fontFamily: "var(--font-mono)", fontSize: 12 }}>
+      className="hn-upd-pill hn-upd-pill--update">
       <Icon name="refresh-cw" size={13} color="var(--brass-700)" />
       {/* SPEC-763 · label panjang dijatuhkan di topbar mobile; versinya tetap dirender karena
           ikon telanjang tak mengatakan apa pun. */}

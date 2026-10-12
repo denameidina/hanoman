@@ -101,22 +101,14 @@ export function PetAnswer({ sessionId, label, reduced, ask }:
   }
 
   const flat = reduced ? { transition: "none", transform: "none" } : undefined;
-  const box: React.CSSProperties = {
-    marginTop: 8, padding: "8px 10px", background: "var(--bone-100)",
-    border: "1px solid var(--border-hair)", borderRadius: "var(--radius-sm)",
-  };
   const noteLine = (line: string) => (
-    <div data-testid="pet-answer-note" style={{
-      fontFamily: "var(--font-ui)", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.45,
-    }}>{line}</div>
+    <div data-testid="pet-answer-note" className="hn-pet-note">{line}</div>
   );
 
   if (sent) {
     return (
-      <div style={box}>
-        <div data-testid="pet-answer-sent" style={{
-          fontFamily: "var(--font-ui)", fontSize: 12.5, color: "var(--text-strong)",
-        }}>Terkirim — menunggu {label} bergerak</div>
+      <div className="hn-pet-box">
+        <div data-testid="pet-answer-sent" className="hn-pet-sent">Terkirim — menunggu {label} bergerak</div>
       </div>
     );
   }
@@ -124,28 +116,27 @@ export function PetAnswer({ sessionId, label, reduced, ask }:
   // ketiga cabang keluar di bawah, termasuk saat `GET …/dialog` menyerah.
   const asked = ask?.questions[Math.min(ask.at, Math.max(0, ask.questions.length - 1))];
   const head = ask ? (
-    <div style={{ marginBottom: 6 }}>
+    <div className="hn-pet-head">
       <div data-testid="pet-answer-lead-state" className="hn-eyebrow">{LEAD_STATE[ask.state]}</div>
       {ask.total > 1 && (
-        <div className="hn-eyebrow" style={{ marginTop: 2 }}>
+        <div className="hn-eyebrow hn-pet-eyebrow-top">
           Pertanyaan {Math.min(ask.at + 1, ask.total)} dari {ask.total}
         </div>
       )}
       {/* Sesi codex tak punya `AskUserQuestion`: yang ada cuma teks giliran terakhirnya. Katakan
           itu apa adanya alih-alih merendernya sebagai pertanyaan berpilihan yang opsinya tak ada. */}
       {ask.source === "turn-end" && (
-        <div data-testid="pet-answer-source" className="hn-eyebrow" style={{ marginTop: 2 }}>
+        <div data-testid="pet-answer-source" className="hn-eyebrow hn-pet-eyebrow-top">
           Giliran terakhir sesi
         </div>
       )}
       {(asked?.question || ask.message) && (
-        <div style={{ fontFamily: "var(--font-ui)", fontSize: 12.5, fontWeight: 600,
-          color: "var(--text-strong)", lineHeight: 1.4, marginTop: 4 }}>
+        <div className="hn-pet-question">
           {asked?.question || ask.message}
         </div>
       )}
       {ask.state !== "taken-over" && (
-        <div style={{ marginTop: 6 }}>
+        <div className="hn-pet-mt-6">
           <Button data-testid="pet-answer-takeover" size="sm" variant="ghost" disabled={busy}
             style={flat} onClick={() => { void takeover(); }}>Ambil alih</Button>
         </div>
@@ -153,30 +144,29 @@ export function PetAnswer({ sessionId, label, reduced, ask }:
     </div>
   ) : null;
 
-  if (payload === undefined) return <div style={box}>{head}{noteLine(NOTE.loading)}</div>;
+  if (payload === undefined) return <div className="hn-pet-box">{head}{noteLine(NOTE.loading)}</div>;
   // Payload event ada tapi dialognya belum tergambar — `PreToolUse` menembak SEBELUM tool-nya
   // jalan, jadi jendela itu nyata. Pertanyaannya sudah terbaca; kotak jawabnya belum bisa dipasang.
   // Satu baris catatan, bukan dua: hasil aksi terakhir (`note`) MENANG atas kalimat keadaan, karena
   // ia yang baru saja dijawab operator.
   if (payload === null)
-    return <div style={box}>{head}{noteLine(note ?? (ask ? NOTE.preparing : NOTE.none))}</div>;
+    return <div className="hn-pet-box">{head}{noteLine(note ?? (ask ? NOTE.preparing : NOTE.none))}</div>;
 
   const { dialog } = payload;
   const answered = dialog.tabs.filter((t) => t.answered).length;
   return (
-    <div data-testid="pet-answer" data-session={sessionId} style={box}>
+    <div data-testid="pet-answer" data-session={sessionId} className="hn-pet-box">
       {head}
       {!ask && dialog.tabs.length > 1 && (
-        <div className="hn-eyebrow" style={{ marginBottom: 4 }}>
+        <div className="hn-eyebrow hn-pet-eyebrow-bottom">
           Pertanyaan {Math.min(answered + 1, dialog.tabs.length)} dari {dialog.tabs.length}
         </div>
       )}
       {!ask && dialog.title && (
-        <div style={{ fontFamily: "var(--font-ui)", fontSize: 12.5, fontWeight: 600,
-          color: "var(--text-strong)", lineHeight: 1.4, marginBottom: 6 }}>{dialog.title}</div>
+        <div className="hn-pet-title">{dialog.title}</div>
       )}
       {dialog.multi ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div className="hn-pet-stack">
           {dialog.options.map((o) => (
             <Checkbox key={o.n} label={o.label} checked={picked.includes(o.n)} disabled={busy}
               onChange={(on: boolean) => setPicked((v) =>
@@ -184,7 +174,7 @@ export function PetAnswer({ sessionId, label, reduced, ask }:
           ))}
         </div>
       ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <div className="hn-pet-wrap">
           {dialog.options.map((o) => (
             <Button key={o.n} data-testid="pet-answer-option" size="sm" variant="ghost"
               disabled={busy} style={flat}
@@ -193,9 +183,9 @@ export function PetAnswer({ sessionId, label, reduced, ask }:
         </div>
       )}
       {(dialog.freeIndex !== null || dialog.notes) && (
-        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+        <div className="hn-pet-free">
           <Input data-testid="pet-answer-text" size="sm" value={text} disabled={busy}
-            placeholder="Jawab dengan kalimatmu sendiri" style={{ flex: 1, minWidth: 0 }}
+            placeholder="Jawab dengan kalimatmu sendiri" className="hn-grow-min"
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setText(e.target.value)} />
           {!dialog.multi && (
             <Button size="sm" variant="ghost" disabled={busy || !text.trim()} style={flat}
@@ -204,14 +194,14 @@ export function PetAnswer({ sessionId, label, reduced, ask }:
         </div>
       )}
       {dialog.multi && (
-        <div style={{ marginTop: 8 }}>
+        <div className="hn-pet-mt-8">
           <Button data-testid="pet-answer-submit" size="sm" variant="primary" disabled={busy} style={flat}
             onClick={() => { void send({ choices: picked, ...(text.trim() ? { text: text.trim() } : {}) }); }}>
             Submit
           </Button>
         </div>
       )}
-      {note && <div style={{ marginTop: 6 }}>{noteLine(note)}</div>}
+      {note && <div className="hn-pet-mt-6">{noteLine(note)}</div>}
     </div>
   );
 }

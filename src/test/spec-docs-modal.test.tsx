@@ -27,7 +27,7 @@ describe("SpecDocsModal", () => {
     render(<SpecDocsModal specId="SPEC-763" onClose={() => {}} />);
     await screen.findByRole("tablist", { name: "Panel dokumen backlog" });
     expect(document.querySelector('[data-panel="files"]')).toHaveAttribute("aria-hidden", "false");
-    fireEvent.click(screen.getByRole("tab", { name: "Preview" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Pratinjau" }));
     expect(document.querySelector('[data-panel="preview"]')).toHaveAttribute("aria-hidden", "false");
   });
   it("mengelompokkan file per jenis & me-render markdown file terpilih", async () => {

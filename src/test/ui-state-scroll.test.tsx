@@ -1,6 +1,6 @@
 import React from "react";
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { useScrollRestore } from "../src/ui-state/hooks";
 import { uiKey, readUiState, writeUiState } from "../src/ui-state/store";
 
@@ -35,13 +35,59 @@ function List({ ready, tall = 2000 }: { ready: boolean; tall?: number }) {
 const frame = async () => { await act(async () => { await new Promise((r) => requestAnimationFrame(() => r(null))); }); };
 
 describe("useScrollRestore", () => {
-  it("menyimpan posisi scroll", async () => {
+  it("menyimpan posisi scroll (ditulis setelah jeda throttle)", async () => {
     render(<List ready />);
     const el = screen.getByTestId("list");
     el.scrollTop = 640;
     fireEvent.scroll(el);
-    await frame();
-    expect(readUiState(uiKey("demo", "scroll"), 0)).toBe(640);
+    await waitFor(() => expect(readUiState(uiKey("demo", "scroll"), 0)).toBe(640));
+  });
+
+  // Audit UI/UX 2026-10 · menggulir tak boleh menulis localStorage tiap frame: sepanjang satu jeda
+  // hanya satu tulisan, dan nilai yang tertulis adalah posisi terakhir.
+  it("menggulir berkali-kali dalam satu jeda hanya menulis sekali, dengan posisi terakhir", async () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    try {
+      render(<List ready />);
+      const el = screen.getByTestId("list");
+      for (const y of [100, 200, 300, 400]) { el.scrollTop = y; fireEvent.scroll(el); }
+      await waitFor(() => expect(readUiState(uiKey("demo", "scroll"), 0)).toBe(400));
+      const writes = setItem.mock.calls.filter(([k]) => k === uiKey("demo", "scroll"));
+      expect(writes).toHaveLength(1);
+    } finally {
+      setItem.mockRestore();
+    }
+  });
+
+  it("scrollend menulis posisi seketika, tanpa menunggu jeda", () => {
+    render(<List ready />);
+    const el = screen.getByTestId("list");
+    el.scrollTop = 320;
+    fireEvent.scroll(el);
+    fireEvent(el, new Event("scrollend"));
+    expect(readUiState(uiKey("demo", "scroll"), 0)).toBe(320);
+  });
+
+  it("posisi terakhir ditulis saat layar dilepas sebelum jeda habis", () => {
+    const { unmount } = render(<List ready />);
+    const el = screen.getByTestId("list");
+    el.scrollTop = 900;
+    fireEvent.scroll(el);
+    unmount();
+    expect(readUiState(uiKey("demo", "scroll"), 0)).toBe(900);
+  });
+
+  it("storage yang menolak tulis tak melempar ke penggulir", async () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("quota"); });
+    try {
+      render(<List ready />);
+      const el = screen.getByTestId("list");
+      el.scrollTop = 500;
+      expect(() => fireEvent.scroll(el)).not.toThrow();
+      await waitFor(() => expect(setItem).toHaveBeenCalled());
+    } finally {
+      setItem.mockRestore();
+    }
   });
 
   it("memulihkan posisi setelah ready", async () => {

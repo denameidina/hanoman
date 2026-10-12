@@ -20,7 +20,8 @@ const iso = (d: string) => `${d}T12:00:00.000Z`;
 describe("TEAM_COLUMNS", () => {
   it("empat kolom, urutannya TASK_STATUSES", () => {
     expect(TEAM_COLUMNS.map((c) => c.key)).toEqual(["backlog", "doing", "review", "done"]);
-    expect(TEAM_COLUMNS.map((c) => c.label)).toEqual(["Backlog", "Dikerjakan", "Review", "Selesai"]);
+    // Audit 2026-10: "Menunggu", bukan "Backlog" — kata itu milik papan Backlog.
+    expect(TEAM_COLUMNS.map((c) => c.label)).toEqual(["Menunggu", "Dikerjakan", "Review", "Selesai"]);
   });
 });
 

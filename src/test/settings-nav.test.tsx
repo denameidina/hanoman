@@ -31,39 +31,47 @@ describe("SettingsScreen sidebar", () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
     const picker = await screen.findByRole("combobox", { name: "Bagian pengaturan" });
     expect(Array.from((picker as HTMLSelectElement).options).map((option) => option.text))
-      .toEqual(expect.arrayContaining(["Akun", "Users", "Akses klien", "Konfigurasi", "Webhook", "Model sesi", "Sesi"]));
+      .toEqual(expect.arrayContaining([
+        "Lanjutan · Akun", "Lanjutan · Pengguna", "Integrasi & akses · Akses klien",
+        "Lanjutan · Konfigurasi", "Integrasi & akses · Webhook", "Agen & model", "Sesi harian",
+      ]));
     fireEvent.change(picker, { target: { value: "model" } });
-    const effort = await screen.findByLabelText("Effort claude");
-    expect(effort).toBeInTheDocument();
-    expect(effort.closest(".hn-setting-row")?.querySelector(".hn-setting-control")).toBeInTheDocument();
+    // Override per fungsi (Konflik, Lead, obrolan portal) kini di Agen & model.
+    expect(await screen.findByText("Konflik rebase & merge")).toBeInTheDocument();
     expect(document.querySelector(".hn-settings-layout")).toHaveAttribute("data-layout", "mobile");
     expect(JSON.parse(localStorage.getItem("hn.ui.v1.settings.tab")!)).toBe("model");
   });
   it("uses the compact settings rail at the tablet breakpoint", async () => {
     mockViewport(768);
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-    await screen.findByText("Ganti password");
-    expect(document.querySelector(".hn-settings-layout")).toHaveStyle({ gridTemplateColumns: "160px minmax(0, 1fr)" });
+    await screen.findByText("Sesi & notifikasi");
+    // Kolom rel ditentukan CSS (settings.css) lewat data-layout; jsdom tak memuat stylesheet.
+    expect(document.querySelector(".hn-settings-layout")).toHaveAttribute("data-layout", "tablet");
   });
-  it("mulai di Akun (form ganti password) lalu pindah tab lewat sidebar", async () => {
+  it("mulai di Sesi harian, lalu pindah ke Akun (Lanjutan) dan niat lain lewat navigasi", async () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-    // default tab = Akun
+    // default = Sesi harian; Akun (form ganti password) bukan layar awal, dan Lanjutan tertutup.
+    expect(await screen.findByText("Sesi & notifikasi")).toBeInTheDocument();
+    expect(screen.queryByText("Ganti password")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Akun" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Lanjutan" }));
+    fireEvent.click(screen.getByRole("button", { name: "Akun" }));
     expect(await screen.findByText("Ganti password")).toBeInTheDocument();
-    // pindah ke Model sesi → kartu model muncul, form password hilang
-    fireEvent.click(screen.getByText("Model sesi"));
+    // pindah ke Agen & model → override muncul, form password hilang
+    fireEvent.click(screen.getByRole("button", { name: "Agen & model" }));
     await waitFor(() => expect(screen.queryByText("Ganti password")).toBeNull());
-    // SPEC-383 · tab ini kini punya baris "Effort" untuk claude MAUPUN codex (dua grup berlabel
-    // agen), jadi identifikasi lewat label yang memang unik — bukan judul barisnya.
-    expect(screen.getByLabelText("Effort claude")).toBeInTheDocument();
-    // pindah ke Umum → toggle full-auto
-    fireEvent.click(screen.getByText("Umum"));
+    expect(await screen.findByText("Konflik rebase & merge")).toBeInTheDocument();
+    // kembali ke Sesi harian → toggle full-auto ada di sana, dan reset ada di Zona bahaya
+    fireEvent.click(screen.getByRole("button", { name: "Sesi harian" }));
     expect(await screen.findByText("Full-auto sebagai default")).toBeInTheDocument();
-    expect(screen.getByText("Reset ke default")).toBeInTheDocument();
+    // Lanjutan sudah terbuka sejak kunjungan ke Akun (disclosure tetap terbuka sampai ditutup).
+    fireEvent.click(screen.getByRole("button", { name: "Zona bahaya" }));
+    expect(await screen.findByRole("button", { name: "Reset ke default" })).toBeInTheDocument();
   });
 
   it("tab Sesi mem-PUT notifyDone saat toggle (SPEC-180)", async () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} onToast={() => {}} />);
-    fireEvent.click(screen.getByText("Sesi"));
+    fireEvent.click(screen.getByRole("button", { name: "Sesi harian" }));
     expect(await screen.findByText("Notifikasi backlog selesai")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("switch")[0]!); // toggle pertama = notifyDone
     await waitFor(() => expect(api.putSettings).toHaveBeenCalled());

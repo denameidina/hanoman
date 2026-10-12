@@ -91,6 +91,29 @@ export function initialWalkState(laneWidth: number, petWidth: number, now: numbe
   };
 }
 
+// Lebar jalur berubah sesudah rencana dibuat (resize, atau ukur pertama setelah mount). Rencana lama bisa
+// menyimpan tujuan di luar jalur baru, dan `until` yang masih jauh membuat stepWalk tak sempat memeriksanya.
+// Maka: berhenti di tempat, di-clamp ke jalur baru, dan jadwal berdiri dimulai ulang. Mode yang memegang
+// panggung sendiri (diseret, jatuh, pusing) tak lewat sini — stepWalk menurunkan posisinya dari masukan.
+export function fitWalk(state: PetWalkState,
+  input: Pick<PetWalkInput, "now" | "currentX" | "laneWidth" | "petWidth" | "pose">): PetWalkStep {
+  const { now, laneWidth, petWidth, pose } = input;
+  const at = clampX(input.currentX, laneWidth, petWidth);
+  return {
+    state: {
+      x: at, y: 0, facing: state.facing, mode: "stand", until: now + STAND_MS[0],
+      parkedX: state.parkedX === null ? null : clampX(state.parkedX, laneWidth, petWidth),
+    },
+    row: POSE_ROW[pose],
+    move: { x: at, y: 0, durationMs: 0, ease: "linear" },
+  };
+}
+
+// Batas render: transform pet tak boleh keluar dari kotak slotnya, walau keadaan yang dihitung sebelum lebar
+// berubah masih menyimpan koordinat lama. Untuk keadaan yang sudah benar, ia tak mengubah apa pun.
+export const clampMove = (move: PetMove, laneWidth: number, laneHeight: number, petWidth: number, petHeight: number): PetMove =>
+  ({ ...move, x: clampX(move.x, laneWidth, petWidth), y: clampY(move.y, laneHeight, petHeight) });
+
 export function stepWalk(state: PetWalkState, input: PetWalkInput, rng: Rng): PetWalkStep {
   const { now, laneWidth, laneHeight, petWidth, petHeight, pose } = input;
   const home = homeX(laneWidth, petWidth);

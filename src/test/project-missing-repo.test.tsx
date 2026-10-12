@@ -11,6 +11,9 @@ const NO_DIR = {
 const CLONED = { ...NO_DIR, binding: "/home/dena/code/arta" };
 
 vi.mock("../src/screens/AutoMergeCard", () => ({ AutoMergeCard: () => null }));
+// Kartu tetangga di detail project self-fetch dan bisa memunculkan role=alert sendiri (mock api di
+// sini tak memuatnya). Tanpa mock ini, `findByRole("alert")` menangkap alert agen custom lebih dulu.
+vi.mock("../src/screens/CustomAgentsPanel", () => ({ CustomAgentsPanel: () => null }));
 const { state } = vi.hoisted(() => ({ state: { project: null as any } }));
 vi.mock("../src/api/client", () => ({
   api: {
@@ -71,33 +74,29 @@ describe("project tanpa dir lokal (SPEC-867)", () => {
     fireEvent.click(screen.getByText("Pilih folder ini"));
     expect((await screen.findByPlaceholderText("/path/ke/arta") as HTMLInputElement).value)
       .toBe("/home/dena/code/arta");
-    fireEvent.click(screen.getByText("Clone"));
-    // SPEC-847 · ADR-0127 · clone menulis ke disk → dikonfirmasi, dan dialognya menyebut targetnya.
-    expect(await screen.findByText("Jalankan git clone di mesin ini?")).toBeInTheDocument();
-    expect(screen.getAllByText("/home/dena/code/arta").length).toBeGreaterThan(0);
+    // Audit 2026-10: satu konfirmasi saja — tombol Clone di modal. Dampaknya ditulis di badan modal,
+    // tak ada dialog kedua yang harus diklik.
+    expect(screen.getByText(/Isi remote diunduh ke disk mesin ini/)).toBeInTheDocument();
     expect((api.cloneProject as any)).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("Jalankan git clone"));
+    fireEvent.click(screen.getByText("Clone"));
     await waitFor(() => expect((api.cloneProject as any))
       .toHaveBeenCalledWith("arta", "/home/dena/code/arta"));
+    expect(screen.queryByText("Jalankan git clone di mesin ini?")).toBeNull();
     await waitFor(() => expect((api.getProject as any)).toHaveBeenCalledWith("arta"));
   });
 
-  it("membatalkan konfirmasi tak menyentuh disk sama sekali", async () => {
+  it("menutup modal sebelum Clone tak menyentuh disk sama sekali", async () => {
     const { api } = await import("../src/api/client");
     await openDetail(NO_DIR);
     fireEvent.click(await screen.findByText("Clone dari git remote"));
     fireEvent.change(await screen.findByPlaceholderText("/path/ke/arta"),
       { target: { value: "/home/dena/code/arta" } });
-    fireEvent.click(screen.getByText("Clone"));
-    fireEvent.click(await screen.findByText("Batal"));
-    await waitFor(() => expect(screen.queryByText("Jalankan git clone di mesin ini?")).toBeNull());
+    fireEvent.click(screen.getByText("Tutup"));
+    await waitFor(() => expect(screen.queryByPlaceholderText("/path/ke/arta")).toBeNull());
     expect((api.cloneProject as any)).not.toHaveBeenCalled();
-    // Modal clone tetap terbuka dengan path yang sudah diisi — membatalkan bukan menutup pekerjaan.
-    expect((screen.getByPlaceholderText("/path/ke/arta") as HTMLInputElement).value)
-      .toBe("/home/dena/code/arta");
   });
 
-  it("clone gagal menampilkan stderr endpoint, project tetap ada, dan bisa dicoba ulang", async () => {
+  it("clone gagal menampilkan stderr endpoint di role=alert, project tetap ada, dan bisa dicoba ulang", async () => {
     const { api } = await import("../src/api/client");
     (api.cloneProject as any).mockRejectedValueOnce(Object.assign(
       new Error("POST /api/projects/arta/clone → 409"),
@@ -107,13 +106,17 @@ describe("project tanpa dir lokal (SPEC-867)", () => {
     fireEvent.change(await screen.findByPlaceholderText("/path/ke/arta"),
       { target: { value: "/home/dena/code/arta" } });
     fireEvent.click(screen.getByText("Clone"));
-    fireEvent.click(await screen.findByText("Jalankan git clone"));
-    expect(await screen.findByText("git clone gagal")).toBeInTheDocument();
-    expect(screen.getByText(/repository 'x' not found/)).toBeInTheDocument();
+    // Toast galat juga ber-role=alert (Fase 2B): ambil alert yang memuat stderr, bukan alert pertama.
+    const alert = await waitFor(() => {
+      const hit = screen.getAllByRole("alert").find((el) => /repository 'x' not found/.test(el.textContent ?? ""));
+      if (!hit) throw new Error("alert stderr belum tampil");
+      return hit;
+    });
+    expect(alert).toHaveTextContent("git clone gagal");
+    expect(alert).toHaveTextContent(/repository 'x' not found/);
     expect(screen.getAllByText("arta").length).toBeGreaterThan(0);   // project tak terhapus
-    // Dialog konfirmasi ikut tertutup oleh kegagalan — percobaan kedua dikonfirmasi ulang.
+    // Modal tetap terbuka oleh kegagalan — percobaan kedua langsung dari tombol "Coba lagi".
     fireEvent.click(screen.getByText("Coba lagi"));
-    fireEvent.click(await screen.findByText("Jalankan git clone"));
     await waitFor(() => expect((api.cloneProject as any)).toHaveBeenCalledTimes(2));
   });
 

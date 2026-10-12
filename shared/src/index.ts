@@ -15,6 +15,7 @@ export * from "./agent-catalog";
 export * from "./github";
 export * from "./lead";
 export * from "./dto";
+export * from "./spec-review";
 export * from "./api";
 export * from "./coverage";
 export * from "./ticket-status";

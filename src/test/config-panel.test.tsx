@@ -34,6 +34,7 @@ beforeEach(() => {
 describe("ConfigPanel (tab Konfigurasi)", () => {
   it("render entri per grup; bootstrap read-only; secret termask", async () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
+    fireEvent.click(screen.getByText("Lanjutan"));
     fireEvent.click(screen.getByText("Konfigurasi"));
     await waitFor(() => expect(screen.getByText("URL hub")).toBeInTheDocument());
     expect(screen.getByText("Device token")).toBeInTheDocument();
@@ -41,6 +42,7 @@ describe("ConfigPanel (tab Konfigurasi)", () => {
   });
   it("simpan knob memanggil putConfig", async () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} onToast={() => {}} />);
+    fireEvent.click(screen.getByText("Lanjutan"));
     fireEvent.click(screen.getByText("Konfigurasi"));
     await waitFor(() => screen.getByText("URL hub"));
     const input = screen.getByLabelText("URL hub") as HTMLInputElement;

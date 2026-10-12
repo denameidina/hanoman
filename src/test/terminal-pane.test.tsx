@@ -1,7 +1,7 @@
-import { render, cleanup, act, screen, fireEvent } from "@testing-library/react";
+import { render, cleanup, act, screen, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { api } from "../src/api/client";
-import { TerminalPane } from "../src/screens/TerminalPane";
+import { TerminalPane, TerminalKeys } from "../src/screens/TerminalPane";
 
 // SPEC-511 · xterm butuh canvas + pengukuran font; jsdom tak punya keduanya. Yang diuji di sini
 // bukan rendering terminalnya melainkan **kontrak call site**: opsi apa yang benar-benar sampai ke
@@ -508,6 +508,48 @@ describe("TerminalPane · papan tombol layar (SPEC-800)", () => {
   });
 });
 
+// QA visual 2026-10 · di 320 px papan kunci (292 px kotak, isi 349 px) memotong "Enter" tanpa tanda bahwa
+// ia bisa digeser. Tepi yang masih menyimpan kunci diberi penanda (`data-fade-*`), seperti strip tab.
+describe("TerminalKeys · penanda tepi papan kunci (320 px)", () => {
+  const layoutKeys = (el: HTMLElement, scrollWidth: number, clientWidth: number, scrollLeft = 0) => {
+    Object.defineProperty(el, "scrollWidth", { configurable: true, value: scrollWidth });
+    Object.defineProperty(el, "clientWidth", { configurable: true, value: clientWidth });
+    Object.defineProperty(el, "scrollLeft", { configurable: true, writable: true, value: scrollLeft });
+  };
+  const keysEl = () => screen.getByRole("group", { name: "Tombol terminal" });
+
+  it("papan yang muat tak diberi penanda sama sekali", () => {
+    render(<TerminalKeys onKey={() => {}} />);
+    layoutKeys(keysEl(), 300, 300);
+    fireEvent.scroll(keysEl());
+    expect(keysEl()).not.toHaveAttribute("data-fade-start");
+    expect(keysEl()).not.toHaveAttribute("data-fade-end");
+  });
+
+  it("meluap dan di awal: hanya tepi kanan yang diberi penanda (Enter masih tersembunyi)", () => {
+    render(<TerminalKeys onKey={() => {}} />);
+    layoutKeys(keysEl(), 349, 292, 0);
+    fireEvent.scroll(keysEl());
+    expect(keysEl()).toHaveAttribute("data-fade-end", "true");
+    expect(keysEl()).not.toHaveAttribute("data-fade-start");
+  });
+
+  it("digulir sampai ujung: penanda kanan hilang, kiri tetap", () => {
+    render(<TerminalKeys onKey={() => {}} />);
+    layoutKeys(keysEl(), 349, 292, 57);
+    fireEvent.scroll(keysEl());
+    expect(keysEl()).toHaveAttribute("data-fade-start", "true");
+    expect(keysEl()).not.toHaveAttribute("data-fade-end");
+  });
+
+  it("tombol tetap bisa ditekan dari papan yang menggulir", () => {
+    const sent: string[] = [];
+    render(<TerminalKeys onKey={(seq) => sent.push(seq)} />);
+    fireEvent.click(screen.getByRole("button", { name: "Kirim Enter ke terminal" }));
+    expect(sent).toEqual(["\r"]);
+  });
+});
+
 describe("TerminalPane · tap memilih opsi dialog (SPEC-800)", () => {
   const screenLines = (lines: string[]) => {
     xt.buffer.viewportY = 0;
@@ -961,7 +1003,7 @@ describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", (
     expect(container.querySelector('[data-testid="terminal-held"]')).toBeNull();
   });
 
-  it("membuang antrean tertahan saat operator memilih Buang", async () => {
+  it("membuang antrean tertahan setelah dikonfirmasi", async () => {
     const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
     act(() => { sockets[0]!.onopen?.(); });
@@ -969,8 +1011,72 @@ describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", (
     act(() => { xt.dataHandler?.("\r"); });
     await reconnect();
     act(() => { fireEvent.click(screen.getByRole("button", { name: "Buang" })); });
+    // Teks yang dibuang tak bisa dipulihkan, jadi dialog konfirmasi wajib menjawab dulu.
+    fireEvent.click(await screen.findByRole("button", { name: "Buang ketikan" }));
+    await vi.waitFor(() => expect(container.querySelector('[data-testid="terminal-held"]')).toBeNull());
     expect(inputsOf(sockets[1])).toEqual([]);
-    expect(container.querySelector('[data-testid="terminal-held"]')).toBeNull();
+  });
+
+  it("Batal pada konfirmasi Buang mempertahankan ketikan tertahan", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    cut();
+    act(() => { xt.dataHandler?.("\r"); });
+    await reconnect();
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Buang" })); });
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Batal" }));
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(container.querySelector('[data-testid="terminal-held"]')).not.toBeNull();
+  });
+
+  // Jalan keluar keyboard: xterm menelan Tab/Esc, jadi Ctrl+Shift+Esc harus keluar TANPA mengirim
+  // apa pun ke pty, sedangkan Esc polos tetap diproses terminal (dan karenanya sampai ke agen).
+  it("Ctrl+Shift+Esc tak diteruskan ke pty; Esc polos tetap diproses terminal", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    expect(xt.keyHandler?.(new KeyboardEvent("keydown", { key: "Escape" }))).toBe(true);
+    expect(xt.keyHandler?.(new KeyboardEvent("keydown", { key: "Escape", ctrlKey: true, shiftKey: true })))
+      .toBe(false);
+  });
+
+  // Keputusan 15 (Audit UI/UX 2026-10): mode pembaca layar xterm itu opsional dan default mati.
+  // Opsinya berpindah di tempat (AccessibilityManager dinyalakan atau dibuang), tanpa socket baru.
+  it("mode pembaca layar mati secara default dan berpindah di tempat tanpa socket baru", async () => {
+    const { rerender } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    expect(xt.options?.screenReaderMode).toBe(false);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+
+    rerender(<TerminalPane sessionId="sesi-1" onExit={() => { }} screenReader />);
+    expect(xt.options?.screenReaderMode).toBe(true);
+    expect(sockets).toHaveLength(1);
+
+    rerender(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    expect(xt.options?.screenReaderMode).toBe(false);
+    expect(sockets).toHaveLength(1);
+  });
+
+  // Dengan mode aktif, Tab tetap diproses xterm (dan dikirim ke pty), sedangkan Ctrl+Shift+Esc tetap
+  // melepas fokus dan tak pernah sampai ke pty. Jalan keluar itu tak boleh hilang di mode ini.
+  it("mode pembaca layar aktif: Ctrl+Shift+Esc tetap melepas fokus, Tab tetap diproses terminal", async () => {
+    render(<TerminalPane sessionId="sesi-1" onExit={() => { }} screenReader />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    expect(xt.options?.screenReaderMode).toBe(true);
+    expect(xt.keyHandler?.(new KeyboardEvent("keydown", { key: "Escape", ctrlKey: true, shiftKey: true })))
+      .toBe(false);
+    expect(xt.keyHandler?.(new KeyboardEvent("keydown", { key: "Tab" }))).toBe(true);
+  });
+
+  it("tombol keluar fokus terlihat saat terminal berfokus dan memindahkan fokus ke akar pane", async () => {
+    const { container } = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    expect(screen.queryByRole("button", { name: /Keluar fokus terminal/ })).toBeNull();
+    fireEvent.focusIn(screen.getByTestId("terminal-host"));
+    const exit = screen.getByRole("button", { name: /Keluar fokus terminal · Ctrl\+Shift\+Esc/ });
+    fireEvent.click(exit);
+    expect(document.activeElement).toBe(container.firstElementChild);
   });
 
   it("memperlihatkan jumlah ketikan yang sedang diantre", async () => {
@@ -1010,6 +1116,22 @@ describe("TerminalPane · umpan balik ketikan saat jaringan goyah (SPEC-878)", (
     expect(inputsOf(sockets[1])).toEqual(["ya"]);
   });
 
+  it("status gone menawarkan Hapus sel; onForget baru jalan setelah dikonfirmasi", async () => {
+    const onForget = vi.fn();
+    render(<TerminalPane sessionId="sesi-1" label="arta · SPEC-9" onExit={() => { }} onForget={onForget} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    act(() => { sockets[0]!.readyState = 3; sockets[0]!.onclose?.({ code: 4004 }); });
+    fireEvent.click(await screen.findByRole("button", { name: "Hapus sel" }));
+    // Judul dialog menyebut nama sel, supaya konfirmasi tak mungkin mengenai sel lain.
+    expect(await screen.findByText(/Hapus sel "arta · SPEC-9 · sesi-1"\?/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Batal" }));
+    expect(onForget).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Hapus sel" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Hapus dari tampilan" }));
+    await vi.waitFor(() => expect(onForget).toHaveBeenCalledTimes(1));
+  });
+
   it("berhenti memprediksi begitu sesi tmux-nya dinyatakan lenyap", async () => {
     render(<TerminalPane sessionId="sesi-1" onExit={() => { }} />);
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
@@ -1042,11 +1164,16 @@ describe("TerminalPane · kolom ketik perangkat sentuh (SPEC-882)", () => {
     await vi.waitFor(() => expect(sockets).toHaveLength(1));
     // Host kini dibungkus wrapper relatif (badge/bar mode seleksi mengambang di atasnya), jadi
     // urutan yang berarti ada di anak-anak container TERATAS, bukan induk langsung host.
+    // Fase 3E: composer dan papan tombol hidup di dock bawah (`.hn-terminal-dock`), jadi urutannya
+    // diuji di dalam dock; host tetap mendahului dock di anak-anak container teratas.
     const kids = Array.from(container.firstElementChild!.children);
     const at = (sel: string) => kids.findIndex((k) => k.matches(sel) || k.querySelector(sel) !== null);
     expect(at('[data-testid="terminal-host"]')).toBeGreaterThanOrEqual(0);
-    expect(at('[data-testid="terminal-host"]')).toBeLessThan(at(".hn-terminal-composer"));
-    expect(at(".hn-terminal-composer")).toBeLessThan(at(".hn-terminal-keys"));
+    expect(at('[data-testid="terminal-host"]')).toBeLessThan(at(".hn-terminal-dock"));
+    const dock = Array.from(container.querySelector(".hn-terminal-dock")!.children);
+    const inDock = (sel: string) => dock.findIndex((k) => k.matches(sel));
+    expect(inDock(".hn-terminal-composer")).toBeGreaterThanOrEqual(0);
+    expect(inDock(".hn-terminal-composer")).toBeLessThan(inDock(".hn-terminal-keys"));
   });
 
   // Tanpa atribut ini papan ketik Android mengapitalkan & mengoreksi otomatis perintah shell,
@@ -1130,23 +1257,36 @@ describe("TerminalPane · kolom ketik perangkat sentuh (SPEC-882)", () => {
     expect(composer().value).toBe("");
   });
 
-  it("mengikuti keadaan sambungan dan antrean pada penanda status", async () => {
+  // Audit UI/UX · kolom ketik tak lagi memasang "terkirim" terus-menerus, dan antrean/tertahan
+  // hanya dinyatakan oleh strip status pane (satu sumber, tak dobel dengan kolom ketik).
+  it("mengikuti keadaan sambungan dan antrean pada strip status, bukan pada kolom ketik", async () => {
     const { container } = await openPane();
-    expect(screen.getByTestId("terminal-composer-status").textContent).toBe("terkirim");
+    expect(screen.getByTestId("terminal-composer-status").textContent).toBe("");
     act(() => { sockets[0]!.readyState = 3; sockets[0]!.onclose?.({ code: 1006 }); });
     for (const c of [..."halo"]) act(() => { xt.dataHandler?.(c); });
     await wait882(40);
     await vi.waitFor(() => {
-      expect(screen.getByTestId("terminal-composer-status").textContent).toBe("diantre 4");
+      expect(container.querySelector('[data-testid="terminal-queue"]')?.textContent).toBe("4 ketikan diantre");
     });
+    expect(screen.getByTestId("terminal-composer-status").textContent).toBe("");
     act(() => { xt.dataHandler?.("\r"); });
     await vi.waitFor(() => expect(sockets.length).toBeGreaterThan(1), { timeout: 3_000 });
     act(() => { sockets[1]!.onopen?.(); });
     await vi.waitFor(() => {
-      expect(screen.getByTestId("terminal-composer-status").textContent)
-        .toBe("tertahan — Kirim di atas");
+      expect(container.querySelector('[data-testid="terminal-held"]')).not.toBeNull();
     });
-    expect(container.querySelector('[data-testid="terminal-held"]')).not.toBeNull();
+    expect(screen.getByTestId("terminal-composer-status").textContent).toBe("");
+  });
+
+  it("badge terkirim muncul sesaat sesudah Enter di kolom ketik, lalu hilang", async () => {
+    await openPane();
+    const input = screen.getByTestId("terminal-composer") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "ls" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByTestId("terminal-composer-status").textContent).toBe("terkirim");
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("terminal-composer-status").textContent).toBe("");
+    }, { timeout: 3_000 });
   });
 
   it("menyesuaikan geometri pty saat kolom ketik muncul dan hilang", async () => {
@@ -1270,5 +1410,84 @@ describe("TerminalPane · dikte suara", () => {
     r.unmount();
     expect(stop).toHaveBeenCalled();
     stop.mockRestore();
+  });
+});
+
+// Fase 3E+ · dock ringkas (pane fokus di ponsel): composer dengan mic dan Kirim, "Tombol khusus" yang
+// mengalihkan papan tombol, dan bahasa dikte di ⋯. Dock tablet/desktop (non-compact) tak berubah.
+describe("TerminalPane · dock ringkas ponsel (Fase 3E+)", () => {
+  class FakeRecognition {
+    static last: FakeRecognition | undefined;
+    lang = ""; continuous = false; interimResults = false;
+    onresult: ((e: any) => void) | null = null;
+    onerror: ((e: { error: string }) => void) | null = null;
+    onend: (() => void) | null = null;
+    constructor() { FakeRecognition.last = this; }
+    start() { }
+    stop() { }
+    abort() { }
+  }
+  const w = window as unknown as Record<string, unknown>;
+  const composer = () => screen.getByTestId("terminal-composer") as HTMLInputElement;
+
+  const openCompact = async (props: Record<string, unknown> = {}) => {
+    const r = render(<TerminalPane sessionId="sesi-1" onExit={() => { }} composer compact {...props} />);
+    await vi.waitFor(() => expect(sockets).toHaveLength(1));
+    act(() => { sockets[0]!.onopen?.(); });
+    return r;
+  };
+
+  afterEach(() => { delete w.SpeechRecognition; FakeRecognition.last = undefined; });
+
+  it("ringkas: kolom ketik dan Kirim tampil; papan tombol tertutup; Tombol khusus memanggil pemilik", async () => {
+    const onToggleKeys = vi.fn();
+    await openCompact({ onToggleKeys });
+    expect(screen.getByTestId("terminal-composer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Kirim perintah ke sesi" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Tombol terminal" })).toBeNull();
+    const toggle = screen.getByRole("button", { name: "Tombol khusus" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    expect(onToggleKeys).toHaveBeenCalledTimes(1);
+  });
+
+  it("ringkas: papan tombol tampil mengikuti showKeys, dan Tombol khusus mencerminkannya", async () => {
+    await openCompact({ showKeys: true, onToggleKeys: () => { } });
+    expect(screen.getByRole("group", { name: "Tombol terminal" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tombol khusus" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("ringkas: Kirim mengirim teks yang diketik persis seperti Enter, dan kolom dikosongkan", async () => {
+    await openCompact({ onToggleKeys: () => { } });
+    const before = inputsOf(sockets[0]).length;
+    act(() => { fireEvent.change(composer(), { target: { value: "ls -l" } }); });
+    act(() => { fireEvent.click(screen.getByRole("button", { name: "Kirim perintah ke sesi" })); });
+    expect(inputsOf(sockets[0]).slice(before)).toEqual(["ls -l\r"]);
+    expect(composer().value).toBe("");
+  });
+
+  it("ringkas tanpa dukungan dikte: tak ada mic dan tak ada ⋯ Opsi dikte", async () => {
+    await openCompact({ onToggleKeys: () => { } });
+    expect(screen.queryByTestId("voice-toggle")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Opsi dikte suara" })).toBeNull();
+  });
+
+  it("ringkas dengan dukungan dikte: mic ada di baris composer; bahasa dan keterangan pindah ke ⋯", async () => {
+    w.SpeechRecognition = FakeRecognition;
+    await openCompact({ onToggleKeys: () => { } });
+    const row = document.querySelector<HTMLElement>(".hn-terminal-composer")!;
+    expect(row.contains(screen.getByTestId("voice-toggle"))).toBe(true);
+    expect(screen.queryByTestId("voice-lang")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Opsi dikte suara" }));
+    const sheet = await screen.findByRole("dialog", { name: "Opsi dikte suara" });
+    expect(within(sheet).getByRole("combobox", { name: "Bahasa dikte" })).toHaveValue("id-ID");
+    expect(within(sheet).getByText(/layanan suara browser Anda/)).toBeInTheDocument();
+  });
+
+  it("ringkas pane baca-saja (remote tanpa sessions:write): tak ada kolom, Kirim, atau Tombol khusus", async () => {
+    await openCompact({ mode: "remote", onToggleKeys: () => { } });
+    expect(screen.queryByTestId("terminal-composer")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Kirim perintah ke sesi" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Tombol khusus" })).toBeNull();
   });
 });

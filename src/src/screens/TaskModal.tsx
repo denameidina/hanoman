@@ -2,6 +2,8 @@ import React from "react";
 import type { CreateTaskInput, MemberView, TaskStatus, TaskView } from "@hanoman/shared";
 import { Button, Field, HnTextarea, Input, Modal, Select, useConfirm } from "../ds";
 import { api } from "../api/client";
+import { failureMessage } from "../lib/report-error";
+import { PRIORITY_LABEL } from "../lib/labels";
 import { TEAM_COLUMNS, dateInputToIso, dateInputValue } from "./team-rules";
 import type { ProjectVM } from "./types";
 
@@ -12,7 +14,6 @@ import type { ProjectVM } from "./types";
 // literal baru — `Record<Priority, …>` membuat nilai yang bertambah jadi galat kompilasi di sini,
 // bukan opsi yang diam-diam hilang dari form.
 type Priority = NonNullable<CreateTaskInput["priority"]>;
-const PRIORITY_LABEL: Record<Priority, string> = { tinggi: "Tinggi", sedang: "Sedang", rendah: "Rendah" };
 const PRIORITIES = (Object.keys(PRIORITY_LABEL) as Priority[])
   .map((value) => ({ value, label: PRIORITY_LABEL[value] }));
 
@@ -90,18 +91,28 @@ export function TaskModal({ open, task, projects, members, defaultProjectId, ord
       onToast(task ? "Tugas diperbarui" : "Tugas dibuat", "ok", "check");
       onSaved();
       onClose();
-    } catch { onToast("Gagal menyimpan tugas", "err", "x-circle"); }
+    } catch (e) { onToast(failureMessage("menyimpan tugas", e), "err", "x-circle"); }
     finally { setBusy(false); }
   }
 
   async function remove() {
     if (!task) return;
-    if (!await confirm({
-      title: `Hapus "${task.title}"?`,
-      message: "Kartu ini hilang dari papan di semua device yang tersinkron.",
-      confirmLabel: "Hapus tugas", tone: "danger", icon: "trash-2",
-      run: () => api.deleteTask(task.id),
-    })) return;
+    // `run` menahan dialog konfirmasi tetap terbuka & busy; galatnya dilempar ke sini, bukan ditelan.
+    try {
+      const ok = await confirm({
+        title: `Hapus "${task.title}"?`,
+        impact: ["Kartu ini hilang dari papan di semua device yang tersinkron."],
+        confirmLabel: "Hapus tugas", tone: "danger", icon: "trash-2",
+        run: async () => {
+          setBusy(true);
+          try { await api.deleteTask(task.id); } finally { setBusy(false); }
+        },
+      });
+      if (!ok) return;
+    } catch (e) {
+      onToast(failureMessage("menghapus tugas", e), "err", "x-circle");
+      return;
+    }
     onToast("Tugas dihapus", "ok", "trash-2");
     onSaved();
     onClose();
@@ -109,7 +120,9 @@ export function TaskModal({ open, task, projects, members, defaultProjectId, ord
 
   return (
     <>
-      <Modal open={open} onClose={onClose} icon="clipboard-list"
+      {/* Selama menyimpan/menghapus, Escape, klik overlay, dan tombol tutup mati — kalau tidak, operator
+          bisa menutup modal di tengah mutasi dan tak tahu hasilnya (DS: close dimatikan selama mutasi). */}
+      <Modal open={open} onClose={busy ? undefined : onClose} icon="clipboard-list"
         eyebrow="Papan tim" title={task ? "Ubah tugas" : "Tugas baru"}
         footer={
           <div style={{ display: "flex", gap: 8, width: "100%", alignItems: "center" }}>

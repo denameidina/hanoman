@@ -25,8 +25,10 @@ describe("inventaris window.confirm (SPEC-847)", () => {
   // bukan sesuatu yang harus ditemukan lewat review.
   // Per BERKAS, bukan per baris: nomor baris bergeser tiap ada suntingan di atasnya dan itu bukan
   // pengecualian baru — yang dijaga di sini adalah jumlah dan lokasi pengecualiannya.
-  it("pengecualian yang diketahui persis satu", () => {
-    expect(hits.map((h) => h.file)).toEqual(["src/src/screens/GitGraph.tsx"]);
+  // Audit UI/UX 2026-10 (Fase 1F): pengecualian GitGraph (tag "Dorong ke origin?") diganti form
+  // DS — dorong kini checkbox di dialog tag. Daftarnya kosong; penambahan baru harus lolos review.
+  it("tak ada window.confirm tersisa (pengecualian GitGraph sudah jadi form DS)", () => {
+    expect(hits.map((h) => h.file)).toEqual([]);
   });
 
   // Komponen yang memanggil useConfirm() tapi lupa merender {dialog} membuat promise-nya

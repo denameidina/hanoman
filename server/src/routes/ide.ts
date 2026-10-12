@@ -1,22 +1,20 @@
 import type { FastifyInstance } from "fastify";
 import { basename, resolve } from "node:path";
-import { execFile, spawn } from "node:child_process";
-import { promisify } from "node:util";
+import { spawn } from "node:child_process";
 import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { listRemotes, addRemote, setRemoteUrl, removeRemote, prUrl } from "../services/git-remotes";
 import { downloadFormat, sendDocDownload, sendReviewDownload } from "../services/doc-export";
-import { prisma } from "../db";
 import { repoOf } from "../services/repo-dir";
 import { listSessions } from "../services/pty";
 import { createAgentSession } from "../services/session-launch-gate";
 import { conflictSessionDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
-import { mergeIntoCurrent, rebaseOntoCurrent, pullIntoCurrent, dropCommit, sourceBranch, type GraphMergeResult } from "../services/integrate";
+import { mergeIntoCurrent, rebaseOntoCurrent, pullIntoCurrent, dropCommit, type GraphMergeResult } from "../services/integrate";
 import { listUnusedBranches, deleteBranches, type BranchScope } from "../services/branch-cleanup";
-import { listWorktrees, worktreeStats, deleteWorktrees, collectOrphanWorktrees } from "../services/worktree-list";
-import { closeSession } from "../services/session-close";
-import { releaseWorktree, releaseWorktreeToTrash, prodReaperDeps } from "../services/worktree-reaper";
+import { listWorktrees, worktreeStats, collectOrphanWorktrees } from "../services/worktree-list";
+import { releaseWorktreeToTrash, prodReaperDeps } from "../services/worktree-reaper";
 import { projectWorktreeInputs as worktreeInputs, worktreeSessions } from "../services/worktree-project";
+import { lockInputs, deleteProjectWorktrees } from "../services/worktree-delete";
 import {
   listRepoTree, listIgnoredEntries, listDirEntries, readRepoFile, writeRepoFile, listGraph, commitDetail, commitFileDiff, compareCommits, compareFile,
   searchCommits, runGitOp, validateGitOp, touchesTree, repoStatus, listStashes,
@@ -28,27 +26,6 @@ import {
 } from "../services/repo-fs";
 
 const activeSessions = (id: string) => listSessions().filter((s) => s.projectId === id && !s.exited).length;
-
-// SPEC-360 · ADR-0077 · sinyal NON-git yang mengunci sebuah branch dari penghapusan. Dikumpulkan
-// di route (yang boleh menyentuh DB & tmux) lalu diserahkan ke service sebagai himpunan nama
-// branch — service tetap murni & bisa dites tanpa DB maupun tmux.
-async function lockInputs(id: string) {
-  const open = await prisma.spec.findMany({
-    where: { projectId: id, stage: { not: "done" } }, select: { id: true } });
-  // Sesi backlog lahir TANPA opts.branch (session-launch.ts) → SessionInfo.branch undefined;
-  // nama branch-nya diturunkan dari id sesi yang deterministik dari id spec (ADR-0015).
-  // Sesi PRD/breakdown memang membawa `branch`. Keduanya harus terlindungi.
-  const sessions = listSessions()
-    .filter((s) => s.projectId === id && !s.exited)
-    .map((s) => s.branch || (s.specId ? `hanoman/${s.id}` : ""))
-    .filter(Boolean);
-  return {
-    openSpecBranches: new Set(open.map((s) => sourceBranch(s.id))),
-    sessionBranches: new Set(sessions),
-  };
-}
-
-const execAsync = promisify(execFile);
 
 // ADR-0121 · terjemahan seragam error service berkas → kode HTTP. Apa pun yang tak dikenal
 // jatuh ke 400: seluruh sisanya adalah penolakan penjaga path, dan itu salah peminta.
@@ -547,27 +524,8 @@ export default async function (app: FastifyInstance) {
         prune: prodReaperDeps.prune,
       });
     }
-    const locks = await lockInputs(id);
-    return deleteWorktrees(repoDir, b.names as string[], {
-      withBranch: b.deleteBranch === true,
-      ...(await worktreeInputs(id)),
-      closeSession,
-      release: (repo, path) => releaseWorktree(repo, path, id),
-      // Worktree terkunci (`git worktree lock`) tetap boleh dihapus dari IDE: buka kuncinya dulu.
-      unlock: async (repo, path) => {
-        await execAsync("git", ["worktree", "unlock", path], { cwd: repo, timeout: 30_000 });
-      },
-      prune: async (repo) => {
-        // Gagal-diam: registrasi basi bukan alasan menahan penghapusan (cermin prodReaperDeps).
-        try { await execAsync("git", ["worktree", "prune"], { cwd: repo, timeout: 30_000 }); } catch { /* */ }
-      },
-      // Pagar kunci ADR-0077 ikut apa adanya — satu-satunya jalur hapus branch di codebase.
-      deleteBranch: async (repo, name) => {
-        const r = await deleteBranches(repo, [name], { scope: "both", ...locks });
-        const first = r.results[0];
-        return { ok: !!first?.ok, ...(first?.error ? { error: first.error } : {}) };
-      },
-    });
+    // ADR-0213 · deps penghapusan hidup di services/worktree-delete (dipakai juga oleh Review).
+    return deleteProjectWorktrees(id, repoDir, b.names as string[], { withBranch: b.deleteBranch === true });
   });
 }
 

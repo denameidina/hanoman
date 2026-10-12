@@ -3,20 +3,21 @@
 // jadi dialog "Ubah type" hanya bisa memakainya dengan menyalin — dan katalog yang disalin pasti
 // berselisih (pola `session-runtime.ts`, yang dipakai bersama picker Start & form "Sesi baru").
 import { zSpecSource } from "@hanoman/shared";
+import { PRIORITY_LABEL, SEVERITY_LABEL, SOURCE_LABEL } from "../lib/labels";
 
 // SPEC-237 · satu peta source → tampilan. audit = audit-only (dokumen). brief adalah fallback
 // untuk source tak dikenal.
 // SPEC-546 · +help. Sebelum ini item Help Center jatuh ke fallback dan memakai lencana
 // "feature brief"; sejak konversi ada, `help` adalah tujuan yang sah dan wajib punya wajah.
 export const SOURCE_META: Record<string, { label: string; icon: string; tone: "err" | "brass" | "info"; color: string }> = {
-  qa:    { label: "QA finding",    icon: "bug",       tone: "err",   color: "var(--clay-500)" },
-  audit: { label: "Audit",         icon: "search",    tone: "info",  color: "var(--wind-600)" },
-  brief: { label: "feature brief", icon: "lightbulb", tone: "brass", color: "var(--brass-500)" },
+  qa:    { label: SOURCE_LABEL.qa,    icon: "bug",       tone: "err",   color: "var(--clay-500)" },
+  audit: { label: SOURCE_LABEL.audit, icon: "search",    tone: "info",  color: "var(--wind-600)" },
+  brief: { label: SOURCE_LABEL.brief, icon: "lightbulb", tone: "brass", color: "var(--brass-500)" },
   // SPEC-407 · ADR-0089 · backlog goal: sesi dua fase (Goal → Verifikasi), tanpa perencanaan.
-  goal:  { label: "Goal",          icon: "target",    tone: "brass", color: "var(--brass-600)" },
-  help:  { label: "Help Center",   icon: "life-buoy", tone: "info",  color: "var(--wind-500)" },
+  goal:  { label: SOURCE_LABEL.goal,  icon: "target",    tone: "brass", color: "var(--brass-700)" },
+  help:  { label: SOURCE_LABEL.help,  icon: "life-buoy", tone: "info",  color: "var(--wind-500)" },
   // SPEC-825 · ADR-0123 · task remeh: satu fase `Kerjakan`, tanpa perencanaan maupun verifikasi.
-  no_effort: { label: "Tanpa effort", icon: "zap", tone: "brass", color: "var(--brass-400)" },
+  no_effort: { label: SOURCE_LABEL.no_effort, icon: "zap", tone: "brass", color: "var(--brass-400)" },
 };
 export const sourceMeta = (s: string) => SOURCE_META[s] ?? SOURCE_META.brief!;
 
@@ -58,6 +59,8 @@ export const SHAPE_FIELDS: Record<string, readonly (readonly [string, string, st
 
 // SPEC-186 · opsi enum untuk form edit inline & dialog konversi.
 export const PRIO_OPTS = [
-  { value: "tinggi", label: "Tinggi" }, { value: "sedang", label: "Sedang" }, { value: "rendah", label: "Rendah" }];
+  { value: "tinggi", label: PRIORITY_LABEL.tinggi }, { value: "sedang", label: PRIORITY_LABEL.sedang },
+  { value: "rendah", label: PRIORITY_LABEL.rendah }];
 export const SEV_OPTS = [
-  { value: "critical", label: "Critical" }, { value: "major", label: "Major" }, { value: "minor", label: "Minor" }];
+  { value: "critical", label: SEVERITY_LABEL.critical }, { value: "major", label: SEVERITY_LABEL.major },
+  { value: "minor", label: SEVERITY_LABEL.minor }];

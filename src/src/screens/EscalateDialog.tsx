@@ -2,8 +2,10 @@ import React from "react";
 import { ESCALATE_SOURCES, type EscalateSource, type EscalateTaskInput, type TaskView } from "@hanoman/shared";
 import { Button, Field, Modal, Select } from "../ds";
 import { api } from "../api/client";
+import { failureMessage } from "../lib/report-error";
 import { PRIO_OPTS, sourceMeta } from "./source-meta";
 import type { ProjectVM } from "./types";
+import "./styles/dialogs.css";
 
 /* SPEC-947 · satu-satunya jembatan papan tim ke dunia agen. Kartu TETAP di papan sesudahnya —
    yang lahir adalah backlog item, bukan pemindahan.
@@ -48,9 +50,9 @@ export function EscalateDialog({ task, projects, onClose, onDone, onToast }: {
       onToast(r.created ? `Dieskalasi jadi ${r.spec.id}` : `Sudah tertaut ke ${r.spec.id}`, "ok", "link");
       onDone(r.task);
       onClose();
-    } catch {
+    } catch (e) {
       // Dialog TETAP terbuka: isian operator tak boleh hilang gara-gara jaringan.
-      onToast("Gagal mengeskalasi kartu", "err", "x-circle");
+      onToast(failureMessage("mengeskalasi kartu", e), "err", "x-circle");
     } finally {
       setBusy(false);
     }
@@ -58,39 +60,39 @@ export function EscalateDialog({ task, projects, onClose, onDone, onToast }: {
 
   return (
     <Modal open onClose={busy ? undefined : onClose} icon="git-branch"
-      eyebrow="Papan tim" title="Eskalasi ke backlog"
+      eyebrow="Papan tim" title="Kirim ke Backlog"
       footer={
-        <div style={{ display: "flex", gap: 8, width: "100%", alignItems: "center" }}>
-          <span style={{ flex: 1 }} />
+        <div className="hn-dia-foot-split">
+          <span className="hn-grow" />
           <Button variant="secondary" onClick={onClose} disabled={busy}>Batal</Button>
           <Button onClick={submit} loading={busy} disabled={!target} leftIcon="git-branch">
-            Eskalasi
+            Kirim ke Backlog
           </Button>
         </div>}>
-      <div style={{ fontSize: 13.5, color: "var(--text-strong)", lineHeight: 1.55, marginBottom: 14 }}>
+      <div className="hn-dia-lead">
         Kartu <strong>{task.title}</strong> tetap di papan. Yang lahir adalah backlog item baru
         yang bisa dikerjakan sesi agen, dan kartu ini menampilkan stage-nya.
       </div>
 
       {needsProject && (
         <Field label="Project">
-          <Select aria-label="Project" value={projectId} style={{ width: "100%" }}
+          <Select aria-label="Project" value={projectId} className="hn-dia-full"
             onChange={(e) => setProjectId(e.target.value)}
             options={[{ value: "", label: "Pilih project…" },
               ...projects.map((p) => ({ value: p.id, label: p.name }))]} />
-          <div style={{ marginTop: 6, fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
+          <div className="hn-dia-hint">
             Nomor SPEC diambil dari repo project, jadi kartu tanpa project belum bisa dieskalasi.
           </div>
         </Field>
       )}
 
-      <Field label="Source">
-        <Select aria-label="Source" value={source} style={{ width: "100%" }}
+      <Field label="Source" hint="Jenis item backlog yang lahir dari kartu ini, mis. feature brief atau Finding QA.">
+        <Select aria-label="Source" value={source} className="hn-dia-full"
           onChange={(e) => setSource(e.target.value as EscalateSource)} options={SOURCE_OPTS} />
       </Field>
 
       <Field label="Prioritas">
-        <Select aria-label="Prioritas" value={priority} style={{ width: "100%" }}
+        <Select aria-label="Prioritas" value={priority} className="hn-dia-full"
           onChange={(e) => setPriority(e.target.value)} options={PRIO_OPTS} />
       </Field>
     </Modal>

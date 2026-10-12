@@ -32,20 +32,20 @@ beforeEach(() => {
 describe("Settings tanpa matrix per-fase (SPEC-252)", () => {
   it("tab Model menampilkan default global TANPA matrix per-fase", async () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} onToast={() => {}} />);
-    fireEvent.click(screen.getByText("Model sesi"));
-    // kartu default global tetap ada. SPEC-383 · judulnya di-assert PERSIS: frasa "default global"
-    // kini juga muncul di kartu Konflik rebase & merge (baris warisan), jadi regex longgar cocok dua kali.
-    expect(await screen.findByText("Model sesi — default global")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Sesi harian"));
+    // kartu default global tetap ada (sekarang di Sesi harian). SPEC-383 · judulnya di-assert PERSIS.
+    expect(await screen.findByText("Agen & model — default global")).toBeInTheDocument();
     // matrix per-fase tidak ada lagi
     expect(screen.queryByText(/Model & effort per fase/i)).not.toBeInTheDocument();
     expect(screen.queryByText("Laporan")).not.toBeInTheDocument();
-    expect(screen.getByText(/tab Orkestrasi/)).toBeInTheDocument();
+    // Prosanya memuat <b>Orkestrasi</b>, jadi teksnya dibaca dari badan dokumen, bukan satu node.
+    expect(document.body.textContent).toMatch(/bagian Orkestrasi/);
   });
 
   it("mengubah model global mem-PUT { model } (bukan phaseModels)", async () => {
     render(<SettingsScreen me={me} onLoggedOut={() => {}} onToast={() => {}} />);
-    fireEvent.click(screen.getByText("Model sesi"));
-    await screen.findByText("Model sesi — default global");
+    fireEvent.click(screen.getByText("Sesi harian"));
+    await screen.findByText("Agen & model — default global");
     // SPEC-338 · tab ini kini juga memuat kartu "Agen sesi" di atasnya, jadi select model claude
     // dipilih lewat label — bukan urutan (`selects[0]` sekarang picker agen).
     fireEvent.change(screen.getByLabelText("Model claude"), { target: { value: "sonnet" } });

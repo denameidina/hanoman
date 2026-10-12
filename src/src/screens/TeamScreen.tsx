@@ -1,8 +1,8 @@
 import React from "react";
-import type { MemberView, TaskStatus, TaskView, TopicParams } from "@hanoman/shared";
+import { memberId, type MemberView, type TaskStatus, type TaskView, type TopicParams } from "@hanoman/shared";
 import {
-  Button, Input, Select, StateBlock, Tabs, LiveConnectionBadge,
-  LIST_SCREEN_STYLE, FIXED_ROW_STYLE,
+  Button, Select, StateBlock, Tabs, LiveConnectionBadge, FilterBar, OverflowActions, Field, Stack,
+  useToast, ToastHost, type FilterChip,
 } from "../ds";
 import { api } from "../api/client";
 import { useLiveTopic } from "../api/live";
@@ -16,34 +16,40 @@ import {
   TEAM_COLUMNS, TIMELINE_ZOOMS, emptyBoard, moveCard, nextOrder, replaceCard,
   type Board, type TimelineZoom,
 } from "./team-rules";
-import { usePersistedState, ResetViewButton, isStr, oneOf, strList } from "../ui-state";
+import { usePersistedState, isStr, oneOf, strList } from "../ui-state";
 import type { ProjectVM } from "./types";
+import { errorMessage } from "../lib/report-error";
+import "./styles/team.css";
 
 /* TeamScreen — papan kerja MANUSIA (SPEC-946 · ADR-0150/ADR-0151). Screen mandiri (pola
    TriageScreen): memuat datanya sendiri, tak lewat `gate` App.
 
+   Redesign Audit UI/UX 2026-10 · Fase 3D:
+   - Lensa "Saya" = tugas yang ditugaskan ke pengguna yang sedang login (bila akunnya terdaftar
+     sebagai anggota); "Semua" melepasnya. Lensa adalah bawaan, bukan penyaring yang harus disetel.
+   - Baris alat ≤6 kontrol: lensa, mode, pencarian, Filter (popover), Tugas baru, ⋯ (anggota).
+   - Papan dan linimasa tetap; linimasa membaca papan yang sama dan membawa legenda sendiri.
+
    Papan berlangganan PER KOLOM. `zSubLimit` menjepit `limit` ke 200 dan `order` bermakna DI DALAM
    kolom, jadi satu langganan untuk seluruh papan memotong himpunan gabungan empat kolom di titik
-   yang sewenang-wenang — kolom mana yang terpotong, dan seberapa, tak bisa dijelaskan kepada
-   operator. Empat langganan memberi tiap kolom `total`-nya sendiri, dan plafonnya berlaku per
-   kolom. Biayanya 4 dari MAX_SUBS = 16. */
+   yang sewenang-wenang. Empat langganan memberi tiap kolom `total`-nya sendiri. Biayanya 4 dari MAX_SUBS = 16. */
 
 const POLL_MS = 5000;
 // ADR-0107 · PLAFON, bukan preferensi — nilainya sama dengan batas atas `zSubLimit`, supaya muat
-// awal HTTP dan langganan WS memotong di titik yang SAMA. Muat awal tak-berbatas lalu langganan
-// berplafon berarti kartu HILANG dari layar tanpa satu pun tindakan operator.
+// awal HTTP dan langganan WS memotong di titik yang SAMA.
 const COLUMN_LIMIT = 200;
-// SPEC-908 · jeda sebelum ketikan mengubah KUNCI langganan: tiap huruf melahirkan kunci baru yang
-// dibangun server di luar jadwal, dan sebelas dari dua belas langsung dibuang.
+// SPEC-908 · jeda sebelum ketikan mengubah KUNCI langganan.
 const Q_DEBOUNCE_MS = 400;
+// Nilai lensa "Saya". Disimpan sebagai sentinel: anggota pengguna baru diketahui setelah muat, jadi
+// nilai ini diterjemahkan ke id anggota saat dipakai, bukan saat disimpan.
+const LENS_ME = "me";
+const LENS_ALL = "all";
 
 /* Diekspor supaya `team-screen.test.tsx` bisa menegakkan cermin `TEAM_VIEWS` ↔ cabang render:
-   entri yang tak punya cabangnya sendiri merender permukaan mode LAIN di bawah pilnya, 200 dan
-   nol error — kelas bug yang sama yang dijaga `nav-pending-badge.test.tsx` untuk `HN_NAV`. */
+   entri yang tak punya cabangnya sendiri merender permukaan mode LAIN di bawah pilnya. */
 export const TEAM_VIEWS = [
   { value: "board", label: "Papan", icon: "kanban" },
-  // SPEC-948 · `gantt-chart` → `GanttChart` DIVERIFIKASI ada di lucide 0.400.0: SPEC-906
-  // menunjukkan nama yang salah jatuh ke `Circle` tanpa satu pun galat, di ±123 call site sekaligus.
+  // SPEC-948 · `gantt-chart` → `GanttChart` DIVERIFIKASI ada di lucide 0.400.0.
   { value: "timeline", label: "Linimasa", icon: "gantt-chart" },
   // SPEC-949 · `layers` → `Layers`, diverifikasi di lucide yang sama.
   { value: "projects", label: "Lintas project", icon: "layers" },
@@ -56,8 +62,7 @@ const zeroTotals = (): Totals =>
   Object.fromEntries(TEAM_COLUMNS.map((c) => [c.key, 0])) as Totals;
 
 /* Satu langganan per kolom. Komponen tanpa render karena jumlah pemanggilan hook harus tetap
-   sah saat kolom disaring keluar — memasang/melepas komponennya adalah cara React yang jujur
-   untuk berhenti berlangganan, dan ia tak melanggar rules-of-hooks seperti hook di dalam map. */
+   sah saat kolom disaring keluar. */
 function ColumnFeed({ status, params, onData, refetch }: {
   status: TaskStatus;
   params: Omit<TopicParams["tasks"], "status">;
@@ -73,14 +78,19 @@ function ColumnFeed({ status, params, onData, refetch }: {
   return null;
 }
 
-export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }: {
+export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast, onOpenSpec }: {
   projects: ProjectVM[]; projectFilter: string;
   onProjectFilter: (v: string) => void;
   onToast: (msg: string, kind?: string, icon?: string) => void;
+  /** Membuka spec terkait di layar Backlog. Opsional: tanpa ini tautan spec tetap statis. */
+  onOpenSpec?: (specId: string) => void;
 }) {
   const [board, setBoard] = React.useState<Board>(emptyBoard);
   const [totals, setTotals] = React.useState<Totals>(zeroTotals);
   const [members, setMembers] = React.useState<MemberView[]>([]);
+  // Audit 2026-10: daftar anggota yang gagal dimuat harus terlihat, bukan dropdown kosong yang
+  // menyesatkan ("Semua anggota" saja seolah tim tak punya anggota).
+  const [membersError, setMembersError] = React.useState("");
   const [state, setState] = React.useState<"loading" | "ready" | "error">("loading");
   // SPEC-857 · ADR-0131 · saat refetch gagal, papan yang sudah tampil TIDAK boleh berubah jadi
   // layar galat: operator harus tahu ia sedang membaca nilai basi, bukan papan yang menyusut.
@@ -89,6 +99,10 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
   const [taskOpen, setTaskOpen] = React.useState(false);
   const [membersOpen, setMembersOpen] = React.useState(false);
   const [escalating, setEscalating] = React.useState<TaskView | null>(null);
+  // Email pengguna yang login. Dibaca sekali; dipakai untuk lensa "Saya" lewat `memberId` (ADR-0094).
+  const [meEmail, setMeEmail] = React.useState<string | null>(null);
+  // Toast dengan aksi "Urungkan" untuk pindah & tugaskan (reversibel). Kegagalan tetap lewat onToast.
+  const [toast, showToast] = useToast();
 
   // SPEC-740 · ADR-0115 · state tampilan layar ini persisten berkunci `team`. Tak ada `page`:
   // papan tidak dipaginasi.
@@ -96,14 +110,13 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
     oneOf(...TEAM_VIEWS.map((v) => v.value)));
   const [q, setQ] = usePersistedState("team", "q", "", isStr);
   const [colFilter, setColFilter] = usePersistedState("team", "col", "all", isStr);
-  const [memberFilter, setMemberFilter] = usePersistedState("team", "member", "all", isStr);
+  // Bawaan `me`: papan dibuka sebagai tugas SAYA. Nilai lama `all` (dari sebelum lensa ada) tetap berlaku.
+  const [memberFilter, setMemberFilter] = usePersistedState("team", "member", LENS_ME, isStr);
   // SPEC-948 · bawaan `week`: hari terlalu sempit untuk melihat tabrakan, bulan terlalu kasar untuk
-  // melihat tenggat. Zoom bukan PENYARING — ia tak ikut `activeFilters` dan tak menyentuh server.
+  // melihat tenggat. Zoom bukan PENYARING — ia tak ikut penyaring dan tak menyentuh server.
   const [zoom, setZoom] = usePersistedState<TimelineZoom>("team", "zoom", "week",
     oneOf(...TIMELINE_ZOOMS));
-  // SPEC-949 · baris project yang sedang dibuka. `strList` menolak nilai rusak → jatuh ke `[]`, tak
-  // pernah melempar (ADR-0115). Project yang sudah lenyap tinggal di sini tanpa efek: tak ada baris
-  // yang bisa dibukanya, jadi tak ada sweep pembersih.
+  // SPEC-949 · baris project yang sedang dibuka. `strList` menolak nilai rusak (ADR-0115).
   const [expanded, setExpanded] = usePersistedState<string[]>("team", "expanded", [], strList);
   const toggleProject = React.useCallback((key: string) => {
     setExpanded((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -114,35 +127,45 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
   // daripada tanggal yang basi satu hari sampai tab dimuat ulang.
   const today = React.useRef(Date.now()).current;
 
+  React.useEffect(() => {
+    let alive = true;
+    // `?.`: klien tanpa `authStatus` (test) tak punya identitas; lensa "Saya" lalu tak muncul.
+    const p = api.authStatus?.();
+    p?.then((r) => { if (alive) setMeEmail(r.user?.email ?? null); })
+      .catch(() => { if (alive) setMeEmail(null); });
+    return () => { alive = false; };
+  }, []);
+
   const columns = React.useMemo(
     () => (colFilter === "all" ? TEAM_COLUMNS : TEAM_COLUMNS.filter((c) => c.key === colFilter)),
     [colFilter],
   );
   // Larik baru tiap render; yang stabil kuncinya, bukan referensinya.
   const columnsKey = columns.map((c) => c.key).join(",");
-  // `projectFilter` tak berlaku di mode Lintas project, jadi menghitungnya di lencana "N filter
-  // aktif" sama menyesatkannya dengan mengabaikannya diam-diam.
-  const activeFilters = [projectFilter !== "all" && !cross, colFilter !== "all",
-    memberFilter !== "all", q.trim() !== ""].filter(Boolean).length;
 
   // Mode yang gunanya membandingkan antar-project tak boleh mendarat menampilkan satu baris karena
-  // penyaring yang disetel di layar lain masih menempel. Ia DILEPAS di sini dan `disabled` di
-  // toolbar — penyaring yang tampak aktif tapi tak berlaku adalah kebohongan UI.
-  //
-  // Diturunkan SEBELUM `useMemo` dan dipakai sebagai dependensinya, bukan `cross` + `projectFilter`
-  // mentah: dengan dua dep mentah, berpindah mode saat penyaring `all` melahirkan objek `filters`
-  // baru yang ISINYA identik, dan `load` yang bergantung padanya menembakkan empat request yang tak
-  // mengubah apa pun.
+  // penyaring yang disetel di layar lain masih menempel. Diturunkan SEBELUM `useMemo` dan dipakai
+  // sebagai dependensinya (lihat catatan di `load`).
   const effectiveProject = cross || projectFilter === "all" ? undefined : projectFilter;
+
+  // Id anggota pengguna yang login, bila akunnya memang terdaftar sebagai anggota tim.
+  const meId = React.useMemo(() => {
+    if (!meEmail) return null;
+    const id = memberId(meEmail);
+    return members.some((m) => m.id === id) ? id : null;
+  }, [meEmail, members]);
+  // Penyaring anggota yang berlaku: "Saya" → id pengguna (bila ada), "Semua" → tanpa penyaring.
+  const memberSel = memberFilter === LENS_ME ? (meId ?? undefined)
+    : memberFilter === LENS_ALL ? undefined : memberFilter;
+  const memberIsOther = memberFilter !== LENS_ME && memberFilter !== LENS_ALL;
 
   const filters = React.useMemo(() => ({
     projectId: effectiveProject,
-    memberId: memberFilter === "all" ? undefined : memberFilter,
+    memberId: memberSel,
     q: q.trim() || undefined,
-  }), [effectiveProject, memberFilter, q]);
+  }), [effectiveProject, memberSel, q]);
 
-  // Muat PERTAMA boleh mengosongkan layar; yang berikutnya tidak. Tanpa pemisahan ini tiap huruf
-  // di kotak cari — dan tiap ganti penyaring — membuat keempat kolom lenyap sekejap.
+  // Muat PERTAMA boleh mengosongkan layar; yang berikutnya tidak.
   const loadedOnce = React.useRef(false);
 
   const load = React.useCallback((silent = false) => {
@@ -175,7 +198,9 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
 
   const loadMembers = React.useCallback(() => {
     // Papan tetap jalan tanpa nama: kartu jatuh ke "belum ditugaskan", bukan ke layar galat.
-    api.listMembers().then((r) => setMembers(r.items)).catch(() => { /* diam disengaja */ });
+    api.listMembers()
+      .then((r) => { setMembers(r.items); setMembersError(""); })
+      .catch((e: unknown) => setMembersError(errorMessage(e, "tidak diketahui")));
   }, []);
   React.useEffect(() => { loadMembers(); }, [loadMembers]);
 
@@ -209,26 +234,46 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
     // pernah disimpan.
     const before = board;
     setBoard(moved.board);
-    try { await api.patchTask(task.id, moved.patch); }
-    catch {
+    try {
+      await api.patchTask(task.id, moved.patch);
+      const label = TEAM_COLUMNS.find((c) => c.key === to)?.label ?? to;
+      showToast(`Tugas dipindah ke ${label}`, "ok", undefined, {
+        action: { label: "Urungkan", onAction: () => { void undoPatch(task.id, { status: task.status }); } },
+      });
+    } catch {
       setBoard(before);
       onToast("Gagal memindahkan tugas", "err", "x-circle");
     }
   }
 
-  async function assign(task: TaskView, memberId: string | null) {
+  async function assign(task: TaskView, nextMember: string | null) {
     const before = board;
-    setBoard(replaceCard(board, { ...task, memberId }));
-    try { await api.patchTask(task.id, { memberId }); }
-    catch {
+    setBoard(replaceCard(board, { ...task, memberId: nextMember }));
+    try {
+      await api.patchTask(task.id, { memberId: nextMember });
+      const name = nextMember ? members.find((m) => m.id === nextMember)?.name ?? "anggota" : null;
+      showToast(name ? `Ditugaskan ke ${name}` : "Penugasan dikosongkan", "ok", undefined, {
+        action: { label: "Urungkan", onAction: () => { void undoPatch(task.id, { memberId: task.memberId }); } },
+      });
+    } catch {
       setBoard(before);
       onToast("Gagal menugaskan", "err", "x-circle");
     }
   }
 
+  // Urung = kirim kebalikan lalu segarkan papan dari server. Tak memakai `board` dari closure
+  // render lama (ia bisa sudah basi); kebenaran papan berasal dari muat ulang.
+  async function undoPatch(id: string, patch: { status?: TaskStatus; memberId?: string | null }) {
+    try {
+      await api.patchTask(id, patch);
+      refetchSilently();
+    } catch {
+      onToast("Gagal mengurungkan perubahan", "err", "x-circle");
+    }
+  }
+
   // SPEC-947 · lepas tautan tak butuh konfirmasi: ia non-destruktif (Spec dibiarkan) dan
-  // reversibel lewat eskalasi ulang, jadi dialog di sini hanya menambah klik untuk tindakan
-  // yang murah.
+  // reversibel lewat eskalasi ulang.
   async function unlink(task: TaskView) {
     const before = board;
     setBoard(replaceCard(board, { ...task, specId: null, spec: null }));
@@ -242,77 +287,110 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
   }
 
   const empty = columns.every((c) => board[c.key].length === 0);
+  // Tugas yang tampil dipersempit oleh penyaring (termasuk lensa orang lain). Lensa "Saya" juga
+  // dihitung: papan kosong "untuk saya" bukan papan yang belum punya tugas.
+  const searching = q.trim() !== "";
+  const chipCount = (!cross && projectFilter !== "all" ? 1 : 0)
+    + (colFilter !== "all" ? 1 : 0) + (memberIsOther ? 1 : 0);
+  const narrowed = chipCount > 0 || searching || memberSel !== undefined;
+  const projName = projects.find((p) => p.id === projectFilter)?.name ?? projectFilter;
+  const memberName = members.find((m) => m.id === memberFilter)?.name ?? memberFilter;
+  const colLabel = TEAM_COLUMNS.find((c) => c.key === colFilter)?.label ?? colFilter;
+  // Hapus penyaring: kembali ke lensa bawaan (Saya). Tampilkan semua: lensa juga dilepas.
+  const resetFilters = () => {
+    if (!cross) onProjectFilter("all");
+    setColFilter("all"); setMemberFilter(LENS_ME); setQ("");
+  };
+  const showAll = () => {
+    if (!cross) onProjectFilter("all");
+    setColFilter("all"); setMemberFilter(LENS_ALL); setQ("");
+  };
   // Linimasa membaca papan yang SAMA — nol fetch dan nol langganan tambahan (ADR-0151).
   const tasks = React.useMemo(() => columns.flatMap((c) => board[c.key]), [board, columns]);
   const hiddenTasks = columns.reduce(
     (n, c) => n + Math.max(0, (totals[c.key] ?? 0) - board[c.key].length), 0);
+  const totalShown = columns.reduce((n, c) => n + (totals[c.key] ?? 0), 0);
+
+  const chips: FilterChip[] = [
+    ...(!cross && projectFilter !== "all" ? [{ key: "project", label: `Project: ${projName}`,
+      onRemove: () => onProjectFilter("all") }] : []),
+    ...(colFilter !== "all" ? [{ key: "col", label: `Kolom: ${colLabel}`,
+      onRemove: () => setColFilter("all") }] : []),
+    ...(memberIsOther ? [{ key: "member", label: `Anggota: ${memberName}`,
+      onRemove: () => setMemberFilter(LENS_ME) }] : []),
+  ];
+  // Pilihan anggota di popover. "Saya" hanya ada bila akunnya terdaftar; tanpanya nilai "me" jatuh ke "Semua".
+  const memberOptions = [
+    ...(meId ? [{ value: LENS_ME, label: "Saya" }] : []),
+    { value: LENS_ALL, label: "Semua anggota" },
+    ...members.map((m) => ({ value: m.id, label: m.name })),
+  ];
+  const memberSelectValue = memberFilter === LENS_ME && !meId ? LENS_ALL : memberFilter;
+  const filtersPanel = (
+    <Stack gap={3}>
+      {/* SPEC-146 · App pemilik tunggal "daftar disaring ke project mana". */}
+      <Field label="Project">
+        <Select size="sm" aria-label="Filter project" value={projectFilter} disabled={cross}
+          onChange={(e) => onProjectFilter(e.target.value)}
+          options={[{ value: "all", label: "Semua project" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]} />
+      </Field>
+      {/* Sebabnya DIRENDER, bukan `title`: kontrol `disabled` tak menampilkan tooltip. */}
+      {cross && <p data-testid="project-filter-note" className="hn-tm-hint">Mode ini melintasi semua project</p>}
+      <Field label="Anggota">
+        <Select size="sm" aria-label="Filter anggota" value={memberSelectValue} disabled={!!membersError}
+          onChange={(e) => setMemberFilter(e.target.value)} options={memberOptions} />
+      </Field>
+      {membersError && (
+        <p role="alert" className="hn-tm-hint hn-tm-alert">
+          Anggota gagal dimuat: {membersError}
+        </p>
+      )}
+      <Field label="Kolom">
+        {/* Menyaring kolom di sebuah PAPAN = mempersempit kolom yang tampil. */}
+        <Select size="sm" aria-label="Filter kolom" value={colFilter}
+          onChange={(e) => setColFilter(e.target.value)}
+          options={[{ value: "all", label: "Semua kolom" }, ...TEAM_COLUMNS.map((c) => ({ value: c.key, label: c.label }))]} />
+      </Field>
+      {(timeline || cross) && (
+        <Field label="Zoom">
+          <Select size="sm" aria-label="Zoom linimasa" value={zoom}
+            onChange={(e) => setZoom(e.target.value as TimelineZoom)}
+            options={TIMELINE_ZOOMS.map((z) => ({ value: z, label: ZOOM_LABEL[z] }))} />
+        </Field>
+      )}
+    </Stack>
+  );
 
   return (
-    <div style={LIST_SCREEN_STYLE}>
-      <div className="hn-team-controls" role="region" aria-label="Kontrol papan tim"
-        style={{ ...FIXED_ROW_STYLE, marginBottom: 18 }}>
-        <div className="hn-team-topline" style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          gap: 12, flexWrap: "wrap", marginBottom: 12,
-        }}>
+    <div className="hn-tm-screen">
+      <section className="hn-tm-toolbar" role="region" aria-label="Kontrol papan tim">
+        <div className="hn-tm-switches">
           <Tabs variant="pill" value={view} onChange={setView} tabs={TEAM_VIEWS} aria-label="Mode tampilan" />
-          <div className="hn-team-view-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {meId && (
+            <Tabs variant="pill" aria-label="Lensa tugas"
+              value={memberFilter === LENS_ALL ? LENS_ALL : memberFilter === LENS_ME ? LENS_ME : ""}
+              onChange={(v) => setMemberFilter(v)}
+              tabs={[{ value: LENS_ME, label: "Saya" }, { value: LENS_ALL, label: "Semua" }]} />
+          )}
+          {/* `role="status"` supaya perubahannya juga terdengar pembaca layar. */}
+          <span className="hn-tm-count" role="status"
+            title={stale ? "Server tak menjawab saat menyegarkan — angka ini dari muatan terakhir yang berhasil" : undefined}>
+            {totalShown} tugas{stale ? " · data lama" : ""}
+          </span>
+          <LiveConnectionBadge />
+        </div>
+        <FilterBar label="Penyaring tim"
+          search={{ value: q, onChange: setQ, label: "Cari tugas", placeholder: "mis. halaman harga atau deploy" }}
+          chips={chips} filters={filtersPanel} filtersLabel="Filter"
+          onReset={chips.length > 0 || searching ? resetFilters : undefined} resetLabel="Reset filter"
+          actions={<>
             <Button size="sm" leftIcon="plus" onClick={() => { setEditing(null); setTaskOpen(true); }}>Tugas baru</Button>
-            <Button size="sm" variant="secondary" leftIcon="users" onClick={() => setMembersOpen(true)}>Anggota</Button>
             <SyncButton onDone={refetchSilently} onToast={onToast} />
-            {/* `onReset` mengikuti `activeFilters`: tombol yang mengaku memegang N filter lalu
-                menghapus filter ke-N+1 mengubah apa yang dilihat Backlog (SPEC-146). */}
-            <ResetViewButton screen="team" active={activeFilters}
-              onReset={cross ? undefined : () => onProjectFilter("all")} />
-            {/* `role="status"` supaya perubahannya juga terdengar pembaca layar. */}
-            <span className="hn-eyebrow" role="status"
-              style={stale ? { color: "var(--amber-600)" } : undefined}
-              title={stale ? "Server tak menjawab saat menyegarkan — angka ini dari muatan terakhir yang berhasil" : undefined}>
-              {columns.reduce((n, c) => n + (totals[c.key] ?? 0), 0)} tugas{stale ? " · basi" : ""}
-            </span>
-            <LiveConnectionBadge />
-          </div>
-        </div>
-        <div className="hn-team-filters" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <Input size="sm" leftIcon="search" aria-label="Cari tugas" value={q}
-            placeholder="mis. halaman harga atau deploy"
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-            style={{ flex: "1 1 220px" }} />
-          {/* SPEC-146 · App pemilik tunggal "daftar disaring ke project mana", jadi berpindah dari
-              Backlog ke Tim tak mengganti project yang sedang dilihat. */}
-          <Select size="sm" aria-label="Filter project" value={projectFilter}
-            disabled={cross}
-            onChange={(e) => onProjectFilter(e.target.value)}
-            options={[{ value: "all", label: "Semua project" },
-              ...projects.map((p) => ({ value: p.id, label: p.name }))]} />
-          {/* Sebabnya DIRENDER, bukan `title`: `Select` menyebar prop sisa ke `<select>` di dalam
-              pembungkusnya, dan kontrol form yang `disabled` menekan pointer event — tooltipnya tak
-              pernah muncul di browser mana pun. Yang tersisa bagi operator persis alternatif yang
-              ditolak ADR-0154: kontrol mati tanpa sebab (kelas SPEC-546). Pola teks-terlihat ini
-              cermin `EscalateDialog`. */}
-          {cross && (
-            <span data-testid="project-filter-note"
-              style={{ fontSize: "var(--text-xs)", color: "var(--text-subtle)" }}>
-              Mode ini melintasi semua project
-            </span>
-          )}
-          {/* Menyaring kolom di sebuah PAPAN = mempersempit kolom yang tampil. Hanya kolom yang
-              tampil yang dimuat & dilanggan, jadi biaya servernya ikut mengecil. */}
-          <Select size="sm" aria-label="Filter kolom" value={colFilter}
-            onChange={(e) => setColFilter(e.target.value)}
-            options={[{ value: "all", label: "Semua kolom" },
-              ...TEAM_COLUMNS.map((c) => ({ value: c.key, label: c.label }))]} />
-          <Select size="sm" aria-label="Filter anggota" value={memberFilter}
-            onChange={(e) => setMemberFilter(e.target.value)}
-            options={[{ value: "all", label: "Semua anggota" },
-              ...members.map((m) => ({ value: m.id, label: m.name }))]} />
-          {(timeline || cross) && (
-            <Select size="sm" aria-label="Zoom linimasa" value={zoom}
-              onChange={(e) => setZoom(e.target.value as TimelineZoom)}
-              options={TIMELINE_ZOOMS.map((z) => ({ value: z, label: ZOOM_LABEL[z] }))} />
-          )}
-        </div>
-      </div>
+            <OverflowActions label="Lainnya" items={[
+              { key: "members", label: "Anggota tim", icon: "users", onSelect: () => setMembersOpen(true) },
+            ]} />
+          </>} />
+      </section>
 
       {columns.map((c) => (
         <ColumnFeed key={c.key} status={c.key} params={subParams} onData={applyFeed} refetch={refetchSilently} />
@@ -321,22 +399,32 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
       {state === "loading" ? <StateBlock kind="loading" />
         : state === "error" ? <StateBlock kind="error" hint="Gagal memuat papan tim."
             action={() => load()} actionLabel="Coba lagi" />
-        // Kolom kosong DI BAWAH penyaring tetap dirender sebagai kolom: "Dikerjakan 0" adalah
+        // Kolom kosong DI BAWAH penyaring tetap dirender sebagai kolom: "Menunggu 0" adalah
         // jawaban, sementara StateBlock akan menyembunyikan tiga kolom lain yang mungkin berisi.
-        // Yang layak menggantikan papan hanya papan yang benar-benar kosong tanpa penyaring.
-        : empty && activeFilters === 0 ? <StateBlock kind="empty" icon="users" title="Papan tim masih kosong"
+        : empty && !narrowed ? <StateBlock kind="empty" icon="users" title="Papan tim masih kosong"
             hint="Catat pekerjaan manusia di sekitar sesi agen — desain, meeting klien, deploy, nego."
             action={() => { setEditing(null); setTaskOpen(true); }} actionLabel="Tugas baru" actionIcon="plus" />
-        : cross
-          ? <TeamProjectTimeline tasks={tasks} projects={projects} members={members}
-              zoom={zoom} today={today} hidden={hiddenTasks} expanded={expanded}
-              onToggle={toggleProject} onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />
-        : timeline
-          ? <TeamTimeline tasks={tasks} members={members} zoom={zoom} today={today}
-              hidden={hiddenTasks} onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />
-          : <TeamBoard board={board} totals={totals} columns={columns} members={members}
-              onMove={move} onAssign={assign} onEscalate={setEscalating} onUnlink={unlink}
-              onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />}
+        : <>
+            {/* Penyaring aktif yang menyaring semua tugas harus dikatakan, dengan jalan keluarnya. */}
+            {empty && narrowed && (
+              <StateBlock kind="empty" compact icon="filter"
+                title={memberSel !== undefined && chipCount === 0 && !searching
+                  ? "Tak ada tugas untuk kamu" : "Tak ada tugas yang cocok dengan filter"}
+                hint="Penyaring yang aktif menyembunyikan semua tugas di papan ini."
+                action={showAll} actionLabel="Tampilkan semua" actionIcon="x" />
+            )}
+            {cross
+              ? <TeamProjectTimeline tasks={tasks} projects={projects} members={members}
+                  zoom={zoom} today={today} hidden={hiddenTasks} expanded={expanded}
+                  onToggle={toggleProject} onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />
+              : timeline
+                ? <TeamTimeline tasks={tasks} members={members} zoom={zoom} today={today}
+                    hidden={hiddenTasks} onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />
+                : <TeamBoard board={board} totals={totals} columns={columns} members={members}
+                    projects={projects} onOpenSpec={onOpenSpec}
+                    onMove={move} onAssign={assign} onEscalate={setEscalating} onUnlink={unlink}
+                    onOpen={(t) => { setEditing(t); setTaskOpen(true); }} />}
+          </>}
 
       <TaskModal open={taskOpen} task={editing} projects={projects} members={members}
         defaultProjectId={effectiveProject ?? null}
@@ -346,13 +434,13 @@ export function TeamScreen({ projects, projectFilter, onProjectFilter, onToast }
       {escalating && (
         <EscalateDialog task={escalating} projects={projects}
           onClose={() => setEscalating(null)}
-          // Kartu dari server dipakai LANGSUNG: `projectId` bisa ikut berubah (kartu tanpa project
-          // yang dieskalasi ikut pindah), jadi menambal `specId` saja akan meleset.
+          // Kartu dari server dipakai LANGSUNG: `projectId` bisa ikut berubah.
           onDone={(t) => setBoard((b) => replaceCard(b, t))}
           onToast={onToast} />
       )}
       <MembersPanel open={membersOpen} onClose={() => setMembersOpen(false)}
         onChanged={setMembers} onToast={onToast} />
+      <ToastHost toast={toast} />
     </div>
   );
 }

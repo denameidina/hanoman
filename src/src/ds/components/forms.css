@@ -1,0 +1,69 @@
+/* Kontrol pilihan DS (`.hn-choice-control`: checkbox, radio, switch) — area sentuh.
+   Checkbox dan radio sudah 24×24 lewat style inline. Switch (track 40×22 di dalamnya) memakai batas
+   minimum ini supaya area sentuhnya 24 px tinggi di pointer halus. Track tetap digambar di tengah
+   (inline-grid, place-items center): hanya kotak pembungkusnya yang membesar, tampilannya tak berubah.
+   Pointer kasar/ponsel naik ke 44 px (--touch-target), sesuai kontrak sentuh DS. Berkas ini sengaja
+   berdampingan dengan forms.tsx; aturan dasar dan blok coarse-nya memakai nilai yang sama di kedua
+   tempat, jadi urutan pemuatan stylesheet tak mengubah hasilnya. */
+.hn-choice-control { min-width: 24px; min-height: 24px; }
+
+/* Putaran spinner tombol loading dan StateBlock loading. Didefinisikan sekali di sini (berkas ini
+   selalu dimuat lewat forms.tsx), bukan sebagai <style> di dalam tombol: teks tombol tak lagi memuat CSS. */
+@keyframes hn-spin { to { transform: rotate(360deg); } }
+
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-choice-control { min-width: var(--touch-target); min-height: var(--touch-target); }
+}
+
+/* Button varian danger (forms.tsx, Audit 2026-10). Warnanya lewat kelas: hover butuh pseudo-class.
+   `hn-btn-danger` solid untuk aksi merusak utama; `hn-btn-danger-outline` teks + border merah untuk aksi
+   sekunder. Keduanya mendapat cincin fokus yang sama dengan fokus DS (`--border-focus`). Tombol nonaktif
+   tak berubah saat hover. Semua varian Button (termasuk non-danger) kini tanpa `outline` inline: cincin
+   fokusnya datang dari `:focus-visible` global di app.css. */
+.hn-btn-danger {
+  background: var(--clay-600); color: #fff; border: 1px solid var(--clay-600);
+}
+.hn-btn-danger:not(:disabled):not([aria-disabled="true"]):hover { filter: brightness(0.95); }
+
+.hn-btn-danger-outline {
+  background: var(--surface-card); color: var(--clay-600); border: 1px solid var(--clay-500);
+  box-shadow: var(--shadow-xs);
+}
+.hn-btn-danger-outline:not(:disabled):not([aria-disabled="true"]):hover {
+  background: var(--status-err-tint); border-color: var(--clay-600);
+}
+
+.hn-btn-danger:focus-visible,
+.hn-btn-danger-outline:focus-visible {
+  outline: 2px solid var(--border-focus); outline-offset: 2px;
+}
+
+/* Radio (forms.tsx). Cincin dan titik lewat kelas, bukan style inline, supaya varian danger bisa menimpanya.
+   Keadaan terpilih dibaca dari aria-checked di elemen role="radio" (induk cincin), tak perlu atribut baru. */
+.hn-radio-ring {
+  display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+  border-radius: var(--radius-pill); background: var(--surface-card);
+  border: 1.5px solid var(--border-strong); box-shadow: var(--shadow-inset);
+  transition: var(--transition-fast);
+}
+.hn-choice-control[aria-checked="true"] > .hn-radio-ring { border-color: var(--accent); box-shadow: none; }
+.hn-radio-dot { width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--accent); }
+.hn-radio-label { display: block; font-size: var(--text-md); color: var(--text-strong); line-height: 1.4; }
+
+/* Varian danger Radio/RadioGroup (`data-tone="danger"` di <label>): warna galat, tanpa mengubah keadaan. */
+.hn-choice-target[data-tone="danger"] .hn-radio-ring,
+.hn-choice-target[data-tone="danger"] .hn-choice-control[aria-checked="true"] > .hn-radio-ring { border-color: var(--status-err); }
+.hn-choice-target[data-tone="danger"] .hn-radio-dot { background: var(--status-err); }
+.hn-choice-target[data-tone="danger"] .hn-radio-label { color: var(--clay-600); }
+
+/* Varian danger Field (kit.tsx, `data-tone="danger"` di .hn-field): label memakai warna galat yang sama
+   dengan border kontrol invalid (Input/Select/HnTextarea dengan invalid: --status-err). Kontrolnya sendiri
+   ditandai lewat tautan Field (aria-invalid), jadi tampilannya identik dengan keadaan invalid. */
+.hn-field[data-tone="danger"] > .hn-field-label { color: var(--status-err); }
+
+/* Select DS (forms.tsx): lebar wrapper mengikuti opsi terpanjang, jadi di layar sempit nama panjang
+   mendorong field keluar viewport lalu terpotong di tengah kata. Dibatasi lebar kontainernya, sisanya elipsis. */
+@media (max-width: 640px) {
+  .hn-select { max-width: 100%; min-width: 0; }
+  .hn-select select { max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

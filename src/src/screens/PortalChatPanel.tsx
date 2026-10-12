@@ -4,7 +4,9 @@ import {
   type PortalChatMessageRow, type PortalChatQuotaRow, type PortalChatSessionRow,
 } from "../api/client";
 import { Button, Card, Input, Pager, serverPage, StateBlock, StatusPill } from "../ds";
+import { PORTAL_CHAT_TYPE_LABEL } from "../lib/labels";
 import { MarkdownView } from "../ds/markdown";
+import "./styles/portal-chat.css";
 
 // SPEC-854 · ADR-0129 · panel operator untuk obrolan portal klien. Ia menjawab tiga pertanyaan:
 // apa yang klien bicarakan, apakah penjagaan bekerja, dan apakah ada PRD draft yang layak
@@ -12,7 +14,7 @@ import { MarkdownView } from "../ds/markdown";
 
 const PAGE = 20;
 
-const TYPE_LABEL: Record<string, string> = { brainstorm: "Brainstorming", tanya: "Bertanya" };
+const TYPE_LABEL: Readonly<Record<string, string>> = PORTAL_CHAT_TYPE_LABEL;
 
 const tanggal = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString("id-ID",
@@ -60,10 +62,9 @@ export function PortalChatPanel({ projectId }: { projectId: string }) {
   const sp = serverPage(total, page, PAGE);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div className="hn-pc">
       {kuota && (
-        <div data-testid="portal-chat-kuota" style={{
-          fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.6 }}>
+        <div data-testid="portal-chat-kuota" className="hn-pc-kuota">
           Jatah bulan ini — Brainstorming <b>{kuota.brainstorm.terpakai} / {kuota.brainstorm.jatah}</b>
           {" · "}Bertanya <b>{kuota.tanya.terpakai} / {kuota.tanya.jatah}</b>
           {" · "}reset {tanggal(kuota.resetPada)}
@@ -79,14 +80,11 @@ export function PortalChatPanel({ projectId }: { projectId: string }) {
           <Card padding={0}>
             {rows.map((s) => (
               <button key={s.id} type="button" data-testid={`portal-chat-row-${s.id}`}
-                onClick={() => buka(s.id)}
-                style={{ display: "flex", alignItems: "center", gap: 12, width: "100%",
-                  textAlign: "left", padding: "12px 16px", background: "none", border: "none",
-                  borderBottom: "1px solid var(--border-hair)", cursor: "pointer" }}>
-                <span style={{ fontSize: 12.5, color: "var(--text-muted)", width: 110 }}>
+                onClick={() => buka(s.id)} className="hn-pc-row">
+                <span className="hn-pc-type">
                   {TYPE_LABEL[s.type] ?? s.type}
                 </span>
-                <span style={{ flex: 1, minWidth: 0, color: "var(--text-strong)" }}>
+                <span className="hn-pc-summary">
                   {s.summary || "Belum ada ringkasan"}
                 </span>
                 {s.prdSiap && (
@@ -94,8 +92,8 @@ export function PortalChatPanel({ projectId }: { projectId: string }) {
                     {s.prdDocPath ? "PRD dokumen" : "PRD draft"}
                   </StatusPill>
                 )}
-                <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{s.clientEmail}</span>
-                <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{tanggal(s.createdAt)}</span>
+                <span className="hn-pc-meta">{s.clientEmail}</span>
+                <span className="hn-pc-meta">{tanggal(s.createdAt)}</span>
               </button>
             ))}
           </Card>
@@ -107,23 +105,19 @@ export function PortalChatPanel({ projectId }: { projectId: string }) {
       {open && (
         <Card eyebrow={`${TYPE_LABEL[open.type] ?? open.type} · ${open.clientEmail}`}
           title={open.summary || "Obrolan"}>
-          <div data-testid="portal-chat-transkrip"
-            style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+          <div data-testid="portal-chat-transkrip" className="hn-pc-transcript">
             {open.messages.map((m) => (
-              <div key={m.id} style={{
-                padding: "10px 12px", borderRadius: "var(--radius-lg)",
-                border: `1px solid ${m.blocked ? "var(--status-err)" : "var(--border-hair)"}`,
-                background: m.role === "klien" ? "var(--bone-100)" : "var(--surface-card)" }}>
-                <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginBottom: 4 }}>
+              <div key={m.id} className="hn-pc-msg" data-role={m.role} data-blocked={m.blocked ? "true" : "false"}>
+                <div className="hn-pc-msg-meta">
                   {m.role === "klien" ? "Klien" : "hanoman"} · {tanggal(m.createdAt)}
                 </div>
-                <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{m.text}</div>
+                <div className="hn-pc-msg-text">{m.text}</div>
                 {/* Baris yang tertolak gerbang keluaran diperlihatkan UTUH beserta alasannya —
                     hanya dari sini operator bisa menilai penjagaannya bekerja atau kelewat lapar. */}
                 {m.blocked && (
-                  <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--text-muted)" }}>
+                  <div className="hn-pc-blocked">
                     <b>Diblokir</b> ({(m.blockReasons ?? []).join(", ")}) — teks asli agen:
-                    <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{m.rawText}</div>
+                    <div className="hn-pc-raw">{m.rawText}</div>
                   </div>
                 )}
               </div>
@@ -132,24 +126,22 @@ export function PortalChatPanel({ projectId }: { projectId: string }) {
 
           {open.prdMarkdown && (
             <>
-              <div data-testid="portal-chat-prd" style={{
-                border: "1px solid var(--border-hair)", borderRadius: "var(--radius-lg)",
-                padding: "12px 14px", marginBottom: 12 }}>
+              <div data-testid="portal-chat-prd" className="hn-pc-prd">
                 <MarkdownView text={open.prdMarkdown} name="prd-draft.md" />
               </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <div className="hn-pc-prd-actions">
                 <Input data-testid="portal-chat-slug" aria-label="Slug dokumen PRD"
-                  placeholder="nama-dokumen" value={slug} style={{ width: 240 }}
+                  placeholder="nama-dokumen" value={slug} className="hn-pc-slug"
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSlug(e.target.value)} />
                 <Button data-testid="portal-chat-jadikan-prd" disabled={!slug.trim()}
                   onClick={() => void jadikanPrd()}>Jadikan dokumen PRD</Button>
-                <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+                <span className="hn-pc-meta">
                   Menyimpan ke <code>docs/prd/</code>. Tidak membuat backlog.
                 </span>
               </div>
             </>
           )}
-          {pesan && <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--text-muted)" }}>{pesan}</p>}
+          {pesan && <p className="hn-pc-note">{pesan}</p>}
         </Card>
       )}
     </div>

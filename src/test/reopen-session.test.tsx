@@ -21,24 +21,27 @@ function renderScreen(spec: Spec, onStart: any) {
 }
 
 describe("reopen session (SPEC-172)", () => {
-  it("detail spec done: tombol 'Buka sesi lagi' memanggil onStart", async () => {
+  // Detail memakai satu CTA "Jalankan" untuk semua tahap; item selesai menjalankannya lagi (sisa kerja).
+  it("detail spec done: tombol 'Jalankan' memanggil onStart", async () => {
     const onStart = vi.fn();
     renderScreen(doneSpec, onStart);
     fireEvent.click(screen.getByText("Reopenable")); // buka detail modal (title = TitleButton)
-    const btn = await screen.findByText("Buka sesi lagi");
+    const btn = await screen.findByText("Jalankan");
     fireEvent.click(btn);
     expect(onStart).toHaveBeenCalledWith(doneSpec);
   });
 
-  it("grid tidak menampilkan reopen untuk spec done — hanya badge 'selesai'", () => {
+  it("daftar tidak menampilkan reopen untuk spec done — hanya tahap 'Selesai'", () => {
     renderScreen(doneSpec, vi.fn());
-    expect(screen.getByText("selesai")).toBeTruthy();          // SpecActions cabang done
-    expect(screen.queryByText("Buka sesi lagi")).toBeNull();   // tak bocor ke grid
+    expect(screen.getAllByText("Selesai").length).toBeGreaterThan(0);   // pil tahap di baris
+    expect(screen.queryByText("Jalankan")).toBeNull();                  // tak bocor ke daftar
+    expect(screen.queryByText("Buka sesi lagi")).toBeNull();
   });
 
-  it("detail spec non-done: tak ada tombol reopen", () => {
+  it("detail spec non-done: CTA 'Jalankan', bukan label reopen", () => {
     renderScreen({ ...doneSpec, stage: "planned" }, vi.fn());
     fireEvent.click(screen.getByText("Reopenable"));
+    expect(screen.getByText("Jalankan")).toBeTruthy();
     expect(screen.queryByText("Buka sesi lagi")).toBeNull();
   });
 });

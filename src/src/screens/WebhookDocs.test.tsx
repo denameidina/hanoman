@@ -1,4 +1,6 @@
 import React from "react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { WEBHOOK_EVENTS, WEBHOOK_MAX_ATTEMPTS, WEBHOOK_TOLERANCE_SEC } from "@hanoman/shared";
@@ -62,5 +64,11 @@ describe("WebhookDocs", () => {
     render(<WebhookDocs onBack={onBack} />);
     fireEvent.click(screen.getByRole("button", { name: /kembali/i }));
     expect(onBack).toHaveBeenCalled();
+  });
+
+  // Anggaran gaya inline (Z3): layout lewat kelas `hn-wh-*` di integrations.css.
+  it("layout lewat kelas: gaya inline tinggal ≤ 6", () => {
+    const src = readFileSync(resolve(import.meta.dirname, "WebhookDocs.tsx"), "utf8");
+    expect((src.match(/style=\{\{/g) ?? []).length).toBeLessThanOrEqual(6);
   });
 });

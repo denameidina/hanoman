@@ -14,6 +14,8 @@ import { clientProjectIds, hasProjectAccess } from "../services/client-access";
 import { portalTicketRateOk } from "../services/help-ratelimit";
 import { intakeTicket, parseTicketUpload } from "../services/ticket-intake";
 import { portalUserId } from "../services/portal-principal";
+import { getSetting } from "../services/settings";
+import { chatOpen } from "../services/portal-chat/gate";
 
 // Project yang tak ditugaskan dan project yang tak ada menjawab hal yang SAMA: menjawab beda
 // membuat portal jadi alat enumerasi nama project (preseden Help Center, ADR-0062).
@@ -46,7 +48,11 @@ export default async function (app: FastifyInstance) {
     const ids = await clientProjectIds(uid);
     const { page, limit } = req.query as { page?: string; limit?: string };
     const rows = await prisma.project.findMany({ where: { id: { in: ids } }, orderBy: { name: "asc" } });
-    return paginate(rows.map(toPortalProject), page, limit);
+    // ADR-0211 · `chatEnabled` memakai gerbang yang SAMA dengan route chat (`chatOpen`): master switch
+    // dibaca sekali untuk semua baris, dan akses dicek dari daftar `ids` yang baru saja diambil.
+    const { portalChat } = await getSetting();
+    const dapat = new Set(ids);
+    return paginate(rows.map((p) => toPortalProject(p, chatOpen(portalChat.enabled, dapat.has(p.id)))), page, limit);
   });
 
   app.get("/portal/projects/:id/backlog", async (req, reply) => {

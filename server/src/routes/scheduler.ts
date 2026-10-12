@@ -4,7 +4,7 @@ import { zScheduler, zCreateCron, zPatchCron, grantsCapability } from "@hanoman/
 import { prisma } from "../db";
 import { getScheduler, setScheduler } from "../services/scheduler/config";
 import { buildQueuePage, markCanceled, markRequeued } from "../services/scheduler/queue";
-import { computeNextRun, listCronRunsPage } from "../services/scheduler/cron";
+import { computeNextRun, listCronRunsPage, serverTimeZone } from "../services/scheduler/cron";
 import { buildSchedulerState } from "../services/scheduler/state";
 
 // SPEC-294 · ADR-0072 · config (knob) + state (antrean/sesi/cadence) scheduler. Di belakang gate cookie.
@@ -16,13 +16,13 @@ const zCancelBody = z.object({ reason: z.string().trim().max(200).optional() });
 
 // Alasan penolakan disusun SESUDAH CAS gagal, bukan sebelum ia dicoba: memeriksa status lebih dulu
 // lalu menulis adalah persis balapan yang dihindari CAS-nya.
-async function refuse(reply: FastifyReply, id: string, verb: string) {
+async function refuse(reply: FastifyReply, id: string, verb: string, hint?: string) {
   const row = await prisma.schedulerQueueItem.findUnique({ where: { id }, select: { status: true } });
   if (!row) return reply.code(404).send({ error: "item antrean tak ada" });
   const why = row.status === "launched"
     ? "sesinya sudah berjalan — tutup dari Terminal bila memang tak diperlukan"
     : `statusnya sudah ${row.status}`;
-  return reply.code(409).send({ error: `tak bisa ${verb}: ${why}`, status: row.status });
+  return reply.code(409).send({ error: `tak bisa ${verb}: ${why}${hint ? `; ${hint}` : ""}`, status: row.status });
 }
 
 // ADR-0191 · cron adalah `POST /terminal/sessions` yang ditunda (ADR-0112): sebuah baris cron
@@ -35,18 +35,24 @@ async function refuse(reply: FastifyReply, id: string, verb: string) {
 // Cookie (manusia) tak dinilai. Menghapus & MENONAKTIFKAN/mengganti nama cron tidak memulai
 // apa pun, jadi tetap `scheduler:write` saja.
 const EXEC_PATCH_KEYS = ["prompt", "agent", "model", "effort", "expr"] as const;
-function refuseWithoutSpawn(req: FastifyRequest, reply: FastifyReply): boolean {
+// ADR-0204 · `requeue` baris `failed` juga membuka sesi agen (governor meluncurkannya ulang), jadi
+// memakai gerbang yang sama. Baris `canceled` tak dijaga: checker backlog memang akan mengantrekan
+// ulang spec-nya sendiri (spec tanpa baseSha), jadi tak ada kewenangan baru di situ.
+const SPAWN_GATE = {
+  cron: { reason: "cron-executes",
+    detail: "cron membuka sesi agen; selain scheduler:write, token wajib juga memegang sessions:spawn" },
+  requeue: { reason: "requeue-executes",
+    detail: "baris gagal dijalankan ulang sebagai sesi agen; selain settings:write, token wajib juga memegang sessions:spawn" },
+} as const;
+function refuseWithoutSpawn(req: FastifyRequest, reply: FastifyReply, gate: keyof typeof SPAWN_GATE = "cron"): boolean {
   if (!req.agent || grantsCapability(req.agent.capabilities, "sessions:spawn")) return false;
-  reply.code(403).send({
-    error: "capability required", need: "sessions:spawn",
-    reason: "cron-executes",
-    detail: "cron membuka sesi agen; selain scheduler:write, token wajib juga memegang sessions:spawn",
-  });
+  reply.code(403).send({ error: "capability required", need: "sessions:spawn", ...SPAWN_GATE[gate] });
   return true;
 }
 
 export default async function (app: FastifyInstance) {
-  app.get("/scheduler/config", async () => getScheduler());
+  // ADR-0204 · + zona waktu server (aditif). PUT di bawah tetap menerima setelan polos.
+  app.get("/scheduler/config", async () => ({ ...(await getScheduler()), serverTimeZone: serverTimeZone() }));
 
   app.put("/scheduler/config", async (req, reply) => {
     const parsed = zScheduler.safeParse(req.body);
@@ -68,9 +74,17 @@ export default async function (app: FastifyInstance) {
 
   // SPEC-522 · jalan pulang. Tanpa ini pembatalan permanen: barisnya tombstone, dan `enqueue`
   // (`upsert` ber-`update:{}`) sengaja tak bisa menghidupkannya lagi.
+  // ADR-0204 · `failed` ikut (lihat REQUEUABLE_STATUSES). Idempotensi berarti efeknya: requeue ulang
+  // atas baris yang sudah `queued` tak mengubah apa pun dan dijawab 409 beserta statusnya — bukan 500,
+  // dan bukan 200 palsu yang menyangka ia baru saja memindahkan baris. Hanya CAS `markRequeued` yang
+  // menulis, jadi dua requeue yang balapan pun hanya satu yang menang.
   app.post("/scheduler/queue/:id/requeue", async (req, reply) => {
     const { id } = req.params as { id: string };
-    if (!(await markRequeued(id))) return refuse(reply, id, "mengembalikan ke antrean");
+    const row = await prisma.schedulerQueueItem.findUnique({ where: { id }, select: { status: true } });
+    if (row?.status === "failed" && refuseWithoutSpawn(req, reply, "requeue")) return;
+    if (!(await markRequeued(id))) {
+      return refuse(reply, id, "mengembalikan ke antrean", "yang bisa dikembalikan hanya baris canceled atau failed");
+    }
     return prisma.schedulerQueueItem.findUnique({ where: { id } });
   });
 

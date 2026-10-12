@@ -34,7 +34,7 @@ export function IntegrateDialog({ projectId, ownBranch, eyebrow, onClose, onInte
         Rebase menata ulang branch di atas target (force-push balik ke branch itu). Merge
         menggabungkan branch ke target. Bila ada konflik, sesi agen membereskannya di Terminal —
         agen, model & effort-nya diatur di <b>Settings → Model sesi → Konflik rebase &amp; merge</b>
-        {" "}(SPEC-383/ADR-0081); selama kartu itu mati, ia mengikuti default global.
+        {" "}— selama kartu itu dinonaktifkan, ia mengikuti default global.
       </div>
       <div style={{ marginBottom: 16 }}>
         <div className="hn-eyebrow" style={{ marginBottom: 4 }}>Target</div>

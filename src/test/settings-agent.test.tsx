@@ -31,7 +31,7 @@ beforeEach(() => {
 
 const openModel = () => {
   render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: "Model sesi" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sesi harian" }));
 };
 
 describe("SettingsScreen · kartu agen sesi (SPEC-338)", () => {
@@ -62,7 +62,7 @@ describe("SettingsScreen · kartu agen sesi (SPEC-338)", () => {
   it("kartu model claude tetap ada berdampingan", async () => {
     openModel();
     expect(await screen.findByLabelText("Agen default")).toBeInTheDocument();
-    expect(screen.getByText("Model sesi — default global")).toBeInTheDocument();
+    expect(screen.getByText("Agen & model — default global")).toBeInTheDocument();
   });
 
   // SPEC-339 · effort per model: memilih Luna saat effort `ultra` harus menyimpan pasangan yang

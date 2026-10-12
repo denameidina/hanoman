@@ -24,7 +24,7 @@ function open(t: TaskView) {
     onClose={onClose} onDone={onDone} onToast={onToast} />);
   return { onDone, onClose, onToast };
 }
-const submit = () => screen.getByRole("button", { name: /^eskalasi$/i });
+const submit = () => screen.getByRole("button", { name: /^kirim ke backlog$/i });
 
 beforeEach(() => vi.restoreAllMocks());
 
@@ -104,12 +104,14 @@ describe("TeamScreen · wiring eskalasi", () => {
     vi.spyOn(api, "listMembers").mockResolvedValue(page([]) as any);
   });
 
-  it("klik Eskalasi membuka dialog untuk kartu itu", async () => {
+  it("klik Kirim ke Backlog membuka dialog untuk kartu itu", async () => {
     vi.spyOn(api, "listTasks").mockImplementation(async (p: any) =>
       page(p.status === "doing" ? [task()] : []) as any);
     render(<TeamScreen projects={projects} projectFilter="all"
       onProjectFilter={() => {}} onToast={() => {}} />);
-    fireEvent.click(await screen.findByRole("button", { name: /eskalasi ke backlog/i }));
+    // Aksi kartu ada di menu "Ubah tugas", bukan tombol sejajar.
+    fireEvent.click(await screen.findByRole("button", { name: /^Ubah tugas/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Kirim ke Backlog" }));
     expect(await screen.findByLabelText(/source/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/prioritas/i)).toBeInTheDocument();
   });
@@ -121,8 +123,12 @@ describe("TeamScreen · wiring eskalasi", () => {
     const spy = vi.spyOn(api, "unlinkTaskSpec").mockResolvedValue(task({ specId: null }));
     render(<TeamScreen projects={projects} projectFilter="all"
       onProjectFilter={() => {}} onToast={() => {}} />);
-    fireEvent.click(await screen.findByRole("button", { name: /lepas tautan/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Ubah tugas/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Lepas tautan" }));
     await waitFor(() => expect(spy).toHaveBeenCalledWith("t1"));
-    await waitFor(() => expect(screen.queryByText("SPEC-9 · executing")).toBeNull());
+    // Tautan sudah lepas: menu kini menawarkan eskalasi lagi, dan label tautan hilang.
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^Ubah tugas/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /^Ubah tugas/ }));
+    expect(await screen.findByRole("menuitem", { name: "Kirim ke Backlog" })).toBeInTheDocument();
   });
 });

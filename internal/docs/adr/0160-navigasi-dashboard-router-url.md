@@ -1,6 +1,7 @@
 # ADR-0160 — Navigasi dashboard lewat URL (react-router) + layar dimuat malas
 
-- Status: Accepted
+- Status: Accepted · daftar menu sidebar **sebagian ditimpa** oleh [ADR-0205](0205-navigasi-8-hub-bergrup.md)
+  (17 entri datar → 8 hub bergrup); bentuk URL di bawah tetap berlaku tanpa perubahan
 - Tanggal: 2026-09-05
 - SPEC: audit menyeluruh 2026-09-05 (tanpa nomor SPEC; keputusan manusia langsung di sesi)
 - Terkait: **mengamandemen [0115](0115-state-tampilan-dashboard-persisten.md)** (alternatif "router +

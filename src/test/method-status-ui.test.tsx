@@ -48,7 +48,7 @@ const status = () => ({
 const me = { id: "u1", email: "dena@nafanesia.id", createdAt: "x" } as never;
 const openSesi = () => {
   render(<SettingsScreen me={me} onLoggedOut={() => {}} />);
-  fireEvent.click(screen.getByRole("button", { name: "Sesi" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sesi harian" }));
 };
 
 beforeEach(() => {

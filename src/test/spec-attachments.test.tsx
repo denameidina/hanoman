@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { AttachmentPicker, SpecAttachmentsPanel } from "../src/screens/SpecAttachments";
 
 const attachments = [
@@ -34,12 +34,27 @@ describe("SPEC-843 · UI lampiran backlog", () => {
     expect(screen.getByLabelText("Unduh error.log")).toBeTruthy();
   });
 
-  it("tombol hapus memanggil API lalu memuat ulang daftar", async () => {
+  it("tombol hapus meminta konfirmasi, lalu memanggil API dan memuat ulang daftar", async () => {
     render(<SpecAttachmentsPanel specId="SPEC-1" onToast={vi.fn()} />);
     await screen.findByAltText("layar.png");
     fireEvent.click(screen.getByLabelText("Hapus lampiran layar.png"));
+    // Belum ada yang terhapus sebelum operator menyetujui: berkas hilang dari disk.
+    const dialog = within(await screen.findByRole("dialog"));
+    expect(dialog.getByText("Hapus lampiran layar.png?")).toBeTruthy();
+    expect(dialog.getByText("Berkas dihapus dari disk dan tak bisa dikembalikan.")).toBeTruthy();
+    expect(deleteSpecAttachment).not.toHaveBeenCalled();
+    fireEvent.click(dialog.getByRole("button", { name: "Hapus lampiran" }));
     await waitFor(() => expect(deleteSpecAttachment).toHaveBeenCalledWith("SPEC-1", "a1"));
     await waitFor(() => expect(listSpecAttachments).toHaveBeenCalledTimes(2));
+  });
+
+  it("Batal di konfirmasi tak menghapus apa pun", async () => {
+    render(<SpecAttachmentsPanel specId="SPEC-1" onToast={vi.fn()} />);
+    await screen.findByAltText("layar.png");
+    fireEvent.click(screen.getByLabelText("Hapus lampiran layar.png"));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Batal" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(deleteSpecAttachment).not.toHaveBeenCalled();
   });
 
   it("penolakan per-berkas dilaporkan ke operator, tak senyap", async () => {

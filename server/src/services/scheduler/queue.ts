@@ -150,9 +150,16 @@ export async function markCanceled(id: string, note: string): Promise<boolean> {
   });
   return count > 0;
 }
+// ADR-0204 · `failed` ikut dikembalikan: sesi yang mati sebelum `done` (reconcile) atau launch yang
+// ditolak (governor) kini bisa diantre ulang tanpa menunggu checker. `launched`, `done`, dan `queued`
+// tak pernah lewat sini: yang sedang berjalan atau sudah selesai tak boleh dihidupkan dua kali.
+export const REQUEUABLE_STATUSES = ["canceled", "failed"] as const;
 export async function markRequeued(id: string): Promise<boolean> {
   const { count } = await prisma.schedulerQueueItem.updateMany({
-    where: { id, status: "canceled" }, data: { status: "queued", note: null },
+    where: { id, status: { in: [...REQUEUABLE_STATUSES] } },
+    // sessionId & launchedAt milik sesi yang sudah mati: ikut dibuang bersama catatannya, supaya baris
+    // `queued` tak membawa jejak sesi lama (markLaunched menulis keduanya lagi saat peluncuran berikutnya).
+    data: { status: "queued", note: null, sessionId: null, launchedAt: null },
   });
   return count > 0;
 }

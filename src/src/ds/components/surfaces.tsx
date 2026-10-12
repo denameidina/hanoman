@@ -22,9 +22,9 @@ export function Card({ children, title, eyebrow, actions, footer, elevation = "r
       cursor: interactive ? "pointer" : "default", overflow: "hidden",
       ...(fill ? { display: "flex", flexDirection: "column", flex: "1 1 auto", minHeight: 0 } : null), ...style },
   }, rest),
+    // Susunan header lewat `.hn-card-header` (app.css) supaya mobile bisa menimpanya tanpa !important.
     hasHeader && React.createElement("div", { className: "hn-card-header",
-      style: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12,
-        padding: `${padding}px ${padding}px ${title && children ? 0 : padding}px` },
+      style: { padding: `${padding}px ${padding}px ${title && children ? 0 : padding}px` },
     },
       React.createElement("div", { style: { minWidth: 0 } },
         eyebrow && React.createElement("div", { className: "hn-eyebrow",

@@ -75,6 +75,12 @@ model Spec {
   // ditandai manual. Ditimpa tiap penandaan berikutnya: ia menjelaskan keadaan yang BERLAKU;
   // riwayat transisi stage tinggal di SessionResult (ADR-0047). Ikut FIELDS.spec sync.
   manualDone Json?
+  // ADR-0218 · kapan operator menandai item SELESAI ini sudah ditinjau ("Tandai ditinjau"). null =
+  // belum ditinjau, atau item belum selesai. Ditulis HANYA oleh `POST /specs/:id/reviewed`, dan
+  // di-reset ke null saat stage dikembalikan mundur dari `done` (PATCH stage, POST source). SENGAJA
+  // tak di-reset oleh recordCompletion: reconcile memanggilnya ulang untuk item yang sudah selesai,
+  // dan itu akan menghapus tanda yang baru dipasang. Ikut FIELDS.spec sync (ADR-0218).
+  reviewedAt DateTime?
   // SPEC-447 · ADR-0093 · id spec lain yang harus SELESAI & commit-nya sudah ada di branch basis
   // sebelum item ini boleh diluncurkan. Array JSON of string; null/[] = tak bergantung apa pun.
   // Sengaja kolom, bukan tabel join: SQLite melarang scalar list, `Json` sudah dipakai `payload`,

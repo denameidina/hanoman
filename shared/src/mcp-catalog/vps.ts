@@ -27,7 +27,8 @@ export const VPS_TOOLS: readonly McpToolDef[] = [
   {
     name: "hanoman_vps_list",
     title: "Daftar VPS",
-    description: "Seluruh VPS yang terdaftar di instance ini, urut waktu dibuat. Jalur key TIDAK ikut menyeberang sync.",
+    description:
+      "Seluruh VPS yang terdaftar di instance ini, urut waktu dibuat. Jalur key TIDAK ikut menyeberang sync. Tiap baris membawa `scoreTotal` = skor kepatuhan dari audit TERSIMPAN (null bila belum pernah diaudit, ADR-0211) — daftar ini tak menjalankan audit; untuk menyegarkan skor pakai hanoman_vps_audit.",
     inputSchema: obj({ properties: {} }),
     mode: "read", capability: "vps:read",
     samplePath: "/vps", sampleMethod: "GET",

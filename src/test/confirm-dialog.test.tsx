@@ -80,6 +80,50 @@ describe("ConfirmDialog impact & icon (SPEC-847)", () => {
   it("tone danger memberi tombol konfirmasi varian danger", () => {
     render(<ConfirmDialog open title="Hapus?" confirmLabel="Hapus" onConfirm={() => {}} onCancel={() => {}} />);
     const btn = screen.getByRole("button", { name: "Hapus" });
-    expect(btn.style.background).toContain("--clay-600");
+    // Warna varian danger ada di forms.css (`.hn-btn-danger`), bukan inline.
+    expect(btn).toHaveClass("hn-btn-danger");
+  });
+});
+
+// Audit UI/UX 2026-10 · Fase 2B · aksi destruktif mulai dari "Batal"; Enter tak mengonfirmasi.
+describe("ConfirmDialog · fokus, Enter, dan busy (Fase 2B)", () => {
+  it("tone danger: fokus awal di Batal, bukan konfirmasi", () => {
+    render(<ConfirmDialog open title="Hapus?" confirmLabel="Hapus" onConfirm={() => {}} onCancel={() => {}} />);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Batal" }));
+    expect(document.activeElement).not.toBe(screen.getByRole("button", { name: "Hapus" }));
+  });
+
+  it("tone default: fokus awal di konfirmasi", () => {
+    render(<ConfirmDialog open tone="default" title="Simpan?" confirmLabel="Simpan" onConfirm={() => {}} onCancel={() => {}} />);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Simpan" }));
+  });
+
+  it("dengan requireText, fokus awal jatuh ke isiannya", () => {
+    render(<ConfirmDialog open title="Hapus folder" requireText="src" onConfirm={() => {}} onCancel={() => {}} />);
+    expect(document.activeElement).toBe(screen.getByLabelText("Ketik src untuk konfirmasi"));
+  });
+
+  it("busy mematikan Escape, klik latar, tombol ×, dan isian ketik-ulang", () => {
+    const onCancel = vi.fn();
+    render(<ConfirmDialog open busy title="Hapus folder" requireText="src" onConfirm={() => {}} onCancel={onCancel} />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.mouseDown(screen.getByTestId("modal-panel").parentElement!);
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Tutup")).toBeDisabled();
+    expect(screen.getByLabelText("Ketik src untuk konfirmasi")).toBeDisabled();
+  });
+
+  it("tidak busy: Escape membatalkan dialog danger", () => {
+    const onCancel = vi.fn();
+    render(<ConfirmDialog open title="Hapus?" onConfirm={() => {}} onCancel={onCancel} />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it("impact dirender sebagai <ul> berisi <li>", () => {
+    const { container } = render(<ConfirmDialog open title="Hapus?" impact={["satu", "dua"]} onConfirm={() => {}} onCancel={() => {}} />);
+    const list = container.querySelector("ul");
+    expect(list).not.toBeNull();
+    expect(list!.querySelectorAll("li")).toHaveLength(2);
   });
 });

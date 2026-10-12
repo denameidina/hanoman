@@ -1,7 +1,9 @@
 import React from "react";
 import { Modal, Input, Select, Button, Badge, Callout, StateBlock, Icon, Pager, serverPage } from "../ds";
 import { api } from "../api/client";
+import { failureMessage } from "../lib/report-error";
 import { SESSION_KINDS, SESSION_KIND_LABEL, restartableKind, sessionOutcome, type SessionHistoryView } from "@hanoman/shared";
+import "./styles/terminal.css";
 
 const PAGE = 20;
 
@@ -55,6 +57,9 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
   const [q, setQ] = React.useState("");
   const [dq, setDq] = React.useState("");
   const [selected, setSelected] = React.useState<SessionHistoryView | null>(null);
+  // Galat memuat daftar TAMPIL sebagai galat, bukan sebagai "Belum ada riwayat sesi" (audit UI/UX).
+  const [listError, setListError] = React.useState<string | null>(null);
+  const [reloadKey, setReloadKey] = React.useState(0);
 
   React.useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
   // AC-15 · ganti penyaring = kembali ke halaman 1. Halaman 5 dari filter lama menjawab daftar
@@ -69,15 +74,20 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
     })
       .then((r) => {
         if (!alive) return;
+        setListError(null);
         setTotal(r.total);
         // SPEC-523 · halaman MENGGANTI isi. Muat-lebih (append) dicabut demi satu pola paginasi
         // yang sama dengan backlog/project/tiket — objective SPEC-523.
         setItems(r.items);
       })
-      .catch(() => { if (alive) { setItems([]); setTotal(0); } })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setItems([]); setTotal(0);
+        setListError(failureMessage("memuat riwayat sesi", e));
+      })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [project, kind, dq, page]);
+  }, [project, kind, dq, page, reloadKey]);
 
   const sp = serverPage(total, page, PAGE);
 
@@ -85,10 +95,10 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
 
   return (
     <Modal open title="Riwayat sesi" icon="history" onClose={onClose} width={900}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+      <div className="hn-terminal-hist-toolbar">
         <Input size="sm" leftIcon="search" placeholder="mis. spec-412 atau reverse" aria-label="Cari riwayat sesi"
           value={q} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQ(e.target.value)}
-          style={{ flex: "1 1 200px" }} />
+          className="hn-terminal-hist-search" />
         <Select size="sm" aria-label="Filter project" value={project} onChange={(e) => setProject(e.target.value)}
           options={[{ value: "", label: "Semua project" }].concat(projects.map((p) => ({ value: p.id, label: p.name })))} />
         <Select size="sm" aria-label="Filter jenis" value={kind} onChange={(e) => setKind(e.target.value)}
@@ -96,36 +106,33 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
             SESSION_KINDS.map((k) => ({ value: k, label: SESSION_KIND_LABEL[k] })))} />
       </div>
 
-      {items.length === 0 && !loading ? (
+      {listError ? (
+        <StateBlock kind="error" icon="history" title="Riwayat belum bisa dimuat" hint={listError}
+          action={() => setReloadKey((k) => k + 1)} actionLabel="Coba lagi" />
+      ) : items.length === 0 && !loading ? (
         <StateBlock kind="empty" icon="history" title="Belum ada riwayat sesi"
           hint="Riwayat terisi sendiri saat sesi terminal dibuka lalu ditutup — termasuk sesi backlog, terminal biasa, dan sesi project-level." />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", maxHeight: "60vh", overflowY: "auto" }}>
+        <div className="hn-terminal-hist-list">
           {items.map((r) => {
             const st = statusOf(r);
             return (
-              // SPEC-763 · cermin baris "Ambil backlog", tiga cacat yang sama: `all: "unset"`
-              // inline mengalahkan `button { min-height: var(--touch-target) }`; kotak tombol tak
-              // menumbuhkan tinggi untuk baris flex yang membungkus (jadi pembungkusnya <span> di
-              // DALAM tombol); dan daftar flex-column ber-`maxHeight` memeras barisnya di bawah
-              // konten kalau `flex: 0 0 auto` tak dinyatakan.
-              <button key={r.id} onClick={() => setSelected(r)} style={{
-                cursor: "pointer", display: "block", width: "100%", flex: "0 0 auto",
-                font: "inherit", color: "inherit", textAlign: "left", background: "transparent",
-                padding: "9px 8px", border: "none", borderBottom: "1px solid var(--border-hair)",
-              }}>
-                <span className="hn-dense-row hn-picker-row" style={{
-                  display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-subtle)", flex: "0 0 132px" }}>
+              // SPEC-763 · cermin baris "Ambil backlog": reset tombol ada di `.hn-terminal-hist-row`
+              // (menang atas `button { min-height: var(--touch-target) }` dan atas `flex-wrap` dari
+              // `.hn-dense-row`); kotak tombol tak menumbuhkan tinggi untuk baris flex yang membungkus
+              // (jadi pembungkusnya <span> di DALAM tombol); dan `flex: 0 0 auto` mencegah baris
+              // diperas oleh daftar flex-column ber-`maxHeight`.
+              <button key={r.id} onClick={() => setSelected(r)} className="hn-terminal-hist-row">
+                <span className="hn-dense-row hn-picker-row hn-terminal-hist-main">
+                <span className="hn-terminal-hist-when">
                   {new Date(r.startedAt).toLocaleString("id-ID")}
                 </span>
                 <Badge size="sm" tone="neutral">{labelOfKind(r.kind)}</Badge>
-                <span className="hn-picker-title" style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--text-strong)",
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span className="hn-picker-title hn-terminal-hist-title">
                   {r.title ?? r.specId ?? nameOf(r.projectId)}
                 </span>
                 {r.transcriptBytes !== null && <Icon name="file-text" size={12} color="var(--text-subtle)" />}
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-muted)", flex: "0 0 72px" }}>
+                <span className="hn-terminal-hist-duration">
                   {durationOf(r)}
                 </span>
                 <Badge size="sm" tone={st.tone}>{st.label}</Badge>
@@ -134,7 +141,7 @@ export function SessionHistoryModal({ projects, onClose, onRestart }: {
             );
           })}
           {loading && (
-            <div style={{ padding: "10px 8px", textAlign: "center", fontSize: 11, color: "var(--text-subtle)" }}>memuat…</div>
+            <div className="hn-terminal-hist-loading">memuat…</div>
           )}
         </div>
       )}
@@ -157,6 +164,17 @@ function SessionHistoryDetail({ row, projectName, onBack, onRestart }: {
 }) {
   const [text, setText] = React.useState<string | null>(null);
   const [state, setState] = React.useState<"idle" | "loading" | "none" | "error">("idle");
+  // Hasil salin transkrip: sukses dan gagal sama-sama diumumkan, tak lagi tombol yang diam.
+  const [copyNote, setCopyNote] = React.useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  async function copyTranscript(t: string) {
+    try {
+      if (!navigator.clipboard) throw new Error("clipboard tidak tersedia di browser ini");
+      await navigator.clipboard.writeText(t);
+      setCopyNote({ tone: "ok", text: "Transkrip disalin." });
+    } catch (e) {
+      setCopyNote({ tone: "err", text: failureMessage("menyalin transkrip", e) });
+    }
+  }
 
   React.useEffect(() => {
     // Baris tanpa transkrip tak perlu request — 404-nya sudah bisa diprediksi dari metadata.
@@ -190,12 +208,12 @@ function SessionHistoryDetail({ row, projectName, onBack, onRestart }: {
 
   return (
     <Modal open title={row.title ?? row.specId ?? row.sessionId} icon="history" onClose={onBack} width={1000}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+      <div className="hn-terminal-hist-actions">
         <Button size="sm" variant="ghost" leftIcon="arrow-left" onClick={onBack}>Kembali</Button>
-        <div style={{ flex: 1 }} />
+        <div className="hn-terminal-hist-spacer" />
         {text && (
           <Button size="sm" variant="secondary" leftIcon="copy"
-            onClick={() => void navigator.clipboard?.writeText(text)}>Salin transkrip</Button>
+            onClick={() => void copyTranscript(text)}>Salin transkrip</Button>
         )}
         {/* Sesi lama tak pernah "hidup lagi" — tmux sudah membunuhnya. Ini men-spawn sesi BARU
             dengan konteks yang sama, dan hanya untuk kind yang konteksnya bisa dibangun ulang. */}
@@ -205,7 +223,7 @@ function SessionHistoryDetail({ row, projectName, onBack, onRestart }: {
       </div>
 
       {interrupted && (
-        <Callout tone="warn" title="Sesi terputus — hasilnya tak diketahui" style={{ marginBottom: 12 }}>
+        <Callout tone="warn" title="Sesi terputus — hasilnya tak diketahui" className="hn-terminal-notice">
           Panenya sudah lenyap saat hanoman menyala lagi (reboot, <code>tmux kill-server</code>, atau
           host mati), jadi sesi ini tak meninggalkan exit code dan transkripnya kemungkinan besar tak
           sempat diambil — capture berjalan tepat sebelum pane dibunuh, dan di jalur ini sudah tak ada
@@ -214,34 +232,33 @@ function SessionHistoryDetail({ row, projectName, onBack, onRestart }: {
         </Callout>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", marginBottom: 12,
-        fontSize: 12 }}>
+      <div className="hn-terminal-hist-meta">
         {meta.map(([k, v]) => (
           <React.Fragment key={k}>
-            <span style={{ color: "var(--text-subtle)" }}>{k}</span>
-            <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-body)", wordBreak: "break-all" }}>{v}</span>
+            <span className="hn-terminal-hist-key">{k}</span>
+            <span className="hn-terminal-hist-val">{v}</span>
           </React.Fragment>
         ))}
       </div>
 
-      {state === "loading" && <div style={{ fontSize: 12, color: "var(--text-subtle)" }}>memuat transkrip…</div>}
+      {state === "loading" && <div className="hn-terminal-hist-note">memuat transkrip…</div>}
       {state === "none" && (
-        <div style={{ fontSize: 12, color: "var(--text-subtle)" }}>
+        <div className="hn-terminal-hist-note">
           {interrupted
             ? "Tanpa transkrip — panenya sudah lenyap sebelum hanoman sempat mengambilnya."
             : "Tanpa transkrip — sesi ini ditutup sebelum fitur riwayat ada, atau panenya tak menyisakan keluaran."}
         </div>
       )}
+      {copyNote && (
+        <div role="status" className={copyNote.tone === "err" ? "hn-terminal-hist-copy is-err" : "hn-terminal-hist-copy"}>
+          {copyNote.text}
+        </div>
+      )}
       {state === "error" && (
-        <div style={{ fontSize: 12, color: "var(--clay-600)" }}>Transkrip tak terbaca lagi di server.</div>
+        <div className="hn-terminal-hist-error">Transkrip tak terbaca lagi di server.</div>
       )}
       {text !== null && (
-        <pre style={{
-          maxHeight: "52vh", overflow: "auto", margin: 0, padding: 10,
-          background: "var(--bone-200)", border: "1px solid var(--border-hair)",
-          borderRadius: "var(--radius-sm)", fontFamily: "var(--font-mono)", fontSize: 11,
-          whiteSpace: "pre-wrap", wordBreak: "break-word", color: "var(--text-body)",
-        }}>{text}</pre>
+        <pre className="hn-terminal-hist-pre">{text}</pre>
       )}
     </Modal>
   );

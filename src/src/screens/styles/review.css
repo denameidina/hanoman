@@ -1,0 +1,140 @@
+/* Review worktree — Audit UI/UX 2026-10 · Fase 3 (3L) · alur "Tinjau lalu Putuskan".
+   Susunan: kepala ringkas (judul, jumlah berkas, +/−) → daftar berkas dan isi berkas → bar
+   keputusan sticky di bawah. Layout inline di ReviewScreen dipindah ke sini. */
+
+.hn-review { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.hn-review-topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+}
+.hn-review-head { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hn-review-title {
+  margin: 0; font-family: var(--font-display); font-size: var(--text-xl); font-weight: 600;
+  color: var(--text-strong); line-height: 1.25; overflow-wrap: anywhere;
+}
+.hn-review-stat { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+.hn-review-delta { font-family: var(--font-mono); font-weight: 600; color: var(--text-strong); }
+
+/* Daftar berkas (kiri / atas di mobile). Di layar lebar daftar ikut menggulir sendiri. */
+.hn-review-pane { display: flex; flex-direction: column; min-width: 0; background: var(--surface-card);
+  border: 1px solid var(--border-hair); border-radius: var(--radius-lg); overflow: hidden; }
+.hn-review-list { padding: 6px 4px; min-width: 0; }
+.hn-review-sep {
+  padding: 8px 8px 6px; margin-top: 8px; border-top: 1px solid var(--border-hair);
+}
+.hn-review-legend {
+  margin: 0; padding: 8px 12px; border-top: 1px solid var(--border-hair);
+  font-size: var(--text-xs); color: var(--text-subtle);
+}
+
+/* Isi berkas (kanan / bawah). */
+.hn-review-viewer { display: flex; flex-direction: column; min-width: 0; background: var(--surface-card);
+  border: 1px solid var(--border-hair); border-radius: var(--radius-lg); overflow: hidden; }
+.hn-review-viewbar {
+  display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 10px 14px;
+  border-bottom: 1px solid var(--border-hair); min-width: 0;
+}
+.hn-review-path {
+  flex: 1 1 180px; min-width: 0; font-family: var(--font-mono); font-size: var(--text-sm);
+  font-weight: 500; color: var(--text-strong); overflow-wrap: anywhere;
+}
+.hn-review-filestat { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
+.hn-review-seg {
+  display: inline-flex; gap: 2px; padding: 2px; background: var(--bone-100); border-radius: var(--radius-pill);
+}
+.hn-review-seg button {
+  padding: 4px 12px; border: none; cursor: pointer; border-radius: var(--radius-pill);
+  font: inherit; font-size: var(--text-xs); color: var(--text-muted); background: transparent;
+}
+.hn-review-seg button[aria-pressed="true"] {
+  background: var(--surface-card); color: var(--text-strong); font-weight: 600;
+}
+.hn-review-seg button:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 1px; }
+.hn-review-body { min-width: 0; background: var(--surface-card); }
+.hn-review-diff { padding: 10px 0; }
+.hn-review-truncated {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px;
+  font-size: var(--text-xs); color: var(--text-muted);
+}
+.hn-review-truncated a { color: var(--brass-700); font-weight: 500; }
+.hn-review-pre {
+  margin: 0; padding: 12px 16px; font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; color: var(--text-body);
+}
+
+/* Bar keputusan: selalu terlihat di bawah konten yang sedang ditinjau. */
+.hn-review-decide {
+  position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between;
+  gap: 8px 12px; flex-wrap: wrap; padding: 10px 12px; background: var(--surface-card);
+  border: 1px solid var(--border-hair); border-radius: var(--radius-lg); box-shadow: var(--shadow-md);
+}
+.hn-review-decide-hint { margin: 0; flex: 1 1 260px; font-size: var(--text-sm); color: var(--text-muted); line-height: 1.5; }
+.hn-review-decide-err { flex: 1 1 100%; margin: 0; }
+.hn-review-decide-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.hn-review-more { display: inline-flex; }
+
+@media (min-width: 768px) {
+  .hn-review-list { max-height: min(640px, 60dvh); overflow: auto; }
+  .hn-review-body { max-height: min(640px, 60dvh); overflow: auto; }
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-review button { min-height: var(--touch-target); }
+  .hn-review-seg button { min-height: var(--touch-target); padding: 8px 14px; }
+}
+
+@media (max-width: 767px) {
+  .hn-review-decide { padding-bottom: calc(10px + var(--safe-bottom)); }
+  .hn-review-viewbar { align-items: stretch; }
+  .hn-review-path { flex-basis: 100%; }
+}
+/* Di bawah 400px bar keputusan satu baris: hint terpotong satu baris, dan aksinya ada di ⋯ (useNarrowBar).
+   Sebelumnya hint dan aksi bertumpuk di dua baris, dan bar menutup ~30% layar 320×640. */
+@media (max-width: 399px) {
+  .hn-review-decide-hint {
+    flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+}
+
+/* ---------- Konflik sinkron (ReconcileModal) ---------- */
+.hn-reconcile-error {
+  font-size: var(--text-sm); color: var(--clay-600); background: var(--status-err-tint);
+  border: 1px solid var(--clay-500); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 12px;
+}
+.hn-reconcile-card {
+  border: 1px solid var(--border-hair); border-radius: var(--radius-md); padding: 12px; margin: 0 0 12px;
+  background: var(--surface-card); min-width: 0;
+}
+.hn-reconcile-head { display: flex; align-items: baseline; gap: 8px 10px; flex-wrap: wrap; font-size: var(--text-sm); color: var(--text-strong); }
+.hn-reconcile-id { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); overflow-wrap: anywhere; }
+.hn-reconcile-hint { font-size: var(--text-xs); color: var(--text-muted); }
+.hn-reconcile-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 4px;
+  font-size: var(--text-xs); color: var(--text-subtle);
+}
+.hn-reconcile-same { margin: 10px 0 0; font-size: var(--text-sm); color: var(--text-muted); }
+.hn-reconcile-fields { margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.hn-reconcile-field {
+  display: grid; grid-template-columns: minmax(0, 110px) minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px;
+  align-items: start; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--bone-100);
+}
+.hn-reconcile-field dt { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-strong); overflow-wrap: anywhere; }
+.hn-reconcile-field dd { margin: 0; min-width: 0; font-size: var(--text-xs); color: var(--text-body); }
+.hn-reconcile-field code {
+  display: block; font-family: var(--font-mono); font-size: var(--text-xs); white-space: pre-wrap;
+  overflow-wrap: anywhere; line-height: 1.5;
+}
+.hn-reconcile-field-head { background: transparent; padding-bottom: 0; }
+.hn-reconcile-field-head dt, .hn-reconcile-field-head dd { font-family: var(--font-ui); font-size: var(--text-xs); color: var(--text-subtle); font-weight: 600; }
+.hn-reconcile-side {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  font-size: var(--text-xs); color: var(--text-subtle); font-weight: 600;
+}
+.hn-reconcile-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+@media (max-width: 767px) {
+  .hn-reconcile-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .hn-reconcile-field-head { display: none; }
+  .hn-reconcile-side { position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; display: block; margin-bottom: 2px; }
+  .hn-reconcile-actions > * { flex: 1 1 140px; justify-content: center; }
+  .hn-reconcile-field dt { font-weight: 600; }
+}

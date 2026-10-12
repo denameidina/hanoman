@@ -3,6 +3,7 @@
 - Status: Accepted
 - Tanggal: 2026-08-04
 - SPEC: SPEC-522 (brief, prioritas tinggi)
+- Diperluas: **ADR-0204** (`failed` ikut diantre ulang; token agen menuntut `sessions:spawn` untuk baris itu).
 - Terkait: **mengamandemen keputusan #2 [0072](0072-scheduler-fondasi-engine-antrean-durable-cap.md)**
   (yang menuliskan kosakata status antrean hanya `queued|launched|done|failed`), memperluas pola
   tombstone SPEC-431 (`markDone` + `ALREADY_DONE_NOTE`), sejajar gerbang pra-launch

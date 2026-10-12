@@ -46,10 +46,10 @@ describe("permukaan chat portal (SPEC-854)", () => {
   });
 
   // Bedanya dari Help desk harus terbaca klien, bukan disimpulkan sendiri (constraint brief).
-  it("menjelaskan bedanya dengan Help desk", async () => {
+  it("menjelaskan bedanya dengan Keluhan saya", async () => {
     render(<ChatPanel projectId="p1" />);
     const b = await screen.findByTestId("chat-beda-help");
-    expect(b.textContent).toMatch(/Help desk/i);
+    expect(b.textContent).toMatch(/Keluhan saya/);
   });
 
   it("mengirim pesan menampilkan giliran klien lalu jawaban hanoman", async () => {
@@ -102,5 +102,23 @@ describe("permukaan chat portal (SPEC-854)", () => {
     const galat = await screen.findByTestId("chat-galat");
     expect(galat.textContent).not.toMatch(/500|\/api\/|POST|Error/);
     expect(galat.textContent!.length).toBeGreaterThan(10);
+  });
+});
+
+describe("permukaan chat portal · pesan gagal terkirim (audit)", () => {
+  it("gelembung gagal ditandai, draf dikembalikan, dan bisa dikirim ulang", async () => {
+    sendChatMessage.mockRejectedValueOnce(new Error("jaringan"));
+    render(<ChatPanel projectId="p1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Bertanya" }));
+    const input = await screen.findByTestId("chat-input") as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "Halo" } });
+    fireEvent.click(screen.getByTestId("chat-kirim"));
+    expect(await screen.findByText("Gagal terkirim")).toBeTruthy();
+    expect((screen.getByTestId("chat-input") as HTMLTextAreaElement).value).toBe("Halo");
+    sendChatMessage.mockResolvedValueOnce({ id: "m3", seq: 3, role: "hanoman", text: "Siap dibantu.",
+      createdAt: "2026-08-19T00:00:02.000Z" });
+    fireEvent.click(screen.getByRole("button", { name: "Kirim ulang" }));
+    expect(await screen.findByText("Siap dibantu.")).toBeTruthy();
+    expect(screen.queryByText("Gagal terkirim")).toBeNull();
   });
 });

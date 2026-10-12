@@ -5,15 +5,14 @@ import React from "react";
 import { Button, Field, Input, Checkbox, Radio, Icon, useConfirm } from "../ds";
 import { api } from "../api/client";
 import { usePersistedState, oneOf } from "../ui-state";
+import { failureMessage } from "../lib/report-error";
 import type {
   ComponentId, ComponentProbe, ProvisionComponent, ProvisionProfile, ProvisionStep,
   VpsComponents, VpsView,
 } from "@hanoman/shared";
+import { COMPONENT_STATUS_LABEL, labelOf } from "../lib/labels";
 
-const STATUS_LABEL: Record<string, string> = {
-  ok: "terpasang", partial: "belum siap", absent: "belum ada" };
-const STATUS_COLOR: Record<string, string> = {
-  ok: "var(--leaf-600)", partial: "var(--amber-600)", absent: "var(--text-subtle)" };
+const STATUS_LABEL = COMPONENT_STATUS_LABEL;
 
 // `partial not-logged-in` SELALU berbunyi "belum login": itu satu-satunya kalimat yang jujur
 // tentang biner yang ada tapi belum siap (SPEC-487, marker ≠ bukti).
@@ -21,21 +20,26 @@ export function badgeText(id: string, entry: { status: string; detail: string })
   if (entry.status === "partial" && entry.detail.startsWith("not-logged-in")) return `${id} · belum login`;
   if (entry.status === "partial") return `${id} · ${entry.detail || STATUS_LABEL.partial}`;
   const suffix = entry.status === "ok" && entry.detail ? ` ${entry.detail}` : "";
-  return `${id} · ${STATUS_LABEL[entry.status] ?? entry.status}${suffix}`;
+  return `${id} · ${labelOf(STATUS_LABEL, entry.status)}${suffix}`;
 }
+
+// Arti kedua profil bagi operator (sumber: `ProvisionComponent.requires` — lab memasang langsung
+// di host, production memasang ke dalam image agen yang terisolasi).
+const PROFILE_HINT: Record<ProvisionProfile, string> = {
+  lab: "Uji coba: komponen dipasang langsung di host ini.",
+  production: "Produksi: agen dipasang ke dalam image terisolasi; sebagian komponen tak tersedia di profil ini.",
+};
 
 // Satu kosakata untuk dua tampilan: chip di panel detail, dan ringkasan di baris daftar.
 const STATUS_SHORT: Record<string, string> = {
   ok: "terpasang", partial: "belum siap", absent: "belum ada" };
 
+// Warna dot status lahir dari `data-status` di CSS (`.vps-prov-dot`), sama dengan `STATUS_COLOR`.
 function Chip({ status, children, title }:
   { status: string; children: React.ReactNode; title?: string }) {
-  const color = STATUS_COLOR[status] ?? "var(--text-subtle)";
   return (
-    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 5,
-      fontSize: 11, lineHeight: "18px", color: "var(--text-primary)", background: "var(--surface-sunken)",
-      border: "1px solid var(--border-hair)", borderRadius: 999, padding: "0 8px", whiteSpace: "nowrap" }}>
-      <span aria-hidden style={{ width: 6, height: 6, borderRadius: "50%", background: color, flex: "0 0 auto" }} />
+    <span title={title} className="vps-prov-chip">
+      <span aria-hidden className="vps-prov-dot" data-status={status} />
       {children}
     </span>
   );
@@ -46,14 +50,14 @@ export function ComponentBadges({ components, checkedAt }:
   { components: VpsComponents | null; checkedAt: string | null }) {
   // Nol data ≠ nol komponen. Deretan strip akan terbaca sebagai "sudah dicek, semuanya kosong".
   if (!components || !checkedAt) {
-    return <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>Komponen belum diperiksa</span>;
+    return <span className="vps-prov-hint">Komponen belum diperiksa</span>;
   }
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+    <div className="vps-prov-badges">
       {Object.entries(components).map(([id, entry]) => (
         <Chip key={id} status={entry.status}>{badgeText(id, entry)}</Chip>
       ))}
-      <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>
+      <span className="vps-prov-hint">
         diperiksa {new Date(checkedAt).toLocaleString("id-ID")}
       </span>
     </div>
@@ -70,7 +74,7 @@ export function ComponentSummary({ components, checkedAt }:
   { components: VpsComponents | null; checkedAt: string | null }) {
   if (!components || !checkedAt) {
     return (
-      <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>
+      <span className="vps-prov-hint">
         Komponen belum diperiksa — buka detail untuk memeriksa
       </span>
     );
@@ -79,17 +83,16 @@ export function ComponentSummary({ components, checkedAt }:
   const problems = entries.filter(([, e]) => e.status !== "ok");
   const okCount = entries.length - problems.length;
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", minWidth: 0 }}>
+    <div className="vps-prov-summary">
       {/* Meter: satu segmen per komponen, warnanya status. Bentuk keseluruhan terbaca sebelum
           satu kata pun dibaca. */}
-      <span aria-hidden style={{ display: "flex", gap: 2, alignItems: "center" }}>
+      <span aria-hidden className="vps-prov-meter">
         {entries.map(([id, e]) => (
-          <span key={id} style={{ width: 12, height: 4, borderRadius: 2,
-            background: e.status === "absent" ? "var(--border-strong)" : STATUS_COLOR[e.status] }} />
+          <span key={id} className="vps-prov-seg" data-status={e.status} />
         ))}
       </span>
-      <span style={{ fontSize: 11, color: "var(--text-subtle)", whiteSpace: "nowrap" }}>
-        <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>{okCount}/{entries.length}</strong> terpasang
+      <span className="vps-prov-count">
+        <strong className="vps-prov-count-ok">{okCount}/{entries.length}</strong> terpasang
       </span>
       {problems.map(([id, e]) => (
         <Chip key={id} status={e.status} title={badgeText(id, e)}>
@@ -97,7 +100,7 @@ export function ComponentSummary({ components, checkedAt }:
             ? "belum login" : STATUS_SHORT[e.status] ?? e.status}
         </Chip>
       ))}
-      <span style={{ fontSize: 11, color: "var(--text-subtle)", whiteSpace: "nowrap" }}>
+      <span className="vps-prov-count">
         diperiksa {shortTime(checkedAt)}
       </span>
     </div>
@@ -132,6 +135,7 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
   const [probe, setProbe] = React.useState<{ components: ComponentProbe[]; checkedAt: string } | null>(null);
   const [setup, setSetup] = React.useState<{ url: string; expiresAt: string } | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [copied, setCopied] = React.useState(false);
   const { confirm, dialog } = useConfirm();
 
   React.useEffect(() => {
@@ -143,6 +147,10 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
   const items = [...required];
   const needsDomain = items.some((id) => catalog.find((c) => c.id === id)?.needsDomain);
   const canRun = items.length > 0 && (!needsDomain || domain.trim().length > 0);
+  // Tombol Pratinjau/Pasang yang mati harus bilang kenapa.
+  const blockReason = items.length === 0 ? "Pilih minimal satu komponen."
+    : needsDomain && !domain.trim() ? "Isi domain dulu — komponen yang dipilih membutuhkannya."
+    : null;
 
   function toggle(id: ComponentId) {
     setPicked((prev) => {
@@ -155,14 +163,14 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
   async function doProbe() {
     setBusy("probe");
     try { setProbe(await api.probeVps(vps.id)); onToast("Komponen diperiksa", "ok", "server"); }
-    catch { onToast("Probe gagal", "err", "x-circle"); }
+    catch (e) { onToast(failureMessage("memeriksa komponen", e), "err", "x-circle"); }
     finally { setBusy(null); }
   }
 
   async function doPreview() {
     setBusy("preview");
     try { setSteps((await api.provisionPreview(vps.id, { items, profile, domain: domain || undefined })).steps); }
-    catch { onToast("Pratinjau gagal", "err", "x-circle"); }
+    catch (e) { onToast(failureMessage("membuat pratinjau", e), "err", "x-circle"); }
     finally { setBusy(null); }
   }
 
@@ -180,13 +188,26 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
       setProbe({ components: r.components, checkedAt: r.checkedAt });
       setSetup(r.setup);
       onToast("Provisioning selesai", "ok", "server");
-    } catch { onToast("Provisioning gagal", "err", "x-circle"); }
+    } catch (e) { onToast(failureMessage("memasang komponen", e), "err", "x-circle"); }
     finally { setBusy(null); }
   }
 
   const openConsole = async () => {
     try { const { id } = await api.vpsConsole(vps.id); onGotoTerminal(id); }
-    catch { onToast("Gagal membuka console", "err", "x-circle"); }
+    catch (e) { onToast(failureMessage("membuka console", e), "err", "x-circle"); }
+  };
+
+  // Salin dengan umpan balik: tombol berubah jadi "Tersalin" sebentar; tanpa API clipboard, bilang jujur.
+  const copyUrl = async (url: string) => {
+    if (!navigator.clipboard) {
+      onToast("Salin tak tersedia di browser ini. Pilih tautannya lalu salin manual.", "err", "x-circle");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch (e) { onToast(failureMessage("menyalin tautan", e), "err", "x-circle"); }
   };
 
   const current: VpsComponents | null = probe
@@ -198,28 +219,34 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
     : [];
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+    <div className="vps-prov">
+      <div className="vps-prov-row">
         <ComponentBadges components={current} checkedAt={checkedAt} />
         <Button size="sm" variant="ghost" onClick={doProbe} disabled={busy !== null}>Periksa</Button>
       </div>
 
-      <div style={{ display: "flex", gap: 16 }}>
-        {(["lab", "production"] as ProvisionProfile[]).map((p) => (
-          <Radio key={p} aria-label={p} label={p} checked={profile === p} onChange={() => setProfile(p)} />
-        ))}
-      </div>
+      <fieldset className="vps-prov-fieldset">
+        <legend className="vps-prov-legend">Profil</legend>
+        <div className="vps-prov-profiles">
+          {(["lab", "production"] as ProvisionProfile[]).map((p) => (
+            <div key={p}>
+              <Radio aria-label={p} label={p} checked={profile === p} onChange={() => setProfile(p)} />
+              <div className="vps-prov-profile-hint">{PROFILE_HINT[p]}</div>
+            </div>
+          ))}
+        </div>
+      </fieldset>
 
-      <div style={{ display: "grid", gap: 6 }}>
+      <div className="vps-prov-items">
         {visible.map((c) => {
           // Prasyarat yang ikut tercentang dikunci DENGAN alasan terlihat: checkbox yang mati
           // tanpa penjelasan terbaca seperti bug, bukan seperti keputusan.
           const auto = required.has(c.id) && !picked.has(c.id);
           return (
-            <div key={c.id} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div key={c.id} className="vps-prov-item">
               <Checkbox aria-label={c.label} label={c.label} checked={required.has(c.id)}
                 disabled={auto} onChange={() => toggle(c.id)} />
-              {auto && <span style={{ fontSize: 10, color: "var(--text-subtle)" }}>prasyarat</span>}
+              {auto && <span className="vps-prov-tag">prasyarat</span>}
             </div>
           );
         })}
@@ -232,34 +259,36 @@ export function VpsProvisionPanel({ vps, onToast, onGotoTerminal }: {
         </Field>
       )}
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className="vps-prov-row">
         <Button variant="ghost" onClick={doPreview} disabled={!canRun || busy !== null}>Pratinjau</Button>
         <Button onClick={doApply} disabled={!canRun || busy !== null}>Pasang</Button>
+        {!canRun && blockReason && <span className="vps-prov-reason">{blockReason}</span>}
       </div>
 
-      {steps && (
-        <pre style={{ fontSize: 11, fontFamily: "var(--font-mono)", maxHeight: 220, overflow: "auto",
-          background: "var(--surface-sunken)", padding: 8, borderRadius: 4 }}>
-          {steps.map((s) => `${s.item.padEnd(14)} ${s.status.padEnd(6)} ${s.detail}`).join("\n")}
-        </pre>
-      )}
+      {/* Hasil langkah diumumkan ke pembaca layar dan bisa difokus untuk digulir lewat keyboard. */}
+      <div aria-live="polite">
+        {steps && (
+          <pre tabIndex={0} aria-label="Hasil langkah provisioning" className="vps-prov-steps">
+            {steps.map((s) => `${s.item.padEnd(14)} ${s.status.padEnd(6)} ${s.detail}`).join("\n")}
+          </pre>
+        )}
+      </div>
 
       {setup && (
-        <div style={{ display: "grid", gap: 4, border: "1px solid var(--border-strong)", borderRadius: 4, padding: 8 }}>
-          <strong style={{ fontSize: 12 }}>Buat admin pertama</strong>
-          <a href={setup.url} target="_blank" rel="noreferrer" style={{ fontSize: 12, wordBreak: "break-all" }}>{setup.url}</a>
-          <span style={{ fontSize: 11, color: "var(--text-subtle)" }}>
+        <div className="vps-prov-setup">
+          <strong className="vps-prov-setup-title">Buat admin pertama</strong>
+          <a href={setup.url} target="_blank" rel="noreferrer" className="vps-prov-setup-link">{setup.url}</a>
+          <span className="vps-prov-hint">
             berlaku sampai {new Date(setup.expiresAt).toLocaleTimeString("id-ID")}
           </span>
           <div>
-            <Button size="sm" variant="ghost"
-              onClick={() => void navigator.clipboard?.writeText(setup.url)}>Salin</Button>
+            <Button size="sm" variant="ghost" onClick={() => void copyUrl(setup.url)}>{copied ? "Tersalin" : "Salin"}</Button>
           </div>
         </div>
       )}
 
       {pending.length > 0 && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12 }}>
+        <div className="vps-prov-pending">
           <Icon name="alert-triangle" />
           <span>{pending.map(([id]) => id).join(", ")} terpasang tapi belum login.</span>
           <Button size="sm" variant="ghost" onClick={openConsole}>Login lewat Console</Button>

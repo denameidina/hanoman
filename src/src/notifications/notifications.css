@@ -1,0 +1,85 @@
+/* ============================================================
+   Lonceng notifikasi (NotificationBell) dan arsip (NotificationsArchiveModal).
+   Audit UI/UX 2026-10 · Fase 4 (migrasi inline → kelas). Nilainya sama dengan inline sebelumnya.
+   Popover memakai .hn-viewport-popover (app.css): di ponsel aturan !important-nya menaruhnya di
+   bawah sebagai sheet, dan kelas ini tak menambah apa pun yang bertabrakan dengan itu.
+   ============================================================ */
+
+.hn-notif-anchor { position: relative; }
+
+.hn-notif-trigger {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border: none; background: transparent; border-radius: var(--radius-sm);
+  cursor: pointer; color: var(--text-muted);
+}
+.hn-notif-trigger.is-open { background: var(--bone-200); }
+
+.hn-notif-badge {
+  position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--clay-500); color: #fff; font-size: 10px; font-weight: 700;
+  border-radius: var(--radius-pill); font-family: var(--font-mono); line-height: 1;
+}
+
+.hn-notif-popover {
+  position: absolute; top: 40px; right: 0; width: 320px; max-height: 420px; overflow-y: auto;
+  background: var(--surface-card); border: 1px solid var(--border-hair);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-xl); z-index: 200; padding: 6px;
+}
+
+.hn-notif-head {
+  display: flex; align-items: center; justify-content: space-between; padding: 8px 10px 6px;
+}
+.hn-notif-title {
+  font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--text-strong);
+}
+.hn-notif-clear {
+  border: none; background: transparent; cursor: pointer; color: var(--text-subtle);
+  font-size: 12px; font-family: var(--font-ui);
+}
+.hn-notif-empty {
+  padding: 18px 10px; text-align: center; color: var(--text-subtle); font-size: 13px;
+}
+
+.hn-notif-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-sm);
+}
+.hn-notif-text { flex: 1 1 0%; min-width: 0; }
+.hn-notif-item-title {
+  font-size: 13px; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hn-notif-item-meta { font-size: 11.5px; color: var(--text-subtle); }
+
+/* Aksi per item / per baris arsip. "Jawab" (keputusan) ditampilkan sebagai aksi primer. */
+.hn-notif-open {
+  flex: 0 0 auto; border: none; background: transparent; cursor: pointer;
+  font-size: 12px; font-family: var(--font-ui); white-space: nowrap; color: var(--text-muted);
+}
+.hn-notif-open--primary {
+  background: var(--accent); color: var(--accent-on); border-radius: var(--radius-sm);
+  padding: 4px 10px; font-weight: 600;
+}
+.hn-notif-open--ticket { color: var(--brass-600); }
+
+.hn-notif-dot {
+  flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+}
+
+.hn-notif-foot { display: flex; margin-top: 4px; border-top: 1px solid var(--border-hair); }
+.hn-notif-foot-btn {
+  flex: 1; padding: 8px; border: none; background: transparent; cursor: pointer;
+  color: var(--text-muted); font-size: 12.5px; font-family: var(--font-ui);
+}
+.hn-notif-foot-btn--archive { border-left: 1px solid var(--border-hair); color: var(--brass-600); }
+
+/* Arsip (modal) */
+.hn-notif-archive-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
+.hn-notif-archive-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 8px;
+  border-bottom: 1px solid var(--border-hair);
+}
+.hn-notif-archive-title {
+  flex: 1 1 0%; min-width: 0; font-size: 13px; color: var(--text-strong);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hn-notif-archive-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-subtle); }

@@ -7,6 +7,8 @@
    jsdom tak melayout, jadi yang diuji adalah RANTAI-nya: harus ada leluhur yang benar-benar
    scroller, dan tiap mata rantai di antaranya harus meneruskan batas tinggi (kolom flex yang
    boleh menyusut). Idiom ini menyalin `scroll-chain.test.tsx` (SPEC-393). */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -75,16 +77,17 @@ function brokenAbove(scroller: HTMLElement, root: HTMLElement): string[] {
 describe("portal klien bisa digulir (SPEC-626)", () => {
   it("daftar Pekerjaan punya leluhur yang benar-benar menggulir", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     const list = await screen.findByTestId("portal-list");
     const scroller = scrollerOf(list);
     expect(scroller, "tak ada satu pun leluhur ber-overflow auto/scroll").not.toBeNull();
     expect(brokenAbove(scroller!, screen.getByTestId("portal-root"))).toEqual([]);
   });
 
-  it("daftar Help desk memakai scroller yang sama", async () => {
+  it("daftar Keluhan saya memakai scroller yang sama", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
     await screen.findByTestId("portal-list");
-    fireEvent.click(screen.getByRole("tab", { name: /help desk/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /keluhan/i }));
     const scroller = screen.getByTestId("portal-scroll");
     expect(scrolls(scroller)).toBe(true);
     expect(scrollerOf(await screen.findByTestId("portal-list"))).toBe(scroller);
@@ -106,8 +109,15 @@ describe("portal klien bisa digulir (SPEC-626)", () => {
   // containing block). Test ini mengunci kontraknya supaya tak hilang diam-diam.
   it("badan modal detail bisa digulir", async () => {
     render(<ClientPortal user={USER} onLoggedOut={() => {}} />);
+    fireEvent.click(await screen.findByRole("tab", { name: /progres/i }));
     fireEvent.click(await screen.findByText("Pekerjaan 1"));
     await waitFor(() => expect(screen.getByTestId("modal-body")).toBeInTheDocument());
-    expect(scrolls(screen.getByTestId("modal-body"))).toBe(true);
+    // Sejak Audit UI/UX 2026-10 (Z4) body modal memakai kelas `hn-modal-body` (app-shell.css), bukan
+    // style inline: jsdom tak memuat CSS, jadi kontrak scroll dibaca dari kelas + berkas CSS-nya.
+    const body = screen.getByTestId("modal-body");
+    expect(body).toHaveClass("hn-modal-body");
+    const css = readFileSync(resolve(__dirname, "../src/styles/app-shell.css"), "utf8");
+    const rule = css.match(/\.hn-modal-body\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toMatch(/overflow:\s*auto/);
   });
 });

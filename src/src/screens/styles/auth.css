@@ -1,0 +1,102 @@
+/* Masuk, setup awal, dan widget akun — Audit UI/UX 2026-10 · Fase 3 (3N) · onboarding.
+   Root layar (scroller dvh + safe-area) tetap inline di AuthScreen/SetupWizard: tes
+   `auth-responsive` mengunci gaya itu di sana. Di sini: susunan kartu, form, dan galat. */
+
+.hn-auth-wrap { width: 100%; max-width: 380px; margin: auto; box-sizing: border-box; }
+.hn-setup-wrap { width: 100%; max-width: 460px; margin: auto; box-sizing: border-box; }
+.hn-auth-mark { display: flex; justify-content: center; margin-bottom: 20px; }
+.hn-auth-illus {
+  display: block; width: 100%; max-height: 120px; margin: 0 0 14px; border-radius: var(--radius-md);
+  object-fit: contain;
+}
+.hn-auth-lead { margin: 0 0 16px; font-size: var(--text-sm); color: var(--text-muted); line-height: 1.5; }
+.hn-auth-form { display: flex; flex-direction: column; gap: 14px; }
+.hn-auth-input { width: 100%; }
+.hn-auth-error {
+  font-size: var(--text-sm); color: var(--clay-600); background: var(--status-err-tint);
+  border: 1px solid var(--clay-500); border-radius: var(--radius-sm); padding: 8px 10px;
+  line-height: 1.5;
+}
+.hn-auth-reason { margin: 0; font-size: var(--text-xs); color: var(--text-muted); line-height: 1.5; }
+.hn-auth-submit { width: 100%; justify-content: center; }
+
+/* ---------- Setup awal: satu layar ---------- */
+.hn-setup-card { display: flex; flex-direction: column; gap: 14px; }
+.hn-setup-illus { width: 100%; max-height: 120px; object-fit: contain; border-radius: var(--radius-md); }
+.hn-setup-warn {
+  display: flex; flex-direction: column; gap: 10px; padding: 12px 14px;
+  background: var(--status-warn-tint); border: 1px solid var(--border-hair); border-radius: var(--radius-md);
+}
+.hn-setup-warn p { margin: 0; font-size: var(--text-sm); color: var(--text-strong); line-height: 1.55; }
+.hn-setup-check {
+  display: flex; align-items: flex-start; gap: 10px; font-size: var(--text-sm); color: var(--text-body); line-height: 1.5;
+  cursor: pointer;
+}
+.hn-setup-check input { margin-top: 2px; flex: 0 0 auto; }
+.hn-setup-advanced { border-top: 1px solid var(--border-hair); padding-top: 12px; }
+.hn-setup-advanced > summary {
+  cursor: pointer; font-size: var(--text-sm); font-weight: 600; color: var(--text-strong); list-style-position: inside;
+}
+.hn-setup-advanced > summary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: var(--radius-xs); }
+.hn-setup-advanced-body { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; }
+.hn-setup-advanced-body p { margin: 0; font-size: var(--text-sm); color: var(--text-muted); line-height: 1.55; }
+.hn-setup-hardening-note { font-size: var(--text-xs); color: var(--text-muted); line-height: 1.5; }
+.hn-setup-prereq { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: var(--text-sm); }
+.hn-setup-prereq li { color: var(--text-muted); }
+.hn-setup-prereq li[data-ok="false"] { color: var(--clay-600); }
+.hn-setup-prereq strong { font-weight: 600; }
+.hn-setup-foot { display: flex; align-items: center; gap: 8px; }
+.hn-setup-foot > :last-child { flex: 1 1 auto; justify-content: center; }
+
+/* ---------- Peringatan instance terbuka tanpa hardening (App) ---------- */
+.hn-unhardened {
+  background: var(--status-warn-tint); color: var(--text-strong); font-size: var(--text-sm);
+  padding: 6px 14px; border-bottom: 1px solid var(--border-hair); line-height: 1.5;
+}
+
+/* ---------- Akun (AccountMenu, topbar) ---------- */
+.hn-account { position: relative; }
+.hn-account-trigger {
+  display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
+  border: none; background: transparent; border-radius: var(--radius-sm); cursor: pointer;
+}
+.hn-account-trigger[aria-expanded="true"] { background: var(--bone-200); }
+.hn-account-avatar {
+  display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--brass-100); color: var(--brass-700);
+  font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 600; line-height: 1;
+}
+.hn-account-menu {
+  position: absolute; top: 40px; right: 0; width: 220px; box-sizing: border-box; padding: 6px; z-index: 200;
+  background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+}
+.hn-account-who { padding: 8px 10px 6px; }
+.hn-account-caption {
+  font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-subtle); margin-bottom: 3px;
+}
+.hn-account-email { font-size: var(--text-sm); color: var(--text-strong); overflow-wrap: anywhere; }
+.hn-account-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 9px 10px;
+  border: none; border-top: 1px solid var(--border-hair); background: transparent; cursor: pointer;
+  color: var(--text-body); font: inherit; font-size: var(--text-sm); text-align: left;
+}
+.hn-account-item:hover { background: var(--bone-100); }
+
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-account-item { min-height: var(--touch-target); }
+}
+@media (pointer: coarse), (max-width: 767px) {
+  .hn-setup-wrap button, .hn-setup-wrap .hn-setup-check input { min-height: var(--touch-target); }
+  .hn-setup-wrap .hn-setup-check input { min-height: 24px; }
+}
+@media (max-width: 767px) {
+  .hn-setup-foot { flex-direction: column-reverse; align-items: stretch; }
+  .hn-setup-foot > :last-child { flex: none; }
+}
+.hn-setup-lead { margin: 0; font-size: var(--text-sm); color: var(--text-muted); line-height: 1.5; }
+
+.hn-setup-root {
+  min-height: 100dvh; display: flex; overflow-y: auto; background: var(--bone-100); box-sizing: border-box;
+  padding: max(24px, var(--safe-top)) max(16px, var(--safe-right)) max(24px, var(--safe-bottom)) max(16px, var(--safe-left));
+}
