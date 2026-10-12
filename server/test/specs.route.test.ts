@@ -366,6 +366,11 @@ describe("GET /specs/:id/review", () => {
     expect(res.statusCode).toBe(200);
     expect(zSpecReview.parse(res.json())).toEqual({ base: "", files: [], changed: [], empty: true, reason: "no-commit" });
   });
+  // ADR-0213/0215 · `…/review/*` (berkas tunggal) tanpa sumber sama sekali tetap 409: tak ada berkas untuk dibaca.
+  it("GET …/review/<berkas> tanpa worktree maupun commit → 409 (tetap)", async () => {
+    const res = await app.inject({ url: "/api/specs/SPEC-172/review/keep.txt" });
+    expect(res.statusCode).toBe(409);
+  });
   it("balasan dengan isi tetap lolos zSpecReview tanpa field `empty`", async () => {
     const res = await app.inject({ url: "/api/specs/SPEC-171/review" });
     expect(zSpecReview.parse(res.json()).empty).toBeUndefined();

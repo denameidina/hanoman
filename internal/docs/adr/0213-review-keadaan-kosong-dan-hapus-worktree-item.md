@@ -1,6 +1,6 @@
 # ADR-0213 — Review tanpa 409 untuk keadaan kosong, dan hapus worktree satu item
 
-- Status: diterima (tindak lanjut audit UI/UX 2026-10, keputusan orkestrator)
+- Status: diterima (tindak lanjut audit UI/UX 2026-10, keputusan orkestrator) · **diamandemen [0215](0215-review-sesi-keadaan-kosong-tanpa-409.md)**: jalur sesi kini 200 `empty` juga (asimetri di bawah selesai)
 - Tanggal: 2026-10-12
 - SPEC: —
 - Terkait: ADR-0030 (`baseSha`/`headSha` disimpan) · ADR-0054 (review sesi PRD, AC-6 409) · ADR-0132 (permukaan penghapusan worktree) · ADR-0155 (cakupan MCP, capability `danger`) · ADR-0202 (keputusan MCP wajib) · ADR-0043 (binding repoDir lokal per-mesin, SPEC-213/217 lewat `resolveRepoDir`)

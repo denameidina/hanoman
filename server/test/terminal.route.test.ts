@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AddressInfo } from "node:net";
-import { RELAY_ACTOR_HEADER, RELAY_HEADER, RELAY_MODE_HEADER, type RemoteCapability } from "@hanoman/shared";
+import { RELAY_ACTOR_HEADER, RELAY_HEADER, RELAY_MODE_HEADER, zSpecReview, type RemoteCapability } from "@hanoman/shared";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
 import { killAll, killSession, listSessions, promptFilePath, agentsFilePath, phaseContextFilePath, createSession as createSessionSvc, PANE_QUIET_MS } from "../src/services/pty";
@@ -528,14 +528,37 @@ describe("terminal routes · sesi PRD review + integrate", () => {
     cleanup(id);
   });
 
-  it("GET /:id/review setelah worktree lenyap (sesi masih terdaftar) → 409, bukan 500", async () => {
+  // ADR-0215 (amandemen ADR-0213): keadaan kosong sesi = 200 `empty`, bukan 409.
+  it("GET /:id/review setelah worktree lenyap (sesi masih terdaftar) → 200 empty no-commit, bukan 500", async () => {
     const id = mkPrd("gone");
     // Worktree dihapus tapi sesi masih di tmux (mis. proses exited, DELETE belum jalan): cwd
-    // sesi menunjuk direktori yang lenyap → 409 ramah (empty-state ReviewScreen), bukan 500.
+    // sesi menunjuk direktori yang lenyap → keadaan kosong `no-commit`, bukan galat.
     execFileSync("git", ["worktree", "remove", "--force", join(repoDir, ".worktrees", id)], { cwd: repoDir });
     const res = await app.inject({ url: `/api/terminal/sessions/${id}/review` });
+    expect(res.statusCode).toBe(200);
+    expect(zSpecReview.parse(res.json())).toEqual({ base: "", files: [], changed: [], empty: true, reason: "no-commit" });
+    killSession(id);
+  });
+
+  it("GET /:id/review sesi tanpa worktree (cwd di luar .worktrees) → 200 empty no-worktree", async () => {
+    createSessionSvc("p1", repoDir, { id: "prd-nowt", flow: "prd", command: ["/bin/sleep", "30"] });
+    const res = await app.inject({ url: "/api/terminal/sessions/prd-nowt/review" });
+    expect(res.statusCode).toBe(200);
+    expect(zSpecReview.parse(res.json())).toEqual({ base: "", files: [], changed: [], empty: true, reason: "no-worktree" });
+    killSession("prd-nowt");
+  });
+
+  it("GET /:id/review/<berkas> tanpa sumber (worktree lenyap) → 409 tetap, tak ada berkas untuk dibaca", async () => {
+    const id = mkPrd("gonefile");
+    execFileSync("git", ["worktree", "remove", "--force", join(repoDir, ".worktrees", id)], { cwd: repoDir });
+    const res = await app.inject({ url: `/api/terminal/sessions/${id}/review/docs-prd-gonefile.md` });
     expect(res.statusCode).toBe(409);
     killSession(id);
+  });
+
+  it("GET /:id/review sesi tak dikenal → 404", async () => {
+    const res = await app.inject({ url: "/api/terminal/sessions/tak-ada/review" });
+    expect(res.statusCode).toBe(404);
   });
 
   it("POST /:id/integrate branch belum ada → 409", async () => {

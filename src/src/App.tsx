@@ -54,6 +54,7 @@ import { ProjectDetailScreen } from "./screens/ProjectDetailScreen";
 import { SkillsWorkspace } from "./screens/skills/SkillsWorkspace";
 import { QaWorkspace } from "./screens/qa/QaWorkspace";
 import { BacklogScreen } from "./screens/BacklogScreen";
+import { reviewSpecIdsOf } from "./screens/backlog-worktree";
 import { PrdScreen, NewPrdModal, type PrdPrefill, type PrdBriefForm } from "./screens/PrdScreen";
 import type { AuditEscalation } from "@hanoman/shared";
 // SPEC-585 · pet maskot. Dipasang di App, BUKAN di dalam Shell: <Shell> ditulis ulang di tiap
@@ -988,6 +989,8 @@ function AppInner() {
   const activeSpecs = React.useMemo(
     () => new Set(sessions.filter((s) => s.specId && !s.exited).map((s) => s.specId as string)),
     [sessions]);
+  // Filter "Perlu ditinjau" di Backlog (gelombang 7): item yang sesinya menunggu jawaban manusia.
+  const reviewSpecIds = React.useMemo(() => reviewSpecIdsOf(sessions), [sessions]);
 
   const presenceMap = React.useMemo(() => presenceIndex(presence), [presence]);
   const specTitles = React.useMemo(
@@ -1646,7 +1649,7 @@ function AppInner() {
         actions={<Button size="sm" leftIcon="plus" onClick={() => setModal("brief")}>Tambah</Button>}>
         {hubTabs}
         {gate(<BacklogScreen backlog={backlog} projects={projectsView} pageSize={20}
-          onStart={startSession} activeSpecs={activeSpecs} presenceBySpec={presenceMap.bySpec}
+          onStart={startSession} activeSpecs={activeSpecs} presenceBySpec={presenceMap.bySpec} reviewSpecIds={reviewSpecIds}
           onNew={() => setModal("brief")}
           onDelete={deleteSpec}
           onOpenRun={(spec) => openTerminal(sessions.find((s) => s.specId === spec.id && !s.exited)?.id)}

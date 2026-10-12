@@ -1,7 +1,7 @@
 import { render, cleanup, act, screen, fireEvent, within } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { api } from "../src/api/client";
-import { TerminalPane } from "../src/screens/TerminalPane";
+import { TerminalPane, TerminalKeys } from "../src/screens/TerminalPane";
 
 // SPEC-511 · xterm butuh canvas + pengukuran font; jsdom tak punya keduanya. Yang diuji di sini
 // bukan rendering terminalnya melainkan **kontrak call site**: opsi apa yang benar-benar sampai ke
@@ -505,6 +505,48 @@ describe("TerminalPane · papan tombol layar (SPEC-800)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Kirim Enter ke terminal" }));
     fireEvent.click(screen.getByRole("button", { name: "Kirim Escape ke terminal" }));
     expect(inputsOf(sockets[0]).slice(before)).toEqual(["\x1b[B", "\r", "\x1b"]);
+  });
+});
+
+// QA visual 2026-10 · di 320 px papan kunci (292 px kotak, isi 349 px) memotong "Enter" tanpa tanda bahwa
+// ia bisa digeser. Tepi yang masih menyimpan kunci diberi penanda (`data-fade-*`), seperti strip tab.
+describe("TerminalKeys · penanda tepi papan kunci (320 px)", () => {
+  const layoutKeys = (el: HTMLElement, scrollWidth: number, clientWidth: number, scrollLeft = 0) => {
+    Object.defineProperty(el, "scrollWidth", { configurable: true, value: scrollWidth });
+    Object.defineProperty(el, "clientWidth", { configurable: true, value: clientWidth });
+    Object.defineProperty(el, "scrollLeft", { configurable: true, writable: true, value: scrollLeft });
+  };
+  const keysEl = () => screen.getByRole("group", { name: "Tombol terminal" });
+
+  it("papan yang muat tak diberi penanda sama sekali", () => {
+    render(<TerminalKeys onKey={() => {}} />);
+    layoutKeys(keysEl(), 300, 300);
+    fireEvent.scroll(keysEl());
+    expect(keysEl()).not.toHaveAttribute("data-fade-start");
+    expect(keysEl()).not.toHaveAttribute("data-fade-end");
+  });
+
+  it("meluap dan di awal: hanya tepi kanan yang diberi penanda (Enter masih tersembunyi)", () => {
+    render(<TerminalKeys onKey={() => {}} />);
+    layoutKeys(keysEl(), 349, 292, 0);
+    fireEvent.scroll(keysEl());
+    expect(keysEl()).toHaveAttribute("data-fade-end", "true");
+    expect(keysEl()).not.toHaveAttribute("data-fade-start");
+  });
+
+  it("digulir sampai ujung: penanda kanan hilang, kiri tetap", () => {
+    render(<TerminalKeys onKey={() => {}} />);
+    layoutKeys(keysEl(), 349, 292, 57);
+    fireEvent.scroll(keysEl());
+    expect(keysEl()).toHaveAttribute("data-fade-start", "true");
+    expect(keysEl()).not.toHaveAttribute("data-fade-end");
+  });
+
+  it("tombol tetap bisa ditekan dari papan yang menggulir", () => {
+    const sent: string[] = [];
+    render(<TerminalKeys onKey={(seq) => sent.push(seq)} />);
+    fireEvent.click(screen.getByRole("button", { name: "Kirim Enter ke terminal" }));
+    expect(sent).toEqual(["\r"]);
   });
 });
 

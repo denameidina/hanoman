@@ -612,8 +612,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           onClick={() => setScreenReader((on) => !on)}>{screenReader ? "Matikan" : "Nyalakan"}</Button>
       </div>
       <p id="terminal-sr-hint" className="hn-terminal-sr-hint">
-        Untuk pembaca layar: teks terminal tersedia di DOM; kecepatan lebih rendah. Tab tetap dikirim ke sesi,
-        dan di mode ini fokus juga bisa pindah ke elemen lain. Ctrl+Shift+Esc tetap melepas fokus dari terminal.
+        Untuk pembaca layar: teks terminal tersedia di DOM; kecepatan lebih rendah. Tab dikirim ke sesi
+        (tidak memindahkan fokus). Untuk keluar dari terminal tekan Ctrl+Shift+Esc.
       </p>
       {/* Reset grid hanya berarti sesuatu di mode grid. Pemilih project pindah ke "Sesi baru". */}
       {!focusMode && (

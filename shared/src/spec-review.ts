@@ -1,6 +1,7 @@
 // SPEC-171 · ADR-0213 · kontrak layar Review: `GET /specs/:id/review` dan `GET /specs/:id/review/*`.
-// Dipakai server (services/spec-review), klien (api/client), dan tool MCP. Bentuk sesi project
-// (`GET /terminal/sessions/:id/review`) sama, tetapi keadaan kosongnya tetap 409 (ADR-0213, Konsekuensi).
+// ADR-0215 · `GET /terminal/sessions/:id/review` memakai bentuk yang sama, termasuk keadaan kosong
+// (200 `empty`). Hanya `…/review/*` (berkas tunggal) yang tetap 409 bila tak ada sumber.
+// Dipakai server (services/spec-review), klien (api/client), dan tool MCP.
 import { z } from "zod";
 
 export const zChangedFile = z.object({
@@ -12,9 +13,10 @@ export const zChangedFile = z.object({
 });
 export type ChangedFile = z.infer<typeof zChangedFile>;
 
-/** ADR-0213 · alasan belum ada yang bisa ditinjau. `no-worktree`: item belum pernah dimulai (tanpa
- *  `baseSha`). `no-commit`: item sudah dimulai (`baseSha` tercatat), worktree-nya sudah lenyap, dan
- *  tak ada commit yang bisa ditinjau. */
+/** ADR-0213 · alasan belum ada yang bisa ditinjau. Backlog item: `no-worktree` = belum pernah dimulai
+ *  (tanpa `baseSha`); `no-commit` = sudah dimulai (`baseSha` tercatat), worktree-nya lenyap, dan tak ada
+ *  commit. Sesi (ADR-0215): `no-worktree` = sesi tak punya worktree (cwd bukan `.worktrees/…`);
+ *  `no-commit` = worktree-nya tercatat tetapi direktorinya sudah lenyap. */
 export const zReviewEmptyReason = z.enum(["no-worktree", "no-commit"]);
 export type ReviewEmptyReason = z.infer<typeof zReviewEmptyReason>;
 

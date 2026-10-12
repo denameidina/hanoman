@@ -2,11 +2,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { existsSync } from "node:fs";
 import { prisma } from "../db";
 import {
-  zTerminalSession, zIntegrate, zTerminalSteerInput, zSessionDialogAnswer, METHODS, grantsCapability, type Stage,
+  zTerminalSession, zIntegrate, zTerminalSteerInput, zSessionDialogAnswer, METHODS, grantsCapability, type ReviewEmptyReason, type Stage,
 } from "@hanoman/shared";
 import { resolveHome, realGit, startProjectPrompt, startPrdPrompt, startScaffoldPrompt, startBreakdownPrompt, RESUMED_WORKTREE_NOTE, CODE_STYLE_CLAUSE, buildPhaseAgents, projectContext, scaffoldContext, prdContext, breakdownContext, PROJECT_METHOD, type Flow } from "@hanoman/runner";
 import { phaseFilePath, decisionFilePath, readPhases, stageForRun } from "../services/session-phases";
-import { specReview, reviewFile } from "../services/spec-review";
+import { specReview, reviewFile, emptySpecReview } from "../services/spec-review";
 import { downloadFormat, sendReviewDownload } from "../services/doc-export";
 import { integrateBranch } from "../services/integrate";
 import { sessionAgentDefaults, conflictSessionDefaults, terminalAgentDefaults, getSetting } from "../services/settings";
@@ -531,27 +531,38 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
 
   // SPEC-230 · review diff worktree hidup sebuah sesi project-level (PRD). Kunci worktree = id
   // sesi (worktreeDir(repoDir, id) === s.cwd). Tanpa baseSha/branchFrom → mergeBase jatuh ke
-  // default repo/HEAD (SPEC-227). Worktree lenyap (sesi ditutup) → 409, bukan 500.
-  type WtOk = { ok: true; id: string; repoDir: string };
-  type WtErr = { ok: false; code: number; msg: string };
-  const sessionWorktree = async (id: string): Promise<WtOk | WtErr> => {
+  // default repo/HEAD (SPEC-227).
+  // ADR-0215 (amandemen ADR-0213) · tanpa worktree / worktree lenyap = KEADAAN kosong: GET …/review
+  // menjawab 200 `empty`. GET …/review/* tetap 409 — tak ada berkas untuk dibaca. Galat konfigurasi
+  // (repoDir belum diatur) dan sesi tak dikenal tetap 409 / 404 di kedua rute.
+  type SessionSource =
+    | { ok: true; id: string; repoDir: string }
+    | { ok: false; code: number; msg: string; empty?: ReviewEmptyReason };
+  const sessionSource = async (id: string): Promise<SessionSource> => {
     const s = getSession(id);
     if (!s) return { ok: false, code: 404, msg: "not found" };
     const repoDir = await resolveRepoDir(s.projectId);
     if (!repoDir) return { ok: false, code: 409, msg: "project belum punya repoDir" };
-    if (!s.cwd.includes("/.worktrees/") || !existsSync(s.cwd))
-      return { ok: false, code: 409, msg: "belum ada worktree untuk di-review — jalankan/lanjutkan sesi dulu" };
+    // `no-worktree`: sesi tak pernah punya worktree (cwd bukan `.worktrees/…`).
+    if (!s.cwd.includes("/.worktrees/"))
+      return { ok: false, code: 409, msg: "belum ada worktree untuk di-review — jalankan/lanjutkan sesi dulu", empty: "no-worktree" };
+    // `no-commit`: worktree tercatat, tetapi direktorinya sudah lenyap (sesi ditutup); tak ada yang ditinjau.
+    if (!existsSync(s.cwd))
+      return { ok: false, code: 409, msg: "belum ada worktree untuk di-review — jalankan/lanjutkan sesi dulu", empty: "no-commit" };
     return { ok: true, id: s.id, repoDir };
   };
   app.get("/terminal/sessions/:id/review", async (req, reply) => {
-    const r = await sessionWorktree((req.params as { id: string }).id);
-    if (!r.ok) return reply.code(r.code).send({ error: r.msg });
+    const r = await sessionSource((req.params as { id: string }).id);
+    if (!r.ok) {
+      if (r.empty) return emptySpecReview(r.empty);
+      return reply.code(r.code).send({ error: r.msg });
+    }
     return specReview(r.repoDir, r.id, null, null);
   });
   app.get("/terminal/sessions/:id/review/*", async (req, reply) => {
     const id = (req.params as { id: string }).id;
     const path = (req.params as Record<string, string>)["*"] ?? "";
-    const r = await sessionWorktree(id);
+    const r = await sessionSource(id);
     if (!r.ok) return reply.code(r.code).send({ error: r.msg });
     const rf = await reviewFile(r.repoDir, r.id, null, null, path);
     if (rf === null) return reply.code(404).send({ error: "not found" });

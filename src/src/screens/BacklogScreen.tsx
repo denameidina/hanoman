@@ -17,9 +17,12 @@ import {
 } from "../ds";
 import { api, ApiError, type SourceResetPending } from "../api/client";
 import { failureMessage } from "../lib/report-error";
-import { PRIORITY_LABEL, WORKTREE_SCOPE_LABEL } from "../lib/labels";
+import { PRIORITY_LABEL, REVIEW_SCOPE_LABEL, WORKTREE_SCOPE_LABEL } from "../lib/labels";
 import { mergeSlim } from "../lib/specs-digest";
-import { WORKTREE_SCOPE_OPTS, scopeByWorktree, type WorktreeScope } from "./backlog-worktree";
+import {
+  WORKTREE_SCOPE_OPTS, scopeByWorktree, type WorktreeScope,
+  REVIEW_SCOPE_OPTS, scopeByReview, type ReviewScope,
+} from "./backlog-worktree";
 import { SpecDocsModal } from "./SpecDocsModal";
 import { SpecAttachmentsPanel, type AttachmentToast } from "./SpecAttachments";
 import { IntegrateDialog } from "./IntegrateDialog";
@@ -913,11 +916,16 @@ function ViewToggle({ value, onChange }: { value: string; onChange: (v: string) 
 
 // Ringkasan skeleton saat muat pertama: tiga baris yang tak tampak seperti "kosong".
 const LOADING_ROWS = 5;
+// Nilai bawaan `reviewSpecIds`: himpunan kosong yang sama identitasnya tiap render (memo stabil).
+const NO_REVIEW_SPECS: ReadonlySet<string> = new Set<string>();
 
-export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, presenceBySpec, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onMarkDone, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onChangeSource, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
+export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activeSpecs, presenceBySpec, reviewSpecIds = NO_REVIEW_SPECS, onDelete, onOpenRun, onOpenReview, onNew, onEditBranch, onRevertStage, onMarkDone, onIntegrate, onEditSpec, onEditDeps, onEditAutoMerge, onChangeSource, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, projectFilter, onProjectFilter, dataVersion, onToast, initialDetailId }:
   {
     backlog: SpecSlim[]; projects: ProjectVM[]; pageSize?: number;
     onStart?: (s: SpecSlim) => void; activeSpecs?: Set<string>; presenceBySpec?: Map<string, string[]>;
+    // Gelombang 7 · filter "Perlu ditinjau": id item yang sesinya menunggu jawaban manusia. App menghitungnya
+    // dari daftar sesi (`reviewSpecIdsOf`); tanpa prop, filter ini hanya menghasilkan daftar kosong.
+    reviewSpecIds?: ReadonlySet<string>;
     onDelete?: (s: SpecSlim) => void | Promise<void>; onOpenRun?: (s: SpecSlim) => void; onOpenReview?: (s: SpecSlim) => void; onNew?: () => void;
     onEditBranch?: (s: SpecSlim, b: string | null) => void;
     onRevertStage?: (s: SpecSlim, target: string, confirmDelete?: boolean) => Promise<any>;
@@ -959,6 +967,9 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   // ADR-0214 · "Ber-worktree": item yang pernah dibuatkan worktree (`baseSha`). Disaring di klien.
   const [wt, setWt] = usePersistedState<WorktreeScope>("backlog", "worktree", "all",
     oneOf<WorktreeScope>("all", "worktree"));
+  // Gelombang 7 · "Perlu ditinjau": item yang sesinya menunggu jawaban manusia (lihat backlog-worktree.ts).
+  const [review, setReview] = usePersistedState<ReviewScope>("backlog", "review", "all",
+    oneOf<ReviewScope>("all", "review"));
   // SPEC-408 · ADR-0090 · rentang tanggal. `dateField` memilih sumbunya (dibuat / dikerjakan);
   // `from`/`to` = "YYYY-MM-DD" apa adanya dari <input type="date">, inklusif, boleh sendirian.
   const [dateField, setDateField] = usePersistedState<"created" | "started">(
@@ -999,14 +1010,14 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   // terbaca sebagai backlog kosong.
   const activeFilters = [
     tab !== "all", proj !== "all", q.trim() !== "", stage !== "all",
-    prioFilter !== "all", from !== "", to !== "", wt !== "all",
+    prioFilter !== "all", from !== "", to !== "", wt !== "all", review !== "all",
   ].filter(Boolean).length;
   // Scroll dipulihkan sesudah potongan pertama dari server mendarat — sebelum itu tinggi
   // daftar belum final dan posisinya meleset.
   const listRef = useScrollRestore("backlog", "scroll", data.length > 0);
   React.useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 250); return () => clearTimeout(t); }, [q]);
   useResetOnChange(
-    JSON.stringify([tab, proj, stage, prioFilter, dq, dateField, from, to, wt]),
+    JSON.stringify([tab, proj, stage, prioFilter, dq, dateField, from, to, wt, review]),
     () => setPage(1));
   React.useEffect(() => {
     let alive = true;
@@ -1048,8 +1059,11 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     () => data.map((s) => mergeSlim(s, backlogById.get(s.id))),
     [data, backlogById],
   );
-  // Himpunan setelah filter cakupan worktree: angka segmen dan isi daftar memakai himpunan ini.
-  const scoped = React.useMemo(() => scopeByWorktree(items, wt), [items, wt]);
+  // Himpunan setelah filter worktree dan "Perlu ditinjau" (keduanya AND): angka segmen dan isi daftar
+  // memakai himpunan ini.
+  const scoped = React.useMemo(
+    () => scopeByReview(scopeByWorktree(items, wt), review, reviewSpecIds),
+    [items, wt, review, reviewSpecIds]);
   // Hitungan per segmen dari himpunan yang SAMA dengan daftar: satu sumber untuk angka dan isi.
   const counts = React.useMemo(() => {
     const out = {} as Record<StageGroup, number>;
@@ -1104,7 +1118,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
   } : undefined;
   const resetAll = () => {
     setTab("all"); setProj("all"); setQ(""); setStage("all"); setPrioFilter("all");
-    setDateField("created"); setFrom(""); setTo(""); setWt("all"); setPage(1);
+    setDateField("created"); setFrom(""); setTo(""); setWt("all"); setReview("all"); setPage(1);
   };
   // Chip untuk filter yang ada di popover. Tahap tak perlu chip: ia sudah segmen yang tampak.
   const chips: FilterChip[] = [
@@ -1117,6 +1131,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     ...(from || to ? [{ key: "date", label: `Tanggal ${dateField === "created" ? "dibuat" : "dikerjakan"}: ${from || "…"} – ${to || "…"}`,
       onRemove: () => { setFrom(""); setTo(""); } }] : []),
     ...(wt !== "all" ? [{ key: "wt", label: WORKTREE_SCOPE_LABEL.worktree, onRemove: () => setWt("all") }] : []),
+    ...(review !== "all" ? [{ key: "review", label: REVIEW_SCOPE_LABEL.review, onRemove: () => setReview("all") }] : []),
   ];
   // Isi popover "Filter": sumber, project, prioritas, dan rentang tanggal. Dibuka dari satu tombol.
   const filtersPanel = (
@@ -1135,6 +1150,12 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
       <Field label="Worktree" hint="Hanya item yang pernah dibuatkan worktree oleh hanoman. Pekerjaan di luar hanoman tidak terhitung.">
         <Select size="sm" aria-label="Filter worktree" value={wt} onChange={(e) => setWt(e.target.value as WorktreeScope)}
           options={WORKTREE_SCOPE_OPTS.map((o) => ({ value: o.value, label: o.label }))} />
+      </Field>
+      {/* Gelombang 7 · "Perlu ditinjau" berdampingan dengan Worktree. Yang disaring hanya sesi yang sedang
+          menunggu jawaban; tinjauan diff tidak tercatat di server dan tetap lewat "Review perubahan" per item. */}
+      <Field label="Tinjauan" hint="Item yang sesinya sedang menunggu jawabanmu. Tinjauan diff tidak tercatat di sini; buka Review perubahan per item.">
+        <Select size="sm" aria-label="Filter perlu ditinjau" value={review} onChange={(e) => setReview(e.target.value as ReviewScope)}
+          options={REVIEW_SCOPE_OPTS.map((o) => ({ value: o.value, label: o.label }))} />
       </Field>
       {/* SPEC-408 · ADR-0090 · rentang tanggal: satu sumbu + dua batas inklusif. */}
       <Field label="Tanggal">
@@ -1191,7 +1212,9 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
 
       {firstLoad ? (
         <SkeletonList rows={LOADING_ROWS} label="Memuat backlog" />
-      ) : items.length === 0 ? (
+      ) : scoped.length === 0 ? (
+        // Kosong karena filter cakupan (atau item memang tak ada): keduanya dijawab dengan keadaan "filter",
+        // bukan "tahap kosong", supaya "Perlu ditinjau" yang kosong tak terbaca sebagai tahap tanpa item.
         backlog.length === 0
           ? <StateBlock kind="empty" illustration="PST-002" title="Backlog masih kosong"
             hint="Ajukan feature brief atau Finding QA — hanoman menjalankannya dari brainstorm sampai execute."

@@ -6,8 +6,13 @@ import { LogsPanel } from "./LogsPanel";
 import { RemoteInstanceView } from "./RemoteInstanceView";
 import { ClientAccessPanel } from "./ClientAccessPanel";
 import { RemoteAccessCard } from "./RemoteControlPanel";
-import type { PresenceDeviceView, PresenceSessionView, PresenceView } from "@hanoman/shared";
+import { customGrantLabels, tierOf } from "./remote-access-tier";
+import type { PresenceDeviceView, PresenceSessionView, PresenceView, RemoteCapability } from "@hanoman/shared";
 import { relativeTime } from "../lib/time-format";
+import {
+  OPEN_BLOCK_NO_GRANT, OPEN_BLOCK_NO_READ, REPORTED_ACCESS_HINT, REPORTED_ACCESS_LABEL, REPORTED_ACCESS_OWNER,
+  REPORTED_ACCESS_PREFIX, type ReportedAccessKey,
+} from "../lib/labels";
 import "./styles/clients.css";
 
 /* SPEC-919 · ADR-0147 · halaman "Klien": perangkat yang sinkron ke server ini, dan pekerjaan yang
@@ -27,13 +32,52 @@ const STATUS: Record<PresenceSessionView["status"], { label: string; pill: strin
   exited: { label: "selesai", pill: "stopped" },
 };
 
+/* ADR-0216 opsi D · izin minimum untuk "Lihat (baca saja)" adalah `sessions:read`. Tampilan perangkat remote
+   dimulai dari terminalnya, dan WS baca-saja menuntut `sessions:read` (`remoteCapabilityFor`). Setiap tingkat
+   memuatnya (`validateRemoteGrant`). Dokumen dan IDE di tampilan itu menuntut Lihat backlog dan Lihat IDE, dan
+   gagal sendiri bila perangkat tak memberinya. Pemeriksaan tingkat tiap tab ada di `RemoteInstanceView`. */
+const OPEN_REQUIRES: RemoteCapability = "sessions:read";
+
 /** Alasan tombol "Lihat (baca saja)" mati, dalam bahasa biasa. `null` = tombol boleh dipakai. Murni, supaya
-    tiap cabangnya bisa diuji tanpa merender baris. */
+    tiap cabangnya bisa diuji tanpa merender baris. Sebelumnya hanya memeriksa ada-tidaknya `control`, sehingga
+    perangkat dengan `capabilities: []` tetap menampilkan tombol aktif lalu ditolak 403 oleh perangkat itu. */
 export function openBlockReason(d: PresenceDeviceView): string | null {
   if (!d.online) return "Perangkat sedang offline — kendali jarak jauh tak bisa dibuka.";
   if (d.control?.state === "protocol-mismatch") return "Versi protokol perangkat tak cocok dengan server ini.";
   if (!d.control) return "Kendali jarak jauh belum diizinkan di perangkat ini.";
+  if (!d.control.capabilities.includes(OPEN_REQUIRES)) {
+    return d.control.capabilities.length === 0 ? OPEN_BLOCK_NO_GRANT : OPEN_BLOCK_NO_READ;
+  }
   return null;
+}
+
+/** Keadaan izin yang dilaporkan perangkat remote, untuk baris "Tingkat akses". Murni: dari `control` hello
+    relay saja. Tanpa `control` tak ada laporan, jadi `tidak-diketahui`, bukan `nonaktif`: server tak bisa
+    membedakan kendali yang dimatikan dari relay yang belum tersambung. */
+export function reportedAccessOf(d: PresenceDeviceView): ReportedAccessKey {
+  const c = d.control;
+  if (!c) return "tidak-diketahui";
+  if (c.state === "protocol-mismatch") return "protokol-tidak-cocok";
+  if (c.capabilities.length === 0) return "nonaktif";
+  const t = tierOf(c.capabilities);
+  return t === "kosong" ? "nonaktif" : t;
+}
+
+/** Baris "Tingkat akses" untuk perangkat remote: baca-saja, tanpa tombol ubah. Perangkat lokal tak memakainya
+    karena izinnya sudah ada di `RemoteAccessCard` di bawah daftar. */
+function ReportedAccessLine({ d }: { d: PresenceDeviceView }) {
+  const key = reportedAccessOf(d);
+  const rincian = key === "khusus" && d.control ? customGrantLabels(d.control.capabilities) : [];
+  return (
+    <div className="kl-device-access" data-testid={`device-access-${d.deviceId}`}>
+      <span>{REPORTED_ACCESS_PREFIX}: <strong>{REPORTED_ACCESS_LABEL[key]}</strong></span>
+      <Badge tone="neutral" size="sm">{REPORTED_ACCESS_OWNER}</Badge>
+      <div className="kl-device-reason">
+        {REPORTED_ACCESS_HINT[key]}
+        {rincian.length > 0 && ` Rincian: ${rincian.join(", ")}.`}
+      </div>
+    </div>
+  );
 }
 
 /** Ringkasan sesi berjalan dalam bahasa biasa: "1 sesi berjalan" atau "Tidak ada sesi berjalan". */
@@ -87,6 +131,7 @@ function DeviceRow({ d, specTitles, onOpenSpec, now, onOpenRemote }:
             : <span>{sessionSummary(d.sessions.length)}</span>}
           <span> · terakhir terlihat {relativeTime(d.lastSeenAt, now) || "—"}</span>
         </div>
+        {!d.local && <ReportedAccessLine d={d} />}
         {reason && (
           <div id={reasonId} data-testid={`device-open-reason-${d.deviceId}`} className="kl-device-reason">{reason}</div>
         )}

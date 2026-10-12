@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
-import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, grantsCapability, type SpecReview, type Stage } from "@hanoman/shared";
+import { zCreateSpec, zPatchSpec, zIntegrate, zBatchCreateSpec, zChangeSpecSource, zMarkSpecDone, grantsCapability, type Stage } from "@hanoman/shared";
 import { CODE_STYLE_CLAUSE } from "@hanoman/runner";
 import { integrate, sourceBranch } from "../services/integrate";
 import { deleteProjectWorktrees } from "../services/worktree-delete";
@@ -10,7 +10,7 @@ import { createAgentSession } from "../services/session-launch-gate";
 import { conflictSessionDefaults } from "../services/settings";
 import { ensureCodexTrust } from "../services/codex-trust";
 import { prisma } from "../db";
-import { specReview, reviewFile, worktreeDir, specCommitRange, specReviewRange, reviewFileRange, shaResolvable } from "../services/spec-review";
+import { specReview, reviewFile, worktreeDir, specCommitRange, specReviewRange, reviewFileRange, shaResolvable, emptySpecReview } from "../services/spec-review";
 import { nextSpecId } from "../services/id";
 // SPEC-546 · turunan priority/objective dipakai TIGA route sekarang (POST /specs, PATCH, dan
 // POST /specs/:id/source), jadi ia tak lagi fungsi lokal berkas ini.
@@ -576,11 +576,7 @@ export default async function (app: FastifyInstance) {
     // `base`/`files`/`changed` ikut kosong supaya klien lama (yang hanya mengenal bentuk SpecReview)
     // menampilkan daftar kosong, tak crash. `no-worktree`: belum pernah dimulai (tanpa baseSha).
     // `no-commit`: sudah dimulai, worktree-nya lenyap, dan tak ada commit untuk ditinjau.
-    if (!r) {
-      const empty: SpecReview = { base: "", files: [], changed: [], empty: true,
-        reason: spec.baseSha ? "no-commit" : "no-worktree" };
-      return empty;
-    }
+    if (!r) return emptySpecReview(spec.baseSha ? "no-commit" : "no-worktree");
     return r.wt ? specReview(repoDir, id, spec.baseSha, spec.branchFrom)
       : specReviewRange(repoDir, r.base, r.head);
   });

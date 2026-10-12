@@ -1206,9 +1206,13 @@ POST   /terminal/sessions/:id/dialog/takeover
 #   Capability `sessions:write`. SENGAJA DI LUAR katalog MCP (shared/src/mcp-catalog.ts): agen yang
 #     bisa memanggilnya bisa menjawab pertanyaannya sendiri, dan gerbang "manusia terakhir yang
 #     memutuskan" runtuh lewat pintu itu (memperluas ADR-0099 & SPEC-646/ADR-0112).
-GET    /terminal/sessions/:id/review        # (SPEC-230, ADR-0054) diff worktree HIDUP sesi project-level (PRD);
-#   bentuk = /specs/:id/review; kunci worktree = id sesi; 409 bila worktree lenyap (sesi ditutup) — bukan 500
+GET    /terminal/sessions/:id/review        # (SPEC-230, ADR-0054, ADR-0215) diff worktree HIDUP sesi project-level (PRD);
+#   bentuk = /specs/:id/review (`zSpecReview`); kunci worktree = id sesi.
+#   ADR-0215 (amandemen ADR-0213) · sesi tanpa worktree / worktree lenyap → 200 { base:"", files:[], changed:[], empty:true, reason }
+#   (`no-worktree`: cwd bukan `.worktrees/…`; `no-commit`: cwd worktree tercatat tetapi direktorinya lenyap), BUKAN 409.
+#   409 hanya `project belum punya repoDir` (galat konfigurasi); 404 bila sesi tak ada.
 GET    /terminal/sessions/:id/review/*path  # { path, status, binary, truncated, diff, content } · 404 · 409
+#   ADR-0215: tanpa sumber (no-worktree/no-commit) tetap 409 — tak ada berkas untuk dibaca. Layar Review tak memanggilnya dalam keadaan kosong.
 POST   /terminal/sessions/:id/attachments   # multipart/form-data, field `file` → 200 { path }
 #   (SPEC-816) lampiran gambar sesi. `path` = path ABSOLUT berkas di server; pane mengetikkannya ke
 #   prompt (+ satu spasi, TANPA Enter) dan agen membacanya sendiri dengan Read. Berkas + path,
@@ -1481,9 +1485,11 @@ GET|PUT /logs/retention                  # COOKIE_ONLY · { eventDays, serverDay
 DELETE /device-tokens/:id                # BERUBAH: socket sync + relay device itu ditutup 1008 SEBELUM 204
 
 # ── KLIEN ────────────────────────────────────────────────────────────────────────────────────────
-GET|PUT /remote-control                  # COOKIE_ONLY. { control:{enabled,capabilities⊆REMOTE_CAPABILITIES},
+GET|PUT /remote-control                  # GET remote:read · PUT remote:control (danger), ADR-0197. { control:{enabled,capabilities⊆REMOTE_CAPABILITIES},
                                          #   logs:{event,server,transcript} } + status relay/pengiriman + audit 50 terbaru.
                                          # PUT /settings TAK menulis remoteControl/logShipping/logRetention.
+                                         # Grant hanya untuk mesin INI. Tak ada `PUT /remote-control/devices/:id` — grant per
+                                         #   perangkat remote belum ada (ADR-0216, Diusulkan; relay PUT ini ditolak ADR-0165 §4).
 POST   /terminal/sessions                # BERUBAH: `force` dari principal remote → 403; body +confirmRemote?;
                                          # 409 { error:"remote-session"|"confirm-required", remoteSession } (gerbang presence di hub)
 POST   /specs/:id/done                   # BERUBAH: 409 confirm-required juga saat presence menunjukkan sesi di device lain

@@ -16,6 +16,7 @@ Dokumen ini adalah kontrak untuk teks yang tampil ke operator. Kode penegaknya: 
 | Lepas dari daftar | **Lepas** | Hapus | Dipakai bila data tetap ada di tempat lain (mis. tautan, binding). |
 | Ubah isi | **Edit** | Ubah | Kata kerja tombol. |
 | Batas sesi | **Batas sesi** | cap | |
+| Izin yang dilaporkan perangkat remote | **Tingkat akses** (baris), **Diatur di perangkat itu** (penanda baca-saja) | Atur dari sini, Ubah di sini | Klien · Perangkat. Hanya dibaca: pengubahnya ada di perangkat itu (ADR-0216 opsi D). Keadaannya Lihat/Kerja/Tulis, Khusus, Nonaktif, atau Tidak diketahui. Label di `lib/labels.ts` (`REPORTED_ACCESS_*`). |
 | Basi sebagai status | keadaan konkret: "dimuat 5 menit lalu", "data lama" | basi | `basi` tak pernah jadi label status. |
 | Pengecekan dokumen OK | **Sesuai standar** | on-convention | |
 | Retry | **Coba lagi** (galat), **Kirim ulang** (pengiriman) | Retry | Istilah teknis di kutipan kode dikecualikan. |
@@ -27,7 +28,8 @@ Dokumen ini adalah kontrak untuk teks yang tampil ke operator. Kode penegaknya: 
 | Laporan dari klien (tiket) | **Keluhan** (tab "Keluhan saya", tombol "Lapor masalah") | Laporan & keluhan, Help desk, Tiket, Bug | Di layar Klien dan Help Center. Kategori "Ada masalah" untuk `bug`. |
 | Obrolan klien | **Tanya & ide** (tab di Klien) | Obrolan, Chat | Sesi chat milik project, bukan milik satu keluhan. |
 | Pemilik konflik sinkron | **server pusat** | hub, Instance, Pusat | Diputuskan di Fase 3L. Dipakai di copy konflik dan sinkronisasi. |
-| Item yang pernah punya worktree | **Ber-worktree** (filter Backlog) | Perlu ditinjau, Belum ditinjau | Predikat `baseSha` terisi: hanoman pernah membuatkan worktree. Bukan status tinjau; status itu tak tercatat di daftar (ADR-0214). |
+| Item yang pernah punya worktree | **Ber-worktree** (filter Backlog) | Belum ditinjau | Predikat `baseSha` terisi: hanoman pernah membuatkan worktree. Bukan status tinjau, dan worktree yang sudah dihapus tetap terhitung (ADR-0214). |
+| Item yang menunggu jawabanmu | **Perlu ditinjau** (filter Backlog) | Belum ditinjau, Menunggu review | Predikat sesi: item yang sesinya menunggu jawaban manusia, kondisi yang sama dengan "Menunggu jawabanmu" di Overview. Bukan status tinjau diff; item selesai tidak ikut (gelombang 7, `screens/backlog-worktree.ts`). |
 
 ## Aturan voice
 
@@ -107,3 +109,4 @@ Sisa di luar pemindai (bukan wilayah Fase 2D, tercatat untuk Fase 3):
 - **Istilah server pusat — DIPUTUSKAN (Fase 3L).** "server pusat" (sudah dipakai di `RemoteControlPanel`) dipakai di copy konflik (`ReconcileModal`). Copy sinkronisasi di `SyncButton.tsx` masih memakai "hub" sampai layar Sinkronisasi diredesain.
 - **"Retry".** Pilihan: "Coba lagi" untuk galat, "Kirim ulang" untuk pengiriman webhook.
 - **Istilah "effort".** Dipertahankan sebagai istilah teknis (`Tanpa effort`, nilai effort per runtime). Belum dibahas sebagai copy.
+- **"Perlu ditinjau" vs "Menunggu jawabanmu".** Filter Backlog (gelombang 7) dan Overview memakai kondisi sesi yang sama dan dua kata. Label filter mengikuti permintaan ("Perlu ditinjau"); aturan "nilai yang sama, kata yang sama" menyarankan satu kata. Belum diputuskan pemilik produk.

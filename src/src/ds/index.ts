@@ -5,7 +5,7 @@ export { StateBlock } from "./components/state";
 export { LiveConnectionBadge } from "./components/live";
 export { Button, IconButton, Input, Select, Checkbox, Radio, RadioGroup, Switch, MultiSelect } from "./components/forms";
 export { Card } from "./components/surfaces";
-export { Tabs, TabPanel, OverflowActions } from "./components/ui";
+export { Tabs, TabPanel, OverflowActions, useScrollEdges } from "./components/ui";
 export type { OverflowItem } from "./components/ui";
 export { PageHeader, FilterBar, RowList, DenseRow, Stack, Inline, Text } from "./components/layout";
 export type { FilterChip, SpaceStep, TextSize, TextTone } from "./components/layout";

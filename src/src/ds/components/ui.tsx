@@ -34,13 +34,17 @@ export function TabPanel({ value, children, className = "", style }: TabPanelPro
 
 // Tepi strip tab yang masih menyimpan tab di luar kotaknya. `start` = ada tab di kiri yang belum terlihat,
 // `end` = ada di kanan. Hanya saat strip benar-benar meluap; di ujungnya gradasi berhenti.
-type TabEdges = { start: boolean; end: boolean };
-const readEdges = (el: HTMLElement): TabEdges => {
+export type ScrollEdges = { start: boolean; end: boolean };
+const readEdges = (el: HTMLElement): ScrollEdges => {
+  // Strip yang dibiarkan `overflow: visible` (tab yang MEMBUNGKUS, mis. Scheduler ≤420 px) bukan penggulir:
+  // tak ada tab tersembunyi di tepinya, dan gradasi tak boleh mengubah tampilannya.
+  if (getComputedStyle(el).overflowX === "visible") return { start: false, end: false };
   const max = el.scrollWidth - el.clientWidth;
   return { start: el.scrollLeft > 1, end: max > 1 && el.scrollLeft < max - 1 };
 };
-function useTabEdges(ref: React.RefObject<HTMLElement>): TabEdges {
-  const [edges, setEdges] = React.useState<TabEdges>({ start: false, end: false });
+// Dipakai juga oleh papan tombol terminal (`TerminalKeys`): gradasi tepi hanya saat ada isi yang tersembunyi.
+export function useScrollEdges(ref: React.RefObject<HTMLElement>): ScrollEdges {
+  const [edges, setEdges] = React.useState<ScrollEdges>({ start: false, end: false });
   // `setEdges` dengan nilai yang sama tak me-render ulang, jadi mengukur di tiap render itu murah.
   const measure = React.useCallback(() => {
     const el = ref.current;
@@ -62,6 +66,21 @@ function useTabEdges(ref: React.RefObject<HTMLElement>): TabEdges {
   return edges;
 }
 
+// Tab yang dipilih harus terlihat di strip (lewat panah, URL, atau tab di luar layar). Hanya kotak strip
+// yang digulir: scrollIntoView ikut menggulir halaman bila strip-nya tertutup di sumbu-Y. Tab yang tak utuh
+// terlihat diletakkan 24 px dari tepi, sebesar gradasi (app.css); `scroll-padding-inline` `.hn-tabs` memberi
+// titik snap di posisi yang sama, jadi scroll-snap tak menggesernya lagi.
+const TAB_FADE_PX = 24;
+function revealTab(list: HTMLElement, tab: HTMLElement) {
+  const lr = list.getBoundingClientRect();
+  const tr = tab.getBoundingClientRect();
+  const start = tr.left - lr.left - list.clientLeft + list.scrollLeft;
+  const end = start + tr.width;
+  if (start < list.scrollLeft + TAB_FADE_PX || end > list.scrollLeft + list.clientWidth - TAB_FADE_PX) {
+    list.scrollLeft = Math.max(0, start - TAB_FADE_PX);
+  }
+}
+
 type TabsProps = { tabs?: Tab[]; value?: string; defaultValue?: string; onChange?: (v: string) => void;
   variant?: "underline" | "pill"; style?: React.CSSProperties; children?: React.ReactNode } & Record<string, any>;
 export function Tabs({ tabs = [], value, defaultValue, onChange, variant = "underline", className = "", style = {}, children, ...rest }: TabsProps) {
@@ -71,7 +90,13 @@ export function Tabs({ tabs = [], value, defaultValue, onChange, variant = "unde
   const active = isControlled ? value : inner;
   const baseId = React.useId();
   const listRef = React.useRef<HTMLDivElement>(null);
-  const edges = useTabEdges(listRef);
+  const edges = useScrollEdges(listRef);
+  // Efek layout: tab terpilih digulir masuk sebelum frame dilukis, tak sempat tampil di luar strip.
+  React.useLayoutEffect(() => {
+    const list = listRef.current;
+    const tab = list?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+    if (list && tab) revealTab(list, tab);
+  }, [active]);
   // Hanya tab yang punya TabPanel sungguhan yang diberi `aria-controls`; selebihnya akan menunjuk ke id yang tak ada.
   const panelValues = new Set(React.Children.toArray(children).flatMap((child) =>
     React.isValidElement<{ value?: string }>(child) && child.type === TabPanel && child.props.value !== undefined

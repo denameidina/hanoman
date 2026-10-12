@@ -840,7 +840,7 @@ Tes:
 Fase 3G (Klien) dan 3J (VPS) dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md).
 Aturan layar mengikuti [audit § Klien dan VPS](ui-ux-audit-2026-10.md#2-per-layar) dan
 [glosarium](glossary.md). Tidak ada API baru: selektor tingkat memetakan ke grant `PUT /remote-control` yang sudah ada. Keputusan selektor
-dicatat di [ADR-0210](../adr/0210-perangkat-tingkat-akses-lihat-kerja-tulis.md).
+dicatat di [ADR-0210](../adr/0210-perangkat-tingkat-akses-lihat-kerja-tulis.md). Grant per perangkat remote belum ada di UI; analisis di [ADR-0216](../adr/0216-grant-per-perangkat-remote-diusulkan.md) (Diusulkan).
 
 Berkas:
 
@@ -3392,7 +3392,8 @@ navigasi yang sudah ada. UI tidak menyediakan akses ke data fitur yang dihapus.
 
 ## Audit UI/UX 2026-10 — Review tanpa 409 dan hapus worktree item (ADR-0213)
 
-- **Review, keadaan kosong** (`screens/ReviewScreen.tsx`): `GET /specs/:id/review` menjawab **200** `{ empty:true, reason }` untuk "belum ada worktree maupun commit", bukan 409. Layar memeriksa `r.empty` lalu menampilkan keadaan kosong dengan teks sesuai `reason`: `no-worktree` ("Sesi belum membuat worktree…") atau `no-commit` ("Worktree sudah dilepas dan belum ada commit…"). `data-reason` pada `.hn-review-empty` memuat alasannya; `409` menandai jalur sesi (`GET /terminal/sessions/:id/review`) yang tetap 409. Tes: `screens/ReviewScreen.test.tsx`.
+- **Review, keadaan kosong** (`screens/ReviewScreen.tsx`): `GET /specs/:id/review` menjawab **200** `{ empty:true, reason }` untuk "belum ada worktree maupun commit", bukan 409. Layar memeriksa `r.empty` lalu menampilkan keadaan kosong dengan teks sesuai `reason`: `no-worktree` ("Sesi belum membuat worktree…") atau `no-commit` ("Worktree sudah dilepas dan belum ada commit…"). `data-reason` pada `.hn-review-empty` memuat alasannya; `409` hanya dipetakan pada jalur spec (repoDir belum diatur), lihat ADR-0215. Tes: `screens/ReviewScreen.test.tsx`.
+- **Jalur sesi, ADR-0215** (amandemen ADR-0213): `GET /terminal/sessions/:id/review` juga menjawab **200** `{ empty, reason }` (`no-worktree` bila sesi tak punya worktree, `no-commit` bila direktorinya lenyap). Layar tak lagi memetakan 409 pada jalur sesi; 409 di sana (repoDir belum diatur) tampil sebagai galat "Gagal memuat review". Tes: `src/test/review-screen.test.tsx` dan `screens/ReviewScreen.test.tsx`.
 - **Hapus worktree satu item** mengganti `deleteWorktrees` dengan nama turunan. Tombol "Hapus worktree" di `App.tsx` memanggil `api.deleteSpecWorktree(spec.id)` → `DELETE /specs/:id/worktree`. Ini mengamandemen kalimat "tanpa endpoint baru" pada bagian Review di atas. Galat `ok:false` tetap dilempar ke bar keputusan.
 - **Tipe kontrak** `SpecReview`, `ReviewFile`, dan `ChangedFile` berasal dari `@hanoman/shared` (`spec-review.ts`, `zSpecReview`). `api/client.ts` mengekspor ulang namanya, jadi pemakainya tak berubah.
 
@@ -3403,3 +3404,18 @@ navigasi yang sudah ada. UI tidak menyediakan akses ke data fitur yang dihapus.
 - Overview: nama aktivitas `min-width: 8ch`, footer Backlog tautan penuh di mobile; Settings merender backtick sebagai `<code>` (`SettingRow desc`); chip jenis modal Feature brief membungkus; dialog Remote IDE bertumpuk ≤640px.
 - Terminal: "Jawab" ke sesi yang sudah berakhir tak lagi memfokus sesi lain — toast "Sesi itu sudah berakhir." dengan aksi "Riwayat sesi"; target fokus dibersihkan saat meninggalkan Terminal (`App.tsx`). Composer sticky di dasar pada ponsel; select dikte 44px pada pointer kasar. IDE: label ref berupa pil berelipsis dengan area klik ≥24px (44px pada pointer kasar).
 - Batas verifikasi: pengecekan layout dilakukan dengan Chrome headless pada fixture CSS asli dan jsdom; QA aplikasi hidup untuk gelombang 6 dicatat di audit doc.
+
+## Audit UI/UX 2026-10 — gelombang 7: filter "Perlu ditinjau" (Backlog)
+
+- **Predikat** (`screens/backlog-worktree.ts`, `reviewSpecIdsOf`): item yang sesinya hidup dan `sessionKind` = `waiting` (`decision && !deciding`). Kondisinya sama dengan "Menunggu jawabanmu" di Overview dan pet. Tes `test/backlog-review-filter.test.tsx` mengunci kesamaannya dengan `waitingSessions`.
+- **Data**: `App.tsx` menghitung `reviewSpecIds` dari daftar sesi dan meneruskannya ke `BacklogScreen` sebagai prop opsional. Tanpa prop, filter ini menghasilkan daftar kosong. Layar Backlog tetap tak menerima daftar sesi.
+- **Tampilan**: field "Tinjauan" di popover Filter, berdampingan dengan "Worktree"; chip "Perlu ditinjau" saat aktif; ikut Reset filter; digabung AND dengan "Ber-worktree". Angka segmen tahap mengikuti himpunan yang disaring. Daftar yang kosong karena filter kini dijawab "Tidak ada spec untuk filter ini" dengan Reset, bukan "Tidak ada spec di tahap …".
+- **Klausa `stage` done + `baseSha` tidak dipakai.** `baseSha` tidak berarti worktree masih ada: `DELETE /specs/:id/worktree` (ADR-0213) dan integrasi tidak menulisnya. Yang meng-nullkannya hanya `POST /specs/:id/source` dengan rencana reset. Status tinjau tak tercatat di server. Klausa itu akan menandai item yang sudah diintegrasikan atau worktree-nya sudah dihapus.
+- **Batas**: tinjauan item selesai belum punya sinyal jujur (audit § Yang tetap terbuka, butir 3). Label "Perlu ditinjau" dan "Menunggu jawabanmu" untuk kondisi yang sama masih keputusan terbuka di `glossary.md`.
+
+## Audit UI/UX 2026-10 — Perangkat: tingkat yang dilaporkan dan alasan "Lihat (baca saja)" (ADR-0216 opsi D)
+
+- **Baris "Tingkat akses" per perangkat remote** di tab Perangkat (`ClientsScreen.tsx`, `ReportedAccessLine`). Tingkatnya dibaca dari `control.capabilities` (hello relay), bukan dari API baru. Keadaannya: Lihat, Kerja, Tulis, Khusus (dengan rincian), Nonaktif (kendali aktif tanpa grant), atau Tidak diketahui (tanpa laporan, atau protokol tak cocok). Penanda "Diatur di perangkat itu" dan penjelasan singkat menegaskan bahwa pengaturannya hanya di perangkat itu. Tidak ada tombol ubah.
+- **Pemetaan murni** `reportedAccessOf(d)` dan **alasan tombol** `openBlockReason(d)`, keduanya diekspor dari `ClientsScreen.tsx` dan diuji di `test/clients-remote-access.test.tsx`.
+- **Alasan tombol memeriksa capability.** "Lihat (baca saja)" butuh `sessions:read`, karena terminal tampilan remote dimulai dari WS baca-saja yang menuntutnya, dan setiap tingkat memuatnya. Perangkat dengan `capabilities: []` atau tanpa `sessions:read` kini menonaktifkan tombol dan menjelaskan alasannya. Sebelumnya tombol tetap aktif lalu ditolak 403.
+- **Batas.** Tab Dokumen dan IDE di `RemoteInstanceView` tetap menuntut `backlog:read` dan `ide:read` dan gagal sendiri; tombol tidak memeriksanya. Copy ada di `lib/labels.ts` (`REPORTED_ACCESS_*`, `OPEN_BLOCK_*`), baris glosarium "Izin yang dilaporkan perangkat remote". Keputusan grant per perangkat (opsi B dan C) tetap di [ADR-0216](../adr/0216-grant-per-perangkat-remote-diusulkan.md).

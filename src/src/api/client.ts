@@ -63,7 +63,7 @@ export type SourceResetPending = {
 export type DocKind = "audit" | "spec" | "plan" | "objective" | "brainstorm" | "other";
 export type SpecDoc = { kind: DocKind; path: string; name: string };
 // SPEC-171 · review worktree backlog item. Kontraknya di shared (ADR-0213); `empty`/`reason` ada
-// di SpecReview bila belum ada worktree maupun commit.
+// di SpecReview bila belum ada worktree maupun commit. Sesi (ADR-0215) memakai bentuk yang sama.
 export type { ChangedFile, SpecReview, ReviewFile } from "@hanoman/shared";
 // SPEC-182 · IDE Visual
 export type RepoFile = { path: string; content: string | null; binary: boolean; truncated: boolean };
@@ -542,7 +542,8 @@ export function createApi(o: { base?: string } = {}) {
   listCleanups: () => j<{ items: WorktreeCleanupView[] }>(paths.terminalCleanups),
   // SPEC-919 · ADR-0147 · muat awal halaman Klien; sesudah itu grup siar `presence` yang mendorong.
   presence: () => j<PresenceView>(paths.presence),
-  // SPEC-230 · review + integrate ber-skop sesi (sesi project-level PRD, tanpa Spec).
+  // SPEC-230 · review + integrate ber-skop sesi (sesi project-level PRD, tanpa Spec). ADR-0215: keadaan
+  // kosong (sesi tanpa worktree / worktree lenyap) datang sebagai 200 `empty`; 409 hanya galat konfigurasi.
   sessionReview: (id: string) => j<SpecReview>(paths.sessionReview(id)),
   sessionReviewFile: (id: string, path: string) => j<ReviewFile>(paths.sessionReviewFile(id, path)),
   sessionIntegrate: (id: string, op: "merge" | "rebase", target: string) =>

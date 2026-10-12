@@ -45,6 +45,10 @@ export const PRIORITY_LABEL: Record<Priority, string> = { tinggi: "Tinggi", seda
 /** Cakupan worktree di filter Backlog (ADR-0214). Bukan enum shared: `worktree` = `baseSha` terisi. */
 export const WORKTREE_SCOPE_LABEL: Record<"all" | "worktree", string> = { all: "Semua item", worktree: "Ber-worktree" };
 
+/** Cakupan "Perlu ditinjau" di filter Backlog (gelombang 7). Predikatnya sesi item yang menunggu jawaban
+ *  manusia, bukan status tinjau diff: lihat `screens/backlog-worktree.ts` (`reviewSpecIdsOf`). */
+export const REVIEW_SCOPE_LABEL: Record<"all" | "review", string> = { all: "Semua item", review: "Perlu ditinjau" };
+
 /** Severity QA. `blocker` = tak bisa dipakai; `trivial` = hanya tampilan. */
 export const QA_SEVERITY_LABEL: Record<QaSeverity, string> = {
   blocker: "Tidak bisa digunakan", critical: "Kritis", major: "Fitur terganggu", minor: "Gangguan kecil", trivial: "Tampilan saja",
@@ -180,3 +184,36 @@ export const PORTAL_CHAT_TYPE_LABEL: Record<"brainstorm" | "tanya", string> = { 
 export const SESSION_ENDED_NOTICE = "Sesi itu sudah berakhir.";
 /** Aksi toast bila riwayat sesi itu tercatat. Sama dengan item menu "Riwayat sesi" di Terminal. */
 export const SESSION_HISTORY_ACTION = "Riwayat sesi";
+
+// ── Izin yang dilaporkan perangkat remote (Klien · Perangkat, ADR-0216 opsi D) ──────────
+
+/** Keadaan izin yang DILAPORKAN perangkat remote ke server ini. Hanya dibaca di sini: pengubahnya ada di perangkat itu.
+ *  `khusus` = grant di luar tiga tingkat. `tidak-diketahui` = tak ada laporan (offline, kendali mati, versi lama).
+ *  `protokol-tidak-cocok` tampil dengan label yang sama dengan `tidak-diketahui`, tetapi alasannya berbeda. */
+export type ReportedAccessKey = "lihat" | "kerja" | "tulis" | "khusus" | "nonaktif" | "tidak-diketahui" | "protokol-tidak-cocok";
+
+export const REPORTED_ACCESS_LABEL: Record<ReportedAccessKey, string> = {
+  lihat: "Lihat", kerja: "Kerja", tulis: "Tulis", khusus: "Khusus",
+  nonaktif: "Nonaktif", "tidak-diketahui": "Tidak diketahui", "protokol-tidak-cocok": "Tidak diketahui",
+};
+
+/** Penanda baca-saja di samping tingkat. Menjawab "siapa yang boleh mengubah ini" tanpa tombol. */
+export const REPORTED_ACCESS_OWNER = "Diatur di perangkat itu";
+
+/** Awalan baris tingkat akses perangkat remote. */
+export const REPORTED_ACCESS_PREFIX = "Tingkat akses";
+
+/** Penjelasan singkat di bawah tingkat. Selalu menyebut bahwa pengaturannya hanya dari perangkat itu. */
+export const REPORTED_ACCESS_HINT: Record<ReportedAccessKey, string> = {
+  lihat: "Server ini hanya menampilkan izin yang dilaporkan perangkat itu. Pengaturannya hanya bisa diubah dari perangkat itu, tidak dari sini.",
+  kerja: "Server ini hanya menampilkan izin yang dilaporkan perangkat itu. Pengaturannya hanya bisa diubah dari perangkat itu, tidak dari sini.",
+  tulis: "Server ini hanya menampilkan izin yang dilaporkan perangkat itu. Pengaturannya hanya bisa diubah dari perangkat itu, tidak dari sini.",
+  khusus: "Kombinasi izin yang tidak sama dengan tingkat mana pun. Pengaturannya hanya bisa diubah dari perangkat itu, tidak dari sini.",
+  nonaktif: "Kendali aktif di perangkat itu, tetapi tanpa izin apa pun. Tidak ada yang bisa dibuka dari sini.",
+  "tidak-diketahui": "Perangkat tidak melaporkan izinnya ke server ini, misalnya karena sedang offline, kendali jarak jauh dimatikan, atau versinya lama.",
+  "protokol-tidak-cocok": "Versi protokol perangkat tidak cocok dengan server ini, jadi izinnya tidak bisa dibaca dengan pasti.",
+};
+
+/** Alasan tombol "Lihat (baca saja)" mati karena izin yang dilaporkan perangkat remote (ADR-0216 opsi D). */
+export const OPEN_BLOCK_NO_GRANT = "Perangkat ini tidak memberi izin apa pun, jadi tidak ada yang bisa dibuka dari sini.";
+export const OPEN_BLOCK_NO_READ = "Perangkat ini belum memberi izin Lihat sesi, jadi tampilannya tidak bisa dibuka.";

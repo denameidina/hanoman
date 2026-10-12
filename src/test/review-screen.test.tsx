@@ -235,8 +235,8 @@ describe("ReviewScreen · belum ada worktree (409)", () => {
     expect(empty?.getAttribute("data-detail")).toBe("GET /api/specs/SPEC-142/review → 409");
   });
 
-  it("sesi PRD tanpa worktree tak menawarkan Backlog", async () => {
-    (api.sessionReview as any).mockRejectedValue(notYet());
+  it("sesi PRD tanpa worktree tak menawarkan Backlog (200 empty, ADR-0215)", async () => {
+    (api.sessionReview as any).mockResolvedValue({ base: "", files: [], changed: [], empty: true, reason: "no-worktree" });
     render(<ReviewScreen specId="S1" title="PRD" kind="session" onBack={() => {}} />);
     await screen.findByText("Belum ada perubahan untuk ditinjau");
     expect(screen.queryByRole("link", { name: "Buka di Backlog" })).toBeNull();

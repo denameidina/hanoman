@@ -432,8 +432,10 @@ textarea:focus-visible,
      pointer-kasar, atau border-bottom hair). Kunci sumbu-Y supaya hanya scroll mendatar. */
   overflow-y: hidden;
   overscroll-behavior-inline: contain;
-  /* Tab yang meluap digulir per tab, tak berhenti di tengah label. */
+  /* Tab yang meluap digulir per tab, tak berhenti di tengah label. `scroll-padding` = lebar gradasi tepi:
+     tab yang di-snap ke tepi tak tertutup gradasi, dan tab pertama tak menggeser strip 4 px (padding-nya). */
   scroll-snap-type: x proximity;
+  scroll-padding-inline: 24px;
 }
 .hn-tabs > [role="tab"] { scroll-snap-align: start; }
 /* Gradasi di tepi yang masih menyimpan tab tersembunyi. Tabs men-set `data-fade-start` / `data-fade-end`
@@ -746,10 +748,14 @@ input[type="file"] { min-height: 24px; }
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   border-top: 1px solid var(--border-hair);
+  /* Kunci digulir per kunci. `scroll-padding` menjaga kunci yang di-snap tak tertutup gradasi tepi. */
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: 24px;
 }
 
 .hn-terminal-key {
   flex: 0 0 auto;
+  scroll-snap-align: start;
   min-width: 40px;
   min-height: 32px;
   padding: 0 8px;
@@ -762,6 +768,18 @@ input[type="file"] { min-height: 24px; }
 }
 
 .hn-terminal-key:hover { background: var(--bone-200); color: var(--text-strong); }
+
+/* Gradasi di tepi papan yang masih menyimpan kunci tersembunyi. TerminalKeys men-set `data-fade-*` hanya
+   saat papan meluap dan tepinya belum sampai ujung, sama dengan strip tab `.hn-tabs` di atas. Lewat mask. */
+.hn-terminal-keys[data-fade-start="true"],
+.hn-terminal-keys[data-fade-end="true"] {
+  --hn-fade-l: 0px;
+  --hn-fade-r: 0px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--hn-fade-l), #000 calc(100% - var(--hn-fade-r)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--hn-fade-l), #000 calc(100% - var(--hn-fade-r)), transparent 100%);
+}
+.hn-terminal-keys[data-fade-start="true"] { --hn-fade-l: 24px; }
+.hn-terminal-keys[data-fade-end="true"] { --hn-fade-r: 24px; }
 
 /* SPEC-882 · kolom ketik perangkat sentuh: satu baris, penanda kejujuran pengiriman di kanannya.
    Basis flex dinyatakan (bukan `auto`) karena `flex-wrap` memutus baris SEBELUM menyusut — pelajaran

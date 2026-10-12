@@ -3,6 +3,7 @@
 - Status: Diterima
 - Tanggal: 2026-10-11
 - SPEC: Audit UI/UX 2026-10 · Fase 3G (tanpa nomor SPEC; keputusan dari audit)
+- Lanjutan: [ADR-0216](0216-grant-per-perangkat-remote-diusulkan.md) (Diusulkan) menganalisis grant per perangkat remote yang belum tercakup di sini (§5). ADR ini tidak berubah.
 - Terkait: **memetakan** grant kendali jarak jauh lokal dari **0165** §4 (grant LOCAL-only di `Setting.data.remoteControl`) dan **0197** (`remote:read` / `remote:control`) tanpa mengubah kontraknya. Menegakkan **0147** (daftar perangkat dan presence), **0110** (portal klien tetap terpisah), **0115** (tingkat adalah izin di server, bukan preferensi tampilan), dan **0202** (API tak berubah, jadi tak ada keputusan MCP baru).
 
 ## Konteks

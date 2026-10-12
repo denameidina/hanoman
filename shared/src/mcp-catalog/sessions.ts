@@ -42,7 +42,7 @@ const MORE: readonly McpToolDef[] = [
     name: "hanoman_session_review",
     title: "Review diff sesi",
     description:
-      "Diff pekerjaan sebuah sesi project-level di worktree-nya. Tanpa `path` ia mengembalikan daftar berkas yang berubah; mengisi `path` mengembalikan diff satu berkas. 409 berarti worktree-nya sudah lenyap (sesi ditutup) — bukan galat server.",
+      "Diff pekerjaan sebuah sesi project-level di worktree-nya. Tanpa `path` ia mengembalikan daftar berkas yang berubah; mengisi `path` mengembalikan diff satu berkas. Bila sesi tak punya worktree (`no-worktree`) atau worktree-nya sudah lenyap tanpa commit (`no-commit`, mis. sesi ditutup), balasannya 200 dengan `empty: true` dan `reason` — itu keadaan, bukan galat. Dengan `path`, keadaan yang sama menjawab 409 karena tak ada berkas untuk dibaca.",
     inputSchema: obj({
       properties: {
         session: str("Id sesi."),

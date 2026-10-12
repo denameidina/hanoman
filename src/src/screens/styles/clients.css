@@ -17,6 +17,10 @@
 }
 .kl-device-meta { font-size: var(--text-xs); color: var(--text-subtle); }
 .kl-device-reason { font-size: var(--text-xs); color: var(--text-muted); }
+/* Tingkat akses yang dilaporkan perangkat remote (baca-saja): tingkat + penanda pemilik, penjelasan di baris bawah. */
+.kl-device-access { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); font-size: var(--text-xs); color: var(--text-muted); }
+.kl-device-access strong { font-weight: 500; color: var(--text-strong); }
+.kl-device-access .kl-device-reason { flex-basis: 100%; }
 
 /* Baris sesi: id · judul · fase · status · waktu. Yang punya SPEC bisa diklik. */
 .kl-session {

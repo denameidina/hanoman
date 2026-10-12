@@ -1389,7 +1389,7 @@ describe("TerminalScreen · audit UI/UX (Terminal)", () => {
     expect(within(dialog).getByText("Mode pembaca layar")).toBeInTheDocument();
     const hint = dialog.querySelector("#terminal-sr-hint")?.textContent ?? "";
     expect(hint).toContain("Untuk pembaca layar: teks terminal tersedia di DOM; kecepatan lebih rendah.");
-    expect(hint).toContain("Tab tetap dikirim ke sesi");
+    expect(hint).toContain("Tab dikirim ke sesi");
     expect(hint).toContain("Ctrl+Shift+Esc");
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Nyalakan mode pembaca layar" }));

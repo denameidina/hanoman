@@ -7,7 +7,7 @@ import { isTerminalResponse, paths } from "@hanoman/shared";
 import type { Phase } from "../api/client";
 import { api } from "../api/client";
 import { useInstance, useWsTarget } from "../api/instance";
-import { IconButton, OverflowActions, useCoarsePointer, useConfirm } from "../ds";
+import { IconButton, OverflowActions, useCoarsePointer, useConfirm, useScrollEdges } from "../ds";
 import { clipboardIntent, imageFilesFrom, hasImageDrag } from "./terminal-clipboard";
 import { clampFontSize, dialogChoiceAt, FONT_DEFAULT, isFocusEscape, TERMINAL_KEYS } from "./terminal-chrome";
 import * as P from "./terminal-predict";
@@ -1020,9 +1020,14 @@ function VoiceOptions({ voice }: { voice: VoiceInput }) {
 // SPEC-800 · keyboard virtual ponsel tak punya panah/Esc/Tab, dan Esc adalah satu-satunya jalan
 // keluar dari copy-mode tmux. SPEC-452 · tiap tekan mengirim SATU keystroke: dialog AskUserQuestion
 // adalah daftar Ink yang menelan burst >1 karakter bulat-bulat.
-function TerminalKeys({ onKey }: { onKey: (seq: string) => void }) {
+export function TerminalKeys({ onKey }: { onKey: (seq: string) => void }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  // Tepi yang masih menyimpan kunci tersembunyi diberi gradasi (app.css `.hn-terminal-keys[data-fade-*]`),
+  // supaya "Enter" di ujung papan di 320 px tak lenyap tanpa tanda bahwa papannya bisa digeser.
+  const edges = useScrollEdges(ref);
   return (
-    <div className="hn-terminal-keys" role="group" aria-label="Tombol terminal">
+    <div ref={ref} className="hn-terminal-keys" role="group" aria-label="Tombol terminal"
+      data-fade-start={edges.start ? "true" : undefined} data-fade-end={edges.end ? "true" : undefined}>
       {TERMINAL_KEYS.map((key) => (
         <button key={key.id} type="button" className="hn-terminal-key" aria-label={key.aria}
           title={key.aria} onClick={() => onKey(key.seq)}>{key.label}</button>

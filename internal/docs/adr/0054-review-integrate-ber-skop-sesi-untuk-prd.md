@@ -1,6 +1,6 @@
 # ADR-0054 — Review + integrate ber-skop sesi untuk sesi project-level (PRD)
 
-**Status:** accepted · **Date:** 2026-07-19 · **Spec:** SPEC-230
+**Status:** accepted · **Date:** 2026-07-19 · **Spec:** SPEC-230 · **sebagian diamandemen [0215](0215-review-sesi-keadaan-kosong-tanpa-409.md)**: worktree sesi yang lenyap kini 200 `empty` (`no-commit`), bukan 409; `…/review/*` tetap 409.
 **Terkait:** [ADR-0041](0041-prd-sebagai-dokumen-flow-project-level.md) (PRD dokumen, project-level),
 [ADR-0031](0031-rebase-merge-backlog.md) (rebase/merge branch dari dashboard),
 [ADR-0030](0030-spec-menyimpan-base-head-sha.md) (base/head SHA), [ADR-0011](0011-docs-realtime-filesystem.md)
