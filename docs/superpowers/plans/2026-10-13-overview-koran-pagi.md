@@ -81,7 +81,7 @@
 **Interfaces:**
 - Produces: `zOverview`, `OverviewDTO`, `OverviewDay`, `OverviewRiver`, `OverviewTokens`, `OverviewWait`, `OverviewBensin`, `BensinVerdict`, `OverviewHeatmap`, `OverviewRecords`, `HeadlinePart`, `paths.overview` (= `/api/overview`), varian `EventMsg` `{ t: "overview"; overview: OverviewDTO }`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `shared/src/overview.test.ts`:
 ```ts
@@ -126,12 +126,12 @@ describe("zOverview", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST shared/src/overview.test.ts`
 Expected: FAIL — `Cannot find module './overview'`.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `shared/src/overview.ts`:
 ```ts
@@ -222,12 +222,12 @@ Lalu ubah komentar di atas union dari `(sebelas sejak SPEC-961)` menjadi `(dua b
   overview: `${API}/overview`,
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `TEST shared/src/overview.test.ts`
 Expected: PASS (4 test).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src/overview.ts shared/src/overview.test.ts shared/src/index.ts shared/src/dto.ts shared/src/api.ts docs/superpowers/plans/2026-10-13-overview-koran-pagi.md

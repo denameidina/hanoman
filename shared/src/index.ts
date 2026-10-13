@@ -25,6 +25,7 @@ export * from "./prd-status";
 export * from "./session-kind";
 export * from "./session-admission";
 export * from "./session-end";
+export * from "./overview";
 export * from "./config";
 export * from "./config-registry";
 export * from "./semver";

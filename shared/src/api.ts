@@ -147,6 +147,8 @@ export const paths = {
   eventsWs: `${API}/events/ws`,   // SPEC-199 · WebSocket siar dashboard (global, bukan per-sesi)
   // SPEC-919 · ADR-0147 · muat awal + fallback halaman Klien. Selama WS sehat tak ada yang men-poll-nya.
   presence: `${API}/presence`,
+  // ADR-0220 · muat awal agen/MCP untuk agregat Overview; dashboard menerimanya lewat grup siar `overview`.
+  overview: `${API}/overview`,
   wsTickets: `${API}/ws-tickets`,
   vps: `${API}/vps`,
   vpsOne: (id: string) => `${API}/vps/${id}`,

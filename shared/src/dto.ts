@@ -838,7 +838,7 @@ export type EventsClientMsg = z.infer<typeof zEventsClientMsg>;
 
 // SPEC-199 · frame siar dashboard (server → klien), lewat GET /events/ws (ADR-0039). Per-grup,
 // bukan snapshot monolitik — perubahan satu grup tak mengirim ulang yang lain.
-// SPEC-908 · grup GLOBAL tanpa parameter di depan (sebelas sejak SPEC-961); enam varian terakhir milik
+// SPEC-908 · grup GLOBAL tanpa parameter di depan (dua belas sejak ADR-0220); enam varian terakhir milik
 // langganan berparameter (`zEventsClientMsg` di atas), yang membuat kanal ini tak lagi read-only.
 export type EventMsg =
   | { t: "models"; catalog: import("./model-catalog").ModelCatalog }
@@ -865,6 +865,9 @@ export type EventMsg =
   // daftar yang sudah disiarkan (`specs`) tak cukup menjawabnya sendiri (tiket, issue GitHub, dan
   // PRD sama sekali tak ada di frame global mana pun).
   | { t: "pending"; counts: PendingCounts }
+  // ADR-0220 · grup GLOBAL ke-12: agregat Overview "Koran Pagi" (hari ini vs kemarin). 30 dtk,
+  // dedup tanpa `generatedAt`. Agregat tanpa id/judul → tidak `cookieOnly` (preseden `pending`).
+  | { t: "overview"; overview: import("./overview").OverviewDTO }
   // SPEC-908 · frame langganan berparameter. `key` = subKey(topic, params) yang dihitung KEDUA
   // sisi; klien membuang frame yang kuncinya bukan miliknya, jadi halaman/filter yang sedang
   // aktif tak mungkin ditimpa muatan halaman lain.
