@@ -257,7 +257,7 @@ git commit -m "feat(shared): kontrak OverviewDTO + frame siar overview (ADR-0220
   tokenStats(now: number, invs: InvocationRow[], landedToday: number | null): OverviewTokens
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/overview-metrics.test.ts`:
 ```ts
@@ -350,12 +350,12 @@ describe("tokenStats", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST server/test/overview-metrics.test.ts`
 Expected: FAIL — modul `overview-metrics` belum ada.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `server/src/services/overview-metrics.ts`:
 ```ts
@@ -455,12 +455,12 @@ export function tokenStats(now: number, invs: InvocationRow[], landedToday: numb
 }
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `TEST server/test/overview-metrics.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/overview-metrics.ts server/test/overview-metrics.test.ts docs/superpowers/plans/2026-10-13-overview-koran-pagi.md
