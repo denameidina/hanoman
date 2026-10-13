@@ -4,17 +4,20 @@
    ini tanpa style inline. Mengamandemen susunan Fase 3B (Audit UI/UX 2026-10). */
 import React from "react";
 import type { OverviewDTO } from "@hanoman/shared";
-import { Button, PageHeader, StateBlock, Tabs } from "../ds";
+import { Button, PageHeader, StateBlock } from "../ds";
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, SpecSlim } from "./types";
-import { LimitWindows } from "./LimitIndicator";
-import { useLimits } from "../api/limits";
-import { useCodexLimits } from "../api/codex-limits";
 import { Masthead } from "./overview/Masthead";
 import { Headline } from "./overview/Headline";
 import { Koreksi, attentionOf } from "./overview/Koreksi";
 import { IndeksProject } from "./overview/IndeksProject";
 import { Denyut, isWaiting, sortLive } from "./overview/Denyut";
+import { Bottleneck } from "./overview/Bottleneck";
+import { SungaiSpec } from "./overview/SungaiSpec";
+import { Rekor } from "./overview/Rekor";
+import { Bensin } from "./overview/Bensin";
+import { EkonomiToken } from "./overview/EkonomiToken";
+import { PetaPanas } from "./overview/PetaPanas";
 import "./styles/overview.css";
 
 export function OverviewScreen({ projects, backlog, sessions, overview = null, onOpenProject, onGoto, onOpenSession, onCreateProject }:
@@ -25,9 +28,6 @@ export function OverviewScreen({ projects, backlog, sessions, overview = null, o
     onOpenSession: (id: string) => void;
     /** Membuka modal project baru langsung (CTA onboarding); tanpa ini jatuh ke halaman Projects. */
     onCreateProject?: () => void }) {
-  const limits = useLimits();
-  const codexLimits = useCodexLimits();
-  const [limitTab, setLimitTab] = React.useState<"claude" | "codex">("claude");
   const now = Date.now();
 
   if (projects.length === 0) {
@@ -65,12 +65,6 @@ export function OverviewScreen({ projects, backlog, sessions, overview = null, o
     ? <Button variant="primary" leftIcon="hand" onClick={() => onOpenSession(waiting[0]!.id)}>Jawab sesi yang menunggu</Button>
     : <Button variant="primary" leftIcon="list-checks" onClick={() => onGoto("backlog")}>Buka backlog</Button>;
 
-  const codexOn = codexLimits.status !== "unavailable";
-  const tab = codexOn ? limitTab : "claude";
-  const limitMeta = tab === "codex"
-    ? `tercatat · Codex${codexLimits.plan ? ` · ${codexLimits.plan}` : ""}`
-    : "langsung · Claude";
-
   return (
     <div className="hn-ov hn-ovk">
       <Masthead now={now} projectCount={projects.length} />
@@ -79,25 +73,22 @@ export function OverviewScreen({ projects, backlog, sessions, overview = null, o
       <Headline overview={overview} />
       <Koreksi projects={projects} onOpen={onOpenProject} />
 
+      {/* Badge limit di Shell tetap memakai `LimitWindows` (LimitIndicator.tsx); di layar ini panel Bensin. */}
       <div className="hn-ovk-cols">
         <div className="hn-ovk-col hn-ovk-col--lead">
           <Denyut live={live} nameById={nameById} specById={specById} now={now} onOpen={onOpenSession} onGoto={onGoto} />
+          <Bottleneck overview={overview} now={now} />
+        </div>
+        <div className="hn-ovk-col hn-ovk-col--mid">
+          <SungaiSpec overview={overview} now={now} />
+          <Rekor overview={overview} now={now} />
         </div>
         <div className="hn-ovk-col hn-ovk-col--side">
-          <section className="hn-ov-section" aria-labelledby="ov-limit">
-            <header className="hn-ov-head"><div className="hn-ov-head-text">
-              <h3 id="ov-limit" className="hn-ovk-kicker">Limit langganan</h3>
-              <span className="hn-ov-meta">{limitMeta}</span>
-            </div></header>
-            {codexOn && (
-              <Tabs aria-label="Sumber limit" value={tab}
-                tabs={[{ value: "claude", label: "Claude" }, { value: "codex", label: "Codex" }]}
-                onChange={(v) => setLimitTab(v === "codex" ? "codex" : "claude")} />
-            )}
-            <div className="hn-ov-limit"><LimitWindows dto={tab === "codex" ? codexLimits : limits} /></div>
-          </section>
+          <Bensin overview={overview} now={now} />
+          <EkonomiToken overview={overview} now={now} />
         </div>
       </div>
+      <PetaPanas overview={overview} now={now} />
 
       <IndeksProject projects={others} total={projects.length} backlog={backlog} onOpen={onOpenProject} onGoto={onGoto} />
     </div>

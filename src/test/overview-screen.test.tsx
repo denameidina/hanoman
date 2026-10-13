@@ -1,24 +1,12 @@
 import React from "react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { OverviewScreen } from "../src/screens/OverviewScreen";
 import type { ProjectVM, SpecSlim } from "../src/screens/types";
 import type { TerminalSession } from "../src/api/client";
 import type { OverviewDTO } from "@hanoman/shared";
-
-// Dua sumber limit dimock lewat objek hoisted supaya tiap test bisa mengubah statusnya.
-const { claude, codex } = vi.hoisted(() => ({
-  claude: { label: "limit-claude", status: "ok" },
-  codex: { label: "limit-codex", status: "unavailable", plan: null as string | null },
-}));
-vi.mock("../src/api/limits", () => ({ useLimits: () => claude }));
-vi.mock("../src/api/codex-limits", () => ({ useCodexLimits: () => codex }));
-vi.mock("../src/screens/LimitIndicator", async () => {
-  const React = await import("react");
-  return { LimitWindows: ({ dto }: { dto: { label: string } }) => React.createElement("div", { "data-testid": "limit-body" }, dto.label) };
-});
 
 const noop = () => {};
 const project = (over: Partial<ProjectVM> & { id: string; name: string }) =>
@@ -38,8 +26,6 @@ const ov = (over: Partial<OverviewDTO> = {}): OverviewDTO => ({
     { text: "1 sesi tumbang", tone: "bad" }, { text: " dan " }, { text: "3 spec mendarat", tone: "good" }, { text: "." }] },
   ...over,
 });
-
-beforeEach(() => { codex.status = "unavailable"; codex.plan = null; });
 
 const overviewSrc = () => readFileSync(resolve(import.meta.dirname, "../src/screens/OverviewScreen.tsx"), "utf8");
 
@@ -254,23 +240,13 @@ describe("Overview · koran", () => {
   });
 });
 
-describe("Overview · limit langganan", () => {
-  it("satu seksi 'Limit langganan' saat codex belum pernah melapor", () => {
+describe("Overview · panel metrik terpasang", () => {
+  it("keenam panel tampil dengan overview; seksi 'Limit langganan' lama sudah tidak ada", () => {
     render(<OverviewScreen projects={[project({ id: "a", name: "alpha" })]} backlog={[]} sessions={[]}
-      onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
-    expect(screen.getAllByText("Limit langganan")).toHaveLength(1);
-    expect(screen.queryByRole("tab", { name: "Codex" })).toBeNull();
-    expect(screen.getByTestId("limit-body").textContent).toBe("limit-claude");
-  });
-
-  it("bila codex melapor, satu seksi bertab Claude/Codex", () => {
-    codex.status = "ok"; codex.plan = "plus";
-    render(<OverviewScreen projects={[project({ id: "a", name: "alpha" })]} backlog={[]} sessions={[]}
-      onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
-    expect(screen.getAllByText("Limit langganan")).toHaveLength(1);
-    fireEvent.click(screen.getByRole("tab", { name: "Codex" }));
-    expect(screen.getByTestId("limit-body").textContent).toBe("limit-codex");
-    expect(screen.getByText(/tercatat · Codex · plus/)).toBeTruthy();
+      overview={ov()} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    for (const name of ["Kamu bottleneck-nya?", "Sungai spec", "Rekor", "Bensin", "Ekonomi token", "Jam kerja agen"])
+      expect(screen.getByRole("heading", { name })).toBeTruthy();
+    expect(screen.queryByText("Limit langganan")).toBeNull();
   });
 });
 

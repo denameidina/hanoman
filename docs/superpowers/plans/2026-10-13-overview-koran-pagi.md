@@ -2090,7 +2090,7 @@ git commit -m "feat(overview): Denyut armada — EKG per sesi hidup menggantikan
 - Consumes: `OverviewDTO` sub-tipe, `format.ts`, `Delta`.
 - Produces: komponen `({ overview: OverviewDTO | null; now: number })` untuk keenam panel. Masing-masing merender `<section className="hn-ovk-panel" aria-labelledby=…>` dengan kicker `<h3>`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `src/test/overview-panels.test.tsx`:
 ```tsx
@@ -2230,7 +2230,7 @@ describe("Overview · panel metrik terpasang", () => {
 Run: `TEST src/test/overview-panels.test.tsx src/test/overview-screen.test.tsx`
 Expected: FAIL — modul panel belum ada.
 
-- [ ] **Step 2: Implementasi panel**
+- [x] **Step 2: Implementasi panel**
 
 `src/src/screens/overview/Bottleneck.tsx`:
 ```tsx
@@ -2466,7 +2466,7 @@ export function PetaPanas({ overview }: { overview: OverviewDTO | null; now: num
 }
 ```
 
-- [ ] **Step 3: Pasang panel di `OverviewScreen.tsx`**
+- [x] **Step 3: Pasang panel di `OverviewScreen.tsx`**
 
 Hapus import `LimitWindows`, `useLimits`, `useCodexLimits`, `Tabs`, state `limitTab`, variabel `codexOn`/`tab`/`limitMeta`, dan seluruh section `ov-limit`. Tambahkan import keenam panel. Ganti blok `<div className="hn-ovk-cols">…</div>` dengan:
 ```tsx
@@ -2488,7 +2488,7 @@ Hapus import `LimitWindows`, `useLimits`, `useCodexLimits`, `Tabs`, state `limit
 ```
 Badge limit di Shell (`LimitIndicator`) tetap memakai `LimitWindows`; jangan menyentuh `LimitIndicator.tsx`.
 
-- [ ] **Step 4: CSS panel** — tambahkan di `overview.css`:
+- [x] **Step 4: CSS panel** — tambahkan di `overview.css`:
 ```css
 .hn-ovk-panel { background: var(--surface-card); border: 1px solid var(--border-hair); border-radius: 6px;
   padding: 12px; display: grid; gap: 6px; min-width: 0; }
@@ -2520,12 +2520,12 @@ Badge limit di Shell (`LimitIndicator`) tetap memakai `LimitWindows`; jangan men
 }
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 Run: `TEST src/test/overview-panels.test.tsx src/test/overview-screen.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/src/screens/overview src/src/screens/OverviewScreen.tsx src/src/screens/styles/overview.css src/test/overview-panels.test.tsx src/test/overview-screen.test.tsx docs/superpowers/plans/2026-10-13-overview-koran-pagi.md
