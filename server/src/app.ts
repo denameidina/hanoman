@@ -30,6 +30,7 @@ import deviceTokens from "./routes/device-tokens";
 import bindings from "./routes/bindings";
 import sync from "./routes/sync";
 import presence from "./routes/presence";
+import overview from "./routes/overview";
 import sessionResults from "./routes/session-results";
 import sessionHistory from "./routes/session-history";
 import sessionEvents from "./routes/session-events";
@@ -281,6 +282,7 @@ await api.register(deviceAccessRequests); // ADR-0217 · opsi C (ADR-0216): POST
     await api.register(bindings);
     await api.register(sync);
     await api.register(presence);   // SPEC-919 · ADR-0147 · muat awal halaman Klien
+    await api.register(overview);   // ADR-0220 · agregat Overview untuk agen/MCP
     await api.register(sessionResults);
     await api.register(sessionHistory);  // SPEC-362 · riwayat sesi terminal (di belakang gate cookie)
     await api.register(sessionEvents);   // SPEC-909 · event hook sesi (token sesi, gate di-bypass di atas)

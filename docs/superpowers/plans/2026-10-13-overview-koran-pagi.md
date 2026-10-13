@@ -1140,7 +1140,7 @@ git commit -m "feat(overview): perekam memori episode menunggu + sampel limit (A
 - Consumes: `computeOverview`, `addDays`, `startOfDay`, `AGENT_KINDS` (Task 2–4); `waitSpans`, `limitSeries`, `recordingSince` (Task 5).
 - Produces: `getOverview(now?: number): Promise<OverviewDTO>`; `GET /api/overview`; frame WS `{ t: "overview", overview }`; tool `hanoman_overview_get`.
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/overview.route.test.ts`:
 ```ts
@@ -1208,12 +1208,12 @@ Di `server/test/events.test.ts`, test `"mengirim snapshot semua grup ke klien sa
     expect(c.frames.find((f) => f.t === "overview")).toMatchObject({ overview: { headline: { text: expect.any(String) } } });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST server/test/overview.route.test.ts server/test/events.test.ts`
 Expected: FAIL — modul `overview-source` belum ada dan frame `overview` belum disiarkan.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `server/src/services/overview-source.ts`:
 ```ts
@@ -1358,12 +1358,12 @@ lamanya episode menunggu (`decisionAt` lenyap begitu dijawab) dan riwayat `usedP
 - [desain Overview "Koran Pagi"](../../docs/superpowers/specs/2026-10-13-overview-koran-pagi-design.md) · [plan](../../docs/superpowers/plans/2026-10-13-overview-koran-pagi.md) — Overview jadi halaman depan koran: headline template, denyut armada, menit menunggu, ekonomi token, prakiraan bensin, sungai spec, peta panas 7×24, rekor. Grup siar ke-12 `overview` + perekam memori. [ADR-0220](adr/0220-overview-koran-pagi.md)
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus** — termasuk test kontrak MCP/capability/doc yang tersentuh:
+- [x] **Step 4: Jalankan test, pastikan lulus** — termasuk test kontrak MCP/capability/doc yang tersentuh:
 
 Run: `TEST server/test/overview.route.test.ts server/test/events.test.ts server/test/mcp-coverage.test.ts server/test/agent-capabilities.test.ts server/test/agent-doc-contract.test.ts server/test/agent-tool-catalog.test.ts`
 Expected: PASS. Bila `agent-capabilities.test.ts` punya tabel lengkap rute `GLOBAL_READ`, tambahkan `"/api/overview"` ke tabel itu dan jalankan ulang.
 
-- [ ] **Step 5: Uji API nyata di lokal**
+- [x] **Step 5: Uji API nyata di lokal**
 
 ```bash
 pnpm --filter ./server build && (node server/dist/server.js > /tmp/hn-ovk/server.log 2>&1 &) ; sleep 4
@@ -1371,7 +1371,7 @@ curl -s http://127.0.0.1:$(grep -o 'listening.*:[0-9]*' /tmp/hn-ovk/server.log |
 ```
 Expected: JSON dengan `generatedAt`, `headline.text`, dan `heatmap.days` sepanjang 7. Bila route meminta cookie, login lewat dashboard lalu ulangi dengan cookie. Setelah selesai, matikan proses server itu (`pkill -f server/dist/server.js`; pastikan dulu tidak ada instance hanoman lain yang memakai perintah yang sama).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/services/overview-source.ts server/src/routes/overview.ts server/test/overview.route.test.ts server/src/app.ts server/src/services/agent-capabilities.ts server/src/services/events.ts server/test/events.test.ts shared/src/mcp-catalog/system.ts docs/agent-integration.md internal/docs/adr/0220-overview-koran-pagi.md internal/docs/architecture/stack.md CLAUDE.md internal/docs/README.md docs/superpowers/plans/2026-10-13-overview-koran-pagi.md

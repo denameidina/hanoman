@@ -35,6 +35,16 @@ export const SYSTEM_TOOLS: readonly McpToolDef[] = [
     shape: (raw) => raw,
   },
   {
+    name: "hanoman_overview_get",
+    title: "Ringkasan kinerja hari ini (Overview)",
+    description:
+      "Agregat kinerja workspace hari ini vs kemarin, persis yang tampil di layar Overview \"Koran Pagi\": spec mendarat, sesi agen tumbang, menit agen menunggu jawaban manusia, token agen tercatat (hanya subagen/agen fase), prakiraan kapan limit habis dibanding reset, peta panas jam kerja agen 7×24, streak/rekor, dan headline-nya. Menit menunggu & prakiraan limit direkam di memori server dan hilang saat restart (`recordingSince`). Panel `null` = sumbernya gagal dibaca. Tak menuntut capability apa pun.",
+    inputSchema: obj({ properties: {} }),
+    mode: "read", capability: null, samplePath: "/overview", sampleMethod: "GET",
+    build: () => ({ method: "GET", path: "/overview" }),
+    shape: (raw) => raw,
+  },
+  {
     name: "hanoman_update_status",
     title: "Status versi & pembaruan",
     description:

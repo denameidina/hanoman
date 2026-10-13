@@ -545,6 +545,7 @@ Panduan siap salin untuk keempat klien, berikut tabel tool → capability, ada d
 | `hanoman_scheduler_queue_cancel`, `hanoman_scheduler_queue_requeue` | tulis | `settings:write`; requeue baris `failed` juga menuntut `sessions:spawn` (ADR-0204, 403 bila tak ada) |
 | `hanoman_lead_ask` | tulis | `lead:write` |
 | `hanoman_health`, `hanoman_models`, `hanoman_codex_version`, `hanoman_methods_status` | baca | — (`GLOBAL_READ`, ADR-0187) |
+| `hanoman_overview_get` | baca | — (`GLOBAL_READ`, ADR-0220) |
 | `hanoman_activity_list` | baca | `activity:read` |
 | `hanoman_activity_purge` | **berbahaya** | `activity:write` |
 | `hanoman_portal_admin_chat_sessions`, `hanoman_portal_admin_chat_session_get` | baca | `portal-chat:read` |

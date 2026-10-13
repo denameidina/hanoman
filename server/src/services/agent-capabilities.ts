@@ -106,8 +106,9 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // properti akun, dan tak satu pun handler-nya membaca `req.user`. `models` dulu cookie-only
   // semata karena ia lahir sebagai data picker dashboard (SPEC-339); katalognya sudah di-allowlist
   // parser sehingga detail akun CLI tak pernah tersimpan. Method tulis tetap cookie-only.
+  // ADR-0220 · `overview` = agregat angka tanpa id/judul (preseden grup `pending`).
   if (top === "limits" || top === "update" || top === "events" || top === "fs" || top === "health"
-    || top === "models" || top === "methods" || top === "codex")
+    || top === "models" || top === "methods" || top === "codex" || top === "overview")
     return read ? "GLOBAL_READ" : "COOKIE_ONLY";
   // ADR-0188 · log aktivitas (SessionResult). MENURUT METHOD: DELETE = purge yang menyeberang ke
   // semua mesin lewat tombstone sync (ADR-0119), jadi `activity:read` tak pernah cukup untuknya.

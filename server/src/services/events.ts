@@ -12,6 +12,7 @@ import { listCleanups } from "./worktree-reaper";
 import { presenceView } from "./presence/view";
 import { listVpsWithScore } from "./vps-list";
 import { pendingCounts } from "./pending-counts";
+import { getOverview } from "./overview-source";
 import { prisma } from "../db";
 import { effectiveInt } from "../config";
 import { subKey, type EventMsg, type EventTopic } from "@hanoman/shared";
@@ -118,6 +119,11 @@ const GROUPS: Group[] = [
   // dibaca satu komponen yang sama. `cookieOnly` TIDAK dipasang — muatannya jumlah agregat tanpa
   // id/judul, dan agent token sudah boleh membaca daftar sumbernya lewat capability masing-masing.
   { everyTicks: 5, last: "", build: async () => ({ t: "pending", counts: await pendingCounts() }) },
+  // ADR-0220 · grup GLOBAL ke-12 · agregat Overview "Koran Pagi". 30 dtk: angkanya harian, bukan
+  // detik-an. `generatedAt` berubah tiap build, jadi kunci dedup mengosongkannya; frame lahir hanya
+  // saat isi agregat benar-benar berubah. Tidak `cookieOnly`: angka agregat tanpa id/judul.
+  { everyTicks: 30, last: "", build: async () => ({ t: "overview", overview: await getOverview() }),
+    sig: (m) => JSON.stringify({ ...(m.overview as object), generatedAt: null }) },
 ];
 
 // SPEC-908 · klien yang `send`-nya melempar harus dilepas dari `clients` DAN dari peta langganan.

@@ -61,6 +61,9 @@ describe("events hub", () => {
     // tak pernah.
     expect(c.frames.find((f) => f.t === "pending"))
       .toMatchObject({ counts: { triage: 0, backlog: 0, prd: 0, lead: 0 } });
+    // ADR-0220 · grup ke-12. Overview tak punya muat awal HTTP di dashboard: tanpa frame ini saat
+    // attach, panel metrik kosong sampai 30 dtk pertama berganti.
+    expect(c.frames.find((f) => f.t === "overview")).toMatchObject({ overview: { headline: { text: expect.any(String) } } });
     detach(c);
   });
 
@@ -239,7 +242,14 @@ describe("events hub · siar paralel & attach dari g.last (SPEC-1267)", () => {
     const spy = vi.spyOn(prisma.spec, "findMany");
     const second = fakeClient();
     await attach(second);
-    expect(spy).not.toHaveBeenCalled();
+    // ADR-0220 · grup `overview` (everyTicks 30) belum punya `g.last` sesudah satu tick, jadi attach
+    // kedua membangunnya segar — dan ia membaca kolom TANGGAL spec. Yang dijaga test ini hanya frame
+    // `specs`, jadi query overview (select persis createdAt/startedAt/doneAt) dikecualikan.
+    const isOverviewQuery = (a: unknown) => {
+      const sel = (a as { select?: Record<string, unknown> } | undefined)?.select;
+      return !!sel && Object.keys(sel).sort().join() === "createdAt,doneAt,startedAt";
+    };
+    expect(spy.mock.calls.filter(([a]) => !isOverviewQuery(a))).toEqual([]);
     expect(groups(second).has("specs")).toBe(true);
     spy.mockRestore();
     detach(first); detach(second);
