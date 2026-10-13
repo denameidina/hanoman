@@ -26,8 +26,9 @@ selaras design system bone paper + brass.
 - `server/src/services/overview-metrics.ts`: fungsi murni `computeOverview(now, sources) → OverviewDTO`
   plus pengumpul sumber dari Prisma. "Hari" = mulai 00.00 waktu lokal mesin. Setiap angka harian
   dihitung untuk hari ini dan kemarin.
-- `server/src/services/overview-recorder.ts`: perekam di memori yang mengamati snapshot `sessions`
-  yang sudah disiarkan tiap detik, dan sampel limit.
+- `server/src/services/overview-recorder.ts`: perekam di memori dengan timer sendiri (10 dtk, `.unref`).
+  Ia membaca sesi (`listSessionsAsync`) dan limit secara mandiri, bukan menumpang loop siar: loop itu
+  hanya hidup selama ada dashboard terbuka, padahal menit menunggu justru menumpuk saat tak ada.
 
 ### Definisi panel
 
@@ -40,7 +41,7 @@ selaras design system bone paper + brass.
 | Bottleneck | perekam | Σ menit episode menunggu yang beririsan dengan hari itu, dan persentasenya terhadap Σ menit sesi hidup hari itu |
 | Bensin | perekam (sampel limit) | regresi linear `usedPct` pada sampel 60 menit terakhir, diproyeksikan ke 100%, dibandingkan dengan `resetsAt` → `habisAt` atau "aman sampai reset". Untuk Claude dan Codex (bila aktif) |
 | Peta panas | `SessionHistory` | menit sesi hidup per sel hari × jam, 7 hari terakhir (sesi yang masih hidup dihitung sampai `now`) |
-| Rekor | `SessionHistory` + `Spec.doneAt` | streak hari berturut-turut tanpa sesi tumbang (berakhir hari ini/kemarin), rekor streak, dan rekor spec mendarat per hari, semuanya dalam jendela 90 hari |
+| Rekor | `SessionHistory` + `Spec.doneAt` | streak hari berturut-turut tanpa sesi tumbang (berakhir hari ini), rekor streak, dan rekor spec mendarat per hari, semuanya dalam jendela 90 hari. "Rekor baru hari ini" hanya bila ada hari sebelumnya yang pernah mendaratkan spec |
 | Headline | `headline(dto)` | template deterministik, tanpa LLM. Memilih 2–3 fakta paling menonjol menurut prioritas: tumbang > 0 → menunggu > 30 menit → rekor baru → bensin habis sebelum reset → mendarat. Fallback: "Hari yang tenang." |
 
 ### Perekam di memori
@@ -90,11 +91,13 @@ mengambil data sendiri. Data `overview` diterima di `App.tsx` seperti grup snaps
 
 ### Denyut
 
-- Satu SVG, satu loop `requestAnimationFrame` untuk semua baris.
-- Detak baru setiap `activityAt` sesi berubah; sesi diam melandai.
+- Satu SVG jejak per baris, dianimasikan dengan CSS murni (`@keyframes`), tanpa `requestAnimationFrame`.
+- Ritme mengikuti **keadaan**, bukan `activityAt`: field itu tak ada di `SessionDTO`, dan menambahkannya
+  membuat frame `sessions` (frame terbesar dashboard) terkirim tiap detik. Tiga tempo dipilih stabil
+  dari id sesi supaya baris tak berdetak serempak.
 - Sesi yang menunggu: garis datar putus-putus clay, label "menunggumu Nm · jawab".
 - Klik baris membuka sesi di Terminal (perilaku `LiveRow` sekarang).
-- `prefers-reduced-motion` membuat garis statis. Animasi dijeda saat `document.hidden`.
+- `prefers-reduced-motion` membuat garis statis. Browser sendiri menjeda animasi CSS di tab tersembunyi.
 - Maksimal 8 baris, sisanya "+N lainnya".
 
 ### Tata letak
