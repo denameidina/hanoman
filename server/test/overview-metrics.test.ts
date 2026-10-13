@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   startOfDay, addDays, dayKey, overlapMs, median, isFailed, dayStats, riverStats, tokenStats,
-  waitStats, heatmapStats, recordStats, liveMs,
+  waitStats, heatmapStats, recordStats, liveMs, bensinStats, headline, computeOverview, fmtMinutes, fmtClock,
+  type LimitSeries,
   type SessionRow, type SpecRow,
 } from "../src/services/overview-metrics";
 
@@ -153,5 +154,99 @@ describe("recordStats", () => {
   });
   it("tanpa riwayat sesi sama sekali → streak 0, rekor 0, tanpa hari terbaik", () => {
     expect(recordStats(NOW, [], [])).toEqual({ streakDays: 0, bestStreak: 0, bestLandedDay: null, landedRecordToday: false });
+  });
+});
+
+describe("bensinStats", () => {
+  const series = (samples: [number, number][], resetsAt: string | null): LimitSeries => ({
+    source: "claude", key: "session", label: "Sesi 5 jam", resetsAt,
+    samples: samples.map(([mAgo, pct]) => ({ at: NOW - mAgo * 60_000, pct })),
+  });
+  it("laju naik, habis sebelum reset → verdict habis + exhaustAt", () => {
+    // naik 1%/menit; sekarang 60% → habis 40 menit lagi (15.10); reset 18.00
+    const [b] = bensinStats(NOW, [series([[30, 30], [20, 40], [10, 50], [0, 60]], at(13, 18).toISOString())]);
+    expect(b).toMatchObject({ usedPct: 60, verdict: "habis" });
+    expect(Date.parse(b!.exhaustAt!)).toBe(NOW + 40 * 60_000);
+    expect(b!.samples).toHaveLength(4);
+  });
+  it("habis sesudah reset → aman", () => {
+    const [b] = bensinStats(NOW, [series([[30, 30], [20, 40], [10, 50], [0, 60]], at(13, 14, 50).toISOString())]);
+    expect(b!.verdict).toBe("aman");
+  });
+  it("kemiringan ≤ 0 → stabil; <4 sampel dalam 60 menit → kurang-data", () => {
+    expect(bensinStats(NOW, [series([[30, 60], [20, 60], [10, 60], [0, 60]], null)])[0]!.verdict).toBe("stabil");
+    expect(bensinStats(NOW, [series([[90, 10], [80, 20], [10, 50], [0, 60]], null)])[0]!.verdict).toBe("kurang-data");
+  });
+  it("seri tanpa sampel dilewati", () => {
+    expect(bensinStats(NOW, [series([], null)])).toEqual([]);
+  });
+});
+
+describe("format", () => {
+  it("fmtMinutes dan fmtClock", () => {
+    expect(fmtMinutes(47)).toBe("47 menit");
+    expect(fmtMinutes(60)).toBe("1 jam");
+    expect(fmtMinutes(72)).toBe("1 jam 12 menit");
+    expect(fmtClock(at(13, 9, 5).getTime())).toBe("09.05");
+  });
+});
+
+describe("headline", () => {
+  const base = { today: { landed: 0, failed: 0 }, wait: { todayMin: 0, yesterdayMin: 0, pctOfLive: null },
+    records: { streakDays: 0, bestStreak: 0, bestLandedDay: null, landedRecordToday: false }, bensin: [] };
+  it("tanpa fakta menonjol → 'Hari yang tenang.'", () => {
+    expect(headline(base)).toEqual({ text: "Hari yang tenang.", parts: [{ text: "Hari yang tenang." }] });
+  });
+  it("prioritas: tumbang → menunggu ≥30m → mendarat; maks 3, digabung 'A, B, dan C.'", () => {
+    const h = headline({ ...base, today: { landed: 3, failed: 1 }, wait: { todayMin: 47, yesterdayMin: 0, pctOfLive: 31 } });
+    expect(h.text).toBe("1 sesi tumbang, agen menunggumu 47 menit, dan 3 spec mendarat.");
+    expect(h.parts.filter((p) => p.tone === "bad")).toHaveLength(2);
+    expect(h.parts.filter((p) => p.tone === "good")).toHaveLength(1);
+  });
+  it("dua fakta digabung 'A dan B'; huruf pertama kapital", () => {
+    expect(headline({ ...base, today: { landed: 2, failed: 0 },
+      records: { ...base.records, landedRecordToday: true } }).text).toBe("Rekor baru: 2 spec mendarat.");
+    expect(headline({ ...base, today: { landed: 2, failed: 1 } }).text).toBe("1 sesi tumbang dan 2 spec mendarat.");
+  });
+  it("bensin habis sebelum reset ikut disebut", () => {
+    const h = headline({ ...base, bensin: [{ source: "claude", key: "session", label: "Sesi 5 jam", usedPct: 80,
+      resetsAt: null, exhaustAt: at(13, 16, 40).toISOString(), verdict: "habis", samples: [] }] });
+    expect(h.text).toBe("Limit Sesi 5 jam habis ±16.40.");
+  });
+  it("menunggu <30 menit tak disebut", () => {
+    expect(headline({ ...base, wait: { todayMin: 29, yesterdayMin: 0, pctOfLive: 10 } }).text).toBe("Hari yang tenang.");
+  });
+});
+
+describe("computeOverview", () => {
+  const src = {
+    specs: [spec({ createdAt: at(13, 8), startedAt: at(13, 9), doneAt: at(13, 11) })],
+    sessions: [sess({ startedAt: at(13, 9), endedAt: at(13, 10), exitCode: 1 })],
+    invocations: [], waits: [], limits: [], recordingSince: at(13, 2).getTime(),
+  };
+  it("merakit semua panel + headline + stempel waktu", () => {
+    const o = computeOverview(NOW, src);
+    expect(o.today).toEqual({ landed: 1, failed: 1 });
+    expect(o.yesterday).toEqual({ landed: 0, failed: 0 });
+    expect(o.river?.landed).toBe(1);
+    expect(o.tokens?.total).toBe(0);
+    expect(o.heatmap?.minutes).toHaveLength(7);
+    expect(o.headline.text).toBe("1 sesi tumbang dan 1 spec mendarat.");
+    expect(o.generatedAt).toBe(new Date(NOW).toISOString());
+    expect(o.recordingSince).toBe(at(13, 2).toISOString());
+  });
+  it("sumber null → panel yang bergantung padanya null, sisanya tetap; tak pernah melempar", () => {
+    const o = computeOverview(NOW, { ...src, specs: null, invocations: null });
+    expect(o.today).toBeNull();
+    expect(o.river).toBeNull();
+    expect(o.records).toBeNull();
+    expect(o.tokens).toBeNull();
+    expect(o.heatmap).not.toBeNull();
+    expect(o.wait).not.toBeNull();
+  });
+  it("bagian yang melempar → null, bukan exception", () => {
+    const bad = [{ kind: "spec", startedAt: null as unknown as Date, endedAt: null, exitCode: null, endedReason: null }];
+    expect(() => computeOverview(NOW, { ...src, sessions: bad })).not.toThrow();
+    expect(computeOverview(NOW, { ...src, sessions: bad }).heatmap).toBeNull();
   });
 });

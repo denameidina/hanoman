@@ -685,7 +685,7 @@ git commit -m "feat(overview): menit menunggu, peta panas 7x24, streak & rekor (
   computeOverview(now: number, src: OverviewSources): OverviewDTO
   ```
 
-- [ ] **Step 1: Tulis test yang gagal** — tambahkan import `bensinStats, headline, computeOverview, fmtMinutes, fmtClock, type LimitSeries` lalu tambahkan:
+- [x] **Step 1: Tulis test yang gagal** — tambahkan import `bensinStats, headline, computeOverview, fmtMinutes, fmtClock, type LimitSeries` lalu tambahkan:
 
 ```ts
 describe("bensinStats", () => {
@@ -783,12 +783,12 @@ describe("computeOverview", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST server/test/overview-metrics.test.ts`
 Expected: FAIL — `bensinStats is not a function`.
 
-- [ ] **Step 3: Implementasi** — tambahkan `OverviewBensin, OverviewDTO, HeadlinePart` ke import tipe, lalu tambahkan di akhir berkas:
+- [x] **Step 3: Implementasi** — tambahkan `OverviewBensin, OverviewDTO, HeadlinePart` ke import tipe, lalu tambahkan di akhir berkas:
 
 ```ts
 export type LimitSeries = {
@@ -900,12 +900,12 @@ export function computeOverview(now: number, src: OverviewSources): OverviewDTO 
 
 Catatan: pada test "bagian yang melempar", `startedAt: null` membuat `heatmapStats` melempar saat `s.startedAt.getTime()`. Begitu juga `today`/`records`, yang hanya dibangun dari specs dan sessions; panel-panel itu menjadi `null`.
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `TEST server/test/overview-metrics.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/overview-metrics.ts server/test/overview-metrics.test.ts docs/superpowers/plans/2026-10-13-overview-koran-pagi.md

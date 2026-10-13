@@ -1,6 +1,6 @@
 import {
   sessionOutcome, type OverviewDay, type OverviewHeatmap, type OverviewRecords, type OverviewRiver,
-  type OverviewTokens, type OverviewWait,
+  type OverviewTokens, type OverviewWait, type OverviewBensin, type OverviewDTO, type HeadlinePart,
 } from "@hanoman/shared";
 
 // ADR-0220 · Overview "Koran Pagi". Seluruh berkas ini MURNI: `now` dan baris sumber masuk sebagai
@@ -176,4 +176,110 @@ export function recordStats(now: number, specs: SpecRow[], sessions: SessionRow[
   const prevMax = Math.max(0, ...[...landedByDay].filter(([k]) => k !== todayKey).map(([, n]) => n));
   // Rekor butuh pembanding: hari pertama yang pernah mendaratkan spec bukan "rekor baru".
   return { streakDays, bestStreak, bestLandedDay, landedRecordToday: prevMax > 0 && todayCount > prevMax };
+}
+
+export type LimitSeries = {
+  source: "claude" | "codex"; key: string; label: string; resetsAt: string | null;
+  samples: { at: number; pct: number }[];
+};
+
+const BENSIN_LOOKBACK_MS = 60 * MIN_MS;
+const BENSIN_MIN_SAMPLES = 4;
+
+// Regresi linear kuadrat terkecil: kemiringan %/ms.
+function slopeOf(pts: { at: number; pct: number }[]): number {
+  const n = pts.length;
+  const mx = pts.reduce((s, p) => s + p.at, 0) / n;
+  const my = pts.reduce((s, p) => s + p.pct, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (const p of pts) { num += (p.at - mx) * (p.pct - my); den += (p.at - mx) ** 2; }
+  return den === 0 ? 0 : num / den;
+}
+
+export function bensinStats(now: number, series: LimitSeries[]): OverviewBensin[] {
+  const out: OverviewBensin[] = [];
+  for (const s of series) {
+    const last = s.samples.at(-1);
+    if (!last) continue;
+    const recent = s.samples.filter((p) => p.at >= now - BENSIN_LOOKBACK_MS);
+    const base = { source: s.source, key: s.key, label: s.label, usedPct: last.pct, resetsAt: s.resetsAt,
+      samples: recent.map((p) => ({ at: new Date(p.at).toISOString(), pct: p.pct })) };
+    if (recent.length < BENSIN_MIN_SAMPLES) { out.push({ ...base, exhaustAt: null, verdict: "kurang-data" }); continue; }
+    const slope = slopeOf(recent);
+    if (slope <= 0) { out.push({ ...base, exhaustAt: null, verdict: "stabil" }); continue; }
+    const exhaust = Math.round(last.at + (100 - last.pct) / slope);
+    const reset = s.resetsAt ? Date.parse(s.resetsAt) : Number.NaN;
+    if (Number.isFinite(reset) && exhaust >= reset) out.push({ ...base, exhaustAt: null, verdict: "aman" });
+    else out.push({ ...base, exhaustAt: new Date(exhaust).toISOString(), verdict: "habis" });
+  }
+  return out;
+}
+
+export function fmtMinutes(min: number): string {
+  if (min < 60) return `${min} menit`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h} jam ${m} menit` : `${h} jam`;
+}
+export function fmtClock(t: number): string {
+  const d = new Date(t);
+  return `${String(d.getHours()).padStart(2, "0")}.${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+const WAIT_HEADLINE_MIN = 30;
+export type HeadlineInput = Pick<OverviewDTO, "today" | "wait" | "records" | "bensin">;
+
+// Template deterministik, tanpa LLM (ADR-0220). Urutan = prioritas; maks tiga fakta.
+export function headline(o: HeadlineInput): OverviewDTO["headline"] {
+  const facts: HeadlinePart[] = [];
+  if (o.today && o.today.failed > 0) facts.push({ text: `${o.today.failed} sesi tumbang`, tone: "bad" });
+  if (o.wait && o.wait.todayMin >= WAIT_HEADLINE_MIN)
+    facts.push({ text: `agen menunggumu ${fmtMinutes(o.wait.todayMin)}`, tone: "bad" });
+  const record = !!o.records?.landedRecordToday && !!o.today && o.today.landed > 0;
+  if (record) facts.push({ text: `rekor baru: ${o.today!.landed} spec mendarat`, tone: "good" });
+  const empty = o.bensin?.find((b) => b.verdict === "habis" && b.exhaustAt);
+  if (empty) facts.push({ text: `limit ${empty.label} habis ±${fmtClock(Date.parse(empty.exhaustAt!))}`, tone: "bad" });
+  if (!record && o.today && o.today.landed > 0) facts.push({ text: `${o.today.landed} spec mendarat`, tone: "good" });
+
+  const top = facts.slice(0, 3);
+  if (top.length === 0) return { text: "Hari yang tenang.", parts: [{ text: "Hari yang tenang." }] };
+  top[0] = { ...top[0]!, text: top[0]!.text.charAt(0).toUpperCase() + top[0]!.text.slice(1) };
+  const parts: HeadlinePart[] = [];
+  top.forEach((f, i) => {
+    if (i > 0) parts.push({ text: i === top.length - 1 ? (top.length === 2 ? " dan " : ", dan ") : ", " });
+    parts.push(f);
+  });
+  parts.push({ text: "." });
+  return { text: parts.map((p) => p.text).join(""), parts };
+}
+
+export type OverviewSources = {
+  specs: SpecRow[] | null; sessions: SessionRow[] | null; invocations: InvocationRow[] | null;
+  waits: Span[]; limits: LimitSeries[]; recordingSince: number;
+};
+
+// Satu bagian yang melempar tak boleh mengosongkan seluruh Overview: panelnya null, sisanya tetap.
+function safe<T>(label: string, f: () => T): T | null {
+  try { return f(); } catch (err) { console.warn(`overview: panel ${label} gagal dihitung:`, err); return null; }
+}
+
+export function computeOverview(now: number, src: OverviewSources): OverviewDTO {
+  const { specs, sessions, invocations } = src;
+  const t0 = startOfDay(now);
+  const today = specs && sessions ? safe("today", () => dayStats(t0, specs, sessions)) : null;
+  const yesterday = specs && sessions ? safe("yesterday", () => dayStats(addDays(t0, -1), specs, sessions)) : null;
+  const wait = safe("wait", () => waitStats(now, src.waits, sessions));
+  const bensin = safe("bensin", () => bensinStats(now, src.limits));
+  const records = specs && sessions ? safe("records", () => recordStats(now, specs, sessions)) : null;
+  return {
+    generatedAt: new Date(now).toISOString(),
+    recordingSince: new Date(src.recordingSince).toISOString(),
+    today, yesterday, wait, bensin, records,
+    river: specs ? safe("river", () => riverStats(now, specs)) : null,
+    tokens: invocations ? safe("tokens", () => tokenStats(now, invocations, today?.landed ?? null)) : null,
+    heatmap: sessions ? safe("heatmap", () => heatmapStats(now, sessions)) : null,
+    headline: safe("headline", () => headline({ today, wait, records, bensin }))
+      ?? { text: "Hari yang tenang.", parts: [{ text: "Hari yang tenang." }] },
+  };
 }
