@@ -22,7 +22,7 @@ function Spark({ b }: { b: OverviewBensin }) {
   const line = pts.map((p) => `${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(" ");
   const last = pts.at(-1)!;
   return (
-    <svg className="hn-ovk-spark" viewBox="0 0 140 42" aria-hidden="true" focusable="false">
+    <svg className="hn-ovk-spark" viewBox="0 0 140 42" preserveAspectRatio="none" aria-hidden="true" focusable="false">
       <line className="hn-ovk-spark-limit" x1="0" y1={sy(100)} x2="140" y2={sy(100)} />
       <polyline points={line} />
       {b.exhaustAt && <line className="hn-ovk-spark-proj" x1={sx(last.x)} y1={sy(last.y)} x2="140" y2={sy(100)} />}
@@ -33,8 +33,10 @@ function Spark({ b }: { b: OverviewBensin }) {
 export function Bensin({ overview }: { overview: OverviewDTO | null; now: number }) {
   const all = overview?.bensin ?? [];
   const hasCodex = all.some((b) => b.source === "codex");
-  const [tab, setTab] = React.useState<"claude" | "codex">("claude");
-  const src = hasCodex ? tab : "claude";
+  // Tab default = Claude bila serinya ada; bila hanya codex yang terbaca, Codex — bukan tab kosong.
+  const [tab, setTab] = React.useState<"claude" | "codex" | null>(null);
+  const fallback = all.some((b) => b.source === "claude") ? "claude" : "codex";
+  const src = hasCodex ? (tab ?? fallback) : "claude";
   const list = all.filter((b) => b.source === src);
   return (
     <section className="hn-ovk-panel" aria-labelledby="ovk-bensin">

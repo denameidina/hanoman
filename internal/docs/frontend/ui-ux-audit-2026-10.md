@@ -93,6 +93,7 @@ Lintas-halaman: IA 4 · onboarding 5 · a11y 5 · power user 5 · responsif 6.
 
 **Overview (5)** — duplikasi KPI/kartu; hero Dalang memakan fold; jargon "SpecSlim/SoT/on-convention"; KPI "0/0" saat tanpa project
 dan pesan "Semua project on-convention" menyesatkan; dua kartu "Limit langganan" berjudul sama; Overview kosong tanpa CTA onboarding.
+Susunan ini diamandemen ADR-0220 (Overview "Koran Pagi").
 
 **Dalang (4)** — mayoritas dekoratif, duplikat Overview/pet/Terminal; "HANOMAN ONLINE / SEMUA SISTEM NORMAL" hardcoded;
 "menunggu" bermakna dua hal; ticker/jam me-render ulang seluruh layar; HUD/scan line/float tanpa makna; footer kontras ±2,9:1;
@@ -175,7 +176,7 @@ trigger akun 34×34 px.
 
 ### 2. Per layar
 - **Overview:** satu kolom "Hari ini" — status satu kalimat + CTA, sesi berjalan, perlu perhatian, tabel project, satu kartu limit
-  bertab Claude/Codex. Hapus KPI strip dan hero.
+  bertab Claude/Codex. Hapus KPI strip dan hero. Susunan ini diamandemen ADR-0220 (Overview "Koran Pagi").
 - **Settings:** empat niat — Sesi harian · Agen & model (override per fungsi satu komponen) · Integrasi & akses · Lanjutan
   (+ zona bahaya). Pencarian pengaturan; satu aturan simpan (`useSettingField`: auto-save debounce + status per baris).
 - **Backlog/Tim:** kartu = judul + stage + titik prioritas + satu aksi primer sadar-stage; sisanya menu ⋯; filter = search + popover.

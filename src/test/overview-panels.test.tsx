@@ -83,6 +83,13 @@ describe("Bensin", () => {
     expect(screen.getByText("20%")).toBeTruthy();
     expect(screen.getByText("laju stabil")).toBeTruthy();
   });
+  it("hanya codex yang punya seri (limit claude tak terbaca) → tab Codex aktif sejak awal, bukan 'Belum ada data'", () => {
+    render(<Bensin overview={base({ bensin: [base().bensin![1]!] })} now={NOW} />);
+    expect(screen.getByText("20%")).toBeTruthy();
+    expect(screen.queryByText("Belum ada data limit.")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Claude" }));
+    expect(screen.getByText("Belum ada data limit.")).toBeTruthy();
+  });
   it("tanpa seri codex, tanpa tab; tanpa data sama sekali, kalimat datar", () => {
     const { unmount } = render(<Bensin overview={base({ bensin: [base().bensin![0]!] })} now={NOW} />);
     expect(screen.queryByRole("tab", { name: "Codex" })).toBeNull();

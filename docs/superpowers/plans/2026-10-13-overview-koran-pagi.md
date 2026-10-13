@@ -2539,7 +2539,7 @@ git commit -m "feat(overview): panel bottleneck, sungai, rekor, bensin, token, p
 **Files:**
 - Modify: `internal/docs/frontend/frontend-implementation.md` (bagian baru sesudah bagian Fase 3B Overview, sekitar baris 573), `internal/docs/frontend/ui-ux-audit-2026-10.md:94-95,177-178` (catatan amandemen)
 
-- [ ] **Step 1: Docs** — tambahkan di `frontend-implementation.md`, tepat sebelum `## Audit UI/UX 2026-10 · Fase 3B · Overview "Hari ini"…`:
+- [x] **Step 1: Docs** — tambahkan di `frontend-implementation.md`, tepat sebelum `## Audit UI/UX 2026-10 · Fase 3B · Overview "Hari ini"…`:
 ```md
 ## Overview "Koran Pagi" (ADR-0220)
 
@@ -2556,15 +2556,15 @@ Desain: [spec](../../../docs/superpowers/specs/2026-10-13-overview-koran-pagi-de
 ```
 Lalu, di dua tempat `ui-ux-audit-2026-10.md` yang menyebut susunan Overview (baris ~94–95 dan ~177–178), tambahkan satu kalimat di akhir paragrafnya: `Susunan ini diamandemen ADR-0220 (Overview "Koran Pagi").`
 
-- [ ] **Step 2: Jalankan semua test yang tersentuh**
+- [x] **Step 2: Jalankan semua test yang tersentuh**
 
 Run: `TEST shared/src/overview.test.ts server/test/overview-metrics.test.ts server/test/overview-recorder.test.ts server/test/overview.route.test.ts server/test/events.test.ts server/test/mcp-coverage.test.ts server/test/agent-capabilities.test.ts server/test/agent-doc-contract.test.ts src/test/overview-screen.test.tsx src/test/overview-panels.test.tsx src/test/app-snapshot-digest.test.tsx`
 Expected: semua PASS.
 
-- [ ] **Step 3: Typecheck paket tersentuh** (bukan `pnpm -r typecheck`): `pnpm --filter ./shared exec tsc --noEmit && pnpm --filter ./server exec tsc --noEmit && pnpm --filter ./src exec tsc --noEmit`
+- [x] **Step 3: Typecheck paket tersentuh** (bukan `pnpm -r typecheck`): `pnpm --filter ./shared exec tsc --noEmit && pnpm --filter ./server exec tsc --noEmit && pnpm --filter ./src exec tsc --noEmit`
 Expected: tanpa error. Bila nama filter paket berbeda, lihat `pnpm-workspace.yaml`.
 
-- [ ] **Step 4: Verifikasi nyata** — boot `pnpm dev`, buka dashboard di browser, lalu periksa:
+- [x] **Step 4: Verifikasi nyata** — boot `pnpm dev`, buka dashboard di browser, lalu periksa:
 - masthead, headline, dan panel tampil; panel menunjukkan kerangka sebelum frame `overview` pertama tiba;
 - `curl` `/api/overview` mengembalikan angka yang sama dengan yang tampil;
 - jejak EKG bergerak, dan sesi yang menunggu datar berwarna clay; klik baris membuka Terminal;
@@ -2573,7 +2573,7 @@ Expected: tanpa error. Bila nama filter paket berbeda, lihat `pnpm-workspace.yam
 
 Kalau ada yang tidak sesuai, perbaiki dulu sebelum commit.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/docs/frontend/frontend-implementation.md internal/docs/frontend/ui-ux-audit-2026-10.md docs/superpowers/plans/2026-10-13-overview-koran-pagi.md

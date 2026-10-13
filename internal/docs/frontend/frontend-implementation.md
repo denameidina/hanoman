@@ -570,6 +570,19 @@ hilang dicabut, dan font tak lagi memblokir render. Perilaku dan tampilan layar 
 - **Catatan:** aset `internal/assets/dalang/*.webp` tak lagi diimpor kode (DalangStage pemakai terakhirnya). Berkas
   aset dibiarkan; pembersihannya di luar 2E.
 
+## Overview "Koran Pagi" (ADR-0220)
+
+Mengamandemen susunan Overview Fase 3B di bawah. `screens/OverviewScreen.tsx` kini kerangka koran, dan
+panelnya ada di `screens/overview/`: `Masthead` ("Kabar Hanoman", tanggal, edisi langsung), `Headline`
+(template server, nada clay/leaf), `Koreksi` (pengganti "Perlu perhatian", hanya tampil bila ada),
+`Denyut` (EKG per sesi hidup di panel `--term-*`, menggantikan "Sesi berjalan"; animasi CSS murni,
+mati di `prefers-reduced-motion`), `Bottleneck`, `SungaiSpec`, `Rekor`, `Bensin` (menggantikan seksi
+limit; badge Shell tetap `LimitWindows`; tab awal Codex bila hanya seri codex yang terbaca), `EkonomiToken`, `PetaPanas`, dan `IndeksProject` (daftar project
+bergaya tabel bursa + footer backlog). Agregat datang dari grup siar ke-12 `overview` (`App.tsx`, state
+`overview`, `null` sampai frame pertama). Tiga kolom `1.4fr 1fr 1fr` ≥1100px, dua kolom 720–1100px,
+satu kolom <720px. Test: `test/overview-screen.test.tsx`, `test/overview-panels.test.tsx`.
+Desain: [spec](../../../docs/superpowers/specs/2026-10-13-overview-koran-pagi-design.md).
+
 ## Audit UI/UX 2026-10 · Fase 3B · Overview "Hari ini" dan Dalang sebagai papan senyap
 
 Fase 3B dari [rencana perbaikan](../../../docs/superpowers/plans/2026-10-11-ui-ux-audit.md) untuk dua layar. Keputusan
