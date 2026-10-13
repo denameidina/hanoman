@@ -19,3 +19,6 @@ server/data/
 *.db
 *.db-journal
 dist-npm/
+
+# Mockup visual companion brainstorming (superpowers)
+.superpowers/
