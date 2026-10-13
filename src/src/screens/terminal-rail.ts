@@ -62,6 +62,17 @@ export function sortRail(sessions: readonly TerminalSession[], finishedIds: Read
   return ranked.map((r) => r.session);
 }
 
+// Rail dikelompokkan per project: grup berurutan menurut kemunculan pertamanya di daftar yang sudah
+// terurut (project dengan sesi paling mendesak di atas), dan urutan di dalam grup tak berubah.
+export function groupByProject(sorted: readonly TerminalSession[]): TerminalSession[] {
+  const groups = new Map<string, TerminalSession[]>();
+  for (const s of sorted) {
+    const bucket = groups.get(s.projectId);
+    if (bucket) bucket.push(s); else groups.set(s.projectId, [s]);
+  }
+  return [...groups.values()].flat();
+}
+
 // Sesi yang tampil di pane fokus: `focusId` bila masih hidup, selain itu baris pertama rail.
 // Kosong bila tak ada sesi sama sekali.
 export function resolveFocus(ordered: readonly TerminalSession[], focusId: string | null): TerminalSession | null {

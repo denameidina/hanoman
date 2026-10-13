@@ -10,6 +10,7 @@ import { railTarget, type RailStatus, type RailTone } from "./terminal-rail";
 export type RailItem = {
   session: TerminalSession;
   label: string;
+  projectName: string;
   status: RailStatus;
   startedMs: number | null;
 };
@@ -38,6 +39,8 @@ export function SessionRail({ items, focusedId, onFocus, menuFor, label = "Dafta
 }) {
   const now = useNowTick(30_000);
   const buttons = React.useRef<(HTMLButtonElement | null)[]>([]);
+  // Judul grup hanya bila ada lebih dari satu project; satu project tak butuh pengelompokan.
+  const grouped = new Set(items.map((item) => item.session.projectId)).size > 1;
   const focusedIndex = items.findIndex((item) => item.session.id === focusedId);
 
   // Panah memindahkan fokus DAN memilih, seperti tab. Hanya tombol baris yang ditangani: menu ⋯
@@ -63,7 +66,11 @@ export function SessionRail({ items, focusedId, onFocus, menuFor, label = "Dafta
         const tabbable = focused || (focusedIndex < 0 && index === 0);
         const ago = item.startedMs !== null ? relativeTime(item.startedMs, now) : "";
         return (
-          <li key={session.id} className="hn-terminal-rail-item">
+          <React.Fragment key={session.id}>
+          {grouped && item.session.projectId !== items[index - 1]?.session.projectId && (
+            <li role="presentation" className="hn-terminal-rail-group">{item.projectName}</li>
+          )}
+          <li className="hn-terminal-rail-item">
             <div className={`hn-terminal-rail-row${focused ? " is-focused" : ""}`} data-tone={status.tone}>
               <button type="button" className="hn-terminal-rail-main"
                 ref={(el) => { buttons.current[index] = el; }}
@@ -80,6 +87,7 @@ export function SessionRail({ items, focusedId, onFocus, menuFor, label = "Dafta
               <OverflowActions label={`Aksi sesi ${session.id} di daftar`} items={menuFor(session)} />
             </div>
           </li>
+          </React.Fragment>
         );
       })}
     </ul>

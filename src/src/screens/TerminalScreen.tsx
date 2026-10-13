@@ -11,6 +11,7 @@ import { flowForSource, sameTerminalWorkspace, type SessionHistoryView, type Wor
 import { TerminalPane } from "./TerminalPane";
 import { SessionHistoryModal } from "./SessionHistoryModal";
 import { NewTerminalModal } from "./NewTerminalModal";
+import { NewShellModal } from "./NewShellModal";
 import { SpecDocsModal } from "./SpecDocsModal";
 import { IntegrateDialog } from "./IntegrateDialog";
 import { B_STAGES } from "./BacklogScreen";
@@ -24,7 +25,7 @@ import { clampFontSize, shouldCollapseToTabs, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
   FONT_MIN, FONT_MAX, MIN_PANE_WIDTH } from "./terminal-chrome";
 import { chipAccessibleName, chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";
 import { RAIL_PILL, SessionRail, type RailItem } from "./TerminalRail";
-import { isTerminalView, railStartedMs, railStatus, resolveFocus, sortRail, type TerminalView } from "./terminal-rail";
+import { groupByProject, isTerminalView, railStartedMs, railStatus, resolveFocus, sortRail, type TerminalView } from "./terminal-rail";
 import { relativeTime } from "../lib/time-format";
 import "./styles/terminal.css";
 
@@ -117,6 +118,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // SPEC-517 · form runtime sebelum sesi agen biasa lahir. Modal, bukan panel: grid di belakangnya
   // tak berubah ukuran — pola yang sama dengan "Ambil backlog" & "Riwayat".
   const [newOpen, setNewOpen] = React.useState(false);
+  // "Terminal biasa" menanyakan project dulu (kecuali hanya ada satu) — shell lahir di repoDir-nya.
+  const [shellOpen, setShellOpen] = React.useState(false);
   // SPEC-362 · riwayat sesi. State-nya sekadar boolean: modal baru dirender saat diminta, jadi
   // tak ada request riwayat maupun elemen tambahan selama operator tak membukanya.
   const [historyOpen, setHistoryOpen] = React.useState(false);
@@ -180,7 +183,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   }, []);
   // Urutan rail dan sesi fokus DIHITUNG dari `sessions`; tak disimpan. Sesi fokus yang lenyap jatuh
   // ke baris pertama rail, jadi tak perlu efek pembersihan.
-  const ordered = React.useMemo(() => sortRail(sessions, finishedIds), [sessions, finishedIds]);
+  const ordered = React.useMemo(() => groupByProject(sortRail(sessions, finishedIds)), [sessions, finishedIds]);
   const focused = resolveFocus(ordered, focusId);
   // Kunci fokus ke sesi yang sedang tampil: tanpa ini fallback "baris pertama rail" ikut berpindah
   // tiap urutan rail berubah (mis. sesi masuk/keluar "Menunggu keputusan").
@@ -316,8 +319,9 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
 
   // SPEC-236 · terminal biasa non-claude: shell mentah di repoDir project terpilih. Cermin
   // openNew, tapi memanggil createShell — server men-spawn $SHELL, bukan claude.
-  async function openShell() {
+  async function openShell(project: string) {
     if (!project) return;
+    setShellOpen(false);
     let id: string;
     try {
       ({ id } = await api.createShell(project));
@@ -682,7 +686,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
     { key: "backlog", label: "Ambil backlog", icon: "inbox",
       onSelect: () => { setPickError(null); setPicking(true); } },
     { key: "history", label: "Riwayat sesi", icon: "history", onSelect: () => setHistoryOpen(true) },
-    { key: "shell", label: "Terminal biasa", icon: "terminal", onSelect: () => void openShell() },
+    { key: "shell", label: "Terminal biasa", icon: "terminal", onSelect: () => (projects.length > 1 ? setShellOpen(true) : void openShell(project)) },
   ];
   // Aksi susunan grid: di desktop tampil sebagai tombol di baris grup; di sempit masuk satu menu.
   const gridItems: OverflowItem[] = [
@@ -927,6 +931,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           railItems={ordered.map((s) => ({
             session: s,
             label: cellLabel(s, nameOf, titleOf),
+            projectName: nameOf(s.projectId),
             status: railStatus(s, finishedIds.has(s.id)),
             startedMs: railStartedMs(s),
           }))}
@@ -954,6 +959,11 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         <NewTerminalModal open projectId={project} projectName={nameOf(project)}
           projects={projects} onProjectChange={setProject}
           onClose={() => setNewOpen(false)} onCreated={placeNew} />
+      )}
+
+      {shellOpen && (
+        <NewShellModal projectId={project} projects={projects} onProjectChange={setProject}
+          onClose={() => setShellOpen(false)} onConfirm={(pid) => void openShell(pid)} />
       )}
 
       {historyOpen && (

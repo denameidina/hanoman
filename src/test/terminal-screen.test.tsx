@@ -327,6 +327,10 @@ describe("TerminalScreen (grid)", () => {
     ]} />);
     await screen.findByText("Belum ada sesi terminal");
     await openBuka("Terminal biasa");
+    // Lebih dari satu project → project ditanyakan dulu; default-nya yang punya checkout.
+    const dlg = await screen.findByRole("dialog", { name: "Terminal biasa" });
+    expect(createShell).not.toHaveBeenCalled();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Buka terminal" }));
     await waitFor(() => expect(createShell).toHaveBeenCalledWith("p2"));
   });
 

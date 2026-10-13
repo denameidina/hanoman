@@ -81,6 +81,32 @@ beforeEach(() => {
 });
 afterEach(() => { resetViewport(); });
 
+describe("TerminalScreen · rail per project & Terminal biasa", () => {
+  const two = [{ id: "p1", name: "hanoman" }, { id: "p2", name: "gulira" }];
+
+  it("rail dikelompokkan per project dengan judul grup", async () => {
+    listTerminals.mockResolvedValue([
+      { id: "a11111", projectId: "p1", cwd: "", exited: false },
+      { id: "b22222", projectId: "p2", cwd: "", exited: false },
+      { id: "c33333", projectId: "p1", cwd: "", exited: false },
+    ]);
+    render(<TerminalScreen projects={two} />);
+    await waitFor(() => expect(railOrder()).toHaveLength(3));
+    expect(railOrder()).toEqual(["a11111", "c33333", "b22222"]);
+    const heads = Array.from(document.querySelectorAll(".hn-terminal-rail-group")).map((e) => e.textContent);
+    expect(heads).toEqual(["hanoman", "gulira"]);
+  });
+
+  it("Terminal biasa menanyakan project dulu bila ada lebih dari satu", async () => {
+    render(<TerminalScreen projects={two} />);
+    await screen.findByTestId("terminal-focus");
+    fireEvent.click(screen.getByRole("button", { name: "Buka…" }));
+    const menu = await screen.findByRole("dialog", { name: "Buka sesi" });
+    fireEvent.click(within(menu).getByRole("button", { name: "Terminal biasa" }));
+    expect(await screen.findByRole("dialog", { name: "Terminal biasa" })).toBeInTheDocument();
+  });
+});
+
 describe("TerminalScreen · mode Fokus (Fase 3E)", () => {
   it("default ke Fokus: satu pane dan rail, tanpa grid", async () => {
     render(<TerminalScreen projects={projects} />);

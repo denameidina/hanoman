@@ -91,3 +91,11 @@ diteruskan ke sesi selama fokus di sana.
   `src/test/terminal-css-contract.test.ts`.
 - Dokumen: [frontend-implementation § Fase 3E](../frontend/frontend-implementation.md),
   [design-system § Kontras, konfirmasi, dan error](../design-system/design-system.md).
+
+## Addendum — pengelompokan per project & pemilih project "Terminal biasa"
+
+- Rail mode Fokus dikelompokkan per project (`groupByProject` di `terminal-rail.ts`): grup berurutan
+  menurut sesi paling mendesak, urutan di dalam grup tak berubah. Judul grup (`.hn-terminal-rail-group`)
+  hanya tampil bila ada ≥2 project; fokus fallback = baris pertama rail yang tampil.
+- "Terminal biasa" (SPEC-236) menanyakan project dulu lewat `NewShellModal` bila ada >1 project
+  (default = project terpilih terakhir); dengan satu project shell langsung dibuka.

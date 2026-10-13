@@ -127,6 +127,19 @@
   padding: 0;
 }
 
+.hn-terminal-rail-group {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  border-bottom: 1px solid var(--border-hair);
+  background: var(--bone-100, var(--surface-page));
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .hn-terminal-rail-item {
   border-bottom: 1px solid var(--border-hair);
 }
