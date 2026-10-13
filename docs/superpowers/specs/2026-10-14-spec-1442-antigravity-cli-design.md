@@ -4,7 +4,7 @@
 
 Fase Brainstorm · 2026-10-14. Base/kandidat riset:
 `c6800c59837a152e413d8b7834ced0b21adcb084`.
-Status desain: menunggu keputusan scope di bawah; belum menjadi spesifikasi implementasi.
+Status desain: enam keputusan awal diterima; kontrak native child masih membutuhkan keputusan lanjutan. Belum menjadi spesifikasi implementasi.
 
 ### Tujuan dan kontrak yang mengikat
 
@@ -67,14 +67,44 @@ ber-`agy` belum dibuktikan. Jangan melonggarkan boundary produksi untuk membuat 
 3. **Command kustom generik:** operator memasok shell command dan config sendiri. Lebih cepat
    tetapi tak memenuhi pemilihan model/trust/MCP dan validasi runtime yang diminta; tidak direkomendasikan.
 
-### Keputusan terbuka untuk relay
+### Keputusan manusia yang diterima (relay pertama)
 
-1. Default Antigravity baru hendak memakai model/effort mana: A `gemini-3.8-flash-high` + `high` (rekomendasi, tersedia pada katalog lokal dan lebih luas antar-plan), B `claude-opus-5-5-high` + `high`, atau C model/effort pilihan lain yang disebutkan eksplisit?
-2. Untuk v1, apakah Antigravity memakai mode sesi tunggal dengan seluruh Custom Agent/orkestrasi fase native ditandai unavailable beserta alasannya (A, rekomendasi sampai kontrak native terbukti), atau wajib implementasi native child lengkap dengan exact model/effort, foreground dan read-only enforcement dalam SPEC ini (B)?
-3. Untuk status dan keputusan v1, apakah memakai observasi tmux dan marker fase dengan batas notifikasi/gate/native telemetry dijelaskan eksplisit (A, rekomendasi scope awal), atau wajib relay native hook/statusline untuk idle/decision dan gate goal dalam SPEC ini (B)?
-4. Konfigurasi MCP hanoman Antigravity hendak ditulis dengan merge-preserve ke global `~/.gemini/config/mcp_config.json` (A, rekomendasi mengikuti config operator), atau dibuat per-worktree `.agents/mcp_config.json` yang excluded dan mempertahankan config repo (B)?
-5. Dukungan deployment awal hendak dibatasi host/lab dengan launch Antigravity di sandbox ditolak jelas sampai auth/state terverifikasi (A, rekomendasi scope awal), atau produksi Podman lengkap wajib tersedia di SPEC ini dengan image dan layout credential/state yang teruji (B)?
-6. Versi Antigravity hendak memakai endpoint additive `/api/antigravity/version` + tool MCP baca tanpa mengubah `/api/codex/version` (A, rekomendasi kompatibilitas), atau endpoint versi generik baru dengan response semua runtime dan kontrak/tool tersendiri (B)?
+| Butir | Putusan |
+| --- | --- |
+| Default | `gemini-3.8-flash-high` + `high`. |
+| Native child | Wajib lengkap dalam SPEC ini: exact model/effort, foreground, read-only enforcement, availability teruji. Sesi tunggal/unavailable bukan pengganti requirement ini. |
+| Status/decision | Observasi tmux + marker fase; batas notifikasi, gate goal dan native telemetry eksplisit. Hook policy read-only tetap diperlukan oleh keputusan native child. |
+| MCP | Global `~/.gemini/config/mcp_config.json`, merge-preserve. |
+| Deployment | Host/lab; launch sandbox ditolak jelas sampai auth/state terverifikasi. Boundary produksi tetap utuh. |
+| Versi | Additive `/api/antigravity/version` + tool MCP baca; `/api/codex/version` dipertahankan. |
+
+### Verifikasi lanjutan native child
+
+`agy agents --help` mengonfirmasi discovery/list, tetapi tidak menyediakan flag native model/effort
+atau foreground. Docs subagent dan [changelog resmi](https://github.com/google-antigravity/antigravity-cli/blob/main/CHANGELOG.md)
+menyebut tier `inherit/flash/pro`; tidak ditemukan kontrak exact slug/effort per-child atau primitive
+blocking foreground. Inspect string schema biner menemukan `Model yaml:"model,omitempty"`,
+tanpa field `yaml:"effort` (petunjuk, bukan bukti runtime execution).
+
+Probe schema-only, **nol inferensi**, menggunakan `agy -p /model --agent <probe> --output-format json`:
+
+- Agen global sementara `~/.gemini/config/agents/hanoman-spec1442-probe-flash.md`, `model: flash`:
+  exit 0, `SUCCESS`, `num_turns: 0`; command model melaporkan `gemini-3.8-flash-high`, effort `high`.
+- Agen global kedua, format identik tetapi `model: gemini-3.8-flash-high`:
+  exit 1, `unknown agent ... (available: hanoman-spec1442-probe-flash)`.
+  Jadi slug exact belum bisa diperlakukan sebagai nilai frontmatter yang didukung.
+- Agen `.agents/agents` di direktori temp, termasuk repo git temp yang diberi trust eksplisit,
+  tetap menghasilkan `no custom agents are available` pada probe. Discovery worktree belum terbukti.
+- Semua proses probe selesai; dua berkas global milik probe dihapus. Hanya entri trust temp milik
+  probe dicabut kembali; entri operator dipertahankan. Tidak ada kredensial/account yang dicetak.
+
+Probe read-only slash di primary agent membuktikan discovery, **bukan** actual model execution child,
+foreground, atau policy enforcement. Klaim parity membutuhkan live invocation dan bukti lifecycle.
+Dengan kontrak yang ditemukan, requirement native child lengkap tidak boleh dianggap sudah feasible.
+
+### Keputusan terbuka lanjutan untuk relay
+
+1. Karena `agy` 1.3.4 menerima native tier `flash` tetapi tidak menemukan definisi dengan slug exact, sementara effort per-child dan foreground belum punya kontrak terverifikasi, jalur mana yang dipilih: A pertahankan 2B sebagai syarat keras dan tahan desain native sampai riset/probe menemukan kontrak yang memenuhi semuanya (rekomendasi menjaga requirement), B izinkan bridge child yang dikelola hanoman lewat proses `agy -p --model --effort` dengan kontrol blocking dan read-only tersendiri—mengamandemen tuntutan native `invoke_subagent`, atau C amandemen 2B menjadi child native tier/inherit dengan batas exact model/effort/foreground diumumkan eksplisit?
 
 ### Aturan verifikasi fase berikutnya
 

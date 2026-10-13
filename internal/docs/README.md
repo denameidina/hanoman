@@ -345,7 +345,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [0001 — Docs sebagai Source of Truth](adr/0001-docs-as-source-of-truth.md) — *superseded by 0023*
 
 ## operations
-- [SPEC-1442 — Runtime Antigravity CLI: konteks, riset primer dan keputusan scope](../../docs/superpowers/specs/2026-10-14-spec-1442-antigravity-cli-design.md) — Brainstorm; kontrak `agy`, trust, model, MCP, skill serta batas native child/produksi menunggu keputusan.
+- [SPEC-1442 — Runtime Antigravity CLI: konteks, riset primer dan keputusan scope](../../docs/superpowers/specs/2026-10-14-spec-1442-antigravity-cli-design.md) — Brainstorm; riset `agy`, keputusan default/MCP/host-lab/versi diterima; kemampuan exact-model/effort dan foreground native child membutuhkan keputusan lanjutan.
 - [Agent pembuatan dan dukungan aplikasi](operations/app-support-agents.md) — delapan peran baru, pemilihan tugas, profil runtime, prompt parent tanpa duplikasi metadata native, bukti dan batas verifikasi; [spec](../../docs/superpowers/specs/2026-09-05-app-support-agents-design.md) dan [plan](../../docs/superpowers/plans/2026-09-05-app-support-agents.md).
 - [roadmap](operations/roadmap.md) · [gtm](operations/gtm.md) · [agent-documentation-workflow](operations/agent-documentation-workflow.md)
 - [production](operations/production.md) — menjalankan instance prod di samping dev (`HANOMAN_HOME` + port terpisah)
