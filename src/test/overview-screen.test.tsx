@@ -6,6 +6,7 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { OverviewScreen } from "../src/screens/OverviewScreen";
 import type { ProjectVM, SpecSlim } from "../src/screens/types";
 import type { TerminalSession } from "../src/api/client";
+import type { OverviewDTO } from "@hanoman/shared";
 
 // Dua sumber limit dimock lewat objek hoisted supaya tiap test bisa mengubah statusnya.
 const { claude, codex } = vi.hoisted(() => ({
@@ -28,6 +29,15 @@ const session = (over: Partial<TerminalSession> & { id: string; projectId: strin
 const spec = (over: { id: string; startedAt?: string | null; stage?: string; source?: string; priority?: string }) =>
   ({ id: over.id, stage: over.stage ?? "executing", startedAt: over.startedAt ?? null,
     source: over.source ?? "brief", priority: over.priority ?? "sedang" }) as unknown as SpecSlim;
+
+const ov = (over: Partial<OverviewDTO> = {}): OverviewDTO => ({
+  generatedAt: new Date().toISOString(), recordingSince: new Date(0).toISOString(),
+  today: { landed: 3, failed: 1 }, yesterday: { landed: 2, failed: 0 }, river: null, tokens: null, wait: null,
+  bensin: [], heatmap: null, records: null,
+  headline: { text: "1 sesi tumbang dan 3 spec mendarat.", parts: [
+    { text: "1 sesi tumbang", tone: "bad" }, { text: " dan " }, { text: "3 spec mendarat", tone: "good" }, { text: "." }] },
+  ...over,
+});
 
 beforeEach(() => { codex.status = "unavailable"; codex.plan = null; });
 
@@ -152,7 +162,7 @@ describe("Overview · perlu perhatian dan project", () => {
     const alpha = project({ id: "a", name: "alpha", docStatus: "broken", coverage: 20 });
     render(<OverviewScreen projects={[alpha, project({ id: "b", name: "beta", docStatus: "drift", coverage: 60 })]}
       backlog={[]} sessions={[]} onOpenProject={onOpenProject} onGoto={noop} onOpenSession={noop} />);
-    const attn = within(screen.getByRole("list", { name: "Perlu perhatian" })).getAllByRole("listitem");
+    const attn = within(screen.getByRole("list", { name: "Koreksi" })).getAllByRole("listitem");
     expect(attn).toHaveLength(2);
     expect(attn[0]!.textContent).toContain("Belum sesuai");
     expect(attn[1]!.textContent).toContain("Tidak sinkron");
@@ -165,33 +175,33 @@ describe("Overview · perlu perhatian dan project", () => {
     const gamma = project({ id: "c", name: "gamma", coverage: 88 });
     render(<OverviewScreen projects={[alpha, project({ id: "b", name: "beta", docStatus: "drift", coverage: 60 }), gamma]}
       backlog={[]} sessions={[]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
-    const rows = within(screen.getByRole("list", { name: "Project" })).getAllByRole("listitem");
+    const rows = within(screen.getByRole("list", { name: "Indeks project" })).getAllByRole("listitem");
     expect(rows).toHaveLength(1);
     expect(rows[0]!.textContent).toContain("gamma");
-    expect(within(screen.getByRole("list", { name: "Project" })).queryByRole("button", { name: /alpha/ })).toBeNull();
-    expect(within(screen.getByRole("list", { name: "Perlu perhatian" })).getByRole("button", { name: /alpha/ })).toBeTruthy();
-    expect(screen.getByText("1 dari 3 · sisanya di atas")).toBeTruthy();
+    expect(within(screen.getByRole("list", { name: "Indeks project" })).queryByRole("button", { name: /alpha/ })).toBeNull();
+    expect(within(screen.getByRole("list", { name: "Koreksi" })).getByRole("button", { name: /alpha/ })).toBeTruthy();
+    expect(screen.getByText("1 dari 3 · sisanya di Koreksi")).toBeTruthy();
   });
 
   it("semua proyek bermasalah: 'Project' tak membuat daftar kosong, tapi menyebut di mana mereka tampil", () => {
     render(<OverviewScreen projects={[project({ id: "a", name: "alpha", docStatus: "broken", coverage: 20 })]}
       backlog={[]} sessions={[]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
-    expect(screen.queryByRole("list", { name: "Project" })).toBeNull();
-    expect(screen.getByText("Semua project ada di Perlu perhatian.")).toBeTruthy();
+    expect(screen.queryByRole("list", { name: "Indeks project" })).toBeNull();
+    expect(screen.getByText("Semua project ada di Koreksi.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Backlog: 0 dari brief · 0 dari QA · 0 prioritas tinggi" })).toBeTruthy();
   });
 
   it("baris 'Perlu perhatian' membawa cakupan, karena bar cakupan hanya ada di daftar Project", () => {
     render(<OverviewScreen projects={[project({ id: "a", name: "alpha", docStatus: "drift", coverage: 62 })]}
       backlog={[]} sessions={[]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
-    const attn = within(screen.getByRole("list", { name: "Perlu perhatian" })).getAllByRole("listitem");
+    const attn = within(screen.getByRole("list", { name: "Koreksi" })).getAllByRole("listitem");
     expect(attn[0]!.textContent).toContain("cakupan 62%");
   });
 
-  it("tanpa masalah dokumen, tampil 'Dokumen sudah sesuai standar'", () => {
+  it("tanpa masalah dokumen, kotak Koreksi tak tampil sama sekali (ralat hanya bila ada yang diralat)", () => {
     render(<OverviewScreen projects={[project({ id: "a", name: "alpha" })]} backlog={[]} sessions={[]}
       onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
-    expect(screen.getByText("Dokumen sudah sesuai standar")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Koreksi" })).toBeNull();
   });
 
   it("project: nama, cakupan, status, dan backlog terbuka; urut cakupan terendah", () => {
@@ -201,7 +211,7 @@ describe("Overview · perlu perhatian dan project", () => {
     render(<OverviewScreen projects={[project({ id: "b", name: "beta", coverage: 95, backlog: 0 }), low]}
       backlog={[spec({ id: "S1", source: "qa", priority: "tinggi" }), spec({ id: "S2", source: "brief" })]}
       sessions={[]} onOpenProject={onOpenProject} onGoto={onGoto} onOpenSession={noop} />);
-    const rows = within(screen.getByRole("list", { name: "Project" })).getAllByRole("listitem");
+    const rows = within(screen.getByRole("list", { name: "Indeks project" })).getAllByRole("listitem");
     expect(rows[0]!.textContent).toContain("alpha");
     expect(rows[0]!.textContent).toContain("40%");
     expect(rows[0]!.textContent).toContain("3 item terbuka");
@@ -212,55 +222,34 @@ describe("Overview · perlu perhatian dan project", () => {
     expect(onGoto).toHaveBeenCalledWith("backlog");
   });
 
-  it("aktivitas terbaru: hanya proyek yang berjalan; keadaan tampil dengan label manusia, tak tampil mentah", () => {
-    render(<OverviewScreen
-      projects={[
-        project({ id: "a", name: "alpha", activity: "idle" }),
-        project({ id: "b", name: "beta", activity: "running · feature",
-          session: { status: "running", phase: null, flow: "feature" } as ProjectVM["session"] }),
-      ]}
-      backlog={[]} sessions={[session({ id: "s1", projectId: "b" })]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
-    const rows = within(screen.getByRole("list", { name: "Aktivitas terbaru" })).getAllByRole("listitem");
-    // alpha (idle) tak punya aktivitas yang berbeda dari daftar Project: tak diulang di sini.
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.textContent).toContain("beta");
-    expect(rows[0]!.textContent).toContain("Berjalan");
-    expect(rows[0]!.textContent).toContain("Fitur");          // nama flow dari FLOW_LABEL, bukan "running · feature"
-    expect(rows[0]!.textContent).not.toMatch(/running ·/);
-    expect(screen.queryByText("idle")).toBeNull();
-    expect(screen.queryByText("Diam")).toBeNull();
-  });
-
-  it("aktivitas terbaru: maksimal lima baris, dan klik membuka project", () => {
-    const onOpenProject = vi.fn();
-    const many = Array.from({ length: 7 }, (_, i) => project({ id: `p${i}`, name: `proj${i}` }));
-    render(<OverviewScreen projects={many} backlog={[]}
-      sessions={many.map((p) => session({ id: `s-${p.id}`, projectId: p.id }))}
-      onOpenProject={onOpenProject} onGoto={noop} onOpenSession={noop} />);
-    const rows = within(screen.getByRole("list", { name: "Aktivitas terbaru" })).getAllByRole("listitem");
-    expect(rows).toHaveLength(5);
-    expect(rows[0]!.textContent).toContain("Berjalan");
-    fireEvent.click(within(rows[0]!).getByRole("button"));
-    expect(onOpenProject).toHaveBeenCalledWith(many[0]);
-  });
-
-  it("proyek di 'Perlu perhatian' tak diulang di 'Aktivitas terbaru': satu proyek, satu baris", () => {
-    const alpha = project({ id: "a", name: "alpha", docStatus: "broken", coverage: 20 });
-    render(<OverviewScreen projects={[alpha, project({ id: "c", name: "gamma" })]} backlog={[]}
-      sessions={[session({ id: "s-a", projectId: "a" }), session({ id: "s-c", projectId: "c" })]}
-      onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
-    const act = within(screen.getByRole("list", { name: "Aktivitas terbaru" })).getAllByRole("listitem");
-    expect(act).toHaveLength(1);
-    expect(act[0]!.textContent).toContain("gamma");
-    expect(within(screen.getByRole("list", { name: "Perlu perhatian" })).getByRole("button", { name: /alpha/ })).toBeTruthy();
-  });
-
-  it("tanpa proyek yang berjalan, 'Aktivitas terbaru' tak tampil sama sekali (tak ada keadaan kosong yang mengulang)", () => {
-    render(<OverviewScreen projects={[project({ id: "a", name: "alpha" }), project({ id: "b", name: "beta", docStatus: "broken", coverage: 10 })]}
-      backlog={[]} sessions={[]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
-    expect(screen.queryByRole("list", { name: "Aktivitas terbaru" })).toBeNull();
+  it("seksi 'Aktivitas terbaru' sudah tidak ada: aktivitas sesi kini dibaca dari Denyut", () => {
+    render(<OverviewScreen projects={[project({ id: "a", name: "alpha" })]} backlog={[]}
+      sessions={[session({ id: "s1", projectId: "a" })]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
     expect(screen.queryByText("Aktivitas terbaru")).toBeNull();
-    expect(screen.getByRole("list", { name: "Project" })).toBeTruthy();
+  });
+});
+
+describe("Overview · koran", () => {
+  it("masthead 'Kabar Hanoman' dengan tanggal panjang dan jumlah project", () => {
+    render(<OverviewScreen projects={[project({ id: "a", name: "alpha" }), project({ id: "b", name: "beta" })]}
+      backlog={[]} sessions={[]} overview={ov()} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    expect(screen.getByText("Kabar Hanoman")).toBeTruthy();
+    expect(screen.getByText("2 project")).toBeTruthy();
+    expect(screen.getByText(/Edisi langsung · \d{2}\.\d{2}/)).toBeTruthy();
+  });
+  it("headline dirender per bagian dengan nada", () => {
+    const { container } = render(<OverviewScreen projects={[project({ id: "a", name: "alpha" })]} backlog={[]}
+      sessions={[]} overview={ov()} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    const h = container.querySelector(".hn-ovk-headline")!;
+    expect(h.textContent).toBe("1 sesi tumbang dan 3 spec mendarat.");
+    expect(h.querySelector(".hn-ovk-tone--bad")!.textContent).toBe("1 sesi tumbang");
+    expect(h.querySelector(".hn-ovk-tone--good")!.textContent).toBe("3 spec mendarat");
+  });
+  it("sebelum frame overview tiba, headline tampil sebagai kerangka (bukan angka nol)", () => {
+    const { container } = render(<OverviewScreen projects={[project({ id: "a", name: "alpha" })]} backlog={[]}
+      sessions={[]} overview={null} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    // `Skeleton` DS merender `<span class="hn-skeleton">` (ds/components/skeleton.tsx).
+    expect(container.querySelector(".hn-ovk-headline .hn-skeleton")).not.toBeNull();
   });
 });
 
@@ -293,7 +282,7 @@ describe("Overview · kontrak layout", () => {
     expect(screen.queryByText("Panggung sunyi")).toBeNull();
   });
 
-  it("satu kolom tanpa inline grid atau layout inline: layout lewat kelas hn-ov-*", () => {
+  it("tanpa inline grid atau layout inline: layout lewat kelas hn-ov-*/hn-ovk-*", () => {
     const src = overviewSrc();
     expect(src).not.toMatch(/gridTemplateColumns/);
     expect(src).not.toMatch(/style=\{\{/);

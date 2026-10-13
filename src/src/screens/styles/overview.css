@@ -109,3 +109,42 @@
   /* Backlog: tautan memakai lebar penuh dan boleh membungkus, tak melewati tepi kartu. */
   .hn-ov-foot-link { width: 100%; min-height: var(--touch-target); padding-inline: var(--space-2); }
 }
+
+/* ADR-0220 · Overview "Koran Pagi". Kerangka broadsheet: masthead, headline, lalu kolom. */
+.hn-ovk-masthead { text-align: center; margin-bottom: var(--space-2); }
+.hn-ovk-title { margin: 0; font-family: var(--font-display); font-size: 30px; font-weight: 600;
+  letter-spacing: .02em; color: var(--text-strong); }
+.hn-ovk-dateline { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  border-top: 2px solid var(--text-strong); border-bottom: 1px solid var(--text-strong);
+  padding: 4px 0; margin-top: 6px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+.hn-ovk-headline { margin: 14px 0 6px; font-family: var(--font-display); font-size: 26px; line-height: 1.25;
+  color: var(--text-strong); max-width: 46ch; }
+.hn-ovk-tone--bad { color: var(--clay-600); }
+.hn-ovk-tone--good { color: var(--leaf-600); }
+.hn-ovk-kicker { margin: 0; font-family: var(--font-ui); font-size: 11px; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-subtle); }
+.hn-ovk-delta { font-size: 12px; color: var(--text-muted); }
+.hn-ovk-koreksi { border: 1px solid var(--border-hair); border-left: 3px solid var(--amber-600);
+  background: var(--surface-card); padding: 8px 12px; margin: 8px 0 12px; }
+.hn-ovk-cols { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 16px; align-items: start; }
+.hn-ovk-col { display: grid; gap: 16px; min-width: 0; }
+.hn-ovk-col--lead { grid-column: 1; }
+.hn-ovk-col--mid { grid-column: 2; }
+.hn-ovk-col--side { grid-column: 3; }
+.hn-ovk-indeks .hn-ov-pct, .hn-ovk-indeks .hn-ov-prj-meta { font-family: var(--font-mono); }
+.hn-ovk-indeks .hn-ov-prj > * { border-bottom: 1px dotted var(--border-hair); }
+@media (max-width: 1100px) {
+  .hn-ovk-cols { grid-template-columns: 1fr 1fr; }
+  .hn-ovk-col--lead { grid-column: 1 / -1; }
+  .hn-ovk-col--mid { grid-column: 1; }
+  .hn-ovk-col--side { grid-column: 2; }
+}
+@media (max-width: 720px) {
+  .hn-ovk-cols { grid-template-columns: 1fr; }
+  .hn-ovk-col--lead, .hn-ovk-col--mid, .hn-ovk-col--side { grid-column: 1; }
+  .hn-ovk-col--side { order: 2; }
+  .hn-ovk-col--mid { order: 3; }
+  .hn-ovk-headline { font-size: 21px; }
+  .hn-ovk-title { font-size: 24px; }
+}
+

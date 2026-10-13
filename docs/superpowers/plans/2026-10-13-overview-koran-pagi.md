@@ -1402,7 +1402,7 @@ git commit -m "feat(overview): grup siar ke-12 overview, GET /api/overview, MCP 
   OverviewScreen props += { overview?: OverviewDTO | null }
   ```
 
-- [ ] **Step 1: Perbarui test layar (gagal dulu)**
+- [x] **Step 1: Perbarui test layar (gagal dulu)**
 
 Di `src/test/overview-screen.test.tsx`:
 1. Tambah import `import type { OverviewDTO } from "@hanoman/shared";` dan helper:
@@ -1465,7 +1465,7 @@ Expected: FAIL — "Kabar Hanoman" dan region "Koreksi" belum ada.
 
 Sebelum lanjut: periksa API `Skeleton` di `src/src/ds/components/skeleton.tsx` (nama kelas atau atribut yang dirender). Sesuaikan selektor test di butir 5 dengan yang benar-benar dirender (`.hn-skeleton` atau `[aria-busy='true']`), lalu biarkan selektornya tetap satu.
 
-- [ ] **Step 2: Implementasi formatter dan komponen**
+- [x] **Step 2: Implementasi formatter dan komponen**
 
 `src/src/screens/overview/format.ts`:
 ```ts
@@ -1647,7 +1647,7 @@ export function IndeksProject({ projects, total, backlog, onOpen, onGoto }: {
 }
 ```
 
-- [ ] **Step 3: Susun ulang `OverviewScreen.tsx`**
+- [x] **Step 3: Susun ulang `OverviewScreen.tsx`**
 
 Ganti seluruh isi berkas dengan versi di bawah. Daftar "Sesi berjalan" dan seksi limit **sementara dipertahankan**; Task 8 dan 9 menggantinya. Seksi "Aktivitas terbaru", `ActRow`, `AttnRow`, `PrjRow` dihapus.
 ```tsx
@@ -1810,7 +1810,7 @@ export function OverviewScreen({ projects, backlog, sessions, overview = null, o
 ```
 Catatan: test "tanpa sesi, keadaan kosong…" mencari `getByRole("region", { name: "Sesi berjalan" })`. Section ber-`aria-labelledby` dengan `<h3 id="ov-live">` memenuhi itu.
 
-- [ ] **Step 4: CSS kerangka koran** — tambahkan di akhir `src/src/screens/styles/overview.css`:
+- [x] **Step 4: CSS kerangka koran** — tambahkan di akhir `src/src/screens/styles/overview.css`:
 ```css
 /* ADR-0220 · Overview "Koran Pagi". Kerangka broadsheet: masthead, headline, lalu kolom. */
 .hn-ovk-masthead { text-align: center; margin-bottom: var(--space-2, 8px); }
@@ -1854,7 +1854,7 @@ Variabel `--space-2`, `--surface-card`, `--border-hair`, `--clay-600`, `--leaf-6
 
 Urutan mobile di spec adalah Headline → Denyut → Bottleneck → Bensin → sisanya. Denyut dan Bottleneck ada di kolom lead (urutan 1), Bensin di kolom side (`order: 2`), lalu kolom mid.
 
-- [ ] **Step 5: App.tsx** — di `src/src/App.tsx`:
+- [x] **Step 5: App.tsx** — di `src/src/App.tsx`:
 1. Import tipe: tambahkan `OverviewDTO` ke import dari `@hanoman/shared` yang sudah ada (atau `import type { OverviewDTO } from "@hanoman/shared";`).
 2. Di dekat `const [pending, setPending] = …`, tambahkan:
    ```ts
@@ -1869,12 +1869,12 @@ Urutan mobile di spec adalah Headline → Denyut → Bottleneck → Bensin → s
    ```
 4. Pada render `OverviewScreen`, tambahkan prop `overview={overview}`.
 
-- [ ] **Step 6: Jalankan test, pastikan lulus**
+- [x] **Step 6: Jalankan test, pastikan lulus**
 
 Run: `TEST src/test/overview-screen.test.tsx src/test/app-snapshot-digest.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/src/screens/overview src/src/screens/OverviewScreen.tsx src/src/screens/styles/overview.css src/src/App.tsx src/test/overview-screen.test.tsx docs/superpowers/plans/2026-10-13-overview-koran-pagi.md

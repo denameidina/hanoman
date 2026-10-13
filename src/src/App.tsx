@@ -20,7 +20,7 @@ import { usePersistedState, pruneUiState, oneOf, isStr } from "./ui-state";
 import { usePetEnabled, petVisibleOn } from "./ui-state/pet-pref";
 import { api, ApiError, createApi, type TerminalSession, type SourceResetPending } from "./api/client";
 import { subscribe } from "./api/events";
-import type { ProjectView, Spec, SpecSlim, SpecListItem, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView, PendingCounts } from "@hanoman/shared";
+import type { ProjectView, Spec, SpecSlim, SpecListItem, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView, PendingCounts, OverviewDTO } from "@hanoman/shared";
 import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, LOCAL_DEVICE_ID, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus, type Orchestration, type OrchestrationFlow, type PhaseOverrides } from "@hanoman/shared";
 // SPEC-1216 · ADR-0165 §11 · target picker dialog Start — murni (Task 10), dipakai di sini apa
 // adanya. `createApi` diimpor dari "./api/client" (bukan "./api/instance"): instance.tsx hanya
@@ -946,6 +946,11 @@ function AppInner() {
      (jebakan yang sama yang membuat muat awal presence duduk di ClientsScreen). */
   const [pending, setPending] = React.useState<PendingCounts | null>(null);
 
+  /* ADR-0220 · agregat Overview "Koran Pagi" dari grup siar `overview`. `null` sampai frame pertama tiba
+     (server lama tak pernah mengirimnya) — panel menampilkan kerangka, bukan angka nol. Server sudah
+     men-dedup frame ini, jadi setiap frame yang tiba memang berisi perubahan. */
+  const [overview, setOverview] = React.useState<OverviewDTO | null>(null);
+
   /* Audit UI/UX 2026-10 · frame `sessions`, `leadAsks`, `pending` hanya menyentuh state bila isinya
      berbeda dari yang SEDANG tampil. Ref ini diperbarui tiap render, jadi perubahan lokal (mis. sesi
      yang baru dimulai) ikut terhitung dan tak tertimpa frame identik. Tanpa ini tiap snapshot WS
@@ -1022,6 +1027,7 @@ function AppInner() {
         setPresence((cur) => (presenceKeyOf(cur) === presenceKeyOf(next) ? cur : next));
       }
       else if (m.t === "pending") applyIfChanged(shown.current.pending, m.counts, setPending);
+      else if (m.t === "overview") setOverview(m.overview);
     });
   }, [operatorSession]);
 
@@ -1598,7 +1604,7 @@ function AppInner() {
   if (section === "overview") {
     screen = (
       <Shell active="overview" title="Overview" breadcrumb="nafanesia.id · ringkasan workspace" onNavigate={setSection}>
-        {gate(<OverviewScreen projects={projectsView} backlog={backlog} sessions={sessions}
+        {gate(<OverviewScreen projects={projectsView} backlog={backlog} sessions={sessions} overview={overview}
           onOpenProject={openProject} onGoto={setSection} onCreateProject={() => setModal("project")}
           onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }} />)}
       </Shell>
