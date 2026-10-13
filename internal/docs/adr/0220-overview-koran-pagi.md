@@ -19,6 +19,8 @@ lamanya episode menunggu (`decisionAt` lenyap begitu dijawab) dan riwayat `usedP
 2. **Perekam di memori** (`overview-recorder.ts`) dengan timer sendiri 10 dtk (`.unref`), bukan
    loop siar yang hanya hidup saat ada klien. Episode menunggu (maks 2.000) dan sampel limit
    (2 jam, jarak ≥25 dtk) **hilang saat restart**. `recordingSince` dikirim supaya UI jujur.
+   Proyeksi bensin menuntut ≥4 sampel yang merentang ≥15 menit: empat sampel rapat sesudah restart
+   sempat memicu alarm "habis" palsu (11% terpakai) saat verifikasi.
    Penyimpanan permanen ditunda ke ADR terpisah bila angkanya terbukti perlu bertahan.
 3. **Perhitungan murni** di `overview-metrics.ts`. Hari = 00.00 lokal mesin. Sesi agen = kind
    `spec|reverse|prd|scaffold|breakdown|telegram`. Tumbang = `sessionOutcome() === "failed"`.

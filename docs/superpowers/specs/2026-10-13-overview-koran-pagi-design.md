@@ -123,7 +123,7 @@ mengambil data sendiri. Data `overview` diterima di `App.tsx` seperti grup snaps
   dicatat di log, dan grup tetap disiarkan.
 - Buffer perekam dibatasi (lihat di atas).
 - Pergantian hari terjadi alami karena `now` adalah parameter.
-- Proyeksi bensin hanya tampil dengan ≥4 sampel dan kemiringan > 0. Bila tidak, tampil "laju stabil".
+- Proyeksi bensin hanya tampil dengan ≥4 sampel yang merentang ≥15 menit (dalam 60 menit terakhir) dan kemiringan > 0. Sampel kurang atau terlalu rapat (mis. baru restart) → "mengumpulkan data…"; kemiringan ≤ 0 → "laju stabil".
 
 ### Test (TDD)
 

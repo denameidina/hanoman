@@ -173,6 +173,10 @@ describe("bensinStats", () => {
     const [b] = bensinStats(NOW, [series([[30, 30], [20, 40], [10, 50], [0, 60]], at(13, 14, 50).toISOString())]);
     expect(b!.verdict).toBe("aman");
   });
+  it("sampel cukup banyak tapi rentangnya <15 menit (mis. baru restart) → kurang-data, bukan alarm habis", () => {
+    const [b] = bensinStats(NOW, [series([[3, 10], [2, 10.5], [1, 11], [0, 11.5]], at(13, 18).toISOString())]);
+    expect(b).toMatchObject({ verdict: "kurang-data", exhaustAt: null });
+  });
   it("kemiringan ≤ 0 → stabil; <4 sampel dalam 60 menit → kurang-data", () => {
     expect(bensinStats(NOW, [series([[30, 60], [20, 60], [10, 60], [0, 60]], null)])[0]!.verdict).toBe("stabil");
     expect(bensinStats(NOW, [series([[90, 10], [80, 20], [10, 50], [0, 60]], null)])[0]!.verdict).toBe("kurang-data");

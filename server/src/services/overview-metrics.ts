@@ -185,6 +185,9 @@ export type LimitSeries = {
 
 const BENSIN_LOOKBACK_MS = 60 * MIN_MS;
 const BENSIN_MIN_SAMPLES = 4;
+// Empat sampel rapat sesudah restart (≈2 menit) membuat kenaikan 1% terbaca sebagai tren dan memicu
+// alarm "habis" palsu di headline. Proyeksi baru dipercaya bila sampelnya merentang ≥15 menit.
+const BENSIN_MIN_SPAN_MS = 15 * MIN_MS;
 
 // Regresi linear kuadrat terkecil: kemiringan %/ms.
 function slopeOf(pts: { at: number; pct: number }[]): number {
@@ -205,7 +208,7 @@ export function bensinStats(now: number, series: LimitSeries[]): OverviewBensin[
     const recent = s.samples.filter((p) => p.at >= now - BENSIN_LOOKBACK_MS);
     const base = { source: s.source, key: s.key, label: s.label, usedPct: last.pct, resetsAt: s.resetsAt,
       samples: recent.map((p) => ({ at: new Date(p.at).toISOString(), pct: p.pct })) };
-    if (recent.length < BENSIN_MIN_SAMPLES) { out.push({ ...base, exhaustAt: null, verdict: "kurang-data" }); continue; }
+    if (recent.length < BENSIN_MIN_SAMPLES || last.at - recent[0]!.at < BENSIN_MIN_SPAN_MS) { out.push({ ...base, exhaustAt: null, verdict: "kurang-data" }); continue; }
     const slope = slopeOf(recent);
     if (slope <= 0) { out.push({ ...base, exhaustAt: null, verdict: "stabil" }); continue; }
     const exhaust = Math.round(last.at + (100 - last.pct) / slope);
