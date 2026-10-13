@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   startOfDay, addDays, dayKey, overlapMs, median, isFailed, dayStats, riverStats, tokenStats,
+  waitStats, heatmapStats, recordStats, liveMs,
   type SessionRow, type SpecRow,
 } from "../src/services/overview-metrics";
 
@@ -83,5 +84,74 @@ describe("tokenStats", () => {
   it("kosong → nol, cache & per-spec null, tanpa agen", () => {
     expect(tokenStats(NOW, [], 0)).toEqual({ input: 0, output: 0, cached: 0, total: 0, cacheHitPct: null,
       perLanded: null, topAgent: null, yesterdayTotal: 0 });
+  });
+});
+describe("waitStats", () => {
+  it("menjumlah menit menunggu per hari, memotong episode yang melewati tengah malam", () => {
+    const waits = [
+      { start: at(12, 23, 50).getTime(), end: at(13, 0, 20).getTime() },   // 10m kemarin + 20m hari ini
+      { start: at(13, 14, 0).getTime(), end: null },                       // masih menunggu → sampai NOW (30m)
+    ];
+    const sessions = [sess({ startedAt: at(13, 13, 30), endedAt: null })]; // hidup 60m hari ini
+    expect(waitStats(NOW, waits, sessions)).toEqual({ todayMin: 50, yesterdayMin: 10, pctOfLive: 83 });
+  });
+  it("tanpa sesi agen hidup → pctOfLive null; sumber sesi gagal (null) juga null", () => {
+    expect(waitStats(NOW, [], []).pctOfLive).toBeNull();
+    expect(waitStats(NOW, [{ start: at(13, 9).getTime(), end: at(13, 10).getTime() }], null))
+      .toEqual({ todayMin: 60, yesterdayMin: 0, pctOfLive: null });
+  });
+  it("persentase dibatasi 100", () => {
+    const sessions = [sess({ startedAt: at(13, 14, 0), endedAt: at(13, 14, 10) })];
+    expect(waitStats(NOW, [{ start: at(13, 13).getTime(), end: at(13, 14).getTime() }], sessions).pctOfLive).toBe(100);
+  });
+});
+
+describe("liveMs", () => {
+  it("sesi yang masih hidup dihitung sampai now; shell manual diabaikan", () => {
+    const t0 = startOfDay(NOW);
+    expect(liveMs([sess({ startedAt: at(13, 14) }), sess({ kind: "shell", startedAt: at(13, 9) })], t0, addDays(t0, 1), NOW))
+      .toBe(30 * 60_000);
+  });
+});
+
+describe("heatmapStats", () => {
+  it("7 hari × 24 jam, terlama dulu, menit per sel", () => {
+    const h = heatmapStats(NOW, [
+      sess({ startedAt: at(13, 9, 30), endedAt: at(13, 10, 15) }),   // 30m di jam 9, 15m di jam 10
+      sess({ startedAt: at(7, 2, 0), endedAt: at(7, 2, 40) }),       // hari terlama
+    ]);
+    expect(h.days).toEqual(["2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10", "2026-10-11", "2026-10-12", "2026-10-13"]);
+    expect(h.minutes).toHaveLength(7);
+    expect(h.minutes[6]![9]).toBe(30);
+    expect(h.minutes[6]![10]).toBe(15);
+    expect(h.minutes[0]![2]).toBe(40);
+    expect(h.minutes.every((row) => row.length === 24)).toBe(true);
+  });
+});
+
+describe("recordStats", () => {
+  it("streak hari tanpa sesi tumbang sampai hari ini, rekor streak, rekor spec per hari", () => {
+    const sessions = [
+      sess({ startedAt: at(1, 9), endedAt: at(1, 10), exitCode: 0 }),   // awal riwayat: 1 Okt
+      sess({ startedAt: at(5, 9), endedAt: at(5, 10), exitCode: 2 }),   // tumbang 5 Okt
+      sess({ startedAt: at(9, 9), endedAt: at(9, 10), exitCode: 1 }),   // tumbang 9 Okt
+    ];
+    const specs = [spec({ doneAt: at(12, 9) }), spec({ doneAt: at(12, 10) }), spec({ doneAt: at(13, 9) })];
+    expect(recordStats(NOW, specs, sessions)).toEqual({
+      streakDays: 4,                                     // 10, 11, 12, 13 Okt
+      bestStreak: 4,                                     // 1–4 Okt juga 4; 6–8 Okt 3
+      bestLandedDay: { date: "2026-10-12", count: 2 },
+      landedRecordToday: false,
+    });
+  });
+  it("tumbang hari ini → streak 0; rekor hari ini bila melampaui semua hari sebelumnya", () => {
+    const r = recordStats(NOW, [spec({ doneAt: at(12, 9) }), spec({ doneAt: at(13, 9) }), spec({ doneAt: at(13, 10) })],
+      [sess({ startedAt: at(13, 9), endedAt: at(13, 10), exitCode: 1 })]);
+    expect(r.streakDays).toBe(0);
+    expect(r.landedRecordToday).toBe(true);
+    expect(r.bestLandedDay).toEqual({ date: "2026-10-13", count: 2 });
+  });
+  it("tanpa riwayat sesi sama sekali → streak 0, rekor 0, tanpa hari terbaik", () => {
+    expect(recordStats(NOW, [], [])).toEqual({ streakDays: 0, bestStreak: 0, bestLandedDay: null, landedRecordToday: false });
   });
 });

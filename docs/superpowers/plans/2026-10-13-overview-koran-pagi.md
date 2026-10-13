@@ -486,7 +486,7 @@ git commit -m "feat(overview): metrik murni — hari, sungai spec, ekonomi token
   recordStats(now: number, specs: SpecRow[], sessions: SessionRow[]): OverviewRecords
   ```
 
-- [ ] **Step 1: Tulis test yang gagal** — tambahkan di akhir `server/test/overview-metrics.test.ts`, lalu lengkapi import di atas berkas dengan `waitStats, heatmapStats, recordStats, liveMs`:
+- [x] **Step 1: Tulis test yang gagal** — tambahkan di akhir `server/test/overview-metrics.test.ts`, lalu lengkapi import di atas berkas dengan `waitStats, heatmapStats, recordStats, liveMs`:
 
 ```ts
 describe("waitStats", () => {
@@ -560,12 +560,12 @@ describe("recordStats", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST server/test/overview-metrics.test.ts`
 Expected: FAIL — `waitStats is not a function` (dan sejenisnya).
 
-- [ ] **Step 3: Implementasi** — tambahkan import tipe `OverviewWait, OverviewHeatmap, OverviewRecords` ke baris import `@hanoman/shared`, lalu tambahkan di akhir `overview-metrics.ts`:
+- [x] **Step 3: Implementasi** — tambahkan import tipe `OverviewWait, OverviewHeatmap, OverviewRecords` ke baris import `@hanoman/shared`, lalu tambahkan di akhir `overview-metrics.ts`:
 
 ```ts
 export type Span = { start: number; end: number | null };
@@ -653,12 +653,12 @@ export function recordStats(now: number, specs: SpecRow[], sessions: SessionRow[
 
 Catatan untuk implementer: pada test pertama `recordStats`, rekor hari terbaik (12 Okt, 2) lebih besar dari hari ini (1), jadi `landedRecordToday` false. Pada test kedua, hari ini (2) melampaui 12 Okt (1). Tanpa hari lain yang pernah mendaratkan spec (`prevMax = 0`), `landedRecordToday` selalu false; test `computeOverview` dan route di Task 4/6 bergantung pada aturan ini. Untuk hari dengan jumlah sama, `bestLandedDay` memilih yang **paling awal** (pembanding `>` ketat dalam iterasi menaik).
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `TEST server/test/overview-metrics.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/overview-metrics.ts server/test/overview-metrics.test.ts docs/superpowers/plans/2026-10-13-overview-koran-pagi.md

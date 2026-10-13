@@ -1,4 +1,7 @@
-import { sessionOutcome, type OverviewDay, type OverviewRiver, type OverviewTokens } from "@hanoman/shared";
+import {
+  sessionOutcome, type OverviewDay, type OverviewHeatmap, type OverviewRecords, type OverviewRiver,
+  type OverviewTokens, type OverviewWait,
+} from "@hanoman/shared";
 
 // ADR-0220 · Overview "Koran Pagi". Seluruh berkas ini MURNI: `now` dan baris sumber masuk sebagai
 // parameter, jadi pergantian hari, potongan tengah malam, dan proyeksi bensin bisa diuji tanpa jam
@@ -91,4 +94,86 @@ export function tokenStats(now: number, invs: InvocationRow[], landedToday: numb
     yesterdayTotal: invs.filter((i) => i.startedAt.getTime() >= y0 && i.startedAt.getTime() < t0)
       .reduce((n, i) => n + invTotal(i), 0),
   };
+}
+
+export type Span = { start: number; end: number | null };
+
+export function liveMs(sessions: SessionRow[], t0: number, t1: number, now: number): number {
+  let ms = 0;
+  for (const s of sessions) {
+    if (!AGENT_KINDS.has(s.kind)) continue;
+    ms += overlapMs(s.startedAt.getTime(), s.endedAt ? s.endedAt.getTime() : now, t0, t1);
+  }
+  return ms;
+}
+
+const spanMs = (spans: Span[], t0: number, t1: number, now: number): number =>
+  spans.reduce((n, w) => n + overlapMs(w.start, w.end ?? now, t0, t1), 0);
+
+export function waitStats(now: number, waits: Span[], sessions: SessionRow[] | null): OverviewWait {
+  const t0 = startOfDay(now);
+  const t1 = addDays(t0, 1);
+  const y0 = addDays(t0, -1);
+  const todayMs = spanMs(waits, t0, t1, now);
+  const live = sessions ? liveMs(sessions, t0, t1, now) : 0;
+  return {
+    todayMin: Math.round(todayMs / MIN_MS),
+    yesterdayMin: Math.round(spanMs(waits, y0, t0, now) / MIN_MS),
+    pctOfLive: sessions && live > 0 ? Math.min(100, Math.round((todayMs / live) * 100)) : null,
+  };
+}
+
+export function heatmapStats(now: number, sessions: SessionRow[]): OverviewHeatmap {
+  const t0 = startOfDay(now);
+  const days: string[] = [];
+  const minutes: number[][] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d0 = addDays(t0, -i);
+    const base = new Date(d0);
+    days.push(dayKey(d0));
+    const row: number[] = [];
+    for (let h = 0; h < 24; h++) {
+      const h0 = new Date(base.getFullYear(), base.getMonth(), base.getDate(), h).getTime();
+      const h1 = new Date(base.getFullYear(), base.getMonth(), base.getDate(), h + 1).getTime();
+      row.push(Math.round(liveMs(sessions, h0, h1, now) / MIN_MS));
+    }
+    minutes.push(row);
+  }
+  return { days, minutes };
+}
+
+const RECORD_WINDOW_DAYS = 90;
+
+export function recordStats(now: number, specs: SpecRow[], sessions: SessionRow[]): OverviewRecords {
+  const t0 = startOfDay(now);
+  const windowStart = addDays(t0, -(RECORD_WINDOW_DAYS - 1));
+  const agent = sessions.filter((s) => AGENT_KINDS.has(s.kind));
+  const failedDays = new Set(agent.filter(isFailed).map((s) => dayKey(s.endedAt!.getTime())));
+
+  let streakDays = 0;
+  let bestStreak = 0;
+  if (agent.length > 0) {
+    const first = Math.max(windowStart, startOfDay(Math.min(...agent.map((s) => s.startedAt.getTime()))));
+    let run = 0;
+    for (let d = first; d <= t0; d = addDays(d, 1)) {
+      run = failedDays.has(dayKey(d)) ? 0 : run + 1;
+      bestStreak = Math.max(bestStreak, run);
+    }
+    streakDays = run;   // run terakhir = run yang berakhir hari ini
+  }
+
+  const landedByDay = new Map<string, number>();
+  for (const s of specs) {
+    if (!s.doneAt || s.doneAt.getTime() < windowStart) continue;
+    const k = dayKey(s.doneAt.getTime());
+    landedByDay.set(k, (landedByDay.get(k) ?? 0) + 1);
+  }
+  let bestLandedDay: OverviewRecords["bestLandedDay"] = null;
+  for (const [date, count] of [...landedByDay].sort(([a], [b]) => a.localeCompare(b)))
+    if (!bestLandedDay || count > bestLandedDay.count) bestLandedDay = { date, count };
+  const todayKey = dayKey(t0);
+  const todayCount = landedByDay.get(todayKey) ?? 0;
+  const prevMax = Math.max(0, ...[...landedByDay].filter(([k]) => k !== todayKey).map(([, n]) => n));
+  // Rekor butuh pembanding: hari pertama yang pernah mendaratkan spec bukan "rekor baru".
+  return { streakDays, bestStreak, bestLandedDay, landedRecordToday: prevMax > 0 && todayCount > prevMax };
 }
