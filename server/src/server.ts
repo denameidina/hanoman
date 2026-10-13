@@ -27,6 +27,7 @@ import { dbFilePath, resolveHardening, resolveHome } from "@hanoman/runner";
 import { ensureSetupToken } from "./services/bootstrap";
 import { secureHanomanHome } from "./services/secure-home";
 import { startRetentionSweep } from "./services/retention";
+import { startOverviewRecorder } from "./services/overview-recorder";
 import { uploadDir } from "./services/uploads";
 import { transcriptDir } from "./services/transcript-store";
 import { startSessionEventRelay } from "./services/session-event-relay";
@@ -195,4 +196,6 @@ bootstrapReady.then(async () => {
   // menutup sesi berikutnya.
   startWorktreeReaper();
   startRetentionSweep();
+  // ADR-0220 · perekam menit menunggu & sampel limit untuk Overview (in-process, timer .unref).
+  startOverviewRecorder();
 }).catch((err) => { console.error("listen gagal:", err); process.exit(1); });

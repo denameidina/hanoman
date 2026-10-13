@@ -934,7 +934,7 @@ git commit -m "feat(overview): prakiraan bensin, headline template, computeOverv
   __resetRecorder(now?: number): void   // test-only
   ```
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `server/test/overview-recorder.test.ts`:
 ```ts
@@ -1008,12 +1008,12 @@ it("recordingSince = awal perekam", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan test, pastikan gagal**
+- [x] **Step 2: Jalankan test, pastikan gagal**
 
 Run: `TEST server/test/overview-recorder.test.ts`
 Expected: FAIL — modul belum ada.
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `server/src/services/overview-recorder.ts`:
 ```ts
@@ -1116,12 +1116,12 @@ export function __resetRecorder(now = Date.now()): void {
   startOverviewRecorder();
 ```
 
-- [ ] **Step 4: Jalankan test, pastikan lulus**
+- [x] **Step 4: Jalankan test, pastikan lulus**
 
 Run: `TEST server/test/overview-recorder.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/services/overview-recorder.ts server/test/overview-recorder.test.ts server/src/server.ts docs/superpowers/plans/2026-10-13-overview-koran-pagi.md
