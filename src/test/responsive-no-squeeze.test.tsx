@@ -62,9 +62,12 @@ describe("SPEC-763 · baris padat memberi teks lebar minimum di mobile", () => {
   it("memakai aturan itu pada baris yang terukur terjepit", () => {
     // Audit 2026-10 · Fase 3B: baris Overview kini memakai DenseRow (kelas `hn-row`, flex-wrap, dan
     // `.hn-row-main` ber-min-width 0), bukan `hn-dense-row` sendiri. Kontraknya tetap: baris membungkus.
+    // ADR-0220 · baris sesi Overview kini dirender panel Denyut (berkasnya sendiri), tetap lewat DenseRow.
     const overview = readFileSync(resolve(import.meta.dirname, "../src/screens/OverviewScreen.tsx"), "utf8");
-    expect(overview).toContain("<DenseRow");
+    const denyut = readFileSync(resolve(import.meta.dirname, "../src/screens/overview/Denyut.tsx"), "utf8");
+    expect(denyut).toContain("<DenseRow");
     expect(overview).not.toMatch(/style=\{\{/);   // layout Overview lewat kelas, bukan inline
+    expect(denyut).not.toMatch(/style=\{\{/);
     expect(css).toMatch(/\.hn-row \{[^}]*flex-wrap:\s*wrap/);
     expect(css).toMatch(/\.hn-row-main \{[^}]*min-width:\s*0/);
 

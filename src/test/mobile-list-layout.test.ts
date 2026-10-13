@@ -127,7 +127,8 @@ describe("Overview · Perlu perhatian di ponsel: nama wrap dua baris, alasan cla
   const mobile = atBlock(css, "@media (max-width: 767px)");
 
   it("daftar memakai kelas yang dikunci CSS-nya (bukan daftar umum)", () => {
-    expect(read("screens/OverviewScreen.tsx")).toContain('className="hn-ov-attn"');
+    // ADR-0220 · "Perlu perhatian" kini kotak Koreksi di berkasnya sendiri; kelas CSS-nya tetap.
+    expect(read("screens/overview/Koreksi.tsx")).toContain('className="hn-ov-attn"');
   });
 
   it("nama project di barisnya sendiri dan boleh turun dua baris", () => {

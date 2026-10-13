@@ -152,7 +152,8 @@ describe("Overview · sesi berjalan", () => {
     const empty = container.querySelector(".hn-ov-empty");
     expect(empty).not.toBeNull();
     expect(empty!.tagName).toBe("P");
-    expect(within(screen.getByRole("region", { name: "Sesi berjalan" })).queryByText("Tidak ada sesi berjalan")).not.toBeNull();
+    // ADR-0220 · seksi sesi kini panel "Denyut armada"; daftarnya tetap berlabel "Sesi berjalan".
+    expect(within(screen.getByRole("region", { name: "Denyut armada" })).queryByText("Tidak ada sesi berjalan")).not.toBeNull();
   });
 });
 
@@ -303,5 +304,39 @@ describe("Overview · kontrak layout", () => {
     const css = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/overview.css"), "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "");
     expect(css).not.toMatch(/!important/);
+  });
+});
+
+describe("Overview · denyut armada", () => {
+  it("tiap sesi hidup punya jejak EKG; yang menunggu jejaknya datar", () => {
+    const { container } = render(<OverviewScreen projects={[project({ id: "a", name: "alpha" }), project({ id: "b", name: "beta" })]}
+      backlog={[]} sessions={[session({ id: "s1", projectId: "a" }), session({ id: "s2", projectId: "b", decision: true })]}
+      onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    expect(container.querySelectorAll(".hn-ovk-trace")).toHaveLength(2);
+    expect(container.querySelectorAll(".hn-ovk-trace--flat")).toHaveLength(1);
+    expect(container.querySelector(".hn-ovk-trace svg")!.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("panel denyut berjudul 'Denyut armada' dan menyebut jumlah sesi", () => {
+    render(<OverviewScreen projects={[project({ id: "a", name: "alpha" })]} backlog={[]}
+      sessions={[session({ id: "s1", projectId: "a" })]} onOpenProject={noop} onGoto={noop} onOpenSession={noop} />);
+    expect(screen.getByRole("heading", { name: "Denyut armada" })).toBeTruthy();
+    expect(screen.getByText("1 sesi hidup")).toBeTruthy();
+  });
+
+  it("maksimal 8 baris; sisanya '+N lainnya' yang membuka Terminal", () => {
+    const onGoto = vi.fn();
+    const many = Array.from({ length: 11 }, (_, i) => project({ id: `p${i}`, name: `proj${i}` }));
+    render(<OverviewScreen projects={many} backlog={[]} sessions={many.map((p) => session({ id: `s-${p.id}`, projectId: p.id }))}
+      onOpenProject={noop} onGoto={onGoto} onOpenSession={noop} />);
+    expect(within(screen.getByRole("list", { name: "Sesi berjalan" })).getAllByRole("listitem")).toHaveLength(8);
+    fireEvent.click(screen.getByRole("button", { name: "+3 lainnya" }));
+    expect(onGoto).toHaveBeenCalledWith("terminal");
+  });
+
+  it("CSS: animasi jejak dimatikan di prefers-reduced-motion, jejak datar tak beranimasi", () => {
+    const css = readFileSync(resolve(import.meta.dirname, "../src/screens/styles/overview.css"), "utf8");
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\.hn-ovk-trace-run\s*\{[^}]*animation:\s*none/);
+    expect(css).toMatch(/\.hn-ovk-trace--flat \.hn-ovk-trace-run\s*\{[^}]*animation:\s*none/);
   });
 });

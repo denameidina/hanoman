@@ -4,50 +4,18 @@
    ini tanpa style inline. Mengamandemen susunan Fase 3B (Audit UI/UX 2026-10). */
 import React from "react";
 import type { OverviewDTO } from "@hanoman/shared";
-import { Button, DenseRow, Icon, PageHeader, RowList, StateBlock, StatusPill, Tabs } from "../ds";
+import { Button, PageHeader, StateBlock, Tabs } from "../ds";
 import type { TerminalSession } from "../api/client";
 import type { ProjectVM, SpecSlim } from "./types";
 import { LimitWindows } from "./LimitIndicator";
-import { FLOW_LABEL, STAGE_LABEL, labelOf } from "../lib/labels";
-import { relativeTime } from "../lib/time-format";
 import { useLimits } from "../api/limits";
 import { useCodexLimits } from "../api/codex-limits";
 import { Masthead } from "./overview/Masthead";
 import { Headline } from "./overview/Headline";
 import { Koreksi, attentionOf } from "./overview/Koreksi";
 import { IndeksProject } from "./overview/IndeksProject";
+import { Denyut, isWaiting, sortLive } from "./overview/Denyut";
 import "./styles/overview.css";
-
-// Menunggu manusia: cermin pet-state.ts dan Terminal (decision && !deciding). Yang deciding dilayani lead.
-const isWaiting = (s: TerminalSession) => !!s.decision && !s.deciding;
-
-// Yang menunggu di atas; lalu yang lebih lama mulai; sesi tanpa waktu mulai di bawah; lalu per id.
-function sortLive(live: TerminalSession[], specById: Map<string, SpecSlim>): TerminalSession[] {
-  const startOf = (s: TerminalSession) => {
-    const started = s.specId ? specById.get(s.specId)?.startedAt : null;
-    const ms = started ? Date.parse(started) : Number.NaN;
-    return Number.isNaN(ms) ? Number.POSITIVE_INFINITY : ms;
-  };
-  return [...live].sort((a, b) => (Number(!isWaiting(a)) - Number(!isWaiting(b)))
-    || (startOf(a) - startOf(b)) || a.id.localeCompare(b.id));
-}
-
-function LiveRow({ s, name, spec, now, onOpen }: {
-  s: TerminalSession; name: string; spec: SpecSlim | undefined; now: number; onOpen: (id: string) => void;
-}) {
-  const waiting = isWaiting(s);
-  const fase = waiting ? "Menunggu jawabanmu"
-    : spec ? labelOf(STAGE_LABEL, spec.stage) : s.flow ? labelOf(FLOW_LABEL, s.flow) : "Sesi";
-  const started = relativeTime(spec?.startedAt, now);
-  return (
-    <DenseRow onClick={() => onOpen(s.id)}
-      actions={waiting ? <Button size="sm" variant="secondary" onClick={() => onOpen(s.id)}>Jawab</Button> : undefined}>
-      <StatusPill status={waiting ? "awaiting" : "running"} variant="dot" size="sm">{fase}</StatusPill>
-      <span className="hn-ov-name" title={name}>{name}</span>
-      <span className="hn-ov-meta">{[spec?.id, started && `dimulai ${started}`].filter(Boolean).join(" · ")}</span>
-    </DenseRow>
-  );
-}
 
 export function OverviewScreen({ projects, backlog, sessions, overview = null, onOpenProject, onGoto, onOpenSession, onCreateProject }:
   { projects: ProjectVM[]; backlog: SpecSlim[]; sessions: TerminalSession[];
@@ -113,26 +81,7 @@ export function OverviewScreen({ projects, backlog, sessions, overview = null, o
 
       <div className="hn-ovk-cols">
         <div className="hn-ovk-col hn-ovk-col--lead">
-          <section className="hn-ov-section" aria-labelledby="ov-live">
-            <header className="hn-ov-head">
-              <div className="hn-ov-head-text"><h3 id="ov-live" className="hn-ovk-kicker">Sesi berjalan</h3></div>
-              <div className="hn-ov-head-actions">
-                <Button size="sm" variant="ghost" leftIcon="terminal" onClick={() => onGoto("terminal")}>Buka Terminal</Button>
-              </div>
-            </header>
-            {live.length === 0
-              ? <p className="hn-ov-empty">
-                  <Icon name="terminal" size={14} />
-                  <span>Tidak ada sesi berjalan</span>
-                  <span className="hn-ov-meta">Mulai sebuah backlog item untuk membuka sesi Claude Code interaktif.</span>
-                </p>
-              : <RowList label="Sesi berjalan">
-                  {live.map((s) => (
-                    <LiveRow key={s.id} s={s} name={nameById.get(s.projectId) ?? s.projectId}
-                      spec={s.specId ? specById.get(s.specId) : undefined} now={now} onOpen={onOpenSession} />
-                  ))}
-                </RowList>}
-          </section>
+          <Denyut live={live} nameById={nameById} specById={specById} now={now} onOpen={onOpenSession} onGoto={onGoto} />
         </div>
         <div className="hn-ovk-col hn-ovk-col--side">
           <section className="hn-ov-section" aria-labelledby="ov-limit">

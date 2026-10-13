@@ -1898,7 +1898,7 @@ git commit -m "feat(overview): kerangka Koran Pagi — masthead, headline, Korek
   DENYUT_MAX = 8
   ```
 
-- [ ] **Step 1: Tulis test yang gagal** — tambahkan describe di `src/test/overview-screen.test.tsx`:
+- [x] **Step 1: Tulis test yang gagal** — tambahkan describe di `src/test/overview-screen.test.tsx`:
 ```ts
 describe("Overview · denyut armada", () => {
   it("tiap sesi hidup punya jejak EKG; yang menunggu jejaknya datar", () => {
@@ -1939,7 +1939,7 @@ Test lama di `describe("Overview · sesi berjalan")` (urutan, tombol Jawab, "dim
 Run: `TEST src/test/overview-screen.test.tsx`
 Expected: FAIL — `.hn-ovk-trace` dan heading "Denyut armada" belum ada.
 
-- [ ] **Step 2: Implementasi** — `src/src/screens/overview/Denyut.tsx`:
+- [x] **Step 2: Implementasi** — `src/src/screens/overview/Denyut.tsx`:
 ```tsx
 /* ADR-0220 · Denyut armada: satu jejak EKG per sesi hidup di panel gelap (`--term-*`). Ritme mengikuti
    KEADAAN, bukan `activityAt` (tak ada di SessionDTO; menambahkannya membuat frame `sessions` terkirim
@@ -2066,12 +2066,12 @@ CSS, tambahkan di `overview.css`:
 ```
 Cek dulu bahwa `--brass-400` dan `--clay-500` tersedia di `src/src/ds/tokens/colors.css` (keduanya ada per 2026-10-13). Cek juga bahwa `DenseRow` meneruskan children sebagai flex item: periksa `src/src/ds/components/layout.tsx`. Bila baris tak bisa menampung jejak, letakkan `<Trace>` sebagai child terakhir dan beri `.hn-ovk-denyut .hn-dense-row { flex-wrap: wrap; }` (sesuaikan nama kelas baris yang benar-benar dirender).
 
-- [ ] **Step 3: Jalankan test, pastikan lulus**
+- [x] **Step 3: Jalankan test, pastikan lulus**
 
 Run: `TEST src/test/overview-screen.test.tsx`
 Expected: PASS, termasuk test lama "sesi berjalan".
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/src/screens/overview/Denyut.tsx src/src/screens/OverviewScreen.tsx src/src/screens/styles/overview.css src/test/overview-screen.test.tsx docs/superpowers/plans/2026-10-13-overview-koran-pagi.md

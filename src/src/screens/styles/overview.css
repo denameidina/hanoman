@@ -148,3 +148,28 @@
   .hn-ovk-title { font-size: 24px; }
 }
 
+
+/* Denyut armada: panel gelap memakai permukaan terminal (konsisten dengan pane sesi). */
+.hn-ovk-denyut { background: var(--term-bg); color: var(--term-fg); border-radius: 6px; padding: 12px; }
+.hn-ovk-denyut .hn-ovk-kicker, .hn-ovk-denyut .hn-ov-meta { color: var(--term-dim); }
+.hn-ovk-denyut .hn-ov-name { color: var(--term-fg); }
+.hn-ovk-denyut .hn-ov-empty { color: var(--term-dim); }
+.hn-ovk-more { color: var(--term-dim); }
+.hn-ovk-trace { display: block; flex: 1 1 120px; min-width: 80px; height: 24px; overflow: hidden; }
+.hn-ovk-trace svg { display: block; width: 200%; height: 100%; }
+.hn-ovk-trace path { fill: none; stroke: var(--brass-400); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.hn-ovk-trace--flat path { stroke: var(--clay-500); stroke-dasharray: 4 4; }
+.hn-ovk-trace-run { animation: hn-ovk-scroll 2.4s linear infinite; }
+.hn-ovk-trace--b .hn-ovk-trace-run { animation-duration: 3.1s; }
+.hn-ovk-trace--c .hn-ovk-trace-run { animation-duration: 1.9s; }
+.hn-ovk-trace--flat .hn-ovk-trace-run { animation: none; }
+@keyframes hn-ovk-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) {
+  .hn-ovk-trace-run { animation: none; }
+}
+/* Baris denyut: jejak EKG boleh turun ke baris sendiri di layar sempit; hover tetap gelap. */
+.hn-ovk-denyut .hn-row-main { flex-wrap: wrap; }
+.hn-ovk-denyut .hn-row { border-bottom-color: var(--term-line); }
+.hn-ovk-denyut .hn-row-interactive:hover,
+.hn-ovk-denyut .hn-row-interactive:focus-within { background: var(--term-line); }
+

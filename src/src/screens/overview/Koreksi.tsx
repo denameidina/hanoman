@@ -20,7 +20,8 @@ export function Koreksi({ projects, onOpen }: { projects: ProjectVM[]; onOpen: (
   return (
     <section className="hn-ovk-koreksi" aria-labelledby="ovk-koreksi">
       <h3 id="ovk-koreksi" className="hn-ovk-kicker">Koreksi</h3>
-      <RowList label="Koreksi">
+      {/* `hn-ov-attn`: kelas yang aturan ponselnya dikunci (nama wrap dua baris, alasan clamp dua baris). */}
+      <RowList label="Koreksi" className="hn-ov-attn">
         {list.map((p) => (
           <DenseRow key={p.id} onClick={() => onOpen(p)}>
             <StatusPill status={p.docStatus} variant="dot" size="sm">{labelOf(DOC_STATUS_LABEL, p.docStatus)}</StatusPill>
