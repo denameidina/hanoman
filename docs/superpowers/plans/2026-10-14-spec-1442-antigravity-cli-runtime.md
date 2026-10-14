@@ -168,12 +168,14 @@ menunggu review parent sebelum ditandai selesai.
 
 **Interfaces:** Existing `agentDefsFor(context)` and availability/selectionReason DTO additive for Antigravity; explicit create/update validation tier `inherit|flash|pro`, independent effort null. Runtime `null` stays inherit/filter, never new process executable.
 
-- [ ] **Step 1:** Assert explicit Antigravity tier valid; explicit slug parent/effort independent invalid →400. Legacy/inherit definitions remain stored but incompatible for this parent have availability false + specific reason. Read-only auditor/isolated-worktree not remapped to inherit; compatible inherited agent available after native materialization support.
+- [x] **Step 1:** Assert explicit Antigravity tier valid; explicit slug parent/effort independent invalid →400. Legacy/inherit definitions remain stored but incompatible for this parent have availability false + specific reason. Read-only auditor/isolated-worktree not remapped to inherit; compatible inherited agent available after native materialization support.
 
   Assertions: `expect(invalidCreate.statusCode).toBe(400)`; `expect(readOnlyRow.available).toBe(false)`; `expect(readOnlyRow.workspacePolicy).toBe("read-only")`; `expect(readOnlyRow.selectionReason).toBeTruthy()`.
-- [ ] **Step 2:** Assert merge of PATCH with existing row is validated even when runtime/policy/model/effort arrives separately; inherited forms do not alter Claude/Codex availability. Generated phase reviewer exception is keyed `kind:phase`, cannot be acquired through custom API or reserved name collision.
-- [ ] **Step 3:** Run red paths; extend selection/availability through known shared seam, server final validation and MCP schema. Unsupported tool restriction/maxTurns/timeout does not claim runtime enforcement; documented instructional limits remain labeled.
-- [ ] **Step 4:** Run green paths, MCP agent schema tests; record §S5 existing tool extension decision and commit docs+code.
+- [x] **Step 2:** Assert merge of PATCH with existing row is validated even when runtime/policy/model/effort arrives separately; inherited forms do not alter Claude/Codex availability. Generated phase reviewer exception is keyed `kind:phase`, cannot be acquired through custom API or reserved name collision.
+- [x] **Step 3:** Run red paths; extend selection/availability through known shared seam, server final validation and MCP schema. Unsupported tool restriction/maxTurns/timeout does not claim runtime enforcement; documented instructional limits remain labeled.
+- [x] **Step 4:** Run green paths, MCP agent schema tests; record §S5 existing tool extension decision and commit docs+code.
+
+**Receipt Task 6:** commit `744734936ee3ba1b99aae2f7a3d47a9a3bf24430` reviewed; original9files/199tests green, sharedtypecheck0. Explicit native tier/effort and merged PATCH validated; incompatible legacy model/tool/policy unavailable with reason, no silent fallback; kind spoof/reserved names and sync preservation tested. Existing agents MCP schema/filter + capability decisions/docs updated. Server remains two later seams pty status/Telegram label. [Receipt SoT](../../../internal/docs/architecture/antigravity-runtime.md).
 
 ### Task 7: Phase orchestration/native relay yang jujur
 
