@@ -713,3 +713,11 @@ The asynchronous version note has a stable `role=status`; mounted resolution/rej
 announcement semantics, without claiming an actual screen-reader run. Lead runtime labels and Telegram
 help include Antigravity. `agent:eval` explicitly reports Antigravity unavailable because that evaluator
 is headless; this does not change the native interactive child/session contract.
+
+Task 14 follow-up audit: bootstrap cleanup uses the server's captured temporary parent directory,
+not the stale daemon's `TMPDIR`. Regression RED confirmed failure with a different daemon TMPDIR;
+GREEN targeted suite: 100/100 tests, 5 files (PTY 78, bootstrap 4, mounted conflict 9, mounted lead 8,
+shared engine 1). Actual Settings conflict/lead picks serialize Antigravity parent defaults through
+their existing save endpoints. The generic EngineFields fixture proves only that shared component,
+not four different mounted surfaces. All five touched packages typecheck; server/frontend checked
+again after this follow-up. Credential sentinels, unique DB/socket and clean auth/control env used.

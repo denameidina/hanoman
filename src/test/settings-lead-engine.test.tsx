@@ -120,3 +120,11 @@ describe("SPEC-488 · kartu agen hanoman-lead", () => {
     expect(values).toContain("max");
   });
 });
+
+it("mounted lead override saves Antigravity defaults through lead config", async () => {
+  const engine = { enabled: true, agent: "claude", model: "claude-opus-5", effort: "xhigh" };
+  vi.mocked(api.getSettings).mockResolvedValue(settings({ antigravity: { model: "gemini-3.8-flash-high", effort: "high" }, lead: LEAD({ engine }) }) as any);
+  vi.mocked(api.getLeadConfig).mockResolvedValue(LEAD({ engine }) as any);
+  openModel(); fireEvent.change(await screen.findByLabelText("Runtime lead"), { target: { value: "antigravity" } });
+  await waitFor(() => expect(api.putLeadConfig).toHaveBeenCalledWith(expect.objectContaining({ engine: { enabled: true, agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high" } })));
+});

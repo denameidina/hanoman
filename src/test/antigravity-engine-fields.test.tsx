@@ -4,7 +4,8 @@ import { EngineFields } from "../src/screens/settings/fields";
 vi.mock("../src/api/client", () => ({ api: { getAntigravityVersion: vi.fn().mockResolvedValue({ version: "1.3.4", error: null }) } }));
 
 describe("shared engine runtime selection", () => {
-  it.each(["IDE", "ide", "konflik", "lead"])("selects Antigravity defaults for %s through the existing engine save contract", async (surface) => {
+  it("selects Antigravity defaults through the shared engine save contract", async () => {
+    const surface = "shared engine";
     const serialized: object[] = [];
     render(<EngineFields engine={{ enabled: true, agent: "claude", model: "claude-opus-5", effort: "medium" }}
       labels={{ agentTitle: surface, agentDesc: "Runtime sesi", effortDesc: "Effort", aria: { agent: `Runtime ${surface}`, model: `Model ${surface}`, effort: `Effort ${surface}` }, msg: { agent: "Runtime", model: "Model", effort: "Effort" } }}

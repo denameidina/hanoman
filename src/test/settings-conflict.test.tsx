@@ -121,3 +121,9 @@ describe("SPEC-383 · kartu default sesi konflik", () => {
     expect(screen.getByTestId("conflict-inherited")).toBeInTheDocument();
   });
 });
+
+it("mounted conflict override saves Antigravity parent defaults", async () => {
+  vi.mocked(api.getSettings).mockResolvedValue(settings({ antigravity: { model: "gemini-3.8-flash-high", effort: "high" }, conflict: { enabled: true, agent: "claude", model: "opus", effort: "xhigh" } }) as any);
+  openModel(); fireEvent.change(await screen.findByLabelText("Agen konflik"), { target: { value: "antigravity" } });
+  await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith(expect.objectContaining({ conflict: { enabled: true, agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high" } })));
+});

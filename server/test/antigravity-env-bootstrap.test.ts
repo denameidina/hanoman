@@ -28,3 +28,11 @@ describe("Antigravity private launch bootstrap", () => {
     cleanupAntigravityEnvBootstrap({ directory: "/", ino: 1, dev: 1 });
   });
 });
+
+it("consumes launch state despite a stale tmux TMPDIR", () => {
+  const bootstrap = createAntigravityEnvBootstrap("/usr/bin/printf ready", {});
+  try {
+    expect(execFileSync("/bin/sh", ["-c", bootstrap.command], { encoding: "utf8", env: { ...process.env, TMPDIR: "/tmp/stale-daemon" } })).toBe("ready");
+    expect(existsSync(bootstrap.directory)).toBe(false);
+  } finally { cleanupAntigravityEnvBootstrap(bootstrap.receipt); }
+});

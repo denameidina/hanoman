@@ -31,7 +31,7 @@ export function createAntigravityEnvBootstrap(command: string, env: NodeJS.Proce
   const directory = fs.mkdtempSync(join(tmpdir(), "hanoman-ag-env-")); fs.chmodSync(directory, 0o700);
   const path = join(directory, "launch.sh"), metadata = join(directory, "receipt.json");
   // The shell has already opened its script; consuming that file does not change its exec PID.
-  const cleaner = `const fs=require('node:fs'),{createHash}=require('node:crypto'),{join,dirname,basename}=require('node:path'); (${consume.toString()})(JSON.parse(fs.readFileSync(process.argv[1],'utf8')),fs,b=>createHash('sha256').update(b).digest('hex'),require('node:os').tmpdir(),require('node:path'));`;
+  const cleaner = `const fs=require('node:fs'),{createHash}=require('node:crypto'),{join,dirname,basename}=require('node:path'); (${consume.toString()})(JSON.parse(fs.readFileSync(process.argv[1],'utf8')),fs,b=>createHash('sha256').update(b).digest('hex'),${JSON.stringify(tmpdir())},require('node:path'));`;
   const exports = ["GEMINI_API_KEY", "GOOGLE_GEMINI_BASE_URL"].map(key => env[key] === undefined ? `unset ${key}` : `export ${key}=${quote(env[key]!)}`);
   const content = `unset GEMINI_API_KEY GOOGLE_GEMINI_BASE_URL CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY\n${quote(process.execPath)} -e ${quote(cleaner)} ${quote(metadata)} || exit 1\ntest ! -e ${quote(path)} || exit 1\n${exports.join("\n")}\nexec ${command}\n`;
   try {
