@@ -177,6 +177,37 @@ sudah terverifikasi memenuhi requirement. Melanjutkan implementasi sebagai parit
 mengambil asumsi yang dilarang. Keputusan terbuka: `-`; keputusan scope sudah jelas dan tetap
 mengikat, penghalangnya kemampuan runtime pada versi yang diuji.
 
+### Audit independen retry Brainstorm (percobaan 2/2)
+
+Audit pada kandidat `c8837707ee14dfdd8067372dd5f82462d0f8ad13` tidak mengulang
+probe loader. Hipotesis baru: override exact model/effort mungkin tersedia lewat definisi
+transient, setting sesi, atau kontrak SDK yang berlaku juga pada CLI. Biner tetap `agy` 1.3.4
+(`agy --version`, exit 0); `agy agents --help` hanya menyediakan discovery. `agy --help`
+menempatkan `--model` dan `--effort` pada **sesi CLI saat ini**, bukan setiap native child.
+
+- [Kontrak tools resmi](https://antigravity.google/docs/hooks) mendokumentasikan
+  `define_subagent` tanpa parameter model/effort dan `invoke_subagent` tanpa override keduanya.
+  Maka definisi transient tidak memberi jalur publik terverifikasi untuk requirement ini.
+- [Settings CLI](https://antigravity.google/docs/settings) menjelaskan override per-sesi;
+  pencarian `subagent` pada halaman tersebut tidak menghasilkan kontrak per-child.
+- [Changelog resmi](https://www.antigravity.google/docs/changelog?tab=cli) membedakan model
+  frontmatter CLI **tier** dari model target child independen pada **SDK**. Contoh
+  [subagent SDK](https://antigravity.google/docs/sdk/subagents/) memakai Python `Agent.chat`,
+  bukan TUI `agy`. SDK bukan bukti kontrak CLI; mengganti runtime ke SDK akan mengubah scope.
+- Pemeriksaan `strings` biner menemukan accessor internal `SubagentSpec.GetModel`,
+  `GetModelTier`, `GetRunAsTask` serta `InvokeSubagent.GetTaskMode`. Ini mempersempit kesimpulan:
+  **loader frontmatter** exact ditolak pada probe sebelumnya, tetapi audit tidak membuktikan
+  semua primitive internal mustahil. Primitive internal tersebut tetap tidak mempunyai
+  kontrak publik dan bukti invocation native yang memenuhi exact model/effort/foreground.
+  Tidak ada alasan menganggap field internal ini aman dipancarkan dari konfigurasi hanoman.
+
+Hasil: **terhalang kembali**. Belum ditemukan jalur native CLI resmi terverifikasi yang
+memenuhi seluruh syarat keras. Requirement tetap utuh, termasuk interaktivitas parent/child,
+penolakan bridge, dan pengecualian lead brain internal. Read-only child tetap memerlukan
+bukti enforcement nyata. Audit ini tidak membuat konfigurasi/proses/model-call baru dan tidak
+menyentuh credential. Perubahan hanya catatan Brainstorm dan link index. Orchestrator perlu
+merelay blocker setelah retry kedua sesuai kontrak sesi; tidak ada izin menurunkan requirement.
+
 ### Aturan verifikasi fase berikutnya
 
 Test harus mencakup biner efektif, argv/escaping prompt, trust/realpath/preservasi config, seed

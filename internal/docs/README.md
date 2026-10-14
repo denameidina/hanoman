@@ -345,7 +345,7 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [0001 — Docs sebagai Source of Truth](adr/0001-docs-as-source-of-truth.md) — *superseded by 0023*
 
 ## operations
-- [SPEC-1442 — Runtime Antigravity CLI: konteks, riset primer dan keputusan scope](../../docs/superpowers/specs/2026-10-14-spec-1442-antigravity-cli-design.md) — Brainstorm terhalang pada native child `agy` 1.3.4: kontrol loader menolak slug model exact; native wajib, bridge ditolak; keputusan default/MCP/host-lab/versi sudah diterima.
+- [SPEC-1442 — Runtime Antigravity CLI: konteks, riset primer dan keputusan scope](../../docs/superpowers/specs/2026-10-14-spec-1442-antigravity-cli-design.md) — Brainstorm terhalang setelah retry independen pada native child `agy` 1.3.4: loader menolak slug exact; kontrak transient/settings/SDK belum menyediakan jalur CLI terverifikasi; native wajib, bridge ditolak; keputusan default/MCP/host-lab/versi sudah diterima.
 - [Agent pembuatan dan dukungan aplikasi](operations/app-support-agents.md) — delapan peran baru, pemilihan tugas, profil runtime, prompt parent tanpa duplikasi metadata native, bukti dan batas verifikasi; [spec](../../docs/superpowers/specs/2026-09-05-app-support-agents-design.md) dan [plan](../../docs/superpowers/plans/2026-09-05-app-support-agents.md).
 - [roadmap](operations/roadmap.md) · [gtm](operations/gtm.md) · [agent-documentation-workflow](operations/agent-documentation-workflow.md)
 - [production](operations/production.md) — menjalankan instance prod di samping dev (`HANOMAN_HOME` + port terpisah)
