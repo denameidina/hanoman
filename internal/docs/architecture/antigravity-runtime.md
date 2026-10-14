@@ -41,4 +41,91 @@ manifest/fixture saja tidak membuktikan integrasi native tersedia.
 [Plan implementasi](../../../docs/superpowers/plans/2026-10-14-spec-1442-antigravity-cli-runtime.md)
 memetakan 18 AC ke Task 0–14, dimulai proof discovery/invoke/follow-up native dari TUI
 sebelum kode integrasi luas. Keputusan installer/kesiapan metode disepakati lewat relay B;
-belum ada klaim implementasi atau smoke selesai.
+receipt feasibility Task 0 di bawah membuktikan native TUI pada fixture, belum helper produk.
+
+
+## Receipt live Task 0 — 2026-10-14
+
+Gate feasibility **lulus** pada biner terpasang `agy --version` → `1.3.4` dan
+`agy --help` → exit 0. Sumber primer dibaca ulang:
+[subagents](https://antigravity.google/docs/subagents/),
+[rules](https://antigravity.google/docs/rules/),
+[skills](https://antigravity.google/docs/skills/) dan
+[overview CLI](https://antigravity.google/docs/cli/overview/).
+Native workspace agent memakai `.agents/agents/hanoman-spec1442-probe.md` dengan
+`name`, `description`, `model: inherit`, `mainAgent: false`, `subagent: true`;
+tidak ada field tools/effort independen atau registry global tambahan.
+
+Fixture: repo Git temp plus `git worktree add --detach … HEAD`; cwd aktual
+`/private/var/folders/5r/0thjglr117g8ln97vs1wf3lw0000gn/T/spec1442-native-60n43nvl/worktree`.
+Skill `.agents/skills/spec1442-probe/SKILL.md`, AGENTS.md dan GEMINI.md memuat
+nonce non-rahasia terpisah. Trust menambahkan **realpath cwd ini** ke
+`trustedWorkspaces` lewat read/merge + temp 0600 + rename. Assert sebelum launch
+membuktikan array lama utuh plus satu cwd dan seluruh field lain tetap setara.
+Tidak ada config credential/token yang dicetak atau disalin ke repo.
+
+Launch aktual pada socket tmux owned `spec1442-731a0d4295`, session `probe`:
+
+```text
+tmux -L spec1442-731a0d4295 new-session -d -s probe -x 160 -y 48 -c <realpath fixture> <owned launcher>
+agy --model gemini-3.8-flash-high --effort high --dangerously-skip-permissions --prompt-interactive <initial prompt>
+```
+
+`tmux … list-panes -F '#{pane_id} #{pane_pid} #{pane_current_command} #{pane_current_path}'`
+sebelum dan sesudah follow-up → pane `%0`, PID `46426`, command `agy`, cwd di atas.
+Tidak ada trust dialog pada initial capture. `ps -p 46426 -o command=` diperiksa
+sebagai boolean: argv interaktif benar, tidak memuat `-p`/`--print`.
+Setiap turn dibatasi 180 detik; poll/capture menggunakan jeda 1–15 detik,
+bukan wait tanpa batas. Timestamp UTC aktual:
+
+| Turn | Mulai → hasil selesai dibaca | Durasi maksimum teramati | Hasil |
+| --- | --- | --- | --- |
+| Initial TUI | 00:52:54 → 00:53:28.742 | 35 detik | AGENTS/GEMINI rules dan skill workspace ditemukan |
+| Native invoke | 00:53:39.157 → 00:54:03.626 | 25 detik | Satu child custom workspace selesai dan idle |
+| Native follow-up | 00:54:18.151 → 00:54:45.772 | 28 detik | ID sama mengingat nonce tanpa nonce pada pesan baru |
+
+Ringkasan output **actual capture** (identitas akun/home teredaksi, bukan fixture
+transcript):
+
+```text
+AGENTS Rule Nonce: AGENTS_1442_CEDAR_29
+GEMINI Rule Nonce: GEMINI_1442_ORCHID_51
+Read(<fixture>/.agents/skills/spec1442-probe/SKILL.md): Read 6 lines
+Skill spec1442-probe Nonce: SKILL_1442_PEBBLE_73
+PARENT_INITIAL_DONE
+Spawned 1 subagent
+Agent(hanoman-spec1442-probe: SPEC1442 Probe Agent)(Remember CHILD_1442_TANGERINE_86 and respond CHILD_INITIAL with it.)
+Child Conversation ID: 1debdc0b-6780-42e6-bcd5-f1f6b9abf453
+CHILD_INITIAL CHILD_1442_TANGERINE_86
+CHILD_READY_DONE
+Messaged 1 subagent
+SendMessage(1debdc0b-6780-42e6-bcd5-f1f6b9abf453: Recall the nonce from your own previous turn without tools or files and reply CHILD_RECALL plus it.)
+Child Reply: CHILD_RECALL CHILD_1442_TANGERINE_86
+CHILD_RECALL_DONE
+/agents: (1 done)
+```
+
+Discovery dibuktikan invocation **custom workspace** yang berhasil, bukan jawaban
+"Available" saja. Tidak ada `define_subagent`, global roster, `self`, bridge, SDK,
+atau one-shot child. Parent menerima dua follow-up dalam pane/PID yang sama.
+Native tools teramati sebagai `invoke_subagent` (TUI `Agent`) dan `send_message`
+(TUI `SendMessage`). Parent melaporkan schema invoke
+`Subagents[{TypeName, Role, Workspace, Model, Prompt}]`, output
+`conversationId/logAbsoluteUri/workspaceUris`, follow-up `Recipient/Message`
+(+ metadata `toolAction/toolSummary`); ini laporan schema parent, bukan capture
+payload JSON mentah. Rendering prompt berikutnya memakai tool names dan ID
+terbukti; jangan menganggap casing field internal sebagai kontrak publik baru.
+
+Cleanup dibaca selesai **00:55:26.407 UTC**. Read/merge terbaru menghapus hanya
+satu trust cwd owned; assert array sibling dan seluruh field selain trust tetap
+setara sebelum/sesudah cleanup. `tmux … kill-session -t probe` + `kill-server`
+pada socket owned; PID 46426 dan semua descendant owned sudah tidak ada lewat
+`os.kill(pid, 0)`, `tmux … has-session -t probe` exit nonzero. Semua command
+subprocess ditunggu/reaped. `git worktree remove --force <fixture>` berhasil;
+temp repo/launcher/capture milik probe dihapus. Tidak ada proses background
+probe yang tersisa atau registry/config MCP global yang berubah.
+
+Tidak ada timeout atau diagnosis fallback yang dibutuhkan. Receipt ini membuka
+Task 1; tetap wajib mengulang live smoke lewat helper produk pada Task 4/5/7/8.
+MCP global, sandbox, read-only enforcement, telemetry dan exact child
+model/effort tidak diuji oleh probe ini.
