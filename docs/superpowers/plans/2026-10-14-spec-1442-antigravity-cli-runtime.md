@@ -214,12 +214,14 @@ menunggu review parent sebelum ditandai selesai.
 
 **Interfaces:** `parseAntigravityModels(raw:unknown):AntigravityModel[]` uses Task 0 actual `agy models` format; `ModelCatalog.antigravity/providers.antigravity` additive. Existing `probeModelCatalog`/`catalogCommand` accepts runtime union, bin Task 3/env Task 3 and returns normalized parent models. `replaceModelCatalog` preserves old callers through optional third argument.
 
-- [ ] **Step 1:** Capture non-sensitive CLI model fixture; test success replaces provider catalog, low/medium/high suffix only known effort, future/unknown slug visible, empty/malformed/output>4MiB/timeout preserve last catalog. Old cache lacking Antigravity parses with bundled minimal default; only id/label/known effort cached, file 0600.
+- [x] **Step 1:** Capture non-sensitive CLI model fixture; test success replaces provider catalog, low/medium/high suffix only known effort, future/unknown slug visible, empty/malformed/output>4MiB/timeout preserve last catalog. Old cache lacking Antigravity parses with bundled minimal default; only id/label/known effort cached, file 0600.
 
   Assertions: `expect(antigravityEfforts("gemini-3.8-flash-high")).toEqual(["high"])`; `expect(snapshot.antigravity).toEqual(lastSuccessfulModels)` setelah failure; `expect(options).toContainEqual(expect.objectContaining({id:unknownStoredId}))`.
-- [ ] **Step 2:** Test 20s bounded probe, refresh 5min, same-bin concurrent coalescing; change effective bin while old probe in flight then assert old generation cannot install stale catalog. Unsupported sandbox returns safe provider reason without host probe.
-- [ ] **Step 3:** Run red paths; add parser/provider, preserve old catalog fallback/cache behavior, invalidation keyed bin+execution mode. Guard every `agent===claude ? ... : codex` in probe/server/client helpers with explicit runtime branch.
-- [ ] **Step 4:** Run green; update model-catalog/API WS schema tool decision with cache evidence and commit docs+code.
+- [x] **Step 2:** Test 20s bounded probe, refresh 5min, same-bin concurrent coalescing; change effective bin while old probe in flight then assert old generation cannot install stale catalog. Unsupported sandbox returns safe provider reason without host probe.
+- [x] **Step 3:** Run red paths; add parser/provider, preserve old catalog fallback/cache behavior, invalidation keyed bin+execution mode. Guard every `agent===claude ? ... : codex` in probe/server/client helpers with explicit runtime branch.
+- [x] **Step 4:** Run green; update model-catalog/API WS schema tool decision with cache evidence and commit docs+code.
+
+**Receipt Task 9:** commit `236e4ebff08572b3968e284da671978077ed81cc` reviewed; original6files/42tests green (actual20.003s bounded timeout), sharedtype0. Native agy models10TSVrows fixture, parser conservative suffix effort; lastgood/cacheold/futureID/0600normalizedcache/CLI replacement/WSrace/mountedpicker covered. DBbin+executionmode key before/afterawait prevents oldsuccess/error/write/finally; newestrefreshcoalesces, 2-keyenv boundaries verified. Existing HTTP/WS/MCPmodels extension documented. Server/FE pendingonlylaterTask13/12seams. [Receipt SoT](../../../internal/docs/architecture/antigravity-runtime.md).
 
 ### Task 10: Endpoint versi additive dan tool MCP baca
 
