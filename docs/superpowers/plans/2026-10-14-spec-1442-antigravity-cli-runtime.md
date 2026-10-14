@@ -153,12 +153,14 @@ menunggu review parent sebelum ditandai selesai.
 
 **Interfaces:** `renderAntigravityAgent(def:AgentDef, roster:AgentDef[]):string`; `materializeAntigravityAgents(opts:{cwd:string,sessionId:string,defs:AgentDef[]}):{names:string[],cleanup:()=>void}`. Inputs have validated tier/effort/policy from Task 1/6; output frontmatter Task 0 verified and body from `agentPromptOf`, no inline parent persona.
 
-- [ ] **Step 1:** Assert frontmatter name/description/model/mainAgent/subagent exact; `null` model→inherit, native tier preserved, no slug/independent effort/Claude tool names/settings. Verify name/path traversal rejected and namespace contains no operator overwrite.
-- [ ] **Step 2:** Fixture two sessions/worktrees, operator collision, partial write failure, owned file later modified, restart cleanup and Git status. Assert file 0600/dir 0700, registry global untouched, manifest/hash cleanup only exact unchanged owned files; phase defs all-or-nothing, one custom failure isolated with reason.
+- [x] **Step 1:** Assert frontmatter name/description/model/mainAgent/subagent exact; `null` model→inherit, native tier preserved, no slug/independent effort/Claude tool names/settings. Verify name/path traversal rejected and namespace contains no operator overwrite.
+- [x] **Step 2:** Fixture two sessions/worktrees, operator collision, partial write failure, owned file later modified, restart cleanup and Git status. Assert file 0600/dir 0700, registry global untouched, manifest/hash cleanup only exact unchanged owned files; phase defs all-or-nothing, one custom failure isolated with reason.
 
   Assertions: `expect(modeFile & 0o777).toBe(0o600)`; `expect(operatorBytesAfterCleanup).toEqual(operatorBytesBefore)`; `expect(gitTrackedDirtyPaths).toEqual([])`; `expect(childModel).toBe("inherit")`, tanpa effort independen.
-- [ ] **Step 3:** Run red paths; implement excluded `.agents/agents` materialization, manifest ownership and cleanup using actual native name/lifecycle from Task 0. Tool allowlist fields only emitted after native names/enforcement proven; unsupported restriction must be unavailable rather than silently removed.
-- [ ] **Step 4:** Run green tests and live discover/invoke/follow-up using implemented session registry. Record same child ID and recall result; validator/plugin manifest alone is insufficient. Update ADR/runtime doc proof and commit explicit paths.
+- [x] **Step 3:** Run red paths; implement excluded `.agents/agents` materialization, manifest ownership and cleanup using actual native name/lifecycle from Task 0. Tool allowlist fields only emitted after native names/enforcement proven; unsupported restriction must be unavailable rather than silently removed.
+- [x] **Step 4:** Run green tests and live discover/invoke/follow-up using implemented session registry. Record same child ID and recall result; validator/plugin manifest alone is insufficient. Update ADR/runtime doc proof and commit explicit paths.
+
+**Receipt Task 5:** commits `b7d27ee19cb346181a4551d47e78c8ebc7f89bca` + review ownership fix `fbffc9189f68777a2bb6576cf2562a69056860f8` reviewed. Original3files/84tests green + rework2files/63tests green, runner typecheck0. Product materializer/createSession native namespaced file resolves frontmatter, one child a40667a7-6b1a-49a2-972b-23ff8a94df90 same-ID recall 43s+25s, cleanup registry/exclude/trust/PID/socket/fixture verified. Review RED reproduced symlink outside-write/operator-edit overwrite and false-phase-live; guarded descriptor ownership preserves operator bytes and unavailable warnings. [Receipt SoT](../../../internal/docs/architecture/antigravity-runtime.md).
 
 ### Task 6: Custom Agent validation/availability tanpa policy fallback
 
