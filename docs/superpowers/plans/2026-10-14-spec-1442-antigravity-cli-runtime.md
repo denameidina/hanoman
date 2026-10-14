@@ -259,13 +259,13 @@ menunggu review parent sebelum ditandai selesai.
 
 **Interfaces:** Shared parent catalog/defaults Task 1/2/9 and `resolvePhasePlan` Task 7 drive parent picker/preview. Child native picker uses tiers only, effort null/disabled with explanation. Availability/selectionReason Task 6 and version Task 10 are displayed, not duplicated inference in UI.
 
-- [ ] **Step 1:** Mounted tests choose Antigravity in Settings/backlog/New Terminal/IDE/lead/default conflicts and assert model `gemini-3.8-flash-high`+high sent through existing API. Stored unknown slug remains visible; stale/offline catalog keeps last choices; switching runtimes retains each saved block.
-- [ ] **Step 2:** Tests child picker offers only inherit/flash/pro, no parent slugs or independent effort; read-only/isolated/legacy incompatible reason visible. Phase reviewer note says read-only instruksional; async/protocol wait/unknown effort text does not claim enforcement/foreground.
-- [ ] **Step 3:** Version/null+safe reason and official install/auth links shown; goal native unsupported explained and rejected without sending ignored goal, sandbox host/lab limits visible, native telemetry unknown not zero. Existing Claude/Codex controls unaffected.
+- [x] **Step 1:** Mounted tests choose Antigravity in Settings/backlog/New Terminal/IDE/lead/default conflicts and assert model `gemini-3.8-flash-high`+high sent through existing API. Stored unknown slug remains visible; stale/offline catalog keeps last choices; switching runtimes retains each saved block.
+- [x] **Step 2:** Tests child picker offers only inherit/flash/pro, no parent slugs or independent effort; read-only/isolated/legacy incompatible reason visible. Phase reviewer note says read-only instruksional; async/protocol wait/unknown effort text does not claim enforcement/foreground.
+- [x] **Step 3:** Version/null+safe reason and official install/auth links shown; goal native unsupported explained and rejected without sending ignored goal, sandbox host/lab limits visible, native telemetry unknown not zero. Existing Claude/Codex controls unaffected.
 
   Mounted assertions menggunakan accessible role/label: runtime `Antigravity CLI` tersedia; child picker options persis inherit/flash/pro; reason unsupported terbaca; serialized phase override `effort:null`; token telemetry null ditampilkan unknown.
-- [ ] **Step 4:** Run red UI test paths; implement through shared runtime catalog/helper rather than repeated two-runtime ternaries. Add localized labels/accessible names per existing DS/glossary; partial API mocks updated only where new getter used.
-- [ ] **Step 5:** Run green UI tests + `pnpm --filter ./src typecheck`; verify in browser Settings/Start/New Terminal/Custom Agent/orchestration, including keyboard selection, reasons and narrow layout. Record runtime/browser receipt and commit frontend SoT with code.
+- [x] **Step 4:** Run red UI test paths; implement through shared runtime catalog/helper rather than repeated two-runtime ternaries. Add localized labels/accessible names per existing DS/glossary; partial API mocks updated only where new getter used.
+- [x] **Step 5:** Run green UI tests + `pnpm --filter ./src typecheck`; verify in browser Settings/Start/New Terminal/Custom Agent/orchestration, including keyboard selection, reasons and narrow layout. Record runtime/browser receipt and commit frontend SoT with code.
 
 ### Task 13: Distribusi, doctor dan dokumentasi final
 
