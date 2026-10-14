@@ -14,6 +14,10 @@ bukan disimpulkan dari keberadaan spec.
 - Trust cwd realpath append-preserve di `~/.gemini/antigravity-cli/settings.json`
   (`trustedWorkspaces` string array). AGENTS.md/GEMINI.md/project skill dipertahankan;
   `.agents/skills` memuat injeksi Hanoman dan skill project bernama sama menang.
+- Relay Plan Q1 **B**: status/pemasangan metode Antigravity unavailable beralasan sampai
+  installer upstream terverifikasi. Skill native yang sudah tersedia tetap dipindai/disuntik;
+  Start tetap fail-open. Tidak mengarang command install, tidak mengaku ready atau membiarkan
+  matrix installer lama crash. Unsupported install ditolak sebelum shell spawn.
 - MCP global `~/.gemini/config/mcp_config.json`, `mcpServers.hanoman` stdio `hanoman mcp`,
   host/token sesuai pilihan operator. Format Settings/alur token existing; merge-preserve,
   token teredaksi dan file 0600. Tidak menerbitkan capability/credential baru otomatis.
@@ -33,3 +37,8 @@ Arsitektur komponen, format data, error dan 18 AC EARS:
 [spec lengkap](../../../docs/superpowers/specs/2026-10-14-spec-1442-antigravity-cli-design.md).
 Discovery registry, trust, skill, MCP dan native invoke/follow-up adalah bukti wajib Execute;
 manifest/fixture saja tidak membuktikan integrasi native tersedia.
+
+[Plan implementasi](../../../docs/superpowers/plans/2026-10-14-spec-1442-antigravity-cli-runtime.md)
+memetakan 18 AC ke Task 0–14, dimulai proof discovery/invoke/follow-up native dari TUI
+sebelum kode integrasi luas. Keputusan installer/kesiapan metode disepakati lewat relay B;
+belum ada klaim implementasi atau smoke selesai.

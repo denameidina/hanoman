@@ -2485,6 +2485,13 @@ Setting JSON additive `antigravity:{model,effort}` dan marker seeded/user; paren
 tidak menerima explicit effort independen; legacy incompatible ditampilkan unavailable beralasan.
 Tidak ada perubahan skema DB atau principal/capability launch existing.
 
+Relay manusia Plan Q1 **B**: `/api/methods/status` menambah status Antigravity unavailable
+beralasan sampai installer upstream terverifikasi, tanpa mengklaim readiness/install command.
+Tetap COOKIE_ONLY karena properti kesiapan mesin lokal untuk dashboard (pengecualian MCP
+existing dipertahankan). Skill native yang sudah ada tetap dipindai/disuntik dan Start fail-open.
+Terminal shell install Antigravity ditolak sebelum spawn lewat shape validation 400 `{error:string}`
+existing; schema/tool/otorisasi Terminal yang ada diperluas, tidak ada endpoint installer baru.
+
 Endpoint baru `GET /api/antigravity/version`: authenticated admin atau agent-token `GLOBAL_READ`,
 200 `{version:string|null,error:string|null}`, error aman tanpa raw output/token/path home.
 Cache keyed bin efektif/boundary 5 menit, timeout 10 dtk; bin change invalidasi segera.

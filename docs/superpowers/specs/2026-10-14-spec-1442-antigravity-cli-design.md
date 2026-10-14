@@ -83,6 +83,7 @@ ber-`agy` belum dibuktikan. Jangan melonggarkan boundary produksi untuk membuat 
 | Versi/API | Additive `/api/antigravity/version` + tool MCP baca; endpoint Codex dipertahankan. |
 | Bridge | Tetap ditolak, termasuk bridge interaktif persisten. |
 | Reviewer fase (relay Spec 1A) | Generated `hanoman-fase-review` boleh native child `inherit` dengan batas read-only **instruksional**, mengikuti ADR-0170; bukan enforcement runtime. Custom Agent auditor read-only tetap unavailable sampai enforcement terbukti. |
+| Kesiapan/pemasangan metode (relay Plan Q1 B) | Status/pemasangan metode Antigravity unavailable beralasan sampai installer upstream terverifikasi. Injeksi skill native yang sudah tersedia tetap bekerja; tidak mengarang perintah installer atau mengubah fail-open Start. |
 
 Keputusan ini diterima lewat relay orchestrator setelah retry Brainstorm. Requirement awal exact
 model/effort independen dan foreground telah diamandemen **oleh manusia**; tidak diturunkan agen.
@@ -293,6 +294,13 @@ Sumber global user `~/.gemini/antigravity-cli/skills` dikenali library bila pemi
 Child dan parent mendapat instruksi/konteks fase melalui konvensi native yang terbukti dibaca.
 Injeksi skill tetap fail-open dengan warning sebagaimana ADR-0172; trust tidak fail-open.
 
+**Amandemen relay Plan Q1 B:** kesiapan/pemasangan metode Antigravity ditampilkan unavailable
+dengan alasan sampai installer upstream terverifikasi. `METHODS.install`/`MethodAgent` dan
+laporan status yang mengiterasi `zAgent.options` harus aman untuk runtime ketiga: tidak crash,
+tidak menjalankan command kosong/fabrikasi, tidak mengaku ready. Skill native yang sudah ada
+tetap dipindai/disuntik dan Start tetap fail-open. Aksi install runtime ini ditolak sebelum
+shell spawn dalam shape validation 400 existing. Claude/Codex mempertahankan installer/status.
+
 MCP global memakai `~/.gemini/config/mcp_config.json`, objek `mcpServers.hanoman`:
 `command: "hanoman"`, `args: ["mcp"]`, env `HANOMAN_HOST` dan `HANOMAN_AGENT_TOKEN` dari
 konfigurasi/token yang dipilih operator. Settings → Akses AI Agent menyediakan format Antigravity
@@ -363,6 +371,7 @@ Kegagalan observasi tidak menjadi 500 atau alasan sendiri memblokir sesi host.
 | GET `/api/models` dan frame models | Schema katalog/tool models existing additive; otorisasi HTTP/WS existing tidak dilonggarkan |
 | Terminal WS/events WS/session-events | Tetap pengecualian beralasan existing: streaming WebSocket atau HMAC per-sesi, bukan REST agent-token; enum runtime diperluas tanpa kanal baru |
 | Config/MCP format UI | Tool/config sensitive existing tetap gated; tidak membuat endpoint tulis config lokal Antigravity baru |
+| Methods status/install (relay Plan Q1 B) | Status `/api/methods/status` tetap `COOKIE_ONLY` beralasan sebagai kesiapan mesin lokal untuk dashboard; response unavailable/reason additive. Terminal install mengikuti schema/tool/otorisasi existing, input Antigravity unavailable ditolak sebelum shell spawn; tidak menambah installer endpoint/tool |
 
 Launch Antigravity pada boundary sandbox aktif/required ditolak **sebelum spawn** dengan
 `409` dan `error:"antigravity-sandbox-unsupported"` beserta alasan aman. Hardening produksi

@@ -57,6 +57,12 @@ lead brain internal existing tetap one-shot. Riset ada di
 9. Status memakai observasi tmux dan marker fase. Native telemetry, notifikasi keputusan dan
    relay gate goal tidak dijanjikan. Unknown tetap null/unknown; tidak membuat invocation/token
    sintetis. Guardrail safety parent yang telah dicabut tidak dihidupkan lagi.
+10. Relay manusia Plan Q1 **B**: status/pemasangan metode Antigravity unavailable beralasan
+    sampai installer upstream terverifikasi. Matrix installer/status runtime ketiga tidak boleh
+    crash, menjalankan command kosong/fabrikasi atau mengaku ready. Skill native yang sudah
+    tersedia tetap dipindai/disuntik; Start tetap fail-open, installer/status Claude/Codex utuh.
+    Methods status tetap COOKIE_ONLY sebagai properti mesin lokal; terminal install memakai
+    otorisasi/shape validation existing dan menolak unsupported sebelum shell spawn.
 
 ## Konsekuensi dan bukti
 
