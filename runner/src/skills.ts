@@ -39,6 +39,7 @@ export interface AgentSkills {
  * `CODEX_HOME` tetap dihormati karena codex sendiri memakainya (`codex-limits`, `codex-trust`).
  */
 export function agentSkillHome(agent: Agent, env: EnvLike = process.env, osHome: string = homedir()): string {
+  if (agent === "antigravity") return join(osHome, ".gemini", "antigravity-cli");
   const own = (agent === "codex" ? env.HANOMAN_CODEX_HOME : env.HANOMAN_CLAUDE_HOME)?.trim();
   if (own) return own;
   if (agent === "codex") {
@@ -187,6 +188,7 @@ function cacheRoots(home: string): PluginRoot[] {
  */
 function disabledPlugins(agent: Agent, home: string): Set<string> {
   const out = new Set<string>();
+  if (agent === "antigravity") return out;
   if (agent === "claude") {
     const en = (readJson(join(home, "settings.json")) as
       { enabledPlugins?: Record<string, unknown> } | null)?.enabledPlugins;
@@ -231,7 +233,7 @@ export function scanAgentSkills(
   const userDir = join(home, "skills");
   add(userDir, skillsUnder(userDir, null));
 
-  for (const r of [...manifestRoots(home), ...cacheRoots(home)]) {
+  for (const r of agent === "antigravity" ? [] : [...manifestRoots(home), ...cacheRoots(home)]) {
     if (disabled.has(`${r.pkg}@${r.marketplace}`)) continue;
     const found = pluginSkills(r.dir, r.pkg);
     if (!found.length) continue;

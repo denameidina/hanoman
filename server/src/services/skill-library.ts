@@ -41,7 +41,7 @@ export async function resolveSkill(key: string): Promise<SkillEntry> {
   return hit;
 }
 
-const USER_SOURCES = [".claude", ".codex", ".agents"] as const;
+const USER_SOURCES = [".claude", ".codex", ".agents", ".gemini/antigravity-cli"] as const;
 const PROJECT_SOURCES = [".claude", ".agents", ".codex"] as const;
 
 /** Direktori INDUK tempat skill baru/fork diletakkan. */
@@ -49,8 +49,9 @@ export async function targetParent(layer: string, source: string | undefined, pr
   if (layer === "hanoman") return hanomanSkillsDir(skillsHome());
   if (layer === "user") {
     const s = source ?? ".claude";
-    if (!(USER_SOURCES as readonly string[]).includes(s)) throw new SkillError(400, "source user harus .claude/.codex/.agents");
+    if (!(USER_SOURCES as readonly string[]).includes(s)) throw new SkillError(400, "source user harus .claude/.codex/.agents/.gemini/antigravity-cli");
     if (s === ".agents") return join(agentsSkillHome(process.env), "skills");
+    if (s === ".gemini/antigravity-cli") return join(agentSkillHome("antigravity", process.env), "skills");
     return join(agentSkillHome(s === ".codex" ? "codex" : "claude", process.env), "skills");
   }
   if (layer === "project") {

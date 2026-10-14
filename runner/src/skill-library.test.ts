@@ -27,11 +27,15 @@ describe("scanGlobalSkills", () => {
     skill(join(osHome, ".claude/plugins/cache/mkt/pkg/1.0.0/skills/pl"), "pl");
     const all = scanGlobalSkills(opts());
     const by = (n: string) => all.find((s) => s.name === n)!;
-    expect(by("shared-a")).toMatchObject({ layer: "hanoman", source: "hanoman", editable: true, loadedBy: ["claude", "codex"] });
+    expect(by("shared-a")).toMatchObject({ layer: "hanoman", source: "hanoman", editable: true, loadedBy: ["claude", "codex", "antigravity"] });
     expect(by("cl")).toMatchObject({ layer: "user", source: ".claude", loadedBy: ["claude"], editable: true });
     expect(by("cx")).toMatchObject({ layer: "user", source: ".codex", loadedBy: ["codex"] });
     expect(by("ag")).toMatchObject({ layer: "user", source: ".agents", loadedBy: ["codex"] });
     expect(by("pl")).toMatchObject({ layer: "plugin", source: "plugin:pkg", editable: false, loadedBy: ["claude"] });
+  });
+  it("includes native Antigravity global user skills with runtime provenance", () => {
+    skill(join(osHome, ".gemini/antigravity-cli/skills/native"), "native");
+    expect(scanGlobalSkills(opts())).toContainEqual(expect.objectContaining({ name: "native", source: ".gemini/antigravity-cli", loadedBy: ["antigravity"], editable: true }));
   });
   it("fail-open: akar hilang menyumbang nol, tak melempar", () => {
     expect(scanGlobalSkills(opts())).toEqual([]);
@@ -56,7 +60,7 @@ describe("scanProjectSkills", () => {
     const got = scanProjectSkills("p1", repo, opts());
     const by = (n: string) => got.find((s) => s.name === n);
     expect(by("a")).toMatchObject({ layer: "project", projectId: "p1", source: ".claude", loadedBy: ["claude"], editable: true });
-    expect(by("b")).toMatchObject({ source: ".agents", loadedBy: ["codex"] });
+    expect(by("b")).toMatchObject({ source: ".agents", loadedBy: ["codex", "antigravity"] });
     expect(by("c")).toMatchObject({ source: ".codex", loadedBy: ["codex"] });
     expect(by("hanoman")).toMatchObject({ source: "lainnya:internal/skills", loadedBy: [] });
     expect(by("nm")).toBeUndefined();

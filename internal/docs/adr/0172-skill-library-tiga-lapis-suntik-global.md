@@ -49,6 +49,16 @@ Skill project (`<repo>/.claude/skills`, `.agents/skills`, `.codex/skills`, folde
      `/.agents/skills/<n>` di blok `# hanoman:skill-inject` pada `<git-common-dir>/info/exclude`.
    - Fail-open: gagal → peringatan stderr sesi; sesi tetap lahir.
 
+   Amandemen [ADR-0221](0221-antigravity-cli-runtime-interaktif-native.md), SPEC-1442:
+   Antigravity memuat skill global native `~/.gemini/antigravity-cli/skills` (source user
+   `.gemini/antigravity-cli`) dan workspace `.agents/skills`; global `~/.agents` tetap
+   hanya Codex. Hanoman global memperoleh `loadedBy` ketiga. Injeksi Antigravity memakai
+   symlink workspace dan exclude di common dir; manifest sesi menyimpan target, inode/device
+   dan hash marker. Kill hanya mencabut link dengan identitas/target yang masih cocok serta
+   pasangan exclude owned; link project/operator atau baris exclude existing dipertahankan.
+   AGENTS.md, GEMINI.md dan config workspace tidak ditulis oleh injektor. Trust native di
+   settings operator dipersiapkan fail-closed; kegagalan skill tetap fail-open.
+
 ## Konsekuensi
 
 - `info/exclude` tinggal di **common dir** git — dipakai bersama semua worktree dan checkout

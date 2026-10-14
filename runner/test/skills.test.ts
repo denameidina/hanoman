@@ -25,6 +25,16 @@ beforeEach(() => { root = mkdtempSync(join(tmpdir(), "hn-skills-")); });
 afterEach(() => { rmSync(root, { recursive: true, force: true }); });
 
 describe("agentSkillHome", () => {
+  it("Antigravity native global skills are isolated from Codex config/plugin parsing", () => {
+    const native = join(root, ".gemini/antigravity-cli");
+    skill(join(native, "skills"), "native");
+    skill(join(native, "plugins/cache/market/wrong/1/skills"), "codex-only");
+    writeFileSync(join(native, "config.toml"), '[plugins."wrong@market"]\nenabled = true');
+    const got = scanAgentSkills("antigravity", env(), root);
+    expect(got.home).toBe(native); expect(got.skills.map((s) => s.name)).toEqual(["native"]);
+    expect(got.packages).toEqual([]);
+    expect(agentSkillHome("antigravity", { CODEX_HOME: "/ignored" }, root)).toBe(native);
+  });
   it("default ~/.claude dan ~/.codex", () => {
     expect(agentSkillHome("claude", {}, "/Users/x")).toBe("/Users/x/.claude");
     expect(agentSkillHome("codex", {}, "/Users/x")).toBe("/Users/x/.codex");

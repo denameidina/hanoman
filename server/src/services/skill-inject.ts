@@ -4,12 +4,13 @@
 // claude: `--add-dir <tmp>/skills-root` yang memuat `.claude/skills/<n>` → symlink. Docs Claude
 //   Code: skill di `.claude/skills/` direktori --add-dir dimuat, dengan live reload. Worktree
 //   tak disentuh.
-// codex: tak ada akar skill tambahan resmi → symlink `<cwd>/.agents/skills/<n>` + baris exclude.
+// codex/antigravity: symlink `<cwd>/.agents/skills/<n>` + baris exclude.
 //   `info/exclude` tinggal di COMMON dir git (dipakai semua worktree + checkout utama), maka
 //   barisnya ditandai dan dicabut `unexcludeInjected` saat skill project bernama sama dibuat.
 // Fail-open: setiap kegagalan jadi peringatan; sesi tak pernah gagal lahir karenanya.
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { scanGlobalSkills, scanProjectSkills } from "@hanoman/runner";
 
@@ -23,7 +24,32 @@ function excludeFile(repoDir: string): string {
   return join(isAbsolute(common) ? common : join(repoDir, common), "info", "exclude");
 }
 
-export function injectGlobalSkills(o: { agent: "claude" | "codex"; cwd: string; tempDir: string; hanomanHome: string }): InjectResult {
+interface OwnedSkill { link: string; target: string; exclude: string; pair: string; ino: number; dev: number }
+const manifestPath = (tempDir: string) => join(tempDir, "antigravity-skills.json");
+function ownedSkills(tempDir: string): OwnedSkill[] {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(manifestPath(tempDir), "utf8"));
+    return Array.isArray(parsed) ? parsed.filter((row): row is OwnedSkill => row && typeof row.link === "string"
+      && typeof row.target === "string" && typeof row.exclude === "string" && typeof row.pair === "string"
+      && typeof row.ino === "number" && typeof row.dev === "number") : [];
+  } catch { return []; }
+}
+
+export function cleanupInjectedSkills(tempDir: string): void {
+  for (const own of ownedSkills(tempDir)) {
+    try {
+      const st = lstatSync(own.link);
+      if (!st.isSymbolicLink() || st.ino !== own.ino || st.dev !== own.dev || readlinkSync(own.link) !== own.target) continue;
+      unlinkSync(own.link);
+      if (own.pair) {
+        const bytes = readFileSync(own.exclude, "utf8");
+        if (bytes.includes(own.pair)) writeFileSync(own.exclude, bytes.replace(own.pair, ""));
+      }
+    } catch { /* operator changes or missing files are preserved */ }
+  }
+}
+
+export function injectGlobalSkills(o: { agent: "claude" | "codex" | "antigravity"; cwd: string; tempDir: string; hanomanHome: string }): InjectResult {
   const out: InjectResult = { injected: [], warnings: [] };
   const opts = { hanomanHome: o.hanomanHome, env: process.env };
   const global = scanGlobalSkills(opts).filter((s) => s.layer === "hanoman");
@@ -50,23 +76,47 @@ export function injectGlobalSkills(o: { agent: "claude" | "codex"; cwd: string; 
 
   let exclude: string;
   try { exclude = excludeFile(o.cwd); }
-  catch { out.warnings.push("skill global tak disuntik (codex): cwd bukan repo git"); return out; }
+  catch { out.warnings.push(`skill global tak disuntik (${o.agent}): cwd bukan repo git`); return out; }
   for (const s of todo) {
+    let ownedLink: string | undefined;
+    let ownedPair = "";
     try {
       const link = join(o.cwd, ".agents", "skills", s.name);
+      if (o.agent === "antigravity") {
+        for (const dir of [join(o.cwd, ".agents"), join(o.cwd, ".agents", "skills")]) {
+          const st = lstatSync(dir, { throwIfNoEntry: false });
+          if (st && (!st.isDirectory() || st.isSymbolicLink())) throw new Error("akar skill bukan direktori aman");
+        }
+      }
       if (lstatSync(link, { throwIfNoEntry: false })) continue;
       mkdirSync(join(o.cwd, ".agents", "skills"), { recursive: true });
       symlinkSync(s.dir, link);
+      ownedLink = link;
       mkdirSync(join(exclude, ".."), { recursive: true });
       const cur = existsSync(exclude) ? readFileSync(exclude, "utf8") : "";
       const line = excludeLine(s.name);
       if (!cur.split("\n").includes(line)) {
-        const head = cur.includes(INJECT_MARKER) ? "" : `${cur && !cur.endsWith("\n") ? "\n" : ""}${INJECT_MARKER}\n`;
-        appendFileSync(exclude, `${head}${line}\n`);
+        if (o.agent === "antigravity") {
+          const hash = createHash("sha256").update(`${link}\0${s.dir}`).digest("hex");
+          ownedPair = `${INJECT_MARKER}:antigravity:${hash}\n${line}\n`;
+          appendFileSync(exclude, `${cur && !cur.endsWith("\n") ? "\n" : ""}${ownedPair}`);
+        } else {
+          const head = cur.includes(INJECT_MARKER) ? "" : `${cur && !cur.endsWith("\n") ? "\n" : ""}${INJECT_MARKER}\n`;
+          appendFileSync(exclude, `${head}${line}\n`);
+        }
+      }
+      if (o.agent === "antigravity") {
+        mkdirSync(o.tempDir, { recursive: true, mode: 0o700 });
+        const st = lstatSync(link);
+        writeFileSync(manifestPath(o.tempDir), JSON.stringify([...ownedSkills(o.tempDir), { link, target: s.dir, exclude, pair: ownedPair, ino: st.ino, dev: st.dev }]), { mode: 0o600 });
       }
       out.injected.push(s.name);
     } catch (e) {
-      out.warnings.push(`skill ${s.name} tak disuntik (codex): ${(e as Error).message}`);
+      if (o.agent === "antigravity" && ownedLink) {
+        try { if (readlinkSync(ownedLink) === s.dir) unlinkSync(ownedLink); } catch { /* cleanup best effort */ }
+        try { if (ownedPair) writeFileSync(exclude, readFileSync(exclude, "utf8").replace(ownedPair, "")); } catch { /* cleanup best effort */ }
+      }
+      out.warnings.push(`skill ${s.name} tak disuntik (${o.agent}): ${(e as Error).message}`);
     }
   }
   return out;

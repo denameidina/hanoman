@@ -38,6 +38,18 @@ Arsitektur komponen, format data, error dan 18 AC EARS:
 Discovery registry, trust, skill, MCP dan native invoke/follow-up adalah bukti wajib Execute;
 manifest/fixture saja tidak membuktikan integrasi native tersedia.
 
+`ensureAntigravityTrust(cwd, home=homedir())` dipanggil oleh pusat launch sebelum efek
+persiapan sesi baru, hanya untuk agen Antigravity; shell mentah dilewati. Settings dibaca
+ulang, cwd di-realpath, `trustedWorkspaces` string array ditambah idempoten, sibling fields
+dipertahankan dan temp exclusive 0600 di-rename. JSON/shape rusak, symlink, owner asing,
+collision/temp/write/rename failure atau perubahan config selama persiapan melempar
+`antigravity-trust-preparation-failed` tanpa memuat path/config/credential pada error.
+Skill fail-open berbeda: peringatan diberi nama runtime, sesi tetap lahir. Global native
+`~/.gemini/antigravity-cli/skills` dipindai tanpa mengartikan manifest/TOML plugin Codex.
+Global `~/.agents` tetap Codex-only; workspace `.agents/skills` dibaca keduanya.
+Manifest injeksi di temp sesi menyimpan link target + inode/device dan hash marker exclude;
+kill mencabut hanya link/exclude owned yang masih cocok, mempertahankan replacement operator.
+
 [Plan implementasi](../../../docs/superpowers/plans/2026-10-14-spec-1442-antigravity-cli-runtime.md)
 memetakan 18 AC ke Task 0–14, dimulai proof discovery/invoke/follow-up native dari TUI
 sebelum kode integrasi luas. Keputusan installer/kesiapan metode disepakati lewat relay B;
@@ -129,6 +141,32 @@ Tidak ada timeout atau diagnosis fallback yang dibutuhkan. Receipt ini membuka
 Task 1; tetap wajib mengulang live smoke lewat helper produk pada Task 4/5/7/8.
 MCP global, sandbox, read-only enforcement, telemetry dan exact child
 model/effort tidak diuji oleh probe ini.
+
+## Receipt helper produk Task 4 — 2026-10-14
+
+Smoke native melalui **`createSession` produk**, bukan trust/symlink buatan harness,
+selesai `2026-10-14T01:34:29.654Z` pada `agy` 1.3.4. Repo Git fixture dengan detached
+worktree menjadi cwd aktual; `$HANOMAN_HOME/skills/task4-native-probe` adalah skill global
+owned. Operator auth tetap di mesin, tanpa copy config/token ke repo. Trust realpath
+ditulis helper launch dan sibling settings dibandingkan setara di memori.
+
+| Bukti aktual | Hasil |
+| --- | --- |
+| Pane/PID sebelum dan sesudah pesan kedua | `%0 25357 agy`, sama |
+| Argv proses aktual | `--prompt-interactive`, tanpa `-p`/`--print` |
+| Turn awal, batas 180 detik | selesai 23 detik, tanpa dialog trust |
+| Native tool, tampilan verbose | `Read(…/.agents/skills/task4-native-probe/SKILL.md)` |
+| Jawaban rule/skill | `AGENTS_1442_MAPLE_42`, `GEMINI_1442_IRIS_58`, `SKILL_1442_FLINT_93` |
+| Follow-up tanpa tools/files atau nonce pada prompt | `TASK4_RECALL_DONE SKILL_1442_FLINT_93`, selesai 5 detik |
+| Repo instructions | bytes AGENTS.md/GEMINI.md tetap sama |
+| Cleanup | symlink owned hilang, cwd trust owned dicabut dengan merge-preserve; sibling tetap, PID hilang, socket/fixture dihapus |
+
+Capture pertama pada harness selesai dengan semua nonce tetapi tool path masih collapsed
+(`Explored 1 file (SKILL.md)`). Harness mengulang dengan tampilan verbose sebelum assert
+path; tidak mengubah helper produk atau menganggap collapsed capture sebagai bukti path.
+Receipt tersanitasi dan hasil command tersimpan selama Execute di workspace ignored plan
+`Task4-native-receipt.log`; tidak mencetak config, auth/token, atau identitas akun operator.
+Native roster/MCP/phase/status masih dibuktikan task berikutnya.
 
 
 ## Receipt kontrak Task 1 — 2026-10-14

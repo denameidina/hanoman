@@ -10,7 +10,7 @@ export const SKILLS_TOOLS: readonly McpToolDef[] = [
     name: "hanoman_skills_list",
     title: "Daftar skill",
     description:
-      "Skill dari semua sumber: global hanoman ($HANOMAN_HOME/skills, disuntik ke setiap sesi), user (~/.claude|~/.codex|~/.agents), plugin (baca-saja), dan per project (.claude/.agents/.codex/skills + folder lain berisi SKILL.md). Tanpa `project`: global + satu grup per project. Dengan `project`: global (bertanda shadowedBy bila ditimpa) + skill project itu.",
+      "Skill dari semua sumber: global hanoman ($HANOMAN_HOME/skills, disuntik ke setiap sesi), user (~/.claude|~/.codex|~/.agents|~/.gemini/antigravity-cli), plugin (baca-saja), dan per project (.claude/.agents/.codex/skills + folder lain berisi SKILL.md). Tanpa `project`: global + satu grup per project. Dengan `project`: global (bertanda shadowedBy bila ditimpa) + skill project itu.",
     inputSchema: obj({ properties: { project: str("Id project. Kosongkan untuk semua grup.") } }),
     mode: "read", capability: "skills:read",
     samplePath: "/skills", sampleMethod: "GET",
@@ -60,7 +60,7 @@ export const SKILLS_TOOLS: readonly McpToolDef[] = [
         layer: enumStr(["hanoman", "user", "project"], "Lapis tujuan."),
         name: str("Nama skill (kebab-case)."),
         description: str("Deskripsi — diawali kapan skill dipakai, mis. \"Use when …\"."),
-        source: enumStr([".claude", ".agents", ".codex"], "Sumber untuk lapis user/project. Default .claude."),
+        source: enumStr([".claude", ".agents", ".codex", ".gemini/antigravity-cli"], "Sumber untuk lapis user/project. .gemini/antigravity-cli hanya user. Default .claude."),
         project: str("Id project (wajib untuk layer project)."),
       },
       required: ["layer", "name", "description"],
@@ -76,13 +76,13 @@ export const SKILLS_TOOLS: readonly McpToolDef[] = [
   {
     name: "hanoman_skill_fork",
     title: "Fork skill",
-    description: "Menyalin skill mana pun (termasuk plugin yang baca-saja) ke global hanoman atau ke project, supaya bisa disunting. `name` default = nama asal.",
+    description: "Menyalin skill mana pun (termasuk plugin yang baca-saja) ke global hanoman, user, atau project, supaya bisa disunting. `name` default = nama asal.",
     inputSchema: obj({
       properties: {
         key: str("Key skill sumber."),
-        layer: enumStr(["hanoman", "project"], "Tujuan. Default hanoman."),
+        layer: enumStr(["hanoman", "user", "project"], "Tujuan. Default hanoman."),
         project: str("Id project (wajib untuk layer project)."),
-        source: enumStr([".claude", ".agents", ".codex"], "Sumber tujuan untuk layer project."),
+        source: enumStr([".claude", ".agents", ".codex", ".gemini/antigravity-cli"], "Sumber tujuan user/project; .gemini/antigravity-cli hanya user."),
         name: str("Nama baru (opsional)."),
       },
       required: ["key"],

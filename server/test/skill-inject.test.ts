@@ -1,10 +1,10 @@
 // server/test/skill-inject.test.ts
 import { describe, it, expect, beforeEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, writeFileSync, chmodSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, writeFileSync, chmodSync, unlinkSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { injectGlobalSkills, unexcludeInjected, INJECT_MARKER } from "../src/services/skill-inject";
+import { cleanupInjectedSkills, injectGlobalSkills, unexcludeInjected, INJECT_MARKER } from "../src/services/skill-inject";
 
 const skill = (dir: string, name: string) => {
   mkdirSync(dir, { recursive: true });
@@ -76,5 +76,58 @@ describe("fail-open", () => {
     expect(r.addDir).toBeUndefined();
     expect(r.warnings.length).toBeGreaterThan(0);
     chmodSync(ro, 0o700);
+  });
+});
+
+describe("antigravity", () => {
+  it("preserves instructions and project skills, excludes once, cleans only owned links", () => {
+    writeFileSync(join(repo, "AGENTS.md"), "agents original"); writeFileSync(join(repo, "GEMINI.md"), "gemini original");
+    skill(join(repo, ".agents/skills/local"), "local");
+    const config = join(repo, ".agents/mcp_config.json"); writeFileSync(config, "operator MCP original");
+    const original = readFileSync(join(repo, ".claude/skills/dup/SKILL.md"), "utf8");
+    execFileSync("git", ["add", "AGENTS.md", "GEMINI.md", ".agents", ".claude"], { cwd: repo });
+    execFileSync("git", ["-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "project originals"], { cwd: repo });
+    const args = { agent: "antigravity" as const, cwd: repo, tempDir: tmp, hanomanHome: home };
+    expect(injectGlobalSkills(args).injected).toEqual(["g1"]); injectGlobalSkills(args);
+    expect(readlinkSync(join(repo, ".agents/skills/g1"))).toBe(join(home, "skills/g1"));
+    const exclude = readFileSync(join(repo, ".git/info/exclude"), "utf8");
+    expect(exclude.match(/^\/\.agents\/skills\/g1$/gm)).toHaveLength(1);
+    expect(execFileSync("git", ["status", "--porcelain"], { cwd: repo, encoding: "utf8" })).toBe("");
+    cleanupInjectedSkills(tmp);
+    expect(existsSync(join(repo, ".agents/skills/g1"))).toBe(false);
+    expect(readFileSync(join(repo, ".git/info/exclude"), "utf8")).not.toContain("/.agents/skills/g1");
+    expect(readFileSync(join(repo, "AGENTS.md"), "utf8")).toBe("agents original");
+    expect(readFileSync(join(repo, "GEMINI.md"), "utf8")).toBe("gemini original");
+    expect(readFileSync(config, "utf8")).toBe("operator MCP original");
+    expect(readFileSync(join(repo, ".claude/skills/dup/SKILL.md"), "utf8")).toBe(original);
+    expect(existsSync(join(repo, ".agents/skills/local/SKILL.md"))).toBe(true);
+  });
+  it("cleanup after manifest reread preserves operator-replaced links and exclude", () => {
+    const args = { agent: "antigravity" as const, cwd: repo, tempDir: tmp, hanomanHome: home };
+    injectGlobalSkills(args); unlinkSync(join(repo, ".agents/skills/g1"));
+    skill(join(root, "operator"), "operator"); symlinkSync(join(root, "operator"), join(repo, ".agents/skills/g1"));
+    cleanupInjectedSkills(tmp);
+    expect(readlinkSync(join(repo, ".agents/skills/g1"))).toBe(join(root, "operator"));
+    expect(readFileSync(join(repo, ".git/info/exclude"), "utf8")).toContain("/.agents/skills/g1");
+  });
+  it("never claims ownership of an existing operator exclude", () => {
+    const f = join(repo, ".git/info/exclude"); writeFileSync(f, "# operator\n/.agents/skills/g1\n");
+    injectGlobalSkills({ agent: "antigravity", cwd: repo, tempDir: tmp, hanomanHome: home }); cleanupInjectedSkills(tmp);
+    expect(readFileSync(f, "utf8")).toBe("# operator\n/.agents/skills/g1\n");
+  });
+  it("preserves an operator replacement even when its target matches the owned link", () => {
+    injectGlobalSkills({ agent: "antigravity", cwd: repo, tempDir: tmp, hanomanHome: home });
+    const link = join(repo, ".agents/skills/g1");
+    // Rename the old inode away so the replacement cannot reuse its identity.
+    const old = join(root, "old-link");
+    execFileSync("mv", [link, old]); symlinkSync(join(home, "skills/g1"), link);
+    cleanupInjectedSkills(tmp);
+    expect(readlinkSync(link)).toBe(join(home, "skills/g1"));
+    expect(readFileSync(join(repo, ".git/info/exclude"), "utf8")).toContain("/.agents/skills/g1");
+  });
+  it("non-repo and blocked .agents fail open with runtime warning", () => {
+    writeFileSync(join(repo, ".agents"), "blocked");
+    const result = injectGlobalSkills({ agent: "antigravity", cwd: repo, tempDir: tmp, hanomanHome: home });
+    expect(result.injected).toEqual([]); expect(result.warnings.join(" ")).toContain("antigravity");
   });
 });

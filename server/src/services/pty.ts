@@ -19,7 +19,8 @@ import {
 } from "./session-phases";
 import { sessionIdForSpec } from "./session-id";
 import { antigravityBin } from "./antigravity-runtime";
-import { injectGlobalSkills } from "./skill-inject";
+import { cleanupInjectedSkills, injectGlobalSkills } from "./skill-inject";
+import { ensureAntigravityTrust } from "./antigravity-trust";
 import { skillsHome } from "./skill-library";
 import { dropSessionUploads } from "./uploads";
 import {
@@ -817,6 +818,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // membaca layar terakhir sesi yang sudah selesai.
   const existing = getSession(id);
   if (existing && !existing.exited) return existing;
+  if (!opts.command && opts.agent === "antigravity") ensureAntigravityTrust(cwd);
   if (existing) killSession(id);
   phaseDoneSeen.delete(id);   // R3 · id sesi dipakai ulang: tenggang sesi lama tak diwarisi
   const eventDir = opts.command ? undefined : sessionEventDir(id);
@@ -1052,7 +1054,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     // kegagalan-senyapnya: JSON tak sah DIABAIKAN tanpa pesan, exit 0, NOL agen.
     const agentsArg = agentsFile ? `--agents "$(cat ${sq(agentsFile)})"` : "";
     const nativeAgentArgs = agent === "codex" ? codexAgentArgs.map(sq).join(" ") : "";
-    // Skills library · skill global hanoman ke sesi agen (claude: `--add-dir`, codex: symlink +
+    // Skills library · skill global hanoman ke sesi agen (claude: `--add-dir`, codex/antigravity: symlink +
     // exclude — lihat skill-inject.ts). Fail-open: peringatan stderr saja, sesi tetap lahir.
     // `--add-dir` variadik, jadi ia HARUS argumen terakhir supaya tak menelan argumen lain.
     let skillsArg = "";
@@ -1747,6 +1749,7 @@ export function killSession(id: string): boolean {
   tmux("kill-session", "-t", name(id));
   // Direktori ini eksklusif milik id sesi yang sudah di-resolve, berisi beberapa config/hook kecil.
   // Hapus sinkron agar return `killSession` juga menjadi batas lifecycle kredensial/instruksinya.
+  cleanupInjectedSkills(agentTempDir(id));
   try { rmSync(agentTempDir(id), { recursive: true, force: true }); } catch { /* temp opsional */ }
   try { rmSync(sessionEventDir(id), { recursive: true, force: true }); } catch { /* spool opsional */ }
   emitDeath({ sessionId: id, exitCode: p.exited ? p.code : null, transcript });

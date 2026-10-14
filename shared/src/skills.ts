@@ -3,14 +3,14 @@
 
 export const SKILL_LAYERS = ["hanoman", "user", "plugin", "project"] as const;
 export type SkillLayer = (typeof SKILL_LAYERS)[number];
-export type SkillRuntime = "claude" | "codex";
+export type SkillRuntime = "claude" | "codex" | "antigravity";
 
 export interface SkillEntry {
   key: string;
   name: string;
   description: string | null;
   layer: SkillLayer;
-  /** ".claude" | ".agents" | ".codex" | "plugin:<pkg>" | "lainnya:<rel>" | "hanoman" */
+  /** ".claude" | ".agents" | ".codex" | ".gemini/antigravity-cli" | "plugin:<pkg>" | "lainnya:<rel>" | "hanoman" */
   source: string;
   projectId: string | null;
   dir: string;

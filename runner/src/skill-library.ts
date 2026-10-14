@@ -38,7 +38,7 @@ export function scanGlobalSkills(o: SkillScanOpts): SkillEntry[] {
   const push = (e: SkillEntry) => { if (!seen.has(e.key)) { seen.add(e.key); out.push(e); } };
 
   for (const s of skillsUnder(hanomanSkillsDir(o.hanomanHome), null, 1))
-    push(entry(s.dir, "hanoman", "hanoman", null, ["claude", "codex"], true));
+    push(entry(s.dir, "hanoman", "hanoman", null, ["claude", "codex", "antigravity"], true));
 
   const claudeHome = agentSkillHome("claude", env, osHome);
   const codexHome = agentSkillHome("codex", env, osHome);
@@ -48,6 +48,10 @@ export function scanGlobalSkills(o: SkillScanOpts): SkillEntry[] {
     [join(codexHome, "skills"), ".codex", "codex"],
     [join(agentsHome, "skills"), ".agents", "codex"],
   ] as const) for (const s of skillsUnder(dir, null)) push(entry(s.dir, "user", source, null, [rt], true));
+
+  const antigravitySkills = join(agentSkillHome("antigravity", env, osHome), "skills");
+  for (const s of skillsUnder(antigravitySkills, null))
+    push(entry(s.dir, "user", ".gemini/antigravity-cli", null, ["antigravity"], true));
 
   for (const agent of ["claude", "codex"] as const) {
     let found: ReturnType<typeof scanAgentSkills>["skills"] = [];
@@ -65,7 +69,7 @@ function projectSource(rel: string): { source: string; loadedBy: SkillRuntime[] 
   const parts = rel.split(sep);
   const root = parts.slice(0, 2).join("/");
   if (parts.length === 3 && root === ".claude/skills") return { source: ".claude", loadedBy: ["claude"] };
-  if (parts.length === 3 && root === ".agents/skills") return { source: ".agents", loadedBy: ["codex"] };
+  if (parts.length === 3 && root === ".agents/skills") return { source: ".agents", loadedBy: ["codex", "antigravity"] };
   if (parts.length === 3 && root === ".codex/skills") return { source: ".codex", loadedBy: ["codex"] };
   return { source: `lainnya:${parts.slice(0, -1).join("/")}`, loadedBy: [] };
 }

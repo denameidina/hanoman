@@ -9,9 +9,7 @@ import { scanAgentSkills } from "@hanoman/runner";
 import { shellBin } from "./pty";
 
 export function methodStatusReport(env: NodeJS.ProcessEnv = process.env): MethodStatusResponse {
-  const scans = zAgent.options.map((a) => a === "antigravity"
-    ? { agent: a, home: "", roots: [], skills: [], packages: [] }
-    : scanAgentSkills(a, env));
+  const scans = zAgent.options.map((a) => scanAgentSkills(a, env));
   return {
     agents: scans.map((s) => ({ agent: s.agent, home: s.home, roots: s.roots, skills: s.skills.length })),
     methods: scans.flatMap((s) => {

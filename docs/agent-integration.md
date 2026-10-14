@@ -673,3 +673,11 @@ SPEC-1442 memperluas response `hanoman_methods_status` additive: untuk Antigravi
 `available:false`, `availabilityReason`, `ready:false`, `install:[]` sampai installer upstream
 terverifikasi. Tool tetap baca `GLOBAL_READ`. Terminal install Antigravity ditolak 400
 `{error:string}` sebelum spawn lewat route existing; tidak menambah installer endpoint/tool.
+
+SPEC-1442 memperluas skill library existing: `loadedBy` dapat memuat `antigravity`;
+source user `.gemini/antigravity-cli` menunjuk skill native global. Source tersebut hanya
+diterima untuk `layer:user`, bukan project; source asing/traversal tetap 400. Keputusan MCP
+ADR-0202: `hanoman_skills_list`/`hanoman_skill_read` tetap `skills:read`, sedangkan
+`hanoman_skill_create`/`hanoman_skill_fork` memperluas enum source melalui tool existing,
+mode `write` dan capability `skills:write` tetap sama. Menulis berkas native lewat key
+existing tetap memakai `hanoman_skill_write`/baseHash. Tidak ada endpoint atau capability baru.
