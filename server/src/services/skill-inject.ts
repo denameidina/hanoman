@@ -95,7 +95,11 @@ export function injectGlobalSkills(o: { agent: "claude" | "codex" | "antigravity
       mkdirSync(join(exclude, ".."), { recursive: true });
       const cur = existsSync(exclude) ? readFileSync(exclude, "utf8") : "";
       const line = excludeLine(s.name);
-      if (!cur.split("\n").includes(line)) {
+      const lines = cur.split("\n");
+      // info/exclude is shared by worktrees: each owned link needs its own removable pair.
+      const hasOperatorLine = lines.some((entry, index) => entry === line
+        && !lines[index - 1]?.startsWith(`${INJECT_MARKER}:antigravity:`));
+      if (o.agent === "antigravity" ? !hasOperatorLine : !lines.includes(line)) {
         if (o.agent === "antigravity") {
           const hash = createHash("sha256").update(`${link}\0${s.dir}`).digest("hex");
           ownedPair = `${INJECT_MARKER}:antigravity:${hash}\n${line}\n`;

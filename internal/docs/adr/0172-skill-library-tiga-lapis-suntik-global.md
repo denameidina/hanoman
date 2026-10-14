@@ -56,6 +56,8 @@ Skill project (`<repo>/.claude/skills`, `.agents/skills`, `.codex/skills`, folde
    symlink workspace dan exclude di common dir; manifest sesi menyimpan target, inode/device
    dan hash marker. Kill hanya mencabut link dengan identitas/target yang masih cocok serta
    pasangan exclude owned; link project/operator atau baris exclude existing dipertahankan.
+   Setiap worktree mendapat pasangan exclude owned sendiri di common dir, sehingga cleanup
+   sesi pertama tidak membuat skill sesi kedua menjadi untracked walau nama skill sama.
    AGENTS.md, GEMINI.md dan config workspace tidak ditulis oleh injektor. Trust native di
    settings operator dipersiapkan fail-closed; kegagalan skill tetap fail-open.
 

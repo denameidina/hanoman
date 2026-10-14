@@ -125,6 +125,28 @@ describe("antigravity", () => {
     expect(readlinkSync(link)).toBe(join(home, "skills/g1"));
     expect(readFileSync(join(repo, ".git/info/exclude"), "utf8")).toContain("/.agents/skills/g1");
   });
+  it("keeps the second worktree ignored after the first session cleans its common-dir exclude", () => {
+    execFileSync("git", ["add", ".claude"], { cwd: repo });
+    execFileSync("git", ["-c", "user.name=fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "project skill"], { cwd: repo });
+    const first = join(root, "first"), second = join(root, "second");
+    for (const path of [first, second]) execFileSync("git", ["worktree", "add", "--detach", path, "HEAD"], { cwd: repo, stdio: "ignore" });
+    const exclude = join(repo, ".git/info/exclude"), original = "# operator keeps this\n/operator-kept\n";
+    writeFileSync(exclude, original);
+    const tempA = join(tmp, "first"), tempB = join(tmp, "second");
+    try {
+      injectGlobalSkills({ agent: "antigravity", cwd: first, tempDir: tempA, hanomanHome: home });
+      injectGlobalSkills({ agent: "antigravity", cwd: second, tempDir: tempB, hanomanHome: home });
+      cleanupInjectedSkills(tempA);
+      expect(existsSync(join(first, ".agents/skills/g1"))).toBe(false);
+      expect(readlinkSync(join(second, ".agents/skills/g1"))).toBe(join(home, "skills/g1"));
+      expect(execFileSync("git", ["status", "--porcelain"], { cwd: second, encoding: "utf8" })).toBe("");
+      cleanupInjectedSkills(tempB);
+      expect(existsSync(join(second, ".agents/skills/g1"))).toBe(false);
+      expect(readFileSync(exclude, "utf8")).toBe(original);
+    } finally {
+      for (const path of [first, second]) execFileSync("git", ["worktree", "remove", "--force", path], { cwd: repo });
+    }
+  });
   it("non-repo and blocked .agents fail open with runtime warning", () => {
     writeFileSync(join(repo, ".agents"), "blocked");
     const result = injectGlobalSkills({ agent: "antigravity", cwd: repo, tempDir: tmp, hanomanHome: home });

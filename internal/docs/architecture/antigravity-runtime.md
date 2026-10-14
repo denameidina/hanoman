@@ -49,6 +49,9 @@ Skill fail-open berbeda: peringatan diberi nama runtime, sesi tetap lahir. Globa
 Global `~/.agents` tetap Codex-only; workspace `.agents/skills` dibaca keduanya.
 Manifest injeksi di temp sesi menyimpan link target + inode/device dan hash marker exclude;
 kill mencabut hanya link/exclude owned yang masih cocok, mempertahankan replacement operator.
+Karena `info/exclude` berada di Git common dir, setiap worktree mendapat pasangan marker/path
+owned sendiri walau path skill identik telah ditambahkan sesi lain. Cleanup satu sesi tidak
+mencabut exclude sesi lain; baris operator existing tidak diambil alih.
 
 [Plan implementasi](../../../docs/superpowers/plans/2026-10-14-spec-1442-antigravity-cli-runtime.md)
 memetakan 18 AC ke Task 0–14, dimulai proof discovery/invoke/follow-up native dari TUI
@@ -167,6 +170,14 @@ path; tidak mengubah helper produk atau menganggap collapsed capture sebagai buk
 Receipt tersanitasi dan hasil command tersimpan selama Execute di workspace ignored plan
 `Task4-native-receipt.log`; tidak mencetak config, auth/token, atau identitas akun operator.
 Native roster/MCP/phase/status masih dibuktikan task berikutnya.
+
+Review Task 4 menemukan exclude common-dir yang awalnya hanya dibuat sesi pertama:
+cleanup sesi pertama membuat symlink worktree kedua terlihat sebagai untracked. Regression
+dua detached worktree membuktikan RED (`?? .agents/`) lalu GREEN sesudah setiap worktree
+mendapat pasangan exclude owned sendiri; setelah cleanup pertama, worktree kedua tetap bersih,
+dan cleanup kedua mengembalikan bytes exclude operator persis. Verifikasi rework terbatas pada
+`skill-inject.test.ts` dan `skill-inject.pty.test.ts`: **17/17 test lulus**. Receipt native
+sebelumnya tetap berlaku; rework hanya mengubah ownership exclude, bukan argv/trust/native roots.
 
 
 ## Receipt kontrak Task 1 — 2026-10-14
