@@ -721,3 +721,9 @@ shared engine 1). Actual Settings conflict/lead picks serialize Antigravity pare
 their existing save endpoints. The generic EngineFields fixture proves only that shared component,
 not four different mounted surfaces. All five touched packages typecheck; server/frontend checked
 again after this follow-up. Credential sentinels, unique DB/socket and clean auth/control env used.
+
+Restart cleanup also persists the bootstrap's expected temporary parent in its non-secret receipt.
+Changing the restarted server TMPDIR no longer strands an unconsumed credential file. RED restart
+fixture reproduced that case; GREEN bootstrap+PTY: 83/83 tests in 2 files, server typecheck exit 0.
+Namespace, directory/file ownership, permissions, inode/device and content hash checks remain;
+operator replacements are preserved. Bootstrap allocation follows decision-directory preparation.

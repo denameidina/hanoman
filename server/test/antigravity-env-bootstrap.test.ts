@@ -36,3 +36,16 @@ it("consumes launch state despite a stale tmux TMPDIR", () => {
     expect(existsSync(bootstrap.directory)).toBe(false);
   } finally { cleanupAntigravityEnvBootstrap(bootstrap.receipt); }
 });
+
+it("cleans a serialized receipt after a server restart under another TMPDIR", () => {
+  const bootstrap = createAntigravityEnvBootstrap("/usr/bin/printf ready", {});
+  const previous = process.env.TMPDIR;
+  try {
+    process.env.TMPDIR = "/tmp/restarted-server";
+    cleanupAntigravityEnvBootstrap(JSON.parse(JSON.stringify(bootstrap.receipt)));
+    expect(existsSync(bootstrap.directory)).toBe(false);
+  } finally {
+    if (previous === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = previous;
+    cleanupAntigravityEnvBootstrap(bootstrap.receipt);
+  }
+});

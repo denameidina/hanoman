@@ -1145,11 +1145,11 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     });
     cmd = wrapped;
   }
+  // SPEC-184 · direktori marker keputusan; hook Notification menulis absolute path di dalamnya.
+  if (opts.decisionFile) mkdirSync(dirname(opts.decisionFile), { recursive: true });
   const bootstrap = runtime === "antigravity"
     ? createAntigravityEnvBootstrap(cmd, agentEnvironment(runtime, { ...process.env, ...opts.env })) : undefined;
   if (bootstrap) cmd = bootstrap.command;
-  // SPEC-184 · direktori marker keputusan; hook Notification menulis absolute path di dalamnya.
-  if (opts.decisionFile) mkdirSync(dirname(opts.decisionFile), { recursive: true });
 
   // Opsi global mendahului `new-session` dalam satu invokasi: window lahir sudah membawa
   // `remain-on-exit`, jadi proses yang mati seketika pun meninggalkan pane mati yang masih

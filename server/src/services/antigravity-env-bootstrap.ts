@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { join, dirname, basename } from "node:path";
 import { tmpdir } from "node:os";
 
-type Receipt = { directory: string; ino: number; dev: number; hash: string };
+type Receipt = { parent: string; directory: string; ino: number; dev: number; hash: string };
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 
 // This function also runs in the pane before exec, using only non-secret receipt arguments.
@@ -24,19 +24,21 @@ function consume(receipt: Receipt, io: typeof fs, hashOf: (bytes: Buffer) => str
 const hashOf = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
 
 export function cleanupAntigravityEnvBootstrap(receipt: unknown): void {
-  consume(receipt as Receipt, fs, hashOf, tmpdir(), { join, dirname, basename });
+  const parent = receipt && typeof receipt === "object" && "parent" in receipt && typeof receipt.parent === "string"
+    ? receipt.parent : tmpdir();
+  consume(receipt as Receipt, fs, hashOf, parent, { join, dirname, basename });
 }
 
 export function createAntigravityEnvBootstrap(command: string, env: NodeJS.ProcessEnv) {
   const directory = fs.mkdtempSync(join(tmpdir(), "hanoman-ag-env-")); fs.chmodSync(directory, 0o700);
   const path = join(directory, "launch.sh"), metadata = join(directory, "receipt.json");
   // The shell has already opened its script; consuming that file does not change its exec PID.
-  const cleaner = `const fs=require('node:fs'),{createHash}=require('node:crypto'),{join,dirname,basename}=require('node:path'); (${consume.toString()})(JSON.parse(fs.readFileSync(process.argv[1],'utf8')),fs,b=>createHash('sha256').update(b).digest('hex'),${JSON.stringify(tmpdir())},require('node:path'));`;
+  const cleaner = `const fs=require('node:fs'),{createHash}=require('node:crypto'),{join,dirname,basename}=require('node:path'); (${consume.toString()})(JSON.parse(fs.readFileSync(process.argv[1],'utf8')),fs,b=>createHash('sha256').update(b).digest('hex'),${JSON.stringify(dirname(directory))},require('node:path'));`;
   const exports = ["GEMINI_API_KEY", "GOOGLE_GEMINI_BASE_URL"].map(key => env[key] === undefined ? `unset ${key}` : `export ${key}=${quote(env[key]!)}`);
   const content = `unset GEMINI_API_KEY GOOGLE_GEMINI_BASE_URL CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY\n${quote(process.execPath)} -e ${quote(cleaner)} ${quote(metadata)} || exit 1\ntest ! -e ${quote(path)} || exit 1\n${exports.join("\n")}\nexec ${command}\n`;
   try {
     fs.writeFileSync(path, content, { mode: 0o600, flag: "wx" });
-    const st = fs.lstatSync(path), receipt = { directory, ino: st.ino, dev: st.dev, hash: hashOf(Buffer.from(content)) };
+    const st = fs.lstatSync(path), receipt = { parent: dirname(directory), directory, ino: st.ino, dev: st.dev, hash: hashOf(Buffer.from(content)) };
     fs.writeFileSync(metadata, JSON.stringify(receipt), { mode: 0o600, flag: "wx" });
     return { directory, path, receipt, command: `exec /bin/sh ${quote(path)}` };
   } catch (error) { fs.rmSync(directory, { recursive: true, force: true }); throw error; }
