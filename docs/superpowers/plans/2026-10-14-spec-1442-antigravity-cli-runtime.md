@@ -229,12 +229,14 @@ menunggu review parent sebelum ditandai selesai.
 
 **Interfaces:** `antigravityVersionInfo():Promise<{version:string|null,error:string|null}>`, semver or safe missing/timeout/parse/boundary reason. `GET /api/antigravity/version` →200 authenticated, `GLOBAL_READ`; `hanoman_antigravity_version` mode read/capability null backed by route decision. Codex version API unchanged.
 
-- [ ] **Step 1:** Parser/fake executable tests for 1.3.4, missing, malformed, timeout 10s/output bounded; DTO never raw stderr/stdout/home/token. Cache 5min keyed effective bin+execution mode, concurrent coalesce and stale generation discard after config change.
-- [ ] **Step 2:** Route tests principal anonymous→401, valid cookie/agent token→200, mode/capability catalog/coverage assertions; version observation failure not 500 and not independent host launch blocker. Existing Codex DTO/snapshot unchanged.
+- [x] **Step 1:** Parser/fake executable tests for 1.3.4, missing, malformed, timeout 10s/output bounded; DTO never raw stderr/stdout/home/token. Cache 5min keyed effective bin+execution mode, concurrent coalesce and stale generation discard after config change.
+- [x] **Step 2:** Route tests principal anonymous→401, valid cookie/agent token→200, mode/capability catalog/coverage assertions; version observation failure not 500 and not independent host launch blocker. Existing Codex DTO/snapshot unchanged.
 
   Assertions: `expect(validResponse.statusCode).toBe(200)`; `expect(validResponse.json()).toEqual({version:"1.3.4",error:null})`; `expect(missingResponse.json()).toMatchObject({version:null,error:expect.any(String)})`; tool `mode:"read",capability:null`.
-- [ ] **Step 3:** Run red; implement service/route register, catalog tool and GLOBAL_READ authorization decision, client getter `getAntigravityVersion():Promise<AntigravityVersionInfo>`.
-- [ ] **Step 4:** Run green selected version/MCP tests; update `docs/agent-integration.md`, API SoT and index in same commit. Live curl deliberately belongs to Task 14 once at end.
+- [x] **Step 3:** Run red; implement service/route register, catalog tool and GLOBAL_READ authorization decision, client getter `getAntigravityVersion():Promise<AntigravityVersionInfo>`.
+- [x] **Step 4:** Run green selected version/MCP tests; update `docs/agent-integration.md`, API SoT and index in same commit. Live curl deliberately belongs to Task 14 once at end.
+
+**Receipt Task 10:** commit `bab1a5723a30d703f284d0cc9ccf406c7c496897` reviewed; original10files/265tests green including actual10.006stimeout/16KiBbound/stalegeneration+identity/coalescing/auth200/401/MCPcoverage/Codexregression. NewGETversion GLOBAL_READ onlyexactGET/HEAD path; siblings/writesCOOKIE_ONLY, readtool capabilitynull, safenullreason no rawdata. Sharedtype0, server/FE pendinglaterTask13/12. Actualagyversion1.3.4; finalrealcurl deferredTask14. [Receipt SoT](../../../internal/docs/architecture/antigravity-runtime.md).
 
 ### Task 11: MCP global format yang aman untuk operator
 
