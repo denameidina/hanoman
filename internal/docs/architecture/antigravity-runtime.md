@@ -586,11 +586,22 @@ Log terarah ada di ignored workspace `Task11-{red,green,green-final}.log`.
 existing; tidak ada diagnostic pada McpPanel atau test Task 11, tanpa suppressions.
 `docs index --check` menjawab `index ok` dan `git diff --check` exit 0.
 
-Bukti native `/mcp`/tools-list serta `hanoman_about` masih pending keputusan sumber
-credential: env sesi tidak memasok token/host dan entri hanoman global Antigravity belum
-ada. Metadata-only menemukan konfigurasi Hanoman Claude existing, tetapi pemilihan
-credential operator tidak diambil oleh implementer. Semua konfigurasi global operator
-masih utuh; receipt fixture tidak menggantikan receipt koneksi native. Jalur rekomendasi
-adalah fixture auth terisolasi pada boot final Task 14 dan entri global sementara yang
-owned, dengan merge-preserve cleanup; alternatif sumber credential existing harus
-dipilih eksplisit oleh operator sebelum reuse.
+Native receipt memakai koneksi Hanoman existing yang sudah dipilih operator di
+`~/.claude.json` → `mcpServers.hanoman` setelah reuse sumber itu diotorisasi orchestrator.
+Isi host/token tetap di memori, tidak dicetak atau dimasukkan argv/artefak; command/args
+sumber divalidasi sebelum digunakan. Hanya entri global Antigravity sementara yang owned
+berisi `hanoman mcp --read-only`; capability token dan konfigurasi Claude tidak berubah.
+Global entry 0600 dan root/sibling preservation diverifikasi saat probe. Native TUI lewat
+`createSession`/`--prompt-interactive` memanggil `hanoman_about` dengan hasil sukses dalam
+23 detik; `/mcp` memunculkan heading native `MCP Servers`, Hanoman dan `Tools`, yang tidak
+ada dalam instruksi prompt. Pane ID/PID tetap sama. Receipt tidak memuat host, token,
+home atau raw tool/config output. Tidak ada server tambahan yang di-boot pada task ini.
+
+Cleanup read-latest/hash-owned hanya menghapus entri probe; original global JSON/mode,
+Claude source entry, trust sibling dan workspace operator tetap utuh. Trust tambahan,
+temp worktree/fixture dan pane PID terhapus; satu descendant MCP stdio yang dimiliki
+pane juga sudah hilang. Final receipt `Task11-native-final.log` exit 0. Probe sebelumnya
+sukses about 39 detik; tightening panel pertama memakai perbandingan current-command
+launcher yang terlalu ketat dan gagal walau heading panel teramati, cleanup tetap sukses
+(`Task11-native-panel.log`). Final probe membandingkan pane ID/PID stabil serta memverifikasi
+descendant cleanup. Tidak ada keputusan credential terbuka atau klaim native pending tersisa.
