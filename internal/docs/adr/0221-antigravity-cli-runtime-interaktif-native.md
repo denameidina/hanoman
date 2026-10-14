@@ -90,3 +90,16 @@ Review ownership Task 5 mewajibkan rewrite roster melalui descriptor `O_NOFOLLOW
 verifikasi inode/device/hash, bukan write pathname yang dapat mengikuti replacement operator.
 Ownership berubah berarti unavailable beralasan atau pembatalan seluruh roster fase; sentinel
 luar registry dan edit operator dipertahankan. Bukti RED→GREEN tercatat di receipt runtime.
+
+
+## Implementasi kontrak fase — Task 7
+
+Parent Antigravity menyebut tier native dan effort unknown, tanpa janji model exact/foreground.
+Delegasi langsung memakai `invoke_subagent`; keputusan dan rework memakai `send_message` ke ID
+child yang sama. Seluruh pertanyaan membawa opsi, rekomendasi dan alasan. Marker tetap hanya
+ditulis parent sesudah laporan lengkap; Execute wajib menunggu reviewer independen Verdict lulus.
+Reviewer generated memakai larangan tulis instruksional sesuai keputusan 1A, tanpa mengubah
+unavailable Custom Agent read-only. Phase override transient menjadi nullable (null/inherit native,
+effort null) dan divalidasi terhadap runtime efektif sebelum worktree/backlog writes. Metadata
+child menyimpan tier dan menghilangkan effort unknown, tidak menyalin effort parent. Fallback
+materialisasi all-or-nothing tetap berlaku. Tidak ada perubahan schema DB atau route tambahan.

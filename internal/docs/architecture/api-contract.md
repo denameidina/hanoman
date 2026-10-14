@@ -1117,7 +1117,7 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #       Setting.agent (konflik: blok Setting.conflict bila dinyalakan, ADR-0081). Terminal agen biasa
 #       DIKECUALIKAN sejak SPEC-517: ia punya form pemilih runtime sendiri (lihat varian di atas).
 #     model/effort opsional = override PER SESI (kosong → default global);
-#     phaseOverrides?: { [fase]: { model?: string; effort?: string } } = override PER SESI untuk
+#     phaseOverrides?: { [fase]: { model?: string|null; effort?: string|null } } = override PER SESI untuk
 #       subagent fase (kosong → rekomendasi/matriks Settings → orchestrator); tidak disimpan ke Setting.
 #       S6: berbatas — model 1..200, effort 1..64, nama fase 1..64, ≤32 fase (400 bila lebih);
 #       dinormalisasi seperti sel Setting (id pensiun dipetakan, effort codex dikoersi).
@@ -2520,3 +2520,12 @@ Keputusan MCP: schema tool Settings/launch/lead/Custom Agent/models existing add
 Terminal/events WebSocket tetap dikecualikan sebagai streaming, session-events sebagai HMAC sesi.
 Tidak menambah endpoint tulis config lokal Antigravity. Implementasi harus memperbarui
 UNWRAPPED/COOKIE_ONLY beralasan bila kontrak pengecualian tersentuh (ADR-0202).
+
+
+SPEC-1442 Task 7: phase override transient Antigravity menggunakan model tier
+`inherit|flash|pro` (null berarti inherit) dan effort null. Validasi memakai runtime efektif,
+termasuk default Settings saat body menghilangkan `agent`; slug model parent dan effort
+independen ditolak 400 sebelum perubahan worktree/backlog, termasuk saat orkestrasi mati.
+Reviewer fase generated tetap read-only instruksional; null effort bukan enforcement atau
+jaminan model exact. Katalog MCP existing Settings dan session phases membawa penjelasan ini,
+tanpa route baru; keputusan streaming/auth exception tetap berlaku.

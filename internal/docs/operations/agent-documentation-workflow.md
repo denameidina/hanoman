@@ -100,3 +100,15 @@ Sandbox dan goal gate native ditolak eksplisit, tanpa hardening downgrade. Kontr
 [runtime Antigravity](../architecture/antigravity-runtime.md) dan
 [18 AC EARS SPEC-1442](../../../docs/superpowers/specs/2026-10-14-spec-1442-antigravity-cli-design.md).
 Dokumen ini menetapkan target, bukan menyatakan adapter telah dirilis.
+
+
+Task 7 mengimplementasikan prompt per-runtime di kontrak tersebut: Antigravity menggunakan
+`invoke_subagent` dan `send_message` ke conversation ID yang sama, bukan tool Agent/SendMessage
+Claude atau spawn_agent/send_input Codex. Parent meneruskan seluruh keputusan dengan opsi,
+rekomendasi dan alasan; rework Execute dan reviewer memakai masing-masing ID yang sudah tercatat.
+`protocol wait` berarti parent menunggu laporan walau invoke native asynchronous. Fase Execute
+mode inline mengerjakan task sendiri; roster delegasi hanya memasukkan Custom Agent kompatibel,
+dan tidak menyebut Custom Agent auditor/isolated/model legacy sebagai tersedia. Reviewer generated
+memuat larangan tulis instruksional, tanpa policy enforced. Gagal satu definisi fase membatalkan
+roster fase dan metadata orchestrated sebelum fallback single-session berperingatan. Output prompt
+Claude/Codex tetap byte-identik, dikunci dua hash parent dan dua hash definisi fase dalam test.

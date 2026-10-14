@@ -21,3 +21,14 @@ describe("sessionPhasePlan (ADR-0164)", () => {
     expect(sessionPhasePlan(DEFAULT_SETTING, "feature", "codex", { model: "gpt-5.6-sol", effort: "high" })).toBeNull();
   });
 });
+
+
+it("Antigravity session phases never inherit parent model or effort", () => {
+  const plan = sessionPhasePlan(DEFAULT_SETTING, "feature", "antigravity", { model: "gemini-3.8-flash-high", effort: "high" }, { Plan: { model: "pro", effort: null } })!;
+  expect(plan.phases.find(p => p.phase === "Plan")).toMatchObject({ model: "pro", effort: null });
+  expect(plan.phases[0]).toMatchObject({ model: "inherit", effort: null });
+  expect(plan.reviewer).toMatchObject({ model: "inherit", effort: null });
+});
+it.each([{ model: "gemini-3.8-flash-high", effort: null }, { model: "flash", effort: "high" }])("rejects invalid native overrides before a session can be spawned: %j", cell => {
+  expect(() => sessionPhasePlan(DEFAULT_SETTING, "feature", "antigravity", { model: "gemini-3.8-flash-high", effort: "high" }, { Plan: cell })).toThrow(/tier native/);
+});

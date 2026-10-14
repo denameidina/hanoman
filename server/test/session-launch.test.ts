@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { prisma } from "../src/db";
 import { startSpecSession, LaunchError, sessionIdForSpec } from "../src/services/session-launch";
-import { killAll, killSession, agentsFilePath, promptFilePath, getSession } from "../src/services/pty";
+import { createSession, killAll, killSession, agentsFilePath, promptFilePath, getSession } from "../src/services/pty";
 import { DEFAULT_SETTING } from "../src/services/settings";
 import { resolveGoalCondition } from "@hanoman/runner";
 import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
@@ -208,6 +208,34 @@ describe("session-launch", () => {
     const agents = JSON.parse(readFileSync(agentsFilePath(r.id), "utf8"));
     expect(agents["hanoman-fase-spec"]).toMatchObject({ model: "claude-haiku-4-5", effort: "low" });
     killSession(r.id);
+  });
+
+  it.each([
+    { model: "gemini-3.8-flash-high", effort: null }, { model: "flash", effort: "high" },
+  ])("inherited Antigravity rejects invalid phase overrides before worktree/persist: %j", async (cell) => {
+    await setSetting({ agent: "antigravity" });
+    const spec = await seedRepo("SPEC-AG-OVERRIDE");
+    await expect(startSpecSession(spec, { flow: "feature", phaseOverrides: { Plan: cell } }))
+      .rejects.toMatchObject({ statusCode: 400 });
+    const stored = (await prisma.spec.findUnique({ where: { id: spec.id } }))!;
+    expect(stored.baseSha).toBeNull();
+    expect(stored.startedAt).toBeNull();
+    expect(stored.payload).toEqual(spec.payload);
+    expect(existsSync(join((await resolveRepoDir(spec.projectId))!, ".worktrees", sessionIdForSpec(spec.id)))).toBe(false);
+    expect(getSession(sessionIdForSpec(spec.id))).toBeUndefined();
+  });
+
+  it("invalid inherited native override preserves an old exited pane before admission", async () => {
+    await setSetting({ agent: "antigravity" });
+    const spec = await seedRepo("SPEC-AG-OLD-PANE");
+    const id = sessionIdForSpec(spec.id);
+    createSession(spec.projectId, (await resolveRepoDir(spec.projectId))!, { id, command: ["/bin/echo", "old fixture"] });
+    for (let n = 0; n < 100 && !getSession(id)?.exited; n++) await new Promise(r => setTimeout(r, 20));
+    expect(getSession(id)?.exited).toBe(true);
+    await expect(startSpecSession(spec, { flow: "feature", phaseOverrides: { Plan: { model: "flash", effort: "high" } } }))
+      .rejects.toMatchObject({ statusCode: 400 });
+    expect(getSession(id)?.exited).toBe(true);
+    killSession(id);
   });
 
   it("orkestrasi flow mati → prompt mode tunggal, tanpa berkas agen", async () => {

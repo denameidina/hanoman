@@ -36,7 +36,16 @@ export type PhasePlanInput = {
   nativeAgents: boolean;
 };
 
+/** Effective runtime can come from Settings when the launch body omits `agent`. */
+export function phaseOverridesProblem(runtime: Agent, overrides?: PhaseOverrides): string | null {
+  if (runtime !== "antigravity" || !overrides) return null;
+  return Object.values(overrides).some(cell => (cell.model != null && !isAntigravityChildTier(cell.model))
+    || cell.effort != null) ? "Antigravity child memakai tier native tanpa effort independen" : null;
+}
+
 export function resolvePhasePlan(input: PhasePlanInput): PhasePlan | null {
+  const problem = phaseOverridesProblem(input.runtime, input.phaseOverrides);
+  if (problem) throw new Error(problem);
   const cfg = (input.orchestration ?? ORCHESTRATION_DEFAULTS)[input.flow];
   if (!input.nativeAgents || cfg?.enabled === false) return null;
   const cells = cfg?.[input.runtime] ?? {};
@@ -47,7 +56,8 @@ export function resolvePhasePlan(input: PhasePlanInput): PhasePlan | null {
     const cell = cells[key];
     const override = input.phaseOverrides?.[key];
     if (input.runtime === "antigravity") {
-      const model = override?.model ?? cell?.model ?? "inherit";
+      const picked = override?.model !== undefined ? override.model : cell?.model;
+      const model = picked ?? "inherit";
       if (!isAntigravityChildTier(model) || override?.effort != null || cell?.effort != null) {
         throw new Error("Antigravity child memakai tier native tanpa effort independen");
       }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,7 +8,11 @@ import {
   agentsFilePath, promptFilePath, agentTempDir, trackPhaseDoneSeen, _forgetPhaseDoneSeen, AGENTS_ARG_SAFE_BYTES,
   agentContractFilePath, fitCustomAgentsToArgBudget,
 } from "../src/services/pty";
-import { agentContractOf, renderAgentsJson, type AgentDef } from "@hanoman/runner";
+import { agentContractOf, buildPhaseAgents, renderAgentsJson, type AgentDef } from "@hanoman/runner";
+
+import { resolveMethod, resolvePhasePlan } from "@hanoman/shared";
+
+vi.mock("../src/services/antigravity-trust", () => ({ ensureAntigravityTrust: vi.fn() }));
 
 // ADR-0164 · kontrak orchestrator di titik cekik kelahiran sesi. Bukti dibaca dari berkas sesi dan
 // layar pane ber-binary /bin/echo — bukan dari bentuk respons (pelajaran `sessionModel()`).
@@ -366,5 +370,48 @@ describe("fitCustomAgentsToArgBudget", () => {
     const one = fitCustomAgentsToArgBudget(defs, size, 10);
     expect(one.kept.map((d) => d.name)).toEqual(["scout"]);
     expect(one.dropped.map((d) => d.name)).toEqual(["opt-2", "qa-verifier", "security-reviewer"]);
+  });
+});
+
+
+describe("Antigravity phases at session birth (SPEC-1442)", () => {
+  const nativeDefs = () => buildPhaseAgents(resolvePhasePlan({ flow: "feature", runtime: "antigravity", nativeAgents: true, orchestration: undefined, orchestrator: { model: "gemini-3.8-flash-high", effort: "high" } })!, { flow: "feature", method: resolveMethod("superpowers"), context: "SYNTHETIC CONTEXT" });
+  beforeEach(() => {
+    process.env.HANOMAN_ANTIGRAVITY_BIN = "/bin/echo";
+    execFileSync("git", ["init", "-q"], { cwd });
+  });
+  afterEach(() => delete process.env.HANOMAN_ANTIGRAVITY_BIN);
+  it("phase files use native delegation and inherited tiers, reviewer is instructional, roster effort unknown", () => {
+    registerCustomAgentSource(() => [{ ...scout, name: "native-scout", model: "flash", effort: null }]);
+    const s = createSession("fixture", cwd, { id: born("orch-ag-native"), agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high", prompt: "PARENT", legacyPrompt: "SINGLE", phaseAgents: nativeDefs() });
+    const files = readdirSync(join(cwd, ".agents/agents")).filter(f => f.endsWith(".md"));
+    const bodies = files.map(f => readFileSync(join(cwd, ".agents/agents", f), "utf8"));
+    const execute = bodies.find(b => b.includes('name: "hanoman-fase-execute"'))!;
+    expect(execute).toContain("invoke_subagent");
+    expect(execute).toContain("native-scout");
+    expect(execute).not.toContain("berjalan foreground");
+    const reviewer = bodies.find(b => b.includes('name: "hanoman-fase-review"'))!;
+    expect(reviewer).toContain("read-only instruksional");
+    expect(reviewer).not.toContain("=== DELEGASI ===");
+    expect(reviewer).toContain('model: "inherit"');
+    const meta = getSession(s.id)!;
+    expect(meta.orchestrated).toBe(true);
+    expect(meta.agentRoster).toHaveLength(7);
+    expect(meta.agentRoster?.filter(d => d.phase).every(d => d.model === "inherit" && d.effort === undefined)).toBe(true);
+  });
+  it("phase failure atomically falls back with warning, no phase definitions or orchestrated metadata", () => {
+    registerCustomAgentSource(() => [{ ...scout, name: "native-scout", model: "flash", effort: null }]);
+    const defs = nativeDefs(); defs[0] = { ...defs[0]!, model: "invalid-parent-slug" };
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const s = createSession("fixture", cwd, { id: born("orch-ag-failed"), agent: "antigravity", prompt: "PARENT", legacyPrompt: "SINGLE", phaseAgents: defs });
+      expect(getSession(s.id)!.orchestrated).toBe(false);
+      expect(getSession(s.id)!.agentRoster?.map(d => d.name)).toEqual(["native-scout"]);
+      expect(readFileSync(promptFilePath(s.id), "utf8").startsWith("SINGLE")).toBe(true);
+      const bodies = readdirSync(join(cwd, ".agents/agents")).filter(f => f.endsWith(".md")).map(f => readFileSync(join(cwd, ".agents/agents", f), "utf8"));
+      expect(bodies).toHaveLength(1);
+      expect(bodies.join(" ")).not.toContain("hanoman-fase-");
+      expect(spy.mock.calls.map(c => String(c[0])).join(" ")).toContain("gagal dimaterialisasi");
+    } finally { spy.mockRestore(); }
   });
 });

@@ -1,5 +1,6 @@
 import {
-  PHASE_AGENT_PREFIX, REVIEWER_CELL, SPEC_AUDIT_VERDICT_LIST, phaseAgentName, type MethodDef, type PhasePlan, type PhasePlanEntry,
+  PHASE_AGENT_PREFIX, REVIEWER_CELL, SPEC_AUDIT_VERDICT_LIST, antigravityCustomAgentProblem, phaseAgentName,
+  type Agent, type MethodDef, type PhasePlan, type PhasePlanEntry,
 } from "@hanoman/shared";
 import type { AgentDef } from "./custom-agents";
 import type { Flow, VerifyScope } from "./types";
@@ -246,6 +247,7 @@ export function phaseAgentInstructions(
     methodClause(method),
     ATTACHMENT_NOTE,
     PHASE_AGENT_AUTONOMY,
+    plan.runtime === "antigravity" ? NATIVE_PHASE_PROTOCOL : "",
     PHASE_AGENT_RULES,
     PHASE_AGENT_REPORT,
     // S2 · catatan resume kecil & khas sesi → tetap di instruksi; konteks bersama yang besar dirakit
@@ -329,6 +331,11 @@ function reviewerInstructions(plan: PhasePlan, ctx: PhaseAgentContext): string {
     scopeClause(plan.flow as Flow, ctx.verifyScope),
     REVIEWER_RULES,
     PHASE_AGENT_AUTONOMY,
+    plan.runtime === "antigravity"
+      ? `${NATIVE_PHASE_PROTOCOL}\nReviewer ini read-only instruksional, bukan enforcement runtime. `
+        + "JANGAN mengaku mempunyai pembatasan tool mutasi. Pengecualian reviewer generated fase ini "
+        + "tidak membuat Custom Agent auditor read-only available."
+      : "",
     [
       "Kontrak laporan (wajib, di akhir, maksimal 1000 kata):",
       "- Baris pertama: `Status: selesai` (review tuntas) | `terhalang` | `menunggu-keputusan`.",
@@ -356,20 +363,28 @@ const roleOf = (phase: string): DelegationRole =>
     : phase === "Kerjakan" || phase === "Verifikasi" ? "none" : "research";
 
 /** Custom agent yang BENAR-BENAR hidup: codex tak memuat isolated-worktree (materializeCodexAgents). */
-const liveCustoms = (roster: AgentDef[], runtime: "claude" | "codex"): AgentDef[] =>
-  roster.filter((d) => d.kind !== "phase" && !(runtime === "codex" && d.workspacePolicy === "isolated-worktree"));
+const liveCustoms = (roster: AgentDef[], runtime: Agent): AgentDef[] =>
+  roster.filter((d) => d.kind !== "phase" && !(runtime === "codex" && d.workspacePolicy === "isolated-worktree")
+    && (runtime !== "antigravity" || antigravityCustomAgentProblem(d) === null));
+
+const NATIVE_PHASE_PROTOCOL = "Runtime child Antigravity memakai tier native dan effort native unknown. "
+  + "invoke_subagent bersifat asynchronous; protocol wait berarti menunggu seluruh laporan anak sebelum "
+  + "melapor, bukan foreground runtime. Relay keputusan/rework diterima lewat send_message ke conversation "
+  + "ID child yang sama. SEMUA keputusan terbuka harus bernomor dengan opsi, rekomendasi dan alasannya; "
+  + "jangan menjawab sendiri. Jangan menjalankan child CLI one-shot atau bridge.";
 
 export function phaseDelegationClause(
-  phase: string, roster: AgentDef[], runtime: "claude" | "codex", executeMode: "inline" | "subagent" = "inline",
+  phase: string, roster: AgentDef[], runtime: Agent, executeMode: "inline" | "subagent" = "inline",
 ): string {
   // Amandemen ADR-0170 P2 · claude `inline` (default): agen fase kerja mengerjakan task SENDIRI.
   // codex tak disentuh setelan ini — subagent bersarang di sana belum pernah diukur.
   const base = roleOf(phase);
-  const role: DelegationRole = base === "execute" && runtime === "claude" && executeMode === "inline"
+  const role: DelegationRole = base === "execute" && (runtime === "claude" || runtime === "antigravity") && executeMode === "inline"
     ? "execute-inline" : base;
   if (role === "none") return "";
   const codex = runtime === "codex";
-  const call = codex ? "spawn_agent" : "tool Agent";
+  const antigravity = runtime === "antigravity";
+  const call = antigravity ? "invoke_subagent" : codex ? "spawn_agent" : "tool Agent";
   const live = liveCustoms(roster, runtime);
   // Audit P0-2 · agen isolated-worktree hanya melihat COMMIT: tanpa tanda ini implementer Execute
   // mendelegasikan pekerjaan yang belum di-commit dan hasilnya tak pernah kembali ke worktree fase.
@@ -379,7 +394,9 @@ export function phaseDelegationClause(
      d.model ?? "model sesi"].filter(Boolean).join(" · ");
   const who = live.length
     ? `Agen di sesi ini: ${live.map((d) => `\`${d.name}\` (${tag(d)})`).join(", ")}. Pilih `
-      + (codex ? "nama agen" : "`subagent_type`") + " dari daftar ini sesuai deskripsinya."
+      + (codex || antigravity ? "nama agen" : "`subagent_type`") + " dari daftar ini sesuai deskripsinya."
+    : antigravity ? "Tak ada custom agent kompatibel di sesi ini; kerjakan pencarian SENDIRI. "
+      + "Jangan mengaku mempunyai subagent read-only enforced."
     : "Tak ada custom agent di sesi ini: bila mendelegasikan, pakai subagent bawaan runtime yang read-only "
       + "untuk pencarian.";
   const when = role === "execute-inline"
@@ -398,10 +415,15 @@ export function phaseDelegationClause(
       + "worktree/branch baru; merge & push milik orchestrator.";
   return [
     "=== DELEGASI ===",
-    `Subagent yang kamu panggil lewat ${call} berjalan foreground: kamu menunggu hasilnya.`,
-    when,
+    antigravity ? NATIVE_PHASE_PROTOCOL
+      : `Subagent yang kamu panggil lewat ${call} berjalan foreground: kamu menunggu hasilnya.`,
+    antigravity ? when.replaceAll("agen read-only termurah", "agen pembaca dengan larangan tulis instruksional")
+      .replaceAll("agen read-only", "agen pembaca dengan larangan tulis instruksional") : when,
     who,
-    (codex
+    (antigravity
+      ? "Delegasi native HANYA lewat invoke_subagent ke nama kompatibel di daftar; "
+        + "lanjutkan percakapan yang sama lewat send_message."
+      : codex
       ? "Hindari agen umum untuk pencarian — ia mewarisi model sesi yang mahal."
       : "Jangan pakai `general-purpose` untuk pencarian — ia mewarisi model sesi yang mahal"
         + (role === "execute"
@@ -419,7 +441,7 @@ export function phaseDelegationClause(
 
 /** ADR-0170 P2 · tempel klausa delegasi ke instruksi tiap agen fase (bukan reviewer) sesuai roster. */
 export function withPhaseDelegation(
-  phaseDefs: AgentDef[], roster: AgentDef[], runtime: "claude" | "codex",
+  phaseDefs: AgentDef[], roster: AgentDef[], runtime: Agent,
 ): AgentDef[] {
   return phaseDefs.map((def) => {
     if (def.kind !== "phase" || !def.phase || def.name === REVIEWER_AGENT_NAME) return def;

@@ -447,8 +447,8 @@ export const zAntigravityPhaseCell = z.object({
 // berbatas, tidak seperti sel Setting yang lenient (sel tersimpan tak boleh tiba-tiba gagal parse).
 export const PHASE_OVERRIDE_LIMITS = { model: 200, effort: 64, phase: 64, phases: 32 } as const;
 export const zPhaseOverride = z.object({
-  model: z.string().min(1).max(PHASE_OVERRIDE_LIMITS.model).optional(),
-  effort: z.string().min(1).max(PHASE_OVERRIDE_LIMITS.effort).optional(),
+  model: z.string().min(1).max(PHASE_OVERRIDE_LIMITS.model).nullable().optional(),
+  effort: z.string().min(1).max(PHASE_OVERRIDE_LIMITS.effort).nullable().optional(),
 });
 export type PhaseOverride = z.infer<typeof zPhaseOverride>;
 export const zPhaseOverrides = z.record(z.string().min(1).max(PHASE_OVERRIDE_LIMITS.phase), zPhaseOverride)

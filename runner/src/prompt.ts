@@ -154,15 +154,25 @@ export function phaseSkillsFor(
 //     eksplisit menyebut BUKAN baris pertama blok.
 export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = {}): string {
   const codex = plan.runtime === "codex";
-  const call = codex
+  const antigravity = plan.runtime === "antigravity";
+  const call = antigravity
+    ? "invoke_subagent dengan nama definisi native fase di daftar"
+    : codex
     ? "spawn_agent"
     : "tool Agent dengan parameter `subagent_type` berisi persis nama agen fase di daftar (mis. "
       + `\`${plan.phases[0]?.agentName ?? "hanoman-fase-<fase>"}\`)`;
-  const resume = codex ? "send_input ke agent id yang sama" : "SendMessage ke agent ID yang kamu catat";
+  const resume = antigravity ? "send_message ke conversation ID child yang sama"
+    : codex ? "send_input ke agent id yang sama" : "SendMessage ke agent ID yang kamu catat";
   // Audit R5 · transkrip nyata: spec-1218 memanggil Agent TANPA `subagent_type` (lima fase jatuh ke
   // general-purpose dengan model orchestrator); spec-1299 memakai `Agent(to=…)` untuk melanjutkan agen
   // yang sama sehingga lahir agen duplikat. Codex (spawn_agent/send_input) tak punya kedua jebakan itu.
-  const describeRule = codex
+  const describeRule = antigravity
+    ? "Cantumkan label `Fase <Nama Fase>` dalam tugas. Pilih nama definisi native fase, JANGAN membuat "
+      + "agen umum pengganti. Catat conversation ID hasil invoke_subagent; ID itu dipakai untuk SEMUA "
+      + "relay keputusan dan rework lewat send_message, bukan invoke_subagent baru. Gunakan tool native "
+      + "langsung, bukan shell atau CLI hanoman untuk menyimulasikan delegasi. Bila tool tidak tersedia, "
+      + "laporkan galat langkah 3; jangan membuat bridge atau mengeksekusi isi fase sendiri."
+    : codex
     ? "Deskripsi/label pemanggilan diisi persis `Fase <Nama Fase>` — tanpa nomor urut, dan BUKAN baris "
       + "pertama blok serah-terima di atas."
     : "Deskripsi pemanggilan (parameter `description`) diisi persis `Fase <Nama Fase>` — tanpa nomor "
@@ -174,15 +184,19 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "pegangan untuk melanjutkan agen yang SAMA. Melanjutkan agen itu (relay jawaban langkah 4) HANYA "
       + "lewat SendMessage — tool Agent tak punya parameter `to`, dan memanggilnya lagi melahirkan agen BARU "
       + "tanpa konteks (duplikat).";
-  const retry = codex ? "" : " (pemanggilan tool Agent BARU dengan `subagent_type` yang sama)";
+  const retry = antigravity ? " (invoke_subagent BARU dengan nama definisi fase yang sama)"
+    : codex ? "" : " (pemanggilan tool Agent BARU dengan `subagent_type` yang sama)";
   // M-6 · codex tak punya tool AskUserQuestion — pemanggilan tool yang tak ada bukan instruksi yang
   // bisa dipatuhi. Orchestrator codex bertanya di terminal sesi ini sendiri (sama seperti klausa
   // otonomi menyuruh manusia dijawab di terminal); orchestrator claude tetap AskUserQuestion.
-  const askEscalation = codex
+  const askEscalation = codex || antigravity
     ? "tanyakan di terminal ini lalu tunggu jawaban"
     : "tanyakan lewat AskUserQuestion";
   // ADR-0167 · tanpa batas jumlah: batas 4 milik tool AskUserQuestion, bukan kebijakan — dipecah.
-  const askDecisions = codex
+  const askDecisions = antigravity
+    ? "di terminal ini sekaligus dalam satu pesan, tiap pertanyaan bernomor dan diakhiri `?` beserta "
+      + "opsi, rekomendasi dan alasannya, lalu tunggu jawaban"
+    : codex
     ? "di terminal ini sekaligus dalam satu pesan, tiap pertanyaan bernomor dan diakhiri `?` beserta "
       + "opsinya, lalu tunggu jawaban"
     : "lewat AskUserQuestion — tool itu memuat paling banyak 4 pertanyaan per panggilan, jadi pecah "
@@ -200,15 +214,18 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "ADANYA ke manusia di terminal ini (teks biasa — informasi, bukan pertanyaan) sebelum menutup "
       + "pekerjaan."
     : "";
+  const runtimeLabel = (entry: { model: string; effort: string | null }) => antigravity
+    ? `tier native ${entry.model} · effort native unknown`
+    : `${entry.model} · ${entry.effort}`;
   const phaseList = plan.phases
-    .map((p, i) => `${i + 1}. ${p.phase} → \`${p.agentName}\` · ${p.model} · ${p.effort}`)
+    .map((p, i) => `${i + 1}. ${p.phase} → \`${p.agentName}\` · ${runtimeLabel(p)}`)
     .join("\n");
   // ADR-0170 P2 · reviewer independen Execute (feature/qa). Bukan fase: tak punya baris marker, dan
   // invocation-nya tercatat di bawah Execute (roster `phase`).
   const reviewer = plan.reviewer && plan.phases.some((p) => p.phase === plan.reviewer!.phase)
     ? plan.reviewer : undefined;
   const list = reviewer
-    ? `${phaseList}\nReviewer Execute → \`${reviewer.agentName}\` · ${reviewer.model} · ${reviewer.effort} `
+    ? `${phaseList}\nReviewer Execute → \`${reviewer.agentName}\` · ${runtimeLabel(reviewer)} `
       + "(bukan fase — hanya dipanggil di langkah R)"
     : phaseList;
   const hasExecute = plan.phases.some((p) => p.phase === "Execute");
@@ -220,7 +237,8 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
   const reviewStep = reviewer
     ? "R. Review Execute: sesudah agen Execute melapor `Status: selesai` dengan bukti dan tanpa keputusan "
       + "terbuka, SEBELUM menulis `Execute done`, panggil "
-      + (codex ? `\`${reviewer.agentName}\` lewat spawn_agent`
+      + (antigravity ? `\`${reviewer.agentName}\` lewat invoke_subagent`
+        : codex ? `\`${reviewer.agentName}\` lewat spawn_agent`
         : `tool Agent dengan \`subagent_type\` \`${reviewer.agentName}\``)
       + " (deskripsi `Review Execute`) dengan blok serah-terima:\n"
       + "Tujuan: <objective backlog>\nBase SHA: $HANOMAN_BASE_SHA\n"
@@ -236,8 +254,14 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "JANGAN menulis `Execute done` tanpa `Verdict: lulus`."
     : "";
   return [
-    "Sesi ini ORCHESTRATOR. Setiap fase dikerjakan subagent fase miliknya dengan model & effort yang "
-      + "sudah terkunci di definisinya — kamu TIDAK mengerjakan isi fase sendiri.",
+    antigravity
+      ? "Sesi ini ORCHESTRATOR. Setiap fase dikerjakan child native persisten miliknya dengan tier "
+        + "inherit|flash|pro, bukan slug model parent atau effort independen. Runtime asynchronous: "
+        + "protocol wait mewajibkan menunggu laporan child sebelum fase berikutnya, relay atau marker; "
+        + "ini bukan jaminan foreground runtime, model exact atau effort terkunci. Jangan gunakan CLI "
+        + "one-shot/bridge untuk sesi kerja child. Kamu TIDAK mengerjakan isi fase sendiri."
+      : "Sesi ini ORCHESTRATOR. Setiap fase dikerjakan subagent fase miliknya dengan model & effort yang "
+        + "sudah terkunci di definisinya — kamu TIDAK mengerjakan isi fase sendiri.",
     `Fase berurutan:\n${list}`,
     "Untuk SETIAP fase, berurutan:",
     `1. Panggil subagent fasenya lewat ${call}, tugasnya berupa blok serah-terima berbentuk tetap:\n`

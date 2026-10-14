@@ -692,3 +692,13 @@ ADR-0202: `hanoman_skills_list`/`hanoman_skill_read` tetap `skills:read`, sedang
 `hanoman_skill_create`/`hanoman_skill_fork` memperluas enum source melalui tool existing,
 mode `write` dan capability `skills:write` tetap sama. Menulis berkas native lewat key
 existing tetap memakai `hanoman_skill_write`/baseHash. Tidak ada endpoint atau capability baru.
+
+
+SPEC-1442 Task 7 memperluas kontrak phase override transient menjadi
+`{model?:string|null,effort?:string|null}`. Runtime efektif memakai `body.agent` atau Settings
+bila tidak dikirim. Antigravity menerima tier `inherit|flash|pro`/model null dan effort null;
+slug parent atau effort independen ditolak 400 sebelum perubahan worktree/backlog. Sel Settings
+mengikuti kontrak tier yang sama. Keputusan MCP ADR-0202: tools Settings existing tetap memakai
+blok penuh; deskripsi `hanoman_settings_set` dan `hanoman_session_phases` menjelaskan kontrak
+native. Tidak ada endpoint baru di task ini. Terminal/events WebSocket tetap streaming exception;
+relay native `invoke_subagent`/`send_message` adalah tool runtime, bukan route REST tambahan.

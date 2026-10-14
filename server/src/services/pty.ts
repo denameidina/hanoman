@@ -905,7 +905,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     const attempt = (requested: AgentDef[]): string[] => {
       // ADR-0170 P2 · klausa delegasi agen fase disusun DI SINI: roster custom agent yang benar-benar
       // hidup di sesi ini baru pasti sesudah `selectCustomDefs`, dan ikut terpilih ulang saat fallback.
-      const phaseDefs = agentForDefs === "antigravity" ? requested : withPhaseDelegation(requested, customDefs, agentForDefs);
+      const phaseDefs = withPhaseDelegation(requested, customDefs, agentForDefs);
       let defs = [...phaseDefs, ...customDefs];
       if (defs.length === 0) return [];
       const readOnlyHook = agentForDefs === "antigravity" ? undefined : readOnlyHookFor();

@@ -230,3 +230,27 @@ it("rejects incompatible native phase cells instead of silently choosing inherit
       orchestrator, orchestration })).toThrow(/tier native/);
   }
 });
+
+it("validates native transient overrides even when orchestration is disabled", () => {
+  const orchestration = zOrchestration.parse({ feature: { enabled: false } });
+  for (const cell of [{ model: "gemini-3.8-flash-high", effort: null }, { model: "flash", effort: "high" }]) {
+    expect(() => resolvePhasePlan({ flow: "feature", runtime: "antigravity", nativeAgents: true,
+      orchestrator, orchestration, phaseOverrides: { Plan: cell } })).toThrow(/tier native/);
+  }
+});
+
+it("native null overrides and pro tier remain separate from arbitrary parent models", () => {
+  const plan = resolvePhasePlan({ flow: "feature", runtime: "antigravity", nativeAgents: true,
+    orchestrator: { model: "future-parent", effort: "future" }, orchestration: zOrchestration.parse({}),
+    phaseOverrides: { Plan: { model: "pro", effort: null }, Spec: { model: null, effort: null } } });
+  expect(plan?.phases.find(p => p.phase === "Plan")).toMatchObject({ model: "pro", effort: null });
+  expect(plan?.phases.find(p => p.phase === "Spec")).toMatchObject({ model: "inherit", effort: null });
+});
+
+it("explicit null native override resets a stored tier to inherit", () => {
+  const orchestration = zOrchestration.parse({ feature: { antigravity: { Plan: { model: "flash", effort: null }, Review: { model: "pro", effort: null } } } });
+  const plan = resolvePhasePlan({ flow: "feature", runtime: "antigravity", nativeAgents: true,
+    orchestrator, orchestration, phaseOverrides: { Plan: { model: null, effort: null }, Review: { model: null, effort: null } } });
+  expect(plan?.phases.find(p => p.phase === "Plan")).toMatchObject({ model: "inherit", effort: null });
+  expect(plan?.reviewer).toMatchObject({ model: "inherit", effort: null });
+});

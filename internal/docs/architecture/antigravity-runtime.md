@@ -388,3 +388,48 @@ Test server serial memakai DB SQLite temp berbeda dan membersihkan env origin/SS
 Shared typecheck exit 0. Server typecheck tersisa hanya dua seam task selanjutnya:
 `pty.ts` status runtime (Task 8) dan Telegram engine label (Task 13); tidak disuppress.
 Endpoint live smoke dijadwalkan sekali pada Task 14 bersama perubahan runtime lain.
+
+
+## Receipt Task 7 — Native phase protocol dan reviewer — 2026-10-14
+
+`orchestratorClause` membedakan native Antigravity dari tool Claude/Codex: invoke langsung
+`invoke_subagent`, catat conversation ID, keputusan dan rework melalui `send_message` ke ID
+child yang sama. Semua keputusan diminta sekaligus, bernomor, dengan opsi/rekomendasi/alasan.
+Protocol wait menahan fase berikutnya dan marker sampai laporan selesai; ia bukan foreground
+runtime atau lock model exact. Daftar fase/reviewer menyebut tier native dan effort unknown.
+Generated reviewer memuat larangan tulis instruksional, tanpa policy/read-only enforcement baru.
+Roster delegasi fase menggunakan hanya Custom Agent yang kompatibel dengan tier/tool/policy native;
+phase Execute inline tetap bekerja sendiri. Satu materialisasi fase gagal membatalkan seluruh
+roster fase dan penanda orchestrated sebelum fallback single-session berperingatan.
+
+Phase override transient DTO menerima model/effort nullable. Model null menjadi inherit native;
+independent effort dan slug parent ditolak terhadap runtime efektif (termasuk Settings bila body
+menghilangkan agent), bahkan ketika orkestrasi mati. `PhasePlanValidationError.statusCode=400`
+dilempar sebelum worktree/baseSha/startedAt/stempel metode dan sebelum reaping pane mati lama.
+Task 8 melengkapi validasi route sebelum approval dan admission runtime seluruh launch.
+
+| Bukti live produk, selesai 2026-10-14T02:25:31.504Z, agy 1.3.4 | Hasil |
+| --- | --- |
+| `createSession` + `buildPhaseAgents` + materializer native dalam repo/worktree temp owned | orchestrated true, tier inherit, effort child unknown |
+| Execute native | `d61f709e-2717-4278-a344-26facbe245d3`, Agent(hanoman-fase-execute), turn pertama 47 detik |
+| Keputusan pertama | dua pertanyaan terbuka diteruskan parent; synthetic phase-file masih kosong |
+| Follow-up | SendMessage ke ID Execute sama, nonce tidak dikirim ulang, recall `CHILD_1442_LYCHEE_71` |
+| Reviewer independen | `66c05b90-01d2-4b3e-80d8-4d3999a0b1e4`, Agent(hanoman-fase-review), report `Verdict: lulus`, `TASK7_REVIEWER_READONLY_RECEIPT` |
+| Marker | parent menulis/tail/cat `Execute done` ke phase-file sintetis sesudah review; berkas fase sesi nyata tidak disentuh |
+| Parent | pane `%0`, PID `84248`, command agy tetap sama; argv prompt-interactive tanpa one-shot, turn kedua 87 detik |
+| Cleanup | registry/manifest/exclude/temp owned dan PID hilang; trust sibling dipertahankan; tiga socket native percobaan owned dihapus setelah daemon dipastikan mati |
+
+Percobaan pertama berhenti pada batas 180 detik sebelum invoke: parent menyelidiki tool lewat shell.
+Prompt kini meminta tool native langsung dan melarang simulasi lewat shell/CLI. Smoke berikutnya
+berhasil menjalankan protokol, tetapi harness awal membaca echo instruksi sebagai final marker;
+predicate diperbaiki untuk menunggu final yang mengandung UUID child/reviewer dan report verbatim.
+Receipt positif di atas berasal dari rerun bersih dengan deadline 180 detik per turn, bukan dari
+percobaan gagal. Logs/script/capture ignored: `Task7-native-receipt.*`, `Task7-native-*-capture.log`.
+
+TDD merah membaca 4 kegagalan prompt/delegasi (69 test lain lulus), override saat orkestrasi mati
+(1 gagal/27 lulus), null DTO (1 gagal/11 lulus), side-effect baseSha (2 gagal), reaping pane
+invalid (1 gagal), serta explicit null reset terhadap tier tersimpan (1 gagal/28 lulus). Scope final delapan test paths: **279/279 test, 8/8 berkas**; dua hash prompt
+parent dan dua hash definisi fase menjaga Claude/Codex byte-identik. Shared dan runner typecheck
+hijau; server masih memiliki dua seam yang menjadi milik task berikutnya: pty idle map dan
+Telegram engine label. Tidak ada endpoint baru; MCP existing Settings/session phases diperbarui
+bersama schema null dan API/workflow/ADR/index, sesuai ADR-0202.

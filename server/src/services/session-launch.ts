@@ -154,8 +154,6 @@ export async function startSpecSession(
       if (blockers.length)
         throw new LaunchError(`${spec.id} ${blockedNote(blockers)}`, "blocked", blockers);
     }
-    if (pane) killSession(id);
-
     // SPEC-252 · ADR-0061 · model/effort per SESI: default global, override per-instance opsional.
     // Satu bacaan Setting dipakai bersama resolusi mode goal di bawah.
     const setting = await getSetting();
@@ -167,6 +165,9 @@ export async function startSpecSession(
       : { model: setting.model, effort: setting.effort };
     const model = opts.model ?? agentDefaults.model;
     const effort = opts.effort ?? agentDefaults.effort;
+    // Validate phase overrides against the effective runtime before worktree or backlog writes.
+    const fullPlan = sessionPhasePlan(setting, opts.flow, agent, { model, effort }, opts.phaseOverrides);
+    if (pane) killSession(id);
     const isContinue = spec.stage === "done";
     const worktree = `${repoDir}/.worktrees/${id}`;
     const branchTo = `hanoman/${id}`;
@@ -258,7 +259,6 @@ export async function startSpecSession(
     const resumeCtx = resume ? buildResumeCtx(repoDir, id, opts.flow, resume.worktreeKept) : undefined;
     // ADR-0164 · rencana fase dihitung SEKALI; prompt orchestrator, agen fase, dan prompt mode tunggal
     // lahir dari input yang SAMA, jadi fallback all-or-nothing di createSession tak merakit ulang apa pun.
-    const fullPlan = sessionPhasePlan(setting, opts.flow, agent, { model, effort }, opts.phaseOverrides);
     // SPEC-172 · continue hanya melanjutkan Execute; flow goal tak punya Execute dan tetap utuh.
     let plan = fullPlan;
     if (fullPlan && isContinue && !isGoalFlow) {

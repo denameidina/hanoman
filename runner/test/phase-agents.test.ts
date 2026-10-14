@@ -1,14 +1,16 @@
 import { describe, it, expect } from "vitest";
+import { createHash } from "node:crypto";
 import {
   ORCHESTRATION_DEFAULTS, SPEC_AUDIT_VERDICTS, SPEC_AUDIT_VERDICT_LIST, resolveMethod, resolvePhasePlan,
 } from "@hanoman/shared";
 import { buildPhaseAgents, fromAuditOf, phaseDelegationClause, withPhaseDelegation } from "../src/phase-agents";
 import { CODE_STYLE_CLAUSE } from "../src/code-style";
-import { ESCALATION_CONTRACT, startPrdPrompt, startProjectPrompt, startScaffoldPrompt } from "../src/prompt";
+import { ESCALATION_CONTRACT, orchestratorClause, startPrdPrompt, startProjectPrompt, startScaffoldPrompt } from "../src/prompt";
+import { renderAntigravityAgent } from "../src/antigravity-agent-config";
 import { phasePromptOf, renderAgentsJson, type AgentDef } from "../src/custom-agents";
 import type { Flow } from "../src/types";
 
-const planFor = (flow: Flow, runtime: "claude" | "codex" = "claude") => resolvePhasePlan({
+const planFor = (flow: Flow, runtime: "claude" | "codex" | "antigravity" = "claude") => resolvePhasePlan({
   flow, runtime, orchestration: ORCHESTRATION_DEFAULTS,
   orchestrator: { model: "claude-opus-5", effort: "high" }, nativeAgents: true,
 })!;
@@ -423,5 +425,81 @@ describe("fromAuditOf", () => {
     expect(fromAuditOf({ fromAudit: "" })).toBeUndefined();
     expect(fromAuditOf(["x"])).toBeUndefined();
     expect(fromAuditOf(null)).toBeUndefined();
+  });
+});
+
+
+describe("Antigravity phase protocol (SPEC-1442)", () => {
+  const native = () => {
+    const plan = planFor("feature", "antigravity");
+    const defs = buildPhaseAgents(plan, { flow: "feature", method: resolveMethod("superpowers"), verifyScope: "changed", context: "KONTEKS-UJI" });
+    return { plan, defs };
+  };
+  it("renders native tiers without exact model/effort or foreground promises", () => {
+    const { plan, defs } = native();
+    expect(defs).toHaveLength(6);
+    for (const def of defs) {
+      expect(def).toMatchObject({ model: "inherit", effort: null, tools: null });
+      expect(renderAntigravityAgent(def, defs)).toContain('model: "inherit"');
+    }
+    const prompt = orchestratorClause(plan);
+    expect(prompt).toContain("invoke_subagent");
+    expect(prompt).toContain("send_message ke conversation ID child yang sama");
+    expect(prompt).toContain("asynchronous");
+    expect(prompt).toContain("protocol wait");
+    expect(prompt).toContain("effort native unknown");
+    expect(prompt).not.toContain("sudah terkunci");
+    expect(prompt).not.toContain("tool Agent");
+    expect(prompt).not.toContain("spawn_agent");
+    expect(prompt).not.toContain("SendMessage");
+    expect(prompt).not.toContain("AskUserQuestion");
+    expect(prompt).not.toContain("· null");
+  });
+  it("relays all decisions and rework to the same child, with review before parent-only marker", () => {
+    const prompt = orchestratorClause(native().plan);
+    expect(prompt).toContain("ajukan SEMUA pertanyaannya");
+    expect(prompt).toContain("opsi, rekomendasi dan alasannya");
+    expect(prompt).toContain("reviewer yang SAMA lewat send_message");
+    expect(prompt).toContain("satu-satunya penulis berkas itu");
+    expect(prompt).toContain('tail -1 "$HANOMAN_PHASE_FILE"');
+    expect(prompt).toContain("JANGAN menulis `Execute done` tanpa `Verdict: lulus`");
+    expect(prompt).toContain("maks 2 putaran rework");
+    expect(prompt).toContain("Percobaan: 2/2");
+    expect(prompt).toContain('cat "$HANOMAN_PHASE_FILE"');
+  });
+  it("reviewer read-only is instructional only; phase delegation names only compatible live customs", () => {
+    const { defs } = native();
+    const roster: AgentDef[] = [
+      { name: "native-research", description: "lookup", instructions: "research", model: "flash", effort: null, tools: null, mentions: [] },
+      { name: "auditor-unavailable", description: "audit", instructions: "audit", model: null, tools: null, mentions: [], workspacePolicy: "read-only" },
+      { name: "isolated-unavailable", description: "code", instructions: "code", model: null, tools: null, mentions: [], workspacePolicy: "isolated-worktree" },
+      { name: "model-unavailable", description: "code", instructions: "code", model: "gemini-3.8-flash-high", tools: null, mentions: [] },
+    ];
+    const live = withPhaseDelegation(defs, roster, "antigravity");
+    const execute = at(live, "Execute").instructions;
+    expect(execute).toContain("invoke_subagent");
+    expect(execute).toContain("native-research");
+    expect(execute).not.toContain("auditor-unavailable");
+    expect(execute).not.toContain("isolated-unavailable");
+    expect(execute).not.toContain("model-unavailable");
+    expect(execute).not.toContain("berjalan foreground");
+    expect(execute).toContain("SENDIRI");
+    expect(execute).toContain("rekomendasi dan alasannya");
+    const reviewer = live.find(d => d.name === REVIEW)!;
+    expect(reviewer.workspacePolicy).toBeUndefined();
+    expect(reviewer.instructions).toContain("read-only instruksional");
+    expect(reviewer.instructions).toContain("bukan enforcement runtime");
+    expect(reviewer.instructions).not.toContain("=== DELEGASI ===");
+    expect(reviewer.instructions).toContain("JANGAN mengubah, membuat, atau menghapus");
+  });
+  it.each([
+    ["claude", "26812ce4a0bd69e52ab388cfd259a44831b09a7f9b0969e0e2044880442fb0f4", "39e7293d499e7e567e67a6fd81324a874455c4d02e52372304b28d8183b5ad2c"],
+    ["codex", "a77bc5f636771d2637d85d7f53bfd0c129fc53fcf2853a577beaf98bf8b7741a", "ff71fee62e39e8a30ef611e933f43a0f16d4bb13a3735ee449940f5c87376862"],
+  ] as const)("%s existing parent/phase prompts stay byte-identical", (runtime, parentHash, defsHash) => {
+    const plan = planFor("feature", runtime);
+    const defs = withPhaseDelegation(buildPhaseAgents(plan, { flow: "feature", method: resolveMethod("superpowers"), verifyScope: "changed", context: "KONTEKS-UJI" }), [], runtime);
+    const hash = (s: string) => createHash("sha256").update(s).digest("hex");
+    expect(hash(orchestratorClause(plan))).toBe(parentHash);
+    expect(hash(JSON.stringify(defs))).toBe(defsHash);
   });
 });

@@ -31,7 +31,7 @@ const MORE: readonly McpToolDef[] = [
     name: "hanoman_session_phases",
     title: "Fase sesi",
     description:
-      "Pipeline fase sebuah sesi beserta posisinya sekarang. Menjawab 404 bila sesi itu bukan sesi ber-flow (terminal biasa tak punya fase).",
+      "Pipeline fase sebuah sesi beserta posisinya sekarang. Antigravity menggunakan tier child native inherit|flash|pro, effort unknown dan protocol wait asynchronous; reviewer fase read-only instruksional, bukan enforcement runtime. Marker Execute menunggu review independen lulus. Menjawab 404 bila sesi itu bukan sesi ber-flow (terminal biasa tak punya fase).",
     inputSchema: obj({ properties: { session: str("Id sesi, dari hanoman_sessions_list.") }, required: ["session"] }),
     mode: "read", capability: "sessions:read",
     samplePath: "/terminal/sessions/s1/phases", sampleMethod: "GET",

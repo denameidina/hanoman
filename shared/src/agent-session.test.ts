@@ -65,6 +65,12 @@ describe("SPEC-338 · agent sesi", () => {
     expect(parsed).toMatchObject({ phaseOverrides: { Plan: { model: "claude-haiku-4-5", effort: "low" } } });
   });
 
+  it("native Antigravity phase override represents inherited model and effort as null", () => {
+    const parsed = zTerminalSession.parse({ spec: "S", flow: "feature", agent: "antigravity",
+      phaseOverrides: { Plan: { model: "pro", effort: null }, Spec: { model: null, effort: null } } });
+    expect(parsed).toMatchObject({ phaseOverrides: { Plan: { model: "pro", effort: null }, Spec: { model: null, effort: null } } });
+  });
+
   // S6 · override transient masuk ke argv/definisi agen apa adanya — batasi panjangnya (model ≤ 200,
   // effort ≤ 64, nama fase ≤ 64, ≤ 32 fase) alih-alih menerima string tak berbatas.
   it("S6 · phaseOverrides berbatas panjang & jumlah", () => {
