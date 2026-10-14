@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { readFileSync, existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -8,6 +8,8 @@ import {
   agentTempDir, registerCodexNativeAgentSupport, sessionEventDir,
 } from "../src/services/pty";
 import type { AgentDef } from "@hanoman/runner";
+
+vi.mock("../src/services/antigravity-trust", () => ({ ensureAntigravityTrust: vi.fn() }));
 
 // SPEC-450 · ADR-0094 keputusan 7 · kontrak ARGV. Diperiksa lewat argv pane tmux + isi berkas,
 // BUKAN lewat bentuk respons — assert bentuk respons LULUS PALSU (pelajaran `sessionModel()`).
@@ -336,5 +338,49 @@ describe("lifecycle materialisasi", () => {
     expect(killSession(s.id)).toBe(true);
     ids.splice(ids.indexOf(s.id), 1);
     expect(existsSync(agentTempDir(s.id))).toBe(false);
+  });
+});
+
+
+describe("createSession · antigravity native registry", () => {
+  let previousBin: string | undefined;
+  beforeEach(() => {
+    previousBin = process.env.HANOMAN_ANTIGRAVITY_BIN;
+    process.env.HANOMAN_ANTIGRAVITY_BIN = "/usr/bin/false";
+    execFileSync("git", ["init", "-q"], { cwd });
+  });
+  afterEach(() => {
+    if (previousBin === undefined) delete process.env.HANOMAN_ANTIGRAVITY_BIN;
+    else process.env.HANOMAN_ANTIGRAVITY_BIN = previousBin;
+  });
+  it("loads workspace native names, interactive argv, and cleans owned registry", () => {
+    registerCustomAgentSource(() => defs);
+    const s = createSession("p1", cwd, { id: born("ca-ag-native"), agent: "antigravity", prompt: "halo", model: "gemini-3.8-flash-high", effort: "high" });
+    expect(paneCmd(s.id)).toContain("--prompt-interactive");
+    expect(paneCmd(s.id)).not.toContain("agents.enabled=true");
+    const prompt = readFileSync(promptFilePath(s.id), "utf8");
+    expect(prompt).toContain("invoke_subagent");
+    expect(prompt).toContain("send_message");
+    expect(prompt).not.toContain("kamu peninjau");
+    expect(getSession(s.id)?.agentRoster?.map(d => d.name)).toEqual(["rev", "tes"]);
+    expect(getSession(s.id)?.agentRoster?.[0]).toMatchObject({ model: "inherit" });
+    expect(getSession(s.id)?.agentRoster?.[0]?.effort).toBeUndefined();
+    const before = execFileSync("git", ["ls-files", "--others", "--exclude-standard"], { cwd, encoding: "utf8" });
+    expect(before).toBe("");
+    killSession(s.id);
+    expect(execFileSync("git", ["status", "--porcelain"], { cwd, encoding: "utf8" })).toBe("");
+    expect(readFileSync(join(cwd, ".git/info/exclude"), "utf8")).not.toContain("hanoman:antigravity-agents");
+  });
+  it("does not claim native phase success when a definition cannot be materialized", () => {
+    registerCustomAgentSource(() => []);
+    const warnings: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation((value) => { warnings.push(String(value)); return true; });
+    try {
+      const s = createSession("p1", cwd, { id: born("ca-ag-phase-failed"), agent: "antigravity", prompt: "orchestrator", legacyPrompt: "single",
+        phaseAgents: [{ ...defs[0]!, kind: "phase", model: "inherit" }, { ...defs[1]!, kind: "phase", model: "unsupported-slug" }] });
+      expect(readFileSync(promptFilePath(s.id), "utf8")).toBe("single");
+      expect(getSession(s.id)?.agentRoster).toEqual([]);
+      expect(warnings.join("")).toContain("gagal dimaterialisasi");
+    } finally { spy.mockRestore(); }
   });
 });

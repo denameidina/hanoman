@@ -302,3 +302,50 @@ log awal dipertahankan teredaksi. Typecheck shared dan runner exit 0; server mas
 pada lima seam task berikutnya: custom-agent adapter (Task 6), phase/skill union (Task 4–7),
 runtime label pty/Telegram (Task 8). Tidak ada suppression atau perubahan skema/API pada Task 3;
 metadata config memakai kontrak/tool config existing, bukan endpoint baru.
+
+## Registry sesi dan receipt helper produk Task 5 — 2026-10-14
+
+`renderAntigravityAgent` menulis frontmatter native yang telah diuji dan body child dari
+`agentPromptOf`/`phasePromptOf`. Model `null` menjadi tier `inherit`; `flash|pro` tetap tier,
+bukan slug parent. Effort independen, tool allowlist dan policy read-only/isolated ditolak
+beralasan, tidak dihilangkan untuk mengaku available. maxTurns/timeout hanya instruksional.
+Metadata roster Antigravity mencatat tier `inherit` dan tidak menyalin effort parent ke child.
+
+`materializeAntigravityAgents({cwd,sessionId,defs})` menyimpan Markdown flat di
+`.agents/agents/hanoman-<hash-cwd-sesi>-<nama>.md`; nama frontmatter tetap nama roster/prompt.
+Manifest private persisten `.hanoman-<hash-cwd-sesi>-manifest.json` mencatat hash isi dan
+inode/device. Folder baru 0700, berkas dan manifest 0600, create exclusive; symlink/owner
+asing ditolak. Definisi operator dengan nama sama (termasuk scalar berkomentar) tidak ditimpa.
+Dua sesi di cwd yang sama dengan nama sama mendapat collision beralasan; worktree berbeda
+memiliki registry sendiri. Tidak ada fallback registry global atau persona parent inline.
+
+Setiap file/manifest mendapat pasangan marker/path exclude sendiri di Git common dir.
+Cleanup sesi A mempertahankan pasangan sesi/worktree B. `cleanupAntigravityAgents` membaca
+manifest persisten sehingga kill sesudah restart API tidak bergantung closure in-memory;
+hanya isi/hash dan inode/device owned yang masih cocok dihapus. Edit/replacement operator
+serta exclude-nya dipertahankan. Kegagalan write parsial dibersihkan dengan inode owned;
+gagal satu custom agent tidak membuang custom agent lain, dan mentions hanya berisi nama
+live. Gagal satu agen fase membatalkan seluruh roster fase sebelum fallback sesi tunggal
+berperingatan; metadata orchestrated tidak diklaim sukses.
+
+Smoke melalui **`createSession` dan materializer produk** selesai
+`2026-10-14T01:50:57.486Z`, `agy` 1.3.4, repo/worktree Git temp owned. Native CLI menemukan
+nama frontmatter `task5-native-probe` walau filename memakai namespace hash sesi. Capture
+verbose membuktikan `Spawned 1 subagent` dan `Agent(task5-native-probe …)`; bukan sekadar
+jawaban daftar registry.
+
+| Bukti aktual | Hasil |
+| --- | --- |
+| Child native | `a40667a7-6b1a-49a2-972b-23ff8a94df90` |
+| Turn awal, batas 180 detik | selesai 43 detik, `TASK5_CHILD_INITIAL CHILD_1442_KUMQUAT_37` |
+| Follow-up native | `SendMessage` ke ID yang sama, tanpa nonce dalam pesan baru |
+| Recall child, batas 180 detik | selesai 25 detik, `TASK5_PARENT_RECALL_OK` dengan ID sama dan nonce `CHILD_1442_KUMQUAT_37` |
+| Parent interaktif | pane `%0`, PID `13667`, command `agy`, sama sebelum/sesudah; tanpa `-p`/`--print` |
+| Trust/registry/Git | realpath trusted, tanpa dialog trust; registry excluded, `git status --porcelain` kosong |
+| Cleanup | Markdown/manifest/exclude owned hilang, sibling trust dipertahankan; PID/socket/fixture hilang |
+
+Receipt tersanitasi tersimpan selama Execute di workspace ignored plan
+`Task5-native-receipt.log`. Tiga test paths Task 5 mencakup renderer, rollback/collision,
+restart cleanup, dua worktree, prompt native, tier/effort metadata dan regressi Claude/Codex.
+Tidak ada endpoint atau skema baru pada Task 5; availability/API dan orkestrasi fase mengikuti
+task berikutnya, tanpa mengklaim enforcement readonly atau model exact dari receipt ini.

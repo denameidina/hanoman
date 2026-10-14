@@ -26,3 +26,5 @@ export * from "./subagent-statusline";
 export * from "./skill-library";
 export * from "./skill-files";
 export * from "./agent-env";
+
+export { renderAntigravityAgent, materializeAntigravityAgents, cleanupAntigravityAgents, type AntigravityMaterialization } from "./antigravity-agent-config";

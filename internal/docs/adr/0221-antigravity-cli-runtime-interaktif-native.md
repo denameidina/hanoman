@@ -77,3 +77,11 @@ Referensi primer: [CLI](https://antigravity.google/docs/cli/overview/),
 [subagents](https://antigravity.google/docs/subagents/),
 [settings](https://antigravity.google/docs/settings/), [MCP](https://antigravity.google/docs/mcp/).
 Nomor 0221 dipilih setelah enumerasi empat refs heads/remotes/HEAD (tertinggi 0220) pada fase Spec.
+
+Receipt Task 5 membuktikan registry per-sesi dari helper produk: filename hash cwd/session
+memuat nama frontmatter asli yang ditemukan native `invoke_subagent`; `send_message` pada
+conversation ID yang sama mengingat nonce tanpa pengiriman ulang. Manifest hash+inode/device
+persisten, file 0600/folder baru 0700, exclude per-owned-file dan cleanup sesudah restart menjaga
+operator serta worktree tetangga. Collision nama pada cwd yang sama menolak materialisasi,
+bukan menimpa definisi. Metadata child mempertahankan tier/inherit dan tidak mengaku effort
+parent sebagai effort child. Rincian serta hasil live ada di [runtime](../architecture/antigravity-runtime.md#registry-sesi-dan-receipt-helper-produk-task-5--2026-10-14).

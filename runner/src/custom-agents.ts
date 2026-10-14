@@ -166,12 +166,12 @@ const ownPolicyLines = (def: AgentDef): string[] => {
   return [];
 };
 
-const workLimitClause = (def: AgentDef, runtime: "claude" | "codex"): string[] => {
+const workLimitClause = (def: AgentDef, runtime: "claude" | "codex" | "antigravity"): string[] => {
   const lines: string[] = [];
   if (typeof def.maxTurns === "number") {
     lines.push(runtime === "claude"
       ? `Batas awal pekerjaan ${def.maxTurns} turn. Renderer juga mengirim maxTurns native ke Claude; ini batas turn, bukan hard kill wall-clock.`
-      : `Batas awal pekerjaan ${def.maxTurns} turn adalah batas instruksional di Codex; bukan hard kill.`);
+      : `Batas awal pekerjaan ${def.maxTurns} turn adalah batas instruksional di ${runtime === "antigravity" ? "Antigravity" : "Codex"}; bukan hard kill.`);
   }
   if (typeof def.timeoutSeconds === "number") {
     lines.push(
@@ -230,7 +230,7 @@ const contractReference = (def: AgentDef, path: string): string[] => [
 export function agentPromptOf(
   def: AgentDef,
   roster: AgentDef[],
-  runtime: "claude" | "codex" = "claude",
+  runtime: "claude" | "codex" | "antigravity" = "claude",
   /** P1-11 · path berkas `agentContractOf(policy)`; absen = kontrak inline (codex selalu begini). */
   contractPath?: string,
 ): string {
@@ -281,7 +281,7 @@ export function agentPromptOf(
     ...contract,
     "",
     "---",
-    `Kamu boleh mendelegasikan HANYA ke: ${list}. Panggil lewat ${MENTION_TOOL} dengan nama agennya.`,
+    `Kamu boleh mendelegasikan HANYA ke: ${list}. Panggil lewat ${runtime === "antigravity" ? "invoke_subagent" : MENTION_TOOL} dengan nama agennya.`,
     ...reviewClause,
     `Anggaran rantai delegasi seluruh sesi ini ${MENTION_MAX_HOPS} hop. Bila kamu sudah berada di hop ke-${MENTION_MAX_HOPS}, JANGAN mendelegasikan lagi — selesaikan sendiri lalu laporkan.`,
     "Sebutkan hop keberapa kamu berada saat mendelegasikan, dan jangan pernah memanggil agen yang sudah ada di rantai yang membawamu ke sini.",
@@ -357,14 +357,17 @@ export function renderAgentsJson(defs: AgentDef[], options: RenderAgentsOptions 
  */
 export function agentDelegationClause(
   defs: AgentDef[],
-  runtime: "claude" | "codex" = "claude",
+  runtime: "claude" | "codex" | "antigravity" = "claude",
 ): string {
   // ADR-0164 · agen fase bukan custom agent: kontrak delegasinya ada di prompt orchestrator,
   // jadi mereka tak pernah ikut klausa ini — di kedua runtime, dari satu tempat.
   if (defs.every((def) => def.kind === "phase")) return "";
   const codex = runtime === "codex";
+  const antigravity = runtime === "antigravity";
   // ADR-0167 · relay yang sama dengan orchestrator langkah 4; codex tak punya AskUserQuestion (M-6).
-  const relay = codex
+  const relay = antigravity
+    ? "ajukan semuanya di terminal ini (bernomor, tiap pertanyaan diakhiri `?`), lalu teruskan jawabannya lewat send_message ke conversation ID child yang sama"
+    : codex
     ? "ajukan semuanya di terminal ini (bernomor, tiap pertanyaan diakhiri `?`), lalu teruskan jawabannya "
       + "lewat send_input ke agent id yang sama"
     : "ajukan semuanya lewat AskUserQuestion (pecah per 4 pertanyaan), lalu teruskan jawabannya lewat "
@@ -372,12 +375,13 @@ export function agentDelegationClause(
   return [
     "",
     "",
-    `Delegasikan tugas yang relevan melalui ${codex ? "spawn_agent" : MENTION_TOOL}. `
+    `Delegasikan tugas yang relevan melalui ${antigravity ? "invoke_subagent" : codex ? "spawn_agent" : MENTION_TOOL}. `
       + "Sertakan tujuan, scope, base SHA dan kandidat SHA sebagai nilai literal, bukti sebelumnya, "
       + "dan aturan verifikasi. Agen isolated-worktree hanya melihat COMMIT: commit kandidat dulu, "
       + "lalu ambil hasilnya dari SHA yang ia laporkan (`git cherry-pick <sha>`). Tinjau hasil subagent sebelum digunakan. "
       + `Bila laporannya memuat \`Keputusan terbuka:\` yang bukan \`-\`, JANGAN menjawabnya sendiri: ${relay}. `
       + `Yang menjawab ${DECIDER}.`,
+    ...(antigravity ? ["Native child dapat asynchronous. Tunggu laporan child yang selesai sebelum memakai hasilnya; send_message melanjutkan conversation ID yang sama. Ini protokol parent, bukan jaminan foreground atau effort independen runtime."] : []),
     "",
   ].join("\n");
 }

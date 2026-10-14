@@ -8,7 +8,7 @@ import { dirname, resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
 import {
   goalOneLine, goalChunks, agentFlags, agentEnvironment, ANTIGRAVITY_ENV_KEYS, codexGoalScript, ensureSpawnHelper, spawnWithHelperRecovery,
-  renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook, withPhaseDelegation,
+  renderAgentsJson, agentDelegationClause, materializeCodexAgents, materializeAntigravityAgents, cleanupAntigravityAgents, writeReadOnlyHook, withPhaseDelegation,
   writeSubagentStatusline, agentContractOf, type AgentContractFile, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import {
@@ -723,9 +723,9 @@ let codexNativeAgentSupport: CodexNativeAgentSupport = () => ({ version: "0.151.
 export function registerCodexNativeAgentSupport(fn: CodexNativeAgentSupport): void {
   codexNativeAgentSupport = fn;
 }
-/** ADR-0164 · runtime sanggup subagent native: claude selalu, codex bila client terdeteksi >= 0.151. */
+/** ADR-0164/0221 · Antigravity uses the verified workspace registry; Codex needs client >= 0.151. */
 export const nativeAgentsAvailable = (agent: Agent): boolean =>
-  agent === "claude" || codexNativeAgentSupport().ok;
+  agent === "claude" || agent === "antigravity" || (agent === "codex" && codexNativeAgentSupport().ok);
 // Gagal baca → daftar KOSONG. Katalog agen tak pernah boleh menggagalkan kelahiran sesi.
 const customAgentsFor = (context: AgentSelectionContext): AgentDef[] => {
   try { return customAgentSource(context); } catch { return []; }
@@ -905,10 +905,10 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     const attempt = (requested: AgentDef[]): string[] => {
       // ADR-0170 P2 · klausa delegasi agen fase disusun DI SINI: roster custom agent yang benar-benar
       // hidup di sesi ini baru pasti sesudah `selectCustomDefs`, dan ikut terpilih ulang saat fallback.
-      const phaseDefs = withPhaseDelegation(requested, customDefs, agentForDefs);
+      const phaseDefs = agentForDefs === "antigravity" ? requested : withPhaseDelegation(requested, customDefs, agentForDefs);
       let defs = [...phaseDefs, ...customDefs];
       if (defs.length === 0) return [];
-      const readOnlyHook = readOnlyHookFor();
+      const readOnlyHook = agentForDefs === "antigravity" ? undefined : readOnlyHookFor();
       if (agentForDefs === "claude") {
         const file = agentsFilePath(id);
         try {
@@ -961,6 +961,24 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
         liveAgentDefs = defs;
         renderedDefs = defs;
         return [];
+      }
+      if (agentForDefs === "antigravity") {
+        try {
+          const materialized = materializeAntigravityAgents({ cwd, sessionId: id, defs });
+          const phaseFailures = materialized.warnings.filter(w => phaseDefs.some(d => d.name === w.agentName));
+          if (phaseFailures.length) return phaseFailures.map(w => `${w.agentName}: ${w.reason}`);
+          rosterBlock = agentDelegationClause(materialized.liveDefs, "antigravity");
+          liveAgentDefs = materialized.liveDefs;
+          renderedDefs = materialized.liveDefs;
+          for (const warning of materialized.warnings) {
+            process.stderr.write(`hanoman: custom agent ${warning.agentName} tidak dimaterialisasi: ${warning.reason}\n`);
+          }
+          return [];
+        } catch {
+          if (phaseDefs.length) return ["native Antigravity registry preparation failed"];
+          process.stderr.write("hanoman: native Antigravity registry preparation failed; custom agents unavailable\n");
+          return [];
+        }
       }
       const materialized = materializeCodexAgents(defs, tempDir, {
         readOnlyHookCommand: readOnlyHook?.command,
@@ -1171,7 +1189,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   if (!opts.command && sessionEffort) tmux("set-option", "-t", name(id), "@hanoman_effort", sessionEffort);
   if (orchestrated) tmux("set-option", "-t", name(id), "@hanoman_orchestrated", "1");
   if (liveAgentDefs.length > 0) {
-    const inherited = { model: opts.model, effort: sessionEffort };
+    const inherited = agent === "antigravity" ? { model: "inherit", effort: undefined } : { model: opts.model, effort: sessionEffort };
     const roster: SessionAgentMeta[] = liveAgentDefs.map((def) => ({
       ...(def.id ? { id: def.id } : {}), name: def.name,
       ...(def.model ?? inherited.model ? { model: def.model ?? inherited.model } : {}),
@@ -1749,6 +1767,7 @@ export function killSession(id: string): boolean {
   tmux("kill-session", "-t", name(id));
   // Direktori ini eksklusif milik id sesi yang sudah di-resolve, berisi beberapa config/hook kecil.
   // Hapus sinkron agar return `killSession` juga menjadi batas lifecycle kredensial/instruksinya.
+  cleanupAntigravityAgents({ cwd: p.cwd, sessionId: id });
   cleanupInjectedSkills(agentTempDir(id));
   try { rmSync(agentTempDir(id), { recursive: true, force: true }); } catch { /* temp opsional */ }
   try { rmSync(sessionEventDir(id), { recursive: true, force: true }); } catch { /* spool opsional */ }
