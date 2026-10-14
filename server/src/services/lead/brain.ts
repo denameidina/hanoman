@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { constants, tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Agent } from "@hanoman/shared";
 import { agentEnvironment, resolveHardening } from "@hanoman/runner";
@@ -177,6 +177,13 @@ export function leadFailureReason(
   agent: Agent, timeoutMs: number, err: ExecFailure, stdout: string, stderr: string,
 ): string {
   if (err.killed) return `lead ${agent} kehabisan waktu ${timeoutMs} ms`;
+  if (agent === "antigravity") {
+    // Provider diagnostics can contain credentials and the internal advisor prompt (SPEC-1442).
+    if (err.code === "ENOENT") return "lead antigravity gagal (biner tidak ditemukan)";
+    const signal = err.signal && Object.hasOwn(constants.signals, err.signal) ? err.signal : null;
+    const code = typeof err.code === "number" && Number.isInteger(err.code) ? err.code : "?";
+    return `lead antigravity gagal (${signal ? `sinyal ${signal}` : `exit ${code}`})`;
+  }
   // `Command failed:` = pesan rakitan execFile yang memuat seluruh argv → buang, bukan potong.
   const fromErr = err.message.startsWith("Command failed:") ? "" : err.message;
   const detail = [tail(stderr), tail(stdout)].filter(Boolean).join(" · ")

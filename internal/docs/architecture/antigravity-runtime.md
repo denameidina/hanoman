@@ -491,3 +491,13 @@ production atau melemahkan assertion. Runner/shared typecheck exit 0; server han
 Telegram engine label (Task 13), frontend hanya seam runtime defaults/engine (Task 12), tanpa
 error baru dari telemetry DTO/nullguard. `docs index --check` memberi `index ok` dan diff-check
 bersih. Boot/curl endpoint terintegrasi tetap milik Task 14 sekali di akhir.
+
+
+Review Task 8 membatasi diagnostik kegagalan advisor Antigravity ke kategori aman timeout,
+exit numerik, sinyal OS yang dikenal, atau biner tidak ditemukan. Stdout/stderr provider dan
+`execFile.error.message` tidak diteruskan ke jejak/notifikasi karena dapat memuat credential
+atau prompt internal. String error-code asing juga tidak disalin. Claude/Codex mempertahankan
+diagnostik existing. Test actual executable yang mencetak sentinel di dua stream lalu exit 7
+membuktikan rejection hanya berisi kategori aman; RED 5 gagal/1 lulus sebelum perbaikan.
+Scoped `lead-brain.test.ts` + `lead-engine-argv.test.ts` sesudah perbaikan lulus 38/38;
+server typecheck hanya menyisakan Telegram engine label milik Task 13.

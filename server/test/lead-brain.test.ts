@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { chmodSync, readFileSync, statSync } from "node:fs";
+import { chmodSync, readFileSync, statSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { leadArgv, leadEnv, leadFailureReason, leadProcess, think } from "../src/services/lead/brain";
 
@@ -213,5 +215,31 @@ describe("Antigravity internal advisor", () => {
     const source = { GEMINI_API_KEY: "fixture", GOOGLE_GEMINI_BASE_URL: "https://fixture.invalid", PATH: "/bin" };
     for (const agent of ["claude", "codex"] as const) { expect(leadEnv(agent, source, 1000)).toEqual({ PATH: "/bin" }); }
     expect(leadEnv("antigravity", source, 1000)).toEqual(source);
+  });
+});
+
+
+describe("Antigravity advisor failure redaction", () => {
+  const secret = "AGY_FIXTURE_CREDENTIAL_PRIVATE_PROMPT";
+  it.each([
+    [{ code: 1 }, "lead antigravity gagal (exit 1)"],
+    [{ code: "ENOENT" }, "lead antigravity gagal (biner tidak ditemukan)"],
+    [{ signal: "SIGKILL" }, "lead antigravity gagal (sinyal SIGKILL)"],
+    [{ killed: true }, "lead antigravity kehabisan waktu 1200 ms"],
+    [{ code: secret }, "lead antigravity gagal (exit ?)"],
+  ] as const)("only exposes the safe failure category %j", (error, expected) => {
+    const reason = leadFailureReason("antigravity", 1200, { message: secret, ...error }, `stdout ${secret}`, `GEMINI_API_KEY=${secret} GOOGLE_GEMINI_BASE_URL=https://${secret}`);
+    expect(reason).toBe(expected); expect(reason).not.toContain(secret);
+  });
+  it("think rejection never forwards CLI output or internal prompt", async () => {
+    const root = mkdtempSync(join(tmpdir(), "agy-advisor-failure-"));
+    const bin = join(root, "fake agy");
+    writeFileSync(bin, `#!${process.execPath}
+process.stdout.write(${JSON.stringify(secret)}); process.stderr.write(${JSON.stringify(secret)}); process.exit(7);
+`, { mode: 0o700 });
+    process.env.HANOMAN_ANTIGRAVITY_BIN = bin;
+    try {
+      await expect(think(secret, { agent: "antigravity", model: "", effort: "", timeoutMs: 5000 })).rejects.toThrow(/^lead antigravity gagal \(exit 7\)$/);
+    } finally { delete process.env.HANOMAN_ANTIGRAVITY_BIN; rmSync(root, { recursive: true, force: true }); }
   });
 });
