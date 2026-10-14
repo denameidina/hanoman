@@ -108,12 +108,14 @@ menunggu review parent sebelum ditandai selesai.
 
 **Interfaces:** Pertahankan `applyRuntimeDefaults(raw:unknown):{data:Setting,changed:boolean}|null`, `markRuntimeDefaultsUserEdited(before:Setting,next:Setting):BuiltinRuntimeDefaults` dan session/terminal/conflict/lead defaults existing; tambah cabang runtime ketiga, parent model/effort default Task 1, phase tier inherit/null.
 
-- [ ] **Step 1:** Tulis fixtures fresh, BARIS_LAMA, marker current/legacy, user edit dan PUT client lama. Assert global `agent` operator, semua Claude/Codex values/markers tetap byte-equivalent; seed Antigravity idempoten dan PUT yang menghilangkan blok baru mempertahankan blok sebelum PUT.
+- [x] **Step 1:** Tulis fixtures fresh, BARIS_LAMA, marker current/legacy, user edit dan PUT client lama. Assert global `agent` operator, semua Claude/Codex values/markers tetap byte-equivalent; seed Antigravity idempoten dan PUT yang menghilangkan blok baru mempertahankan blok sebelum PUT.
 
   Assertions: `expect(second.changed).toBe(false)`; `expect(after.codex).toEqual(before.codex)`; `expect(after.agent).toBe(before.agent)`; `expect(after.builtinRuntimeDefaults.antigravity.model).toBe("user")` sesudah edit operator.
-- [ ] **Step 2:** Run test paths, verify FAIL yang relevan.
-- [ ] **Step 3:** Seed hanya blok/marker Antigravity additive; jangan reseed Claude/Codex karena version marker baru. Cabangkan helper defaults eksplisit agar ternary `codex ? ... : claude` tidak mengirim model Claude ke Antigravity. Settings/orchestration/tool schema memakai validasi native child terpisah.
-- [ ] **Step 4:** Run test paths sampai PASS >0; perbarui SoT runtime/default ownership dan commit explicit touched paths.
+- [x] **Step 2:** Run test paths, verify FAIL yang relevan.
+- [x] **Step 3:** Seed hanya blok/marker Antigravity additive; jangan reseed Claude/Codex karena version marker baru. Cabangkan helper defaults eksplisit agar ternary `codex ? ... : claude` tidak mengirim model Claude ke Antigravity. Settings/orchestration/tool schema memakai validasi native child terpisah.
+- [x] **Step 4:** Run test paths sampai PASS >0; perbarui SoT runtime/default ownership dan commit explicit touched paths.
+
+**Receipt Task 2:** commit `4be61a2cbdb142bd31a82393c723f5f9a4455f04` reviewed; scoped 9 files/99 tests lulus, shared typecheck exit 0. Current v2 Claude/Codex value/ownership tetap; historical v1/no-marker migration preserved. Old-client PUT preserves new block/native matrix. Server typecheck pending five later-task seams (custom-agent adapter, pty flags/skill/environment, Telegram runtime label), dicatat untuk Task 3/4/6/8. [Receipt SoT](../../../internal/docs/architecture/antigravity-runtime.md).
 
 ### Task 3: Biner efektif, argv interaktif dan isolasi env
 
