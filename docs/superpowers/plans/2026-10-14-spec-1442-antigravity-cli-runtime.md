@@ -138,12 +138,14 @@ menunggu review parent sebelum ditandai selesai.
 
 **Interfaces:** `ensureAntigravityTrust(cwd:string, home:string=homedir()):void`, synchronous read/merge-latest/temp-rename; existing skill injection interface extended with `agent:"antigravity"` and cleanup ownership. Tests pass temp home, never real HOME.
 
-- [ ] **Step 1:** Assert realpath append once, repeated cwd no duplicate, two launch cwd additions preserve both and all sibling fields. Corrupt JSON, wrong trustedWorkspaces type, symlink/unsafe owner/temp collision/write failure throw safe preparation error and leave original bytes untouched.
+- [x] **Step 1:** Assert realpath append once, repeated cwd no duplicate, two launch cwd additions preserve both and all sibling fields. Corrupt JSON, wrong trustedWorkspaces type, symlink/unsafe owner/temp collision/write failure throw safe preparation error and leave original bytes untouched.
 
   Assertions: `expect(config.trustedWorkspaces).toEqual(expect.arrayContaining([realA,realB]))`; `expect(config.other).toEqual(before.other)`; `expect(originalBytesAfterFailure).toEqual(originalBytesBefore)`.
-- [ ] **Step 2:** Assert AGENTS.md/GEMINI.md and existing project skill content unchanged, global skill symlink `.agents/skills`, project collision wins, common-dir exclude idempotent, cleanup only owned symlink; skill failure warns/fail-open. Scanner recognizes `~/.gemini/antigravity-cli/skills`, no Codex plugin config misparse.
-- [ ] **Step 3:** Run red test paths; implement guard/atomic merge and branch injection. Invoke trust for actual cwd in final agent launch, no shell/raw preparation. Reuse existing exclude marker mechanism with ownership-specific entries.
-- [ ] **Step 4:** Run green paths; repeat Task 0 trust/skill receipt through implemented helper rather than hand-written fixture. No trust dialog and native skill discovery are required evidence; commit docs+code explicit paths.
+- [x] **Step 2:** Assert AGENTS.md/GEMINI.md and existing project skill content unchanged, global skill symlink `.agents/skills`, project collision wins, common-dir exclude idempotent, cleanup only owned symlink; skill failure warns/fail-open. Scanner recognizes `~/.gemini/antigravity-cli/skills`, no Codex plugin config misparse.
+- [x] **Step 3:** Run red test paths; implement guard/atomic merge and branch injection. Invoke trust for actual cwd in final agent launch, no shell/raw preparation. Reuse existing exclude marker mechanism with ownership-specific entries.
+- [x] **Step 4:** Run green paths; repeat Task 0 trust/skill receipt through implemented helper rather than hand-written fixture. No trust dialog and native skill discovery are required evidence; commit docs+code explicit paths.
+
+**Receipt Task 4:** commits `a88dc2d84a87f9373952a9fbf22ace4d770b3df5` + review fix `3d19197c8a43d94691ae5f4d1272729cefa156f2` reviewed. Original 7files/74tests green + ownership rework2files/17tests green, runner/shared typecheck0. Actual createSession native Read injected skill + AGENTS/GEMINI nonces, no trust dialog, same pane/PID 23s+5s, owned cleanup verified. Review reproduced common-dir exclude cross-worktree dirty state and fixed per-link owned pairs. Skills source create/fork existing tools updated; source API smoke queued Task14. [Receipt SoT](../../../internal/docs/architecture/antigravity-runtime.md).
 
 ### Task 5: Renderer/materializer native roster per sesi
 
