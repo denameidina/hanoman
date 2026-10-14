@@ -4,9 +4,11 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Agent } from "@hanoman/shared";
-import { resolveHardening } from "@hanoman/runner";
+import { agentEnvironment, resolveHardening } from "@hanoman/runner";
 import { effectiveStr } from "../../config";
 import { rootBypassEnv } from "../pty";
+import { antigravityBin } from "../antigravity-runtime";
+import { assertAntigravityLaunch } from "../session-sandbox";
 import { sandboxArgvFromEnv } from "../session-sandbox";
 
 // SPEC-409 · ADR-0091 · lead adalah AGEN, bukan aturan if/else: pertanyaan yang ia jawab berbentuk
@@ -23,7 +25,7 @@ import { sandboxArgvFromEnv } from "../session-sandbox";
 
 /** Cermin `claudeBin()`/`codexBin()` di pty.ts — knob yang sama, supaya test bisa menukar biner. */
 const binFor = (agent: Agent): string =>
-  agent === "codex"
+  agent === "antigravity" ? antigravityBin() : agent === "codex"
     ? effectiveStr("HANOMAN_CODEX_BIN") ?? "codex"
     : effectiveStr("HANOMAN_CLAUDE_BIN") ?? "claude";
 
@@ -38,6 +40,11 @@ const binFor = (agent: Agent): string =>
  * hasil pikirannya sendiri.
  */
 export function leadArgv(o: { agent: Agent; model: string; effort: string; prompt: string }): string[] {
+  if (o.agent === "antigravity") return [
+    "-p", ...(o.model ? ["--model", o.model] : []),
+    ...(o.effort ? ["--effort", o.effort] : []),
+    "--dangerously-skip-permissions", "--output-format", "json", o.prompt,
+  ];
   if (o.agent === "codex") {
     return [
       "exec",
@@ -75,7 +82,7 @@ export const leadEnv = (
   agent: Agent,
   base: NodeJS.ProcessEnv = process.env,
   uid = process.getuid?.(),
-): NodeJS.ProcessEnv => (agent === "claude" ? { ...rootBypassEnv(uid), ...base } : { ...base });
+): NodeJS.ProcessEnv => agentEnvironment(agent, agent === "claude" ? { ...rootBypassEnv(uid), ...base } : base);
 
 export type ThinkOpts = {
   agent: Agent; model: string; effort: string;
@@ -93,6 +100,7 @@ export function leadProcess(
   o: ThinkOpts,
   env: NodeJS.ProcessEnv = process.env,
 ): LeadProcess {
+  assertAntigravityLaunch(o.agent, undefined, env);
   const file = binFor(o.agent);
   const directArgs = leadArgv({ agent: o.agent, model: o.model, effort: o.effort, prompt });
   // SPEC-884 · ADR-0139 · pemicunya hardening, bukan NODE_ENV (cermin `sandboxArgvFromEnv`).
@@ -196,7 +204,14 @@ export function think(prompt: string, o: ThinkOpts): Promise<string> {
         reject(new Error(leadFailureReason(o.agent, o.timeoutMs, err as unknown as ExecFailure, stdout, stderr)));
         return;
       }
-      resolve(stdout);
+      if (o.agent === "antigravity") {
+        try {
+          const result: unknown = JSON.parse(stdout);
+          if (!result || typeof result !== "object" || !("status" in result) || result.status !== "SUCCESS"
+            || !("response" in result) || typeof result.response !== "string") throw new Error();
+          resolve(result.response);
+        } catch { reject(new Error("lead antigravity mengembalikan keluaran JSON advisor yang tidak sah")); }
+      } else resolve(stdout);
     });
     // SPEC-448 (QA) · TUTUP stdin. `execFile` selalu melahirkan anak ber-`stdio:["pipe",…]` — opsi
     // `stdio` TIDAK diteruskan Node untuk execFile (hanya cwd/env/uid/shell/signal yang sampai ke

@@ -1,4 +1,6 @@
 import { LaunchAdmissionError } from "./services/session-admission";
+import { RuntimeLaunchError } from "./services/session-sandbox";
+import { PhasePlanValidationError } from "./services/orchestration";
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
 import websocket from "@fastify/websocket";
@@ -115,6 +117,10 @@ export function buildApp(
   const ingress = loadIngressPolicy(env);
   const app = Fastify({ logger: false, trustProxy: trustProxyFromEnv(env) });
   app.setErrorHandler((error, _req, reply) => {
+    if (error instanceof RuntimeLaunchError)
+      return reply.code(error.statusCode).send({ error: error.code, message: error.message });
+    if (error instanceof PhasePlanValidationError)
+      return reply.code(400).send({ error: error.message });
     if (error instanceof LaunchAdmissionError)
       return reply.code(409).send({ error: error.message, kind: error.kind, admission: error.admission });
     return reply.send(error);

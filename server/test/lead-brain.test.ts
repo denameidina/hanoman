@@ -196,3 +196,22 @@ describe("leadArgv · bentuk argv tiap agen (tak berubah oleh SPEC-448)", () => 
         "--dangerously-bypass-approvals-and-sandbox", "P"]);
   });
 });
+
+
+describe("Antigravity internal advisor", () => {
+  it("uses explicit JSON headless argv solely for the internal advisor", () => {
+    expect(leadArgv({ agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high", prompt: "advisor" })).toEqual(["-p", "--model", "gemini-3.8-flash-high", "--effort", "high", "--dangerously-skip-permissions", "--output-format", "json", "advisor"]);
+  });
+  it("uses the same configured executable and blocks sandbox before preparing any process", () => {
+    process.env.HANOMAN_ANTIGRAVITY_BIN = "/fixture/ag y";
+    try {
+      expect(leadProcess("prompt", { agent: "antigravity", model: "m", effort: "high", timeoutMs: 100 }, {})).toMatchObject({ file: "/fixture/ag y" });
+      expect(() => leadProcess("prompt", { agent: "antigravity", model: "m", effort: "high", timeoutMs: 100 }, { HANOMAN_SESSION_SANDBOX: "podman" })).toThrow(expect.objectContaining({ statusCode: 409, code: "antigravity-sandbox-unsupported" }));
+    } finally { delete process.env.HANOMAN_ANTIGRAVITY_BIN; }
+  });
+  it("isolates Antigravity credentials from other advisor runtimes", () => {
+    const source = { GEMINI_API_KEY: "fixture", GOOGLE_GEMINI_BASE_URL: "https://fixture.invalid", PATH: "/bin" };
+    for (const agent of ["claude", "codex"] as const) { expect(leadEnv(agent, source, 1000)).toEqual({ PATH: "/bin" }); }
+    expect(leadEnv("antigravity", source, 1000)).toEqual(source);
+  });
+});

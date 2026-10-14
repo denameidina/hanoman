@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertRuntimeBoundary, sandboxArgv } from "../src/services/session-sandbox";
+import { assertRuntimeBoundary, assertAntigravityLaunch, sandboxArgv } from "../src/services/session-sandbox";
 
 describe("production session sandbox", () => {
   it("fails closed for root, missing sandbox, or public bind without ingress", () => {
@@ -85,5 +85,17 @@ describe("production session sandbox", () => {
       podmanBin: "/opt/podman-custom",
     });
     expect(argv[0]).toBe("/opt/podman-custom");
+  });
+});
+
+
+describe("Antigravity launch admission", () => {
+  it.each([{ HANOMAN_SESSION_SANDBOX: "podman" }, { HANOMAN_SESSION_SANDBOX: "required" }, { HANOMAN_HARDENING: "1" }, { HANOMAN_HARDENING: "1", HANOMAN_SESSION_SANDBOX: "off" }])("rejects hardened or sandbox launch without host downgrade %j", (env) => {
+    expect(() => assertAntigravityLaunch("antigravity", undefined, env)).toThrow(expect.objectContaining({ statusCode: 409, code: "antigravity-sandbox-unsupported" }));
+  });
+  it("rejects native goal even on host, preserving Claude/Codex admission", () => {
+    expect(() => assertAntigravityLaunch("antigravity", "finish", {})).toThrow(expect.objectContaining({ statusCode: 409, code: "antigravity-goal-unsupported" }));
+    expect(() => assertAntigravityLaunch("antigravity", undefined, {})).not.toThrow();
+    for (const agent of ["claude", "codex"] as const) expect(() => assertAntigravityLaunch(agent, "finish", { HANOMAN_SESSION_SANDBOX: "podman" })).not.toThrow();
   });
 });

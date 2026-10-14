@@ -30,7 +30,7 @@ import {
 import { effectiveStr, suppressedInheritKeys } from "../config";
 import { controlHost, loadIngressPolicy } from "./ingress-policy";
 import { sessionEventToken } from "./session-event-token";
-import { sandboxCommand } from "./session-sandbox";
+import { assertAntigravityLaunch, RuntimeLaunchError, sandboxCommand } from "./session-sandbox";
 import { sessionEventDir } from "./session-event-spool";
 import { agentDefinitionHash, resolveDbUrl } from "@hanoman/runner";
 export { sessionEventDir } from "./session-event-spool";
@@ -262,7 +262,7 @@ function phaseView(p: Pane, phases: Phase[]): Phase[] {
   // I-1/M-2 · ADR-0164 · `startedAt` tmux dalam detik epoch; `enrichPhases` menerima ms.
   return enrichPhases(
     phases, roster, phaseInvocations.get(p.id) ?? [], trackPhaseDoneSeen(p.id, phases, now), now,
-    p.startedAt * 1000, new Set(p.doneAtBirth ?? []),
+    p.startedAt * 1000, new Set(p.doneAtBirth ?? []), p.agent,
   );
 }
 
@@ -554,7 +554,7 @@ export function parsePanes(out: string): Pane[] {
       decision: !exited && !!decisionFile && markerFilled(decisionFile) && paneQuiet(activityAt)
         && markerCurrent(decisionFile, activityAt),
       // SPEC-338 · sesi yang lahir sebelum ADR-0074 tak punya opsi ini → claude.
-      agent: (agent === "codex" ? "codex" : "claude") as Agent,
+      agent: agent === "antigravity" ? "antigravity" : agent === "codex" ? "codex" : "claude",
       altScreen: alternate === "1",
       activityAt,
       // SPEC-919 · sesi yang lahir di tmux yang tak menjawab field ini → 0 (epoch).
@@ -818,7 +818,13 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // membaca layar terakhir sesi yang sudah selesai.
   const existing = getSession(id);
   if (existing && !existing.exited) return existing;
-  if (!opts.command && opts.agent === "antigravity") ensureAntigravityTrust(cwd);
+  if (!opts.command) {
+    assertAntigravityLaunch(opts.agent ?? "claude", opts.goal);
+    if (opts.agent === "antigravity") {
+      try { ensureAntigravityTrust(cwd); }
+      catch { throw new RuntimeLaunchError(500, "antigravity-config-failed", "Persiapan konfigurasi Antigravity CLI gagal; periksa konfigurasi lokal."); }
+    }
+  }
   if (existing) killSession(id);
   phaseDoneSeen.delete(id);   // R3 · id sesi dipakai ulang: tenggang sesi lama tak diwarisi
   const eventDir = opts.command ? undefined : sessionEventDir(id);
@@ -1394,6 +1400,7 @@ const DIALOG_CAPTURE_LINES = 60;
 const GOAL_ARMED_MARKERS: Record<Agent, string[]> = {
   claude: ["/goal"],
   codex: ["Goal active", "Pursuing goal", "Goal achieved"],
+  antigravity: [],
 };
 
 const goalArmed = (id: string, agent: Agent): boolean => {
@@ -1406,6 +1413,7 @@ export async function armGoalInTui(id: string, condition: string, o: GoalArmOpts
   const settleMs = o.settleMs ?? 1200, verifyTries = o.verifyTries ?? 12;
   const chunkMs = o.chunkMs ?? 50, sendTries = o.sendTries ?? 3;
   const agent: Agent = o.agent ?? "claude";
+  assertAntigravityLaunch(agent, condition);
   const line = goalOneLine(condition);
   if (!line) return false;
   // Tunggu pane menggambar sesuatu (TUI sudah hidup). Habis percobaan → kirim saja: yang hilang

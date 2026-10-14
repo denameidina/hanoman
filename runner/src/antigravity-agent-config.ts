@@ -5,6 +5,7 @@ import {
 } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { isAntigravityChildTier } from "@hanoman/shared";
+import { agentEnvironment } from "./agent-env";
 import { agentPromptOf, phasePromptOf, type AgentDef } from "./custom-agents";
 
 const digest = (bytes: string): string => createHash("sha256").update(bytes).digest("hex");
@@ -39,7 +40,7 @@ function paths(opts: { cwd: string; sessionId: string }) {
   const cwd = resolve(opts.cwd), directory = join(cwd, ".agents", "agents");
   const prefix = `hanoman-${digest(`${cwd}\0${opts.sessionId}`).slice(0, 24)}-`;
   const manifest = join(directory, `.${prefix}manifest.json`);
-  const common = execFileSync("git", ["rev-parse", "--git-common-dir"], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  const common = execFileSync("git", ["rev-parse", "--git-common-dir"], { cwd, env: agentEnvironment(null, process.env), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   const exclude = join(isAbsolute(common) ? common : join(cwd, common), "info", "exclude");
   return { cwd, directory, prefix, manifest, exclude };
 }

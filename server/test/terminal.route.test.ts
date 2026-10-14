@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import WebSocket from "ws";
-import { mkdtempSync, appendFileSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, appendFileSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,7 +9,7 @@ import type { AddressInfo } from "node:net";
 import { RELAY_ACTOR_HEADER, RELAY_HEADER, RELAY_MODE_HEADER, zSpecReview, type RemoteCapability } from "@hanoman/shared";
 import { buildApp } from "../src/app";
 import { prisma } from "../src/db";
-import { killAll, killSession, listSessions, promptFilePath, agentsFilePath, phaseContextFilePath, createSession as createSessionSvc, PANE_QUIET_MS } from "../src/services/pty";
+import { killAll, killSession, getSession, listSessions, promptFilePath, agentsFilePath, phaseContextFilePath, createSession as createSessionSvc, PANE_QUIET_MS } from "../src/services/pty";
 import { DEFAULT_SETTING } from "../src/services/settings";
 import { phaseFilePath } from "../src/services/session-phases";
 import { sweepRepo, __resetReaper } from "../src/services/worktree-reaper";
@@ -22,6 +22,8 @@ import { resetDb, makeProject, makeSpec, makeSetting } from "./factory";
 
 // Lihat pty.test.ts: /bin/cat mati karena --dangerously-skip-permissions ilegal baginya.
 const FAKE_CLAUDE = fileURLToPath(new URL("./fixtures/fake-claude.sh", import.meta.url));
+
+vi.mock("../src/services/antigravity-trust", () => ({ ensureAntigravityTrust: vi.fn() }));
 
 const app = buildApp({ requireAuth: false });
 let origin = "";
@@ -1356,4 +1358,73 @@ describe("DELETE /terminal/sessions/:id · penutupan asinkron (SPEC-742)", () =>
     expect(del.json().cleanup).toBeNull();
     expect(trashNames()).toEqual([]);
   });
+});
+
+
+describe("Antigravity launch route admission", () => {
+  it.each([true, false])("invalid native override is 400 before approval (explicit agent %s)", async (explicit) => {
+    const id = `SPEC-AGY-INVALID-${explicit}`;
+    await makeSpec({ id, projectId: "p1", stage: "planned" });
+    await makeSetting({ agent: "antigravity", scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { ...DEFAULT_SETTING.scheduler.launchGuard, enabled: false } }, orchestration: { ...DEFAULT_SETTING.orchestration, feature: { ...DEFAULT_SETTING.orchestration.feature, enabled: false } } });
+    const before = await prisma.spec.findUnique({ where: { id } });
+    const r = await app.inject({ method: "POST", url: "/api/terminal/sessions", payload: { spec: id, flow: "feature", ...(explicit ? { agent: "antigravity" } : {}), phaseOverrides: { Spec: { model: "parent-slug", effort: "high" } } } });
+    expect(r.statusCode).toBe(400); expect(r.json()).toEqual({ error: expect.any(String) });
+    expect((await prisma.spec.findUnique({ where: { id } }))!.launchApprovedAt).toEqual(before!.launchApprovedAt);
+    expect(existsSync(join(repoDir, ".worktrees", id.toLowerCase()))).toBe(false);
+  });
+  it.each(["sandbox", "goal"])("unsupported %s returns exact code before approval", async (kind) => {
+    const id = `SPEC-AGY-UNSUPPORTED-${kind}`;
+    await makeSpec({ id, projectId: "p1", stage: "planned" });
+    await makeSetting({ agent: "antigravity", scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { ...DEFAULT_SETTING.scheduler.launchGuard, enabled: false } } });
+    const before = await prisma.spec.findUnique({ where: { id } });
+    vi.stubEnv("HANOMAN_SESSION_SANDBOX", kind === "sandbox" ? "podman" : "off");
+    try {
+      const r = await app.inject({ method: "POST", url: "/api/terminal/sessions", payload: { spec: id, flow: "feature", goal: kind === "goal" } });
+      expect(r.statusCode).toBe(409); expect(r.json().error).toBe(`antigravity-${kind}-unsupported`);
+      expect((await prisma.spec.findUnique({ where: { id } }))!.launchApprovedAt).toEqual(before!.launchApprovedAt);
+    } finally { vi.unstubAllEnvs(); }
+  });
+  it("trust failure is a safe 500 code for ordinary terminal", async () => {
+    await makeSetting({ agent: "antigravity", scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { ...DEFAULT_SETTING.scheduler.launchGuard, enabled: false } } });
+    const { ensureAntigravityTrust } = await import("../src/services/antigravity-trust");
+    vi.mocked(ensureAntigravityTrust).mockImplementationOnce(() => { throw new Error("secret-home-token"); });
+    const r = await app.inject({ method: "POST", url: "/api/terminal/sessions", payload: { project: "p1" } });
+    expect(r.statusCode).toBe(500); expect(r.json().error).toBe("antigravity-config-failed"); expect(r.body).not.toContain("secret-home-token");
+  });
+});
+
+
+describe("Antigravity interactive project entrypoints", () => {
+  beforeEach(restoreShell);
+  it.each(["terminal", "reverse", "scaffold", "prd", "breakdown"])("%s selects the Antigravity parent and actual cwd", async (flow) => {
+    killAll();
+    await makeSetting({ agent: "antigravity", scheduler: { ...DEFAULT_SETTING.scheduler, launchGuard: { ...DEFAULT_SETTING.scheduler.launchGuard, enabled: false } } });
+    const capture = join(mkdtempSync(join(tmpdir(), "agy-route-")), "argv.json");
+    const bin = `${capture}.bin`;
+    writeFileSync(bin, `#!${process.execPath}
+require('node:fs').writeFileSync(${JSON.stringify(capture)}, JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2,-1)})); process.stdin.resume();
+`, { mode: 0o700 });
+    vi.stubEnv("HANOMAN_ANTIGRAVITY_BIN", bin);
+    let payload: Record<string, unknown> = { project: "p1" };
+    if (flow !== "terminal") payload.flow = flow;
+    if (flow === "prd") payload.brief = { title: "AGY project", context: "c", outcome: "o" };
+    if (flow === "breakdown") {
+      const path = "docs/prd/agy-source.md"; mkdirSync(join(repoDir, "docs/prd"), { recursive: true });
+      writeFileSync(join(repoDir, path), "# PRD\nA meaningful capability."); payload.prdPath = path;
+    }
+    try {
+      const r = await app.inject({ method: "POST", url: "/api/terminal/sessions", payload });
+      expect(r.statusCode).toBe(201); const id = r.json().id;
+      await waitFor(() => existsSync(capture), 20000);
+      const actual = JSON.parse(readFileSync(capture, "utf8"));
+      expect(actual.args).toContain("--model"); expect(actual.args).toContain("gemini-3.8-flash-high");
+      expect(actual.args).not.toContain("-p"); expect(actual.args).not.toContain("--print");
+      if (flow !== "terminal") expect(actual.args).toContain("--prompt-interactive");
+      expect(actual.cwd).toBe(realpathSync(flow === "terminal" ? repoDir : join(repoDir, ".worktrees", id)));
+      expect(getSession(id)!.agent).toBe("antigravity");
+      expect(realpathSync(getSession(id)!.cwd)).toBe(actual.cwd);
+      const { ensureAntigravityTrust } = await import("../src/services/antigravity-trust");
+      expect(ensureAntigravityTrust).toHaveBeenCalledWith(getSession(id)!.cwd);
+    } finally { killAll(); vi.unstubAllEnvs(); }
+  }, 25000);
 });

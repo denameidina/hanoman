@@ -1298,7 +1298,7 @@ export function PhaseStrip({ phases, compact = false, now }: {
               {full && a.model && <span>· {modelLabel(a.model)}</span>}
               {full && a.effort && <span>· {a.effort}</span>}
               {full && duration && <span>· {duration}</span>}
-              {a.attempts > 1 && <span>↻{a.attempts}</span>}
+              {(a.attempts ?? 0) > 1 && <span>↻{a.attempts}</span>}
               {a.evidence === "missing" && (
                 <span role="img" aria-label="bukti subagent tak diterima" title="bukti subagent tak diterima"
                   className="hn-terminal-phase-warn">⚠</span>

@@ -112,3 +112,12 @@ dan tidak menyebut Custom Agent auditor/isolated/model legacy sebagai tersedia. 
 memuat larangan tulis instruksional, tanpa policy enforced. Gagal satu definisi fase membatalkan
 roster fase dan metadata orchestrated sebelum fallback single-session berperingatan. Output prompt
 Claude/Codex tetap byte-identik, dikunci dua hash parent dan dua hash definisi fase dalam test.
+
+
+Task 8 memastikan launch backlog/Terminal/project-level/konflik mewarisi runtime Antigravity dari
+Settings dengan parent defaults bloknya sendiri dan trust actual cwd final. Unsupported boundary
+atau native goal ditolak sebelum persiapan/approval, tanpa downgrade ke host atau runtime lain.
+Pekerjaan parent/child tetap TUI; pengecualian `-p --output-format json` hanya advisor internal lead.
+Telemetry phase native belum terhubung: attempts/effort/durasi/token unknown/null tidak boleh dibaca
+sebagai nol penggunaan atau kegagalan delegasi. Marker serta checked plan tetap bukti completion,
+bukan telemetry invocation. [Receipt final launcher Task 8](../architecture/antigravity-runtime.md#launch-admission-status-dan-receipt-task-8--2026-10-14).

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -11,6 +11,8 @@ import { resolveGoalCondition } from "@hanoman/runner";
 import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
 import { makeRepoWithBranches } from "./factory";
 import { resolveRepoDir } from "../src/services/local-binding";
+
+vi.mock("../src/services/antigravity-trust", () => ({ ensureAntigravityTrust: vi.fn() }));
 
 const clean = async () => {
   killAll();
@@ -121,6 +123,30 @@ describe("session-launch", () => {
     expect(row!.startedAt).toBeInstanceOf(Date);
     expect(row!.startedAt!.getTime()).toBeGreaterThanOrEqual(before - 1000);
     killSession(r.id);
+  });
+
+  it("Antigravity global defaults reach actual backlog worktree and tmux metadata", async () => {
+    const spec = await seedRepo("SPEC-AGY");
+    const data = { ...DEFAULT_SETTING, agent: "antigravity", antigravity: { model: "gemini-3.8-flash-high", effort: "high" } };
+    await prisma.setting.create({ data: { id: 1, data } });
+    vi.stubEnv("HANOMAN_ANTIGRAVITY_BIN", "/bin/echo");
+    try {
+      const r = await startSpecSession(spec, { flow: "feature" });
+      const argv = await argvOf(r.id);
+      expect(argv).toContain("--model gemini-3.8-flash-high");
+      expect(argv).toContain("--effort high"); expect(argv).toContain("--prompt-interactive");
+      expect(getSession(r.id)).toMatchObject({ agent: "antigravity", cwd: `${(await prisma.project.findUnique({ where: { id: spec.projectId } }))!.repoDir}/.worktrees/${r.id}` });
+    } finally { vi.unstubAllEnvs(); }
+  });
+  it.each(["sandbox", "goal"])("Antigravity %s rejection leaves backlog/worktree untouched", async (kind) => {
+    const spec = await seedRepo(`SPEC-AGY-${kind}`);
+    const repo = (await prisma.project.findUnique({ where: { id: spec.projectId } }))!.repoDir!;
+    vi.stubEnv("HANOMAN_SESSION_SANDBOX", kind === "sandbox" ? "podman" : "off");
+    try {
+      await expect(startSpecSession(spec, { flow: "feature", agent: "antigravity", goal: kind === "goal" })).rejects.toMatchObject({ statusCode: 409, code: `antigravity-${kind}-unsupported` });
+      expect(existsSync(`${repo}/.worktrees/${sessionIdForSpec(spec.id)}`)).toBe(false);
+      expect((await prisma.spec.findUnique({ where: { id: spec.id } }))!).toMatchObject({ baseSha: null, startedAt: null, payload: null });
+    } finally { vi.unstubAllEnvs(); }
   });
 
   it("Setting.goal mati & tanpa override → sesi lahir tanpa hook Stop", async () => {

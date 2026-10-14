@@ -440,3 +440,54 @@ hanya effort efektif (override bila dikirim, selain itu sel Settings); tanpa ove
 legacy `flash/high` tetap ditolak. Ini tidak memperluas dukungan effort child independen.
 Regresi terfokus mula-mula 1 gagal/29 lulus karena override null masih membaca sel legacy;
 sesudah perbaikan, `shared/src/orchestration.test.ts` lulus 30/30 dan typecheck shared hijau.
+
+
+## Launch, admission, status dan receipt Task 8 — 2026-10-14
+
+`createSession` memvalidasi Antigravity sebelum trust, registry, prompt/event files, spawn dan
+riwayat kelahiran. Boundary sandbox aktif/required atau hardening eksplisit (termasuk kombinasi
+hardening aktif dengan sandbox off) ditolak 409 `antigravity-sandbox-unsupported`; tidak ada
+fallback host. Goal native ditolak 409 `antigravity-goal-unsupported`. Trust gagal menjadi
+500 `antigravity-config-failed` dengan pesan aman tanpa path, isi konfigurasi atau credential.
+Shell mentah mempertahankan jalur existing. Route backlog memvalidasi override terhadap runtime
+efektif serta admission unsupported sebelum `approveLaunch`, sehingga penolakan tidak meninggalkan
+persetujuan; admission capacity/reuse existing tetap berlaku. Default backlog Antigravity mengambil
+blok `Setting.antigravity`, bukan model Claude. Semua entrypoint memakai final launcher yang sama.
+
+Lead advisor internal memakai resolver biner yang sama, `-p`, model/effort/bypass dan
+`--output-format json`; hanya envelope `status:SUCCESS` dengan `response:string` diteruskan ke
+parser keputusan existing. Bentuk ini diverifikasi dari
+[headless JSON upstream](https://antigravity.google/docs/cli/headless/#json) serta help agy 1.3.4.
+Boundary unsupported juga menolak advisor sebelum spawn. Sesi kerja yang dilahirkan lead tetap
+TUI, dan portal tetap restricted Claude-only. Env advisor memakai `agentEnvironment`; proses Git
+metadata registry serta skill exclude menerima env unrelated yang menghapus kedua key Antigravity.
+Fixture Git executable nyata membuktikan dua key tidak hadir, sementara GOOGLE_CLOUD_PROJECT tetap.
+
+Parser restart tmux mempertahankan runtime `antigravity`, parent model/effort dan cwd. Frame fase
+Antigravity memakai `attempts:null`, `effort:null`, `durationMs:null`, token/result null serta
+`evidence:unknown`; status/startedAt invocation tidak dibuat dari cache DB tanpa telemetry native.
+Model pada chip tetap **tier yang dideklarasikan**, bukan klaim model child aktual. Marker fase dan
+plan tetap menentukan completion; pane exited tetap mendahului waiting. Tidak ada regex idle baru.
+MCP existing session-create/cron/model schema menerima runtime additive; session-create meneruskan
+phaseOverrides nullable/berbatas ke validasi server. Mode/capability lama tetap. Frame Terminal/events
+tetap pengecualian streaming existing, session-events tetap HMAC; tidak ada route baru di task ini.
+
+Receipt product launcher actual pada UTC `2026-10-14T02:46:15.800Z`: temp Git worktree canonical
+trusted, `agy` 1.3.4 dengan argv interaktif tanpa `-p`/`--print`, metadata runtime Antigravity dan
+cwd cocok. Jawaban aritmetika initial selesai **13 detik**, follow-up recall nonce selesai
+**11 detik**, keduanya pada pane `%0` dan PID `9721` yang sama. Trust dialog tidak muncul.
+Cleanup menghapus PID/socket/fixture dan hanya trust entry cwd owned, mempertahankan sibling
+operator. Receipt/harness ignored: `.superpowers/sdd/task8-native-receipt.log` dan
+`.superpowers/sdd/2026-10-14-spec-1442-antigravity-cli-runtime/Task8-native-receipt.ts`.
+Percobaan pertama harness memakai predicate follow-up Task 4 yang keliru, lalu timeout bounded
+180 detik dan cleanup lulus; receipt di atas dari rerun dengan predicate Task 8 yang benar.
+
+
+Verifikasi Task 8: run scoped 20 berkas/526 test menghasilkan 19 berkas hijau; berkas PTY
+memiliki 35 kegagalan sementara `tmux list-panes: server exited unexpectedly`. Rerun hanya
+`server/test/pty.test.ts` memakai socket/DB baru dan env SSH bersih lulus **77/77**, sehingga
+seluruh 526 kasus di scope memiliki hasil hijau (449 non-PTY + 77 PTY). Tidak menambahkan retry
+production atau melemahkan assertion. Runner/shared typecheck exit 0; server hanya menyisakan
+Telegram engine label (Task 13), frontend hanya seam runtime defaults/engine (Task 12), tanpa
+error baru dari telemetry DTO/nullguard. `docs index --check` memberi `index ok` dan diff-check
+bersih. Boot/curl endpoint terintegrasi tetap milik Task 14 sekali di akhir.

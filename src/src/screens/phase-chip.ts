@@ -36,7 +36,7 @@ export function chipAccessibleName(p: Phase, duration: string): string {
     modelLabel(a?.model),
     a?.effort ?? "",
     duration,
-    a && a.attempts > 1 ? `percobaan ${a.attempts}` : "",
+    a && (a.attempts ?? 0) > 1 ? `percobaan ${a.attempts}` : "",
     a?.evidence === "missing" ? "bukti subagent tak diterima" : "",
   ].filter(Boolean);
   return `Fase ${p.name}: ${parts.join(" · ")}`;

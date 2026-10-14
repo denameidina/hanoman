@@ -7,6 +7,7 @@ import { CheckoutError, cloneProjectCheckout, fetchRefIfMissing } from "./projec
 import { getSetting } from "./settings";
 import { ensureCodexTrust } from "./codex-trust";
 import { createSession, getSessionAsync, killSession, sessionIdForSpec } from "./pty";
+import { assertAntigravityLaunch } from "./session-sandbox";
 import { sessionPhasePlan } from "./orchestration";
 import { blockersForSpec, blockedNote, type SpecBlocker } from "./spec-deps";
 import { phaseFilePath, decisionFilePath, readPhases } from "./session-phases";
@@ -162,11 +163,13 @@ export async function startSpecSession(
     const agent: Agent = opts.agent ?? setting.agent;
     const agentDefaults = agent === "codex"
       ? { model: setting.codex.model, effort: setting.codex.effort }
+      : agent === "antigravity" ? setting.antigravity
       : { model: setting.model, effort: setting.effort };
     const model = opts.model ?? agentDefaults.model;
     const effort = opts.effort ?? agentDefaults.effort;
     // Validate phase overrides against the effective runtime before worktree or backlog writes.
     const fullPlan = sessionPhasePlan(setting, opts.flow, agent, { model, effort }, opts.phaseOverrides);
+    assertAntigravityLaunch(agent, isGoalShapedFlow(opts.flow) || (opts.goal ?? setting.goal.enabled));
     if (pane) killSession(id);
     const isContinue = spec.stage === "done";
     const worktree = `${repoDir}/.worktrees/${id}`;

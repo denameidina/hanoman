@@ -27,7 +27,9 @@ export type JsonSchemaNode = {
   oneOf?: readonly JsonSchemaNode[];
   properties?: Record<string, JsonSchemaNode>;
   required?: readonly string[];
-  additionalProperties?: boolean;
+  additionalProperties?: boolean | JsonSchemaNode;
+  maxProperties?: number;
+  propertyNames?: JsonSchemaNode;
 };
 
 export type IfThen = { if: JsonSchemaNode; then: JsonSchemaNode };

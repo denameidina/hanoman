@@ -2529,3 +2529,18 @@ independen ditolak 400 sebelum perubahan worktree/backlog, termasuk saat orkestr
 Reviewer fase generated tetap read-only instruksional; null effort bukan enforcement atau
 jaminan model exact. Katalog MCP existing Settings dan session phases membawa penjelasan ini,
 tanpa route baru; keputusan streaming/auth exception tetap berlaku.
+
+
+SPEC-1442 Task 8: galat launch terstruktur memakai body `{error:code,message:string}` dengan
+409 `antigravity-sandbox-unsupported` / `antigravity-goal-unsupported`, atau 500
+`antigravity-config-failed` teredaksi. Validator phase override memakai 400 `{error:string}`
+existing; runtime efektif dari Settings dinilai walau request tanpa agent atau orkestrasi mati,
+sebelum approval tersimpan. Auth/not-found/capacity/reuse existing tetap mengikat. Final launcher
+menolak unsupported sebelum trust/roster/spawn/history. Hardening aktif tidak dapat diturunkan
+ke host lewat sandbox off. Frame fase Terminal Antigravity memberi `attempts:null`,
+`effort:null`, duration/tokens/result null dan `evidence:"unknown"`; status invocation tidak
+dikarang. Claude/Codex tetap memakai kontrak numeric/evidence sebelumnya. MCP existing
+session-create/cron/models diperluas additive; session-create menerima record phaseOverrides
+nullable dengan batas shared yang sama, mode danger/capability sessions:spawn tetap. Model filter
+Antigravity membatasi response ke model/provider runtime itu. Terminal/events WS serta HMAC
+session-events mempertahankan keputusan pengecualian ADR-0202, tanpa endpoint baru.

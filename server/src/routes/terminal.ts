@@ -14,6 +14,8 @@ import { ensureCodexTrust } from "../services/codex-trust";
 import { startSpecSession, LaunchError } from "../services/session-launch";
 import { sessionPhasePlan } from "../services/orchestration";
 import { withSessionAdmission, createAgentSession, createOperatorSession } from "../services/session-launch-gate";
+import { assertAntigravityLaunch } from "../services/session-sandbox";
+import { validatePhaseOverrides } from "../services/orchestration";
 import { approveLaunch, launchPrincipal } from "../services/launch-authority";
 import { admitBrowserWs, openWsConnection, revalidateWsPrincipal, createPrincipalWatch, WsMessageGuard } from "../services/ws-admission";
 import { ANTIGRAVITY_METHOD_UNAVAILABLE_REASON } from "@hanoman/shared";
@@ -30,7 +32,7 @@ import { recordSessionResult } from "../services/session-result";
 import { recordCompletion } from "../services/notifications";
 import { STAGES } from "../services/stage-machine";
 import {
-  createSession, getSession, getSessionAsync, attachAsync, screenResyncFrame, listSessions, listSessionsAsync, killSession, sessionPhases,
+  createSession, sessionIdForSpec, getSession, getSessionAsync, attachAsync, screenResyncFrame, listSessions, listSessionsAsync, killSession, sessionPhases,
   detach, writeTo, resize, shellBin, sendToPane, interruptPane, clearMarker, type Client,
 } from "../services/pty";
 import { createBoundedSender } from "../services/bounded-sender";
@@ -125,6 +127,13 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
       const spec = await prisma.spec.findUnique({ where: { id: parsed.data.spec } });
       if (!spec) return reply.code(404).send({ error: "spec not found" });
       try {
+        const setting = await getSetting();
+        const agent = parsed.data.agent ?? setting.agent;
+        validatePhaseOverrides(agent, parsed.data.phaseOverrides);
+        const requestedGoal = parsed.data.flow === "goal" || parsed.data.flow === "no_effort" || (parsed.data.goal ?? setting.goal.enabled);
+        if (agent === "antigravity") await withSessionAdmission({ id: sessionIdForSpec(spec.id), force: parsed.data.force }, async () => {
+          assertAntigravityLaunch(agent, requestedGoal);
+        }, () => undefined);
         const principal = launchPrincipal(req);
         if (principal) await approveLaunch(spec.id, principal);
         const launchable = principal
@@ -216,6 +225,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
         // tak punya picker: ia mengikuti agen default global.
         const { agent, model, effort } = await sessionAgentDefaults();
+        assertAntigravityLaunch(agent);
         if (agent === "codex") ensureCodexTrust(repoDir);
         const wt = `${repoDir}/.worktrees/${id}`;
         let reused: boolean;
@@ -254,6 +264,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
         // tak punya picker: ia mengikuti agen default global.
         const { agent, model, effort } = await sessionAgentDefaults();
+        assertAntigravityLaunch(agent);
         if (agent === "codex") ensureCodexTrust(repoDir);
         const wt = `${repoDir}/.worktrees/${id}`;
         let reused: boolean;
@@ -302,6 +313,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
         // tak punya picker: ia mengikuti agen default global.
         const { agent, model, effort } = await sessionAgentDefaults();
+        assertAntigravityLaunch(agent);
         if (agent === "codex") ensureCodexTrust(repoDir);
         const wt = `${repoDir}/.worktrees/${id}`;
         let reused: boolean;
@@ -352,6 +364,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         // SPEC-252 · ADR-0061 · default global (per sesi). SPEC-338 · ADR-0074 · sesi project-level
         // tak punya picker: ia mengikuti agen default global.
         const { agent, model, effort } = await sessionAgentDefaults();
+        assertAntigravityLaunch(agent);
         if (agent === "codex") ensureCodexTrust(repoDir);
         const wt = `${repoDir}/.worktrees/${id}`;
         let reused: boolean;

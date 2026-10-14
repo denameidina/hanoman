@@ -12,7 +12,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
-import { scanGlobalSkills, scanProjectSkills } from "@hanoman/runner";
+import { agentEnvironment, scanGlobalSkills, scanProjectSkills } from "@hanoman/runner";
 
 export const INJECT_MARKER = "# hanoman:skill-inject";
 export interface InjectResult { addDir?: string; injected: string[]; warnings: string[] }
@@ -20,7 +20,7 @@ export interface InjectResult { addDir?: string; injected: string[]; warnings: s
 const excludeLine = (name: string) => `/.agents/skills/${name}`;
 
 function excludeFile(repoDir: string): string {
-  const common = execFileSync("git", ["rev-parse", "--git-common-dir"], { cwd: repoDir, encoding: "utf8" }).trim();
+  const common = execFileSync("git", ["rev-parse", "--git-common-dir"], { cwd: repoDir, env: agentEnvironment(null, process.env), encoding: "utf8" }).trim();
   return join(isAbsolute(common) ? common : join(repoDir, common), "info", "exclude");
 }
 

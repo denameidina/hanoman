@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { promisify } from "node:util";
 import { PIPELINES, WORK_PHASES, type Flow } from "@hanoman/runner";
-import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, phaseAgentName, type Stage } from "@hanoman/shared";
+import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, phaseAgentName, type Stage, type Agent } from "@hanoman/shared";
 import { STAGES } from "./stage-machine";
 
 export type PhaseState = "done" | "skipped" | "active" | "pending";
@@ -18,11 +18,11 @@ export type PhaseInvocation = {
 };
 export type PhaseRosterEntry = { name: string; phase: string; model?: string; effort?: string };
 export type PhaseAgent = {
-  name: string; model?: string; effort?: string; status?: string; startedAt?: string;
-  durationMs?: number | null; attempts: number;
+  name: string; model?: string; effort?: string | null; status?: string; startedAt?: string;
+  durationMs?: number | null; attempts: number | null;
   inputTokens?: number | null; outputTokens?: number | null; cachedTokens?: number | null;
   resultExcerpt?: string | null;
-  evidence: "ok" | "pending" | "missing";
+  evidence: "ok" | "pending" | "missing" | "unknown";
 };
 export type Phase = { name: string; state: PhaseState; agent?: PhaseAgent };
 
@@ -116,7 +116,7 @@ export async function readPhasesAsync(file: string, flow: Flow): Promise<Phase[]
 export function enrichPhases(
   phases: Phase[], roster: PhaseRosterEntry[], invocations: PhaseInvocation[],
   doneSeenAt: Map<string, number>, now: number, bornAt: number,
-  doneAtBirth: ReadonlySet<string> = new Set(),
+  doneAtBirth: ReadonlySet<string> = new Set(), runtime?: Agent,
 ): Phase[] {
   return phases.map((p) => {
     // ADR-0170 · satu fase bisa punya lebih dari satu agen di roster (reviewer Execute): chip milik
@@ -125,6 +125,11 @@ export function enrichPhases(
     const r = roster.find((entry) => entry.phase === p.name && entry.name === own)
       ?? roster.find((entry) => entry.phase === p.name);
     if (!r) return p;
+    if (runtime === "antigravity") return {
+      ...p, agent: { name: r.name, ...(r.model ? { model: r.model } : {}), effort: null,
+        attempts: null, durationMs: null, inputTokens: null, outputTokens: null, cachedTokens: null,
+        resultExcerpt: null, evidence: "unknown" },
+    };
     const all = invocations.filter((i) => i.phase === p.name && (!i.agentName || i.agentName === r.name));
     const mine = all.filter((i) => bornAt === 0 || Date.parse(i.startedAt) >= bornAt)
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt));

@@ -78,3 +78,9 @@ describe("SPEC-1108 · gerbang bersama peluncuran backlog", () => {
     expect(state.effects).toContain("spawn");
   });
 });
+
+
+it("capacity precedes unsupported Antigravity runtime without any preparation", async () => {
+  await expect(startSpecSession(spec, { flow: "qa", agent: "antigravity", goal: true })).rejects.toMatchObject({ kind: "capacity", statusCode: 409 });
+  expect(state.effects).toEqual([]);
+});

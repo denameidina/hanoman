@@ -81,7 +81,7 @@ const CRON_FIELDS = {
   name: str("Nama cron (1–120 karakter)."),
   expr: str("Cron expression 5 kolom (menit jam tanggal bulan hari-minggu), mis. `0 7 * * *`. Ekspresi tak sah ditolak 400."),
   prompt: str("Prompt awal yang dikirim ke sesi agen setiap kali cron jatuh tempo (maks 8000 karakter).", { maxLength: 8000 }),
-  agent: enumStr(["claude", "codex"], "Mesin sesi. Kosong = default global."),
+  agent: enumStr(["claude", "codex", "antigravity"], "Mesin sesi. Kosong = default global."),
   model: str("Model. Kosong = default global."),
   effort: str("Effort. Kosong = default global."),
 } as const;

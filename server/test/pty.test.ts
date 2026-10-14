@@ -15,6 +15,8 @@ import {
   MAX_SCROLLBACK, SCROLLBACK_SLACK, trimScrollback, PANE_QUIET_MS, paneQuiet, decisionOnset, markerCurrent, MARKER_STALE_SLACK_S,
   type SessionBirth, type SessionDeath,
 } from "../src/services/pty";
+vi.mock("../src/services/antigravity-trust", () => ({ ensureAntigravityTrust: vi.fn() }));
+
 import { phaseFilePath, type Phase } from "../src/services/session-phases";
 
 // createSession SELALU menambahkan --dangerously-skip-permissions, jadi binary pengganti
@@ -1194,4 +1196,30 @@ process.stdin.resume();
     expect(empty.keyPresent).toBe(false);
     expect(empty.basePresent).toBe(false);
   }, TMUX_SPAWN_TIMEOUT);
+});
+
+
+describe("Antigravity final launcher admission", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it.each([{ HANOMAN_SESSION_SANDBOX: "podman" }, { HANOMAN_HARDENING: "1", HANOMAN_SESSION_SANDBOX: "off" }])("rejects unsupported sandbox before trust, roster and birth %j", async (env) => {
+    const { ensureAntigravityTrust } = await import("../src/services/antigravity-trust");
+    vi.mocked(ensureAntigravityTrust).mockClear();
+    for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+    const onBirth = vi.fn(); const unhook = registerSessionHooks({ onBirth });
+    try {
+      expect(() => createSession("blocked", repoDir, { id: "agy-blocked", agent: "antigravity" })).toThrow(expect.objectContaining({ statusCode: 409, code: "antigravity-sandbox-unsupported" }));
+      expect(ensureAntigravityTrust).not.toHaveBeenCalled(); expect(onBirth).not.toHaveBeenCalled();
+      expect(getSession("agy-blocked")).toBeUndefined();
+    } finally { unhook(); }
+  });
+  it("rejects goal before preparation and redacts failed trust", async () => {
+    vi.stubEnv("HANOMAN_SESSION_SANDBOX", "off"); vi.stubEnv("HANOMAN_HARDENING", "0");
+    const { ensureAntigravityTrust } = await import("../src/services/antigravity-trust");
+    vi.mocked(ensureAntigravityTrust).mockClear();
+    expect(() => createSession("blocked", repoDir, { id: "agy-goal", agent: "antigravity", goal: "finish" })).toThrow(expect.objectContaining({ statusCode: 409, code: "antigravity-goal-unsupported" }));
+    expect(ensureAntigravityTrust).not.toHaveBeenCalled();
+    vi.mocked(ensureAntigravityTrust).mockImplementationOnce(() => { throw new Error("secret-home-token"); });
+    expect(() => createSession("blocked", repoDir, { id: "agy-config", agent: "antigravity" })).toThrow(expect.objectContaining({ statusCode: 500, code: "antigravity-config-failed", message: expect.not.stringContaining("secret-home-token") }));
+    expect(getSession("agy-config")).toBeUndefined();
+  });
 });

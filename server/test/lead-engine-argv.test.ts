@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
-import { chmodSync, mkdtempSync, readFileSync, existsSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,6 +46,7 @@ afterEach(() => {
   delete process.env.HANOMAN_LEAD_ARGV_FILE;
   delete process.env.HANOMAN_CLAUDE_BIN;
   delete process.env.HANOMAN_CODEX_BIN;
+  delete process.env.HANOMAN_ANTIGRAVITY_BIN;
 });
 afterAll(clean);
 
@@ -154,4 +155,21 @@ describe("SPEC-488 · setelan lead sampai ke ARGV proses lead", () => {
     expect(argv.filter((a) => a === "claude-fable-5")).toHaveLength(1);
     expect(argv.filter((a) => a === "high")).toHaveLength(1);
   });
+});
+
+
+it("Antigravity advisor executable JSON envelope is parsed into a valid lead decision", async () => {
+  const bin = join(mkdtempSync(join(tmpdir(), "lead-agy-")), "fake agy");
+  writeFileSync(bin, `#!${process.execPath}
+const fs = require('node:fs'); fs.writeFileSync(process.env.HANOMAN_LEAD_ARGV_FILE, process.argv.slice(2,-1).join('\\n'));
+process.stdin.resume(); process.stdin.on('end', () => process.stdout.write(JSON.stringify({status:'SUCCESS',response:'{"decision":"lanjut","reason":"argv terekam","confidence":"tinggi"}'})));
+`, { mode: 0o700 });
+  process.env.HANOMAN_ANTIGRAVITY_BIN = bin;
+  await putSetting({ agent: "antigravity", antigravity: { model: "gemini-3.8-flash-high", effort: "high" }, lead: leadOn() });
+  const row = await decide(ask, argvDeps);
+  expect(row?.status).toBe("berlaku");
+  const argv = recordedArgv();
+  expect(argv).toContain("-p"); expect(after(argv, "--output-format")).toBe("json");
+  expect(after(argv, "--model")).toBe("gemini-3.8-flash-high");
+  expect(after(argv, "--effort")).toBe("high");
 });

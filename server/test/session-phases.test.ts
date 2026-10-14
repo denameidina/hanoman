@@ -583,3 +583,12 @@ describe("gerbang plan · plan ber-spec-id di luar PLAN_DIRS", () => {
     expect(stageForRun(done, wt, "SPEC-1341")).toBe("executing");
   });
 });
+
+
+it("Antigravity markers retain phase completion while unavailable native telemetry stays unknown", () => {
+  const phases: Phase[] = [{ name: "Execute", state: "done" }];
+  const roster = [{ name: "hanoman-fase-execute", phase: "Execute", model: "inherit" }];
+  const [p] = enrichPhases(phases, roster, [{ phase: "Execute", runtimeInvocationId: "stale", status: "running", startedAt: "2026-10-14T00:00:00Z", durationMs: 42, inputTokens: 1, outputTokens: 2, cachedTokens: 0, resultExcerpt: "stale" }], new Map([["Execute", 1]]), 999999, 0, new Set(), "antigravity");
+  expect(p).toMatchObject({ state: "done", agent: { model: "inherit", effort: null, attempts: null, durationMs: null, inputTokens: null, outputTokens: null, cachedTokens: null, resultExcerpt: null, evidence: "unknown" } });
+  expect(p!.agent!.status).toBeUndefined(); expect(p!.agent!.startedAt).toBeUndefined();
+});

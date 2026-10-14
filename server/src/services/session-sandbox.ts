@@ -1,6 +1,21 @@
 import { resolveHardening } from "@hanoman/runner";
 
+import type { Agent } from "@hanoman/shared";
+
 type Env = Record<string, string | undefined>;
+
+export class RuntimeLaunchError extends Error {
+  constructor(readonly statusCode: 409 | 500, readonly code: "antigravity-sandbox-unsupported" | "antigravity-goal-unsupported" | "antigravity-config-failed", message: string) {
+    super(message);
+  }
+}
+
+export function assertAntigravityLaunch(agent: Agent, goal?: string | boolean, env: Env = process.env): void {
+  if (agent !== "antigravity") return;
+  if (resolveHardening(env) || (env.HANOMAN_SESSION_SANDBOX !== undefined && env.HANOMAN_SESSION_SANDBOX !== "off"))
+    throw new RuntimeLaunchError(409, "antigravity-sandbox-unsupported", "Antigravity CLI hanya tersedia pada host/lab; sandbox belum didukung.");
+  if (goal) throw new RuntimeLaunchError(409, "antigravity-goal-unsupported", "Antigravity CLI belum mendukung enforcement goal native.");
+}
 
 export function assertRuntimeBoundary(env: Env, runtime: { uid: number | undefined; host: string }): void {
   // SPEC-884 · ADR-0139 · satu-satunya perubahan pada gerbang ini: ia berhenti diturunkan dari

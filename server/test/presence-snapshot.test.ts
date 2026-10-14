@@ -53,3 +53,8 @@ describe("paneToPresence", () => {
     expect(out!.startedAt).toBe(new Date(0).toISOString());
   });
 });
+
+
+it("Antigravity runtime survives presence projection and exited takes precedence", () => {
+  expect(paneToPresence(pane({ agent: "antigravity", exited: true, decision: true }))).toMatchObject({ agent: "antigravity", status: "exited" });
+});

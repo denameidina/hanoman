@@ -103,3 +103,12 @@ unavailable Custom Agent read-only. Phase override transient menjadi nullable (n
 effort null) dan divalidasi terhadap runtime efektif sebelum worktree/backlog writes. Metadata
 child menyimpan tier dan menghilangkan effort unknown, tidak menyalin effort parent. Fallback
 materialisasi all-or-nothing tetap berlaku. Tidak ada perubahan schema DB atau route tambahan.
+
+
+Implementasi Task 8 mengunci admission runtime di final launcher dan memetakan galat 409/500
+terstruktur tanpa isi config. Hardening aktif tetap menolak Antigravity walau sandbox disetel off.
+Validasi override/runtime unsupported mendahului approval backlog, sementara capacity/reuse existing
+tetap mengikat. Frame phase native menyatakan telemetry `unknown` dengan attempts/effort/token/durasi
+null; tidak membuat invocation sintetis. JSON advisor internal memakai envelope upstream
+SUCCESS/response, tetap satu-satunya one-shot. [Receipt](../architecture/antigravity-runtime.md#launch-admission-status-dan-receipt-task-8--2026-10-14)
+membuktikan initial/follow-up 13s/11s pada pane/proses sama dan cleanup trust owned.

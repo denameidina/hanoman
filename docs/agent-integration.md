@@ -702,3 +702,15 @@ mengikuti kontrak tier yang sama. Keputusan MCP ADR-0202: tools Settings existin
 blok penuh; deskripsi `hanoman_settings_set` dan `hanoman_session_phases` menjelaskan kontrak
 native. Tidak ada endpoint baru di task ini. Terminal/events WebSocket tetap streaming exception;
 relay native `invoke_subagent`/`send_message` adalah tool runtime, bukan route REST tambahan.
+
+
+SPEC-1442 Task 8: `hanoman_session_create` menerima runtime `antigravity` dan phaseOverrides
+nullable/berbatas untuk backlog; tier child inherit|flash|pro, effort null. Launch tetap mode danger
+dengan capability `sessions:spawn`; cron existing juga menerima runtime additive. `hanoman_models`
+filter Antigravity mengembalikan model dan provider runtime itu. Sandbox/hardening menolak launch
+409 `antigravity-sandbox-unsupported`, goal native 409 `antigravity-goal-unsupported`, trust/config
+gagal 500 `antigravity-config-failed` teredaksi. Tidak ada fallback host/runtime. Override invalid
+400 `{error:string}` mengikuti runtime efektif sebelum approval. Frame fase Antigravity memberi
+`evidence:unknown` dan attempts/effort/durasi/token null; ini bukan bukti nol penggunaan atau gagal
+delegasi. Completion tetap berdasarkan marker lengkap dan checked plan. Sesi kerja tetap
+interaktif; hanya advisor internal lead memakai JSON one-shot.

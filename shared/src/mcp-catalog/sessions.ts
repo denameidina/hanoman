@@ -1,5 +1,6 @@
 // ADR-0099 · katalog tool domain `sessions`. Entri dipindahkan APA ADANYA dari berkas
 // `shared/src/mcp-catalog.ts` yang lama; perilakunya identik.
+import { PHASE_OVERRIDE_LIMITS } from "../entities";
 import { PAGE_PARAMS, bool, enumStr, int, obj, str } from "../mcp-schema";
 import { shapeSession } from "../mcp-shape";
 import { enc, localPage, n, query, s } from "./helpers";
@@ -147,7 +148,7 @@ const MORE: readonly McpToolDef[] = [
     name: "hanoman_session_create",
     title: "Buka sesi agen baru (BERBAHAYA)",
     description:
-      "BERBAHAYA — membuka sesi agen BARU: hanoman menjalankan claude/codex dengan IZIN PENUH di worktree project, dan sesi itu bisa menulis berkas, menjalankan perintah, serta membuat commit tanpa manusia di pane. Menuntut capability `sessions:spawn`; `sessions:write` — yang cukup untuk mengendalikan sesi yang SUDAH ada — tidak cukup di sini. Panggil hanoman_sessions_list lebih dulu: sesi yang sudah berjalan untuk backlog yang sama akan DILANJUTKAN, bukan digandakan. Hanya muncul saat tingkat `--danger` menyala.",
+      "BERBAHAYA — membuka sesi agen BARU: hanoman menjalankan claude/codex/antigravity dengan IZIN PENUH di worktree project, dan sesi itu bisa menulis berkas, menjalankan perintah, serta membuat commit tanpa manusia di pane. Menuntut capability `sessions:spawn`; `sessions:write` — yang cukup untuk mengendalikan sesi yang SUDAH ada — tidak cukup di sini. Panggil hanoman_sessions_list lebih dulu: sesi yang sudah berjalan untuk backlog yang sama akan DILANJUTKAN, bukan digandakan. Hanya muncul saat tingkat `--danger` menyala.",
     inputSchema: obj({
       properties: {
         spec: str("Id backlog, mis. `SPEC-482`. Mengisinya membuka sesi BACKLOG dan mewajibkan `flow`."),
@@ -155,13 +156,21 @@ const MORE: readonly McpToolDef[] = [
         flow: enumStr(["feature", "qa", "audit", "goal", "no_effort", "reverse", "prd", "breakdown", "scaffold"],
           "Alur sesi. Wajib bila `spec` diisi. `reverse`/`prd`/`breakdown`/`scaffold` adalah sesi tingkat-project dan dipasangkan dengan `project`."),
         shell: bool("true = terminal shell biasa di repo project, tanpa agen. Hanya dengan `project`."),
-        agent: enumStr(["claude", "codex"], "Mesin sesi. Kosong = default global."),
+        agent: enumStr(["claude", "codex", "antigravity"], "Mesin sesi. Kosong = default global."),
         model: str("Model. Kosong = default global."),
         effort: str("Effort. Kosong = default global."),
         goal: bool("Mode goal per-sesi. Kosong = ikut setelan global."),
         goalCondition: str("Kondisi selesai mode goal (maks 4000 karakter)."),
         verifyScope: enumStr(["changed", "full"], "Scope verifikasi. Kosong = ikut setelan global."),
         method: str("Metode workflow. Id tak dikenal jatuh ke default, bukan ditolak."),
+        phaseOverrides: { type: "object", maxProperties: PHASE_OVERRIDE_LIMITS.phases,
+          propertyNames: { type: "string", minLength: 1, maxLength: PHASE_OVERRIDE_LIMITS.phase },
+          description: "Override fase backlog. Antigravity memakai tier inherit|flash|pro, effort null; validasi mengikuti runtime efektif.",
+          additionalProperties: obj({ properties: {
+            model: { oneOf: [{ type: "string", minLength: 1, maxLength: PHASE_OVERRIDE_LIMITS.model }, { type: "null" }] },
+            effort: { oneOf: [{ type: "string", minLength: 1, maxLength: PHASE_OVERRIDE_LIMITS.effort }, { type: "null" }] },
+          } }),
+        },
         prdPath: str("flow `breakdown`: jalur PRD yang dipecah. WAJIB untuk alur itu."),
         force: bool("Lewati gerbang dependency. Pakai HANYA sesudah melihat daftar pemblokirnya."),
       },
@@ -182,6 +191,7 @@ const MORE: readonly McpToolDef[] = [
         const body: Record<string, unknown> = { spec: String(a.spec), flow: String(a.flow) };
         for (const k of ["model", "effort", "goalCondition", "agent", "verifyScope", "method"])
           if (s(a[k]) !== undefined) body[k] = s(a[k]);
+        if (a.phaseOverrides && typeof a.phaseOverrides === "object" && !Array.isArray(a.phaseOverrides)) body.phaseOverrides = a.phaseOverrides;
         for (const k of ["goal", "force"]) if (typeof a[k] === "boolean") body[k] = a[k];
         return { method: "POST", path: "/terminal/sessions", body };
       }

@@ -71,10 +71,10 @@ const OBSERVE: readonly McpToolDef[] = [
     name: "hanoman_models",
     title: "Katalog model agen",
     description:
-      "Katalog model claude & codex yang tersedia di MESIN ini: id, label, effort yang diterima, serta status probe per penyedia (`providers`: sumber `cli`/`cache`/`bundled`, kapan terakhir dicek, galatnya). Katalog dibaca dari CLI yang terpasang dan di-refresh server tiap 5 menit, jadi ini jawaban yang benar untuk \"model/effort apa yang sah dipakai hanoman_session_create atau hanoman_agent_create\" — jangan menebak id model. Hanya menampilkan data yang sudah disaring parser (detail akun CLI tak pernah tersimpan). Tak menuntut capability apa pun.",
+      "Katalog model claude, codex & antigravity yang tersedia di MESIN ini: id, label, effort yang diterima, serta status probe per penyedia (`providers`: sumber `cli`/`cache`/`bundled`, kapan terakhir dicek, galatnya). Katalog dibaca dari CLI yang terpasang dan di-refresh server tiap 5 menit, jadi ini jawaban yang benar untuk \"model/effort apa yang sah dipakai hanoman_session_create atau hanoman_agent_create\" — jangan menebak id model. Hanya menampilkan data yang sudah disaring parser (detail akun CLI tak pernah tersimpan). Tak menuntut capability apa pun.",
     inputSchema: obj({
       properties: {
-        agent: enumStr(["claude", "codex"], "Batasi ke satu mesin. Kosong = keduanya."),
+        agent: enumStr(["claude", "codex", "antigravity"], "Batasi ke satu mesin. Kosong = semua runtime."),
       },
     }),
     mode: "read", capability: null, samplePath: "/models", sampleMethod: "GET",
@@ -82,7 +82,7 @@ const OBSERVE: readonly McpToolDef[] = [
     shape: (raw, a) => {
       const agent = s(a.agent);
       const r = (raw ?? {}) as Record<string, unknown>;
-      if (agent !== "claude" && agent !== "codex") return raw;
+      if (agent !== "claude" && agent !== "codex" && agent !== "antigravity") return raw;
       const providers = (r.providers ?? {}) as Record<string, unknown>;
       return { [agent]: r[agent], providers: { [agent]: providers[agent] } };
     },

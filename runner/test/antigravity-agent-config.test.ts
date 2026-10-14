@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, symlinkSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
@@ -9,7 +9,7 @@ const def = (extra: Partial<AgentDef> = {}): AgentDef => ({name:'probe',descript
 const roots: string[] = [];
 const fixture = () => { const root = mkdtempSync(join(tmpdir(),'hnm-ag-agents-')); roots.push(root); execFileSync('git',['init','-q',root]); return root; };
 const markdown = (cwd: string) => readdirSync(join(cwd,'.agents/agents')).filter(n=>n.endsWith('.md'));
-afterEach(()=>{for(const root of roots.splice(0))rmSync(root,{recursive:true,force:true});});
+afterEach(()=>{vi.unstubAllEnvs();for(const root of roots.splice(0))rmSync(root,{recursive:true,force:true});});
 describe('native Antigravity agent rendering',()=>{
   it('uses verified frontmatter, inline child context and inherit, without unsupported fields',()=>{
     const text = renderAntigravityAgent(def({kind:'phase',context:'context nonce'}),[]);
@@ -114,4 +114,21 @@ describe('session registry ownership',()=>{
     const a=materializeAntigravityAgents({cwd:repo,sessionId:'a',defs:[def()]}),b=materializeAntigravityAgents({cwd:second,sessionId:'b',defs:[def()]});
     expect(a.names).toEqual(b.names);a.cleanup();expect(execFileSync('git',['status','--porcelain'],{cwd:second,encoding:'utf8'})).toBe('');b.cleanup();
   });
+});
+
+
+it("git metadata child excludes Antigravity credentials while preserving unrelated env", () => {
+  const cwd = fixture();
+  const realGit = execFileSync("which", ["git"], { encoding: "utf8" }).trim();
+  const fakeDir = join(cwd, "fake-bin"); mkdirSync(fakeDir);
+  const result = join(cwd, "git-env.json");
+  writeFileSync(join(fakeDir, "git"), `#!${process.execPath}
+const fs = require('node:fs'); const cp = require('node:child_process');
+fs.writeFileSync(${JSON.stringify(result)}, JSON.stringify({ keyPresent: Object.hasOwn(process.env,'GEMINI_API_KEY'), basePresent: Object.hasOwn(process.env,'GOOGLE_GEMINI_BASE_URL'), projectKept: process.env.GOOGLE_CLOUD_PROJECT === 'fixture-project' }));
+const out = cp.spawnSync(${JSON.stringify(realGit)}, process.argv.slice(2), {stdio:'inherit'}); process.exit(out.status ?? 1);
+`, { mode: 0o700 });
+  vi.stubEnv("PATH", `${fakeDir}:${process.env.PATH}`); vi.stubEnv("GEMINI_API_KEY", "fixture-key"); vi.stubEnv("GOOGLE_GEMINI_BASE_URL", "https://fixture.invalid"); vi.stubEnv("GOOGLE_CLOUD_PROJECT", "fixture-project");
+  const own = materializeAntigravityAgents({ cwd, sessionId: "env-probe", defs: [def()] });
+  expect(JSON.parse(readFileSync(result, "utf8"))).toEqual({ keyPresent: false, basePresent: false, projectKept: true });
+  own.cleanup();
 });

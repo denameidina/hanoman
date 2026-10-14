@@ -80,3 +80,25 @@ describe("cron", () => {
       expect(def.has(`hanoman_scheduler_cron_${n}`), n).toBe(false);
   });
 });
+
+
+it("Antigravity launch/cron/history enum is additive without capability downgrade", () => {
+  for (const name of ["hanoman_session_create", "hanoman_scheduler_cron_create", "hanoman_models"]) {
+    const t = tool(name);
+    expect(t.inputSchema.properties!.agent).toMatchObject({ enum: ["claude", "codex", "antigravity"] });
+  }
+  expect(tool("hanoman_session_create")).toMatchObject({ mode: "danger", capability: "sessions:spawn" });
+  expect(tool("hanoman_session_create").build({ spec: "SPEC-1442", flow: "feature", agent: "antigravity" })!.body).toMatchObject({ agent: "antigravity" });
+});
+
+
+it("Antigravity model filter returns only the selected runtime provider", () => {
+  const raw = { claude: ["c"], codex: ["x"], antigravity: ["a"], providers: { claude: "c", codex: "x", antigravity: "a" } };
+  expect(tool("hanoman_models").shape(raw, { agent: "antigravity" })).toEqual({ antigravity: ["a"], providers: { antigravity: "a" } });
+});
+it("native phase overrides are preserved by the existing launch MCP tool", () => {
+  const phaseOverrides = { Plan: { model: "inherit", effort: null } };
+  const t = tool("hanoman_session_create");
+  expect(t.inputSchema.properties!.phaseOverrides).toBeDefined();
+  expect(t.build({ spec: "SPEC-1442", flow: "feature", agent: "antigravity", phaseOverrides })!.body).toMatchObject({ phaseOverrides });
+});

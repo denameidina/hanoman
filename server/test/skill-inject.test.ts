@@ -1,5 +1,5 @@
 // server/test/skill-inject.test.ts
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, writeFileSync, chmodSync, unlinkSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -152,4 +152,20 @@ describe("antigravity", () => {
     const result = injectGlobalSkills({ agent: "antigravity", cwd: repo, tempDir: tmp, hanomanHome: home });
     expect(result.injected).toEqual([]); expect(result.warnings.join(" ")).toContain("antigravity");
   });
+});
+
+
+afterEach(() => vi.unstubAllEnvs());
+it("git skill exclude child never inherits Antigravity credentials", () => {
+  const realGit = execFileSync("which", ["git"], { encoding: "utf8" }).trim();
+  const fakeDir = join(root, "fake-bin"); mkdirSync(fakeDir);
+  const result = join(root, "git-env.json");
+  writeFileSync(join(fakeDir, "git"), `#!${process.execPath}
+const fs = require('node:fs'); const cp = require('node:child_process');
+fs.writeFileSync(${JSON.stringify(result)}, JSON.stringify({ keyPresent: Object.hasOwn(process.env,'GEMINI_API_KEY'), basePresent: Object.hasOwn(process.env,'GOOGLE_GEMINI_BASE_URL'), projectKept: process.env.GOOGLE_CLOUD_PROJECT === 'fixture-project' }));
+const out = cp.spawnSync(${JSON.stringify(realGit)}, process.argv.slice(2), {stdio:'inherit'}); process.exit(out.status ?? 1);
+`, { mode: 0o700 });
+  vi.stubEnv("PATH", `${fakeDir}:${process.env.PATH}`); vi.stubEnv("GEMINI_API_KEY", "fixture-key"); vi.stubEnv("GOOGLE_GEMINI_BASE_URL", "https://fixture.invalid"); vi.stubEnv("GOOGLE_CLOUD_PROJECT", "fixture-project");
+  expect(injectGlobalSkills({ agent: "antigravity", cwd: repo, tempDir: tmp, hanomanHome: home }).injected).toContain("g1");
+  expect(JSON.parse(readFileSync(result, "utf8"))).toEqual({ keyPresent: false, basePresent: false, projectKept: true });
 });

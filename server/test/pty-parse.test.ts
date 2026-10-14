@@ -99,3 +99,11 @@ describe("parsePanes", () => {
     expect(parsePanes(line())[0]!.doneAtBirth).toBeUndefined();
   });
 });
+
+
+describe("Antigravity restart metadata", () => {
+  it("retains Antigravity runtime and explicit parent settings after tmux rediscovery", () => {
+    const [p] = parsePanes(line({ "#{@hanoman_agent}": "antigravity", "#{@hanoman_model}": "gemini-3.8-flash-high", "#{@hanoman_effort}": "high", "#{@hanoman_event_hook}": "0" }));
+    expect(p).toMatchObject({ agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high", eventHook: false });
+  });
+});

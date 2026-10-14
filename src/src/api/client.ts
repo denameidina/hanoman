@@ -23,11 +23,11 @@ export type { PrdDoc };
 // ADR-0164 · agen fase yang mengerjakan fase ini (frame `phase` WS terminal). Absen = fase tanpa
 // orkestrasi. `evidence: "missing"` = fase tercatat selesai tanpa bukti subagent lewat tenggang relay.
 export type PhaseAgent = {
-  name: string; model?: string; effort?: string; status?: string; startedAt?: string;
-  durationMs?: number | null; attempts: number;
+  name: string; model?: string; effort?: string | null; status?: string; startedAt?: string;
+  durationMs?: number | null; attempts: number | null;
   inputTokens?: number | null; outputTokens?: number | null; cachedTokens?: number | null;
   resultExcerpt?: string | null;
-  evidence: "ok" | "pending" | "missing";
+  evidence: "ok" | "pending" | "missing" | "unknown";
 };
 export type Phase = { name: string; state: "done" | "skipped" | "active" | "pending"; agent?: PhaseAgent };
 export type TerminalSession = {

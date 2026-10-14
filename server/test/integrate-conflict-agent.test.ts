@@ -1,15 +1,18 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildApp } from "../src/app";
-import { killAll, createSession } from "../src/services/pty";
+import { killAll, createSession, getSession } from "../src/services/pty";
+import { DEFAULT_SETTING } from "../src/services/settings";
 import { resetDb, makeProject, makeSpec, makeSetting, makeRepoWithSpecBranch } from "./factory";
 
 // SPEC-377 · sesi penyelesai konflik rebase/merge harus lahir dengan AGEN + model + effort dari
 // Setting — bukan default claude. Buktinya diambil dari argv pane tmux (pola session-launch.test),
 // karena di situlah pilihan agen benar-benar mewujud: `claude --model …` vs `codex -m …`.
+vi.mock("../src/services/antigravity-trust", () => ({ ensureAntigravityTrust: vi.fn() }));
+afterEach(() => vi.unstubAllEnvs());
 const app = buildApp({ requireAuth: false });
 
 const argvOf = async (id: string): Promise<string> => {
@@ -186,4 +189,24 @@ describe("SPEC-383 · default sesi konflik yang bisa disetel sendiri", () => {
     expect(argv).toContain("--model claude-sonnet-5");
     expect(argv).not.toContain("gpt-5.6-terra");
   });
+});
+
+
+it.each(["backlog", "ide", "terminal"])("Antigravity conflict %s uses runtime defaults and conflicted worktree", async (entry) => {
+  await makeSetting({ agent: "antigravity", antigravity: { model: "gemini-3.8-flash-high", effort: "high" }, scheduler: { ...DEFAULT_SETTING.scheduler, maxConcurrent: 50 } });
+  vi.stubEnv("HANOMAN_ANTIGRAVITY_BIN", "/bin/echo");
+  const specId = `SPEC-AGY-${entry}`; const projectId = `p-agy-${entry}`; const repoDir = conflictRepo(specId);
+  await makeProject({ id: projectId, repoDir }); await makeSpec({ id: specId, projectId, stage: "done" });
+  let url = `/api/specs/${specId}/integrate`; let payload: Record<string, unknown> = { op: "merge", target: "origin:main" };
+  if (entry === "ide") { url = `/api/projects/${projectId}/git/merge`; payload = { source: `hanoman/${specId.toLowerCase()}` }; }
+  if (entry === "terminal") {
+    createSession(projectId, repoDir, { id: `existing-${entry}`, specId, branch: `hanoman/${specId.toLowerCase()}`, command: ["/bin/echo"] });
+    url = `/api/terminal/sessions/existing-${entry}/integrate`;
+  }
+  const res = await app.inject({ method: "POST", url, payload }); expect(res.statusCode).toBe(200);
+  expect(res.json().status).toBe("conflict"); const id = res.json().sessionId;
+  const argv = await argvOf(id); expect(argv).toContain("--model gemini-3.8-flash-high"); expect(argv).toContain("--prompt-interactive");
+  expect(getSession(id)).toMatchObject({ agent: "antigravity", cwd: expect.stringContaining("/.worktrees/") });
+  const { ensureAntigravityTrust } = await import("../src/services/antigravity-trust");
+  expect(ensureAntigravityTrust).toHaveBeenCalledWith(getSession(id)!.cwd);
 });
