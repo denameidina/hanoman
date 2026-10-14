@@ -542,3 +542,14 @@
   gap: var(--space-2);
   margin-bottom: var(--space-2);
 }
+
+/* Judul kelompok per project (mode "Semua project") */
+.hn-sched-table .hn-sched-group-row th {
+  text-align: left;
+  padding: var(--space-3) var(--space-3) var(--space-1);
+  background: transparent;
+}
+
+.hn-sched-group-sub {
+  margin: var(--space-3) 0 var(--space-1);
+}

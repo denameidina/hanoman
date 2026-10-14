@@ -1319,7 +1319,7 @@ menyapu sisanya. Nilai yang gagal di-parse atau salah bentuk jatuh ke default, t
 | backlog | — | `tab`, `view`, `q`, `stage`, `prio`, `dateField`, `from`, `to`, `page`, `detailId`, scroll |
 | triage | — | `tab`, `project`, `status`, `q`, `page`, `openId`, scroll |
 | team | — | `view`, `q`, `col`, `member`, `zoom` (ADR-0153), `expanded` (ADR-0154) — **tanpa `page`**: papan tim tak dipaginasi (ADR-0151) |
-| scheduler | — | `queue-<status>-page`, `cronRunsPage`, `cronProject`, `cronOpenRuns` |
+| scheduler | — | `queue-<status>-page`, `cronRunsPage`, `cronProject` (""=Semua project, default), `cronListPage`, `cronOpenRuns` |
 | lead | — | `filter`, `decPage`, `flowPage` |
 | terminal | — | `project`; mapping grid kanonik di server per user (ADR-0118) |
 | ide | project | `tab`, `viewRef`, `selected`, `selKind`, `mdView`, `stagedView`, `changedView`, `diffTab` |
