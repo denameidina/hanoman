@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { allReady, prerequisites, type ProbeFacts } from "../src/sandbox-probe";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { allReady, collectProbeFacts, prerequisites, type ProbeFacts } from "../src/sandbox-probe";
 
 const facts = (o: Partial<ProbeFacts> = {}): ProbeFacts => ({
   podman: null, rootless: false, networkExists: false, credentialDirReadable: false, ...o,
@@ -50,4 +53,14 @@ describe("prasyarat hardening (SPEC-884)", () => {
       facts({ credentialDirReadable: false }));
     expect(byId(rows, "credential-dir").ok).toBe(false);
   });
+});
+
+
+it("SPEC-1442 strips AG credentials from actual Podman prerequisite children", () => {
+  const dir = mkdtempSync(join(tmpdir(), "h1442-prereq-"));
+  try {
+    writeFileSync(join(dir, "podman"), '#!/bin/sh\n[ -z "${GEMINI_API_KEY:-}${GOOGLE_GEMINI_BASE_URL:-}" ] || exit 7\ncase "$1" in --version) echo "podman fixture" ;; info) echo true ;; network) exit 0 ;; esac\n', { mode: 0o700 });
+    const facts = collectProbeFacts({ ...process.env, PATH: dir, GEMINI_API_KEY: "fake", GOOGLE_GEMINI_BASE_URL: "fake" });
+    expect(facts).toMatchObject({ podman: "podman fixture", rootless: true, networkExists: true });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

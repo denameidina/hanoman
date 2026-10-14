@@ -4,6 +4,7 @@
 import { execFileSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { isAbsolute } from "node:path";
+import { agentEnvironment } from "./agent-env";
 import type { SetupPrerequisite } from "@hanoman/shared";
 
 type Env = Record<string, string | undefined>;
@@ -67,22 +68,22 @@ export function allReady(rows: SetupPrerequisite[]): boolean {
   return rows.every((r) => r.ok);
 }
 
-function run(file: string, args: string[]): string | null {
-  try { return execFileSync(file, args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); }
+function run(file: string, args: string[], env: Env): string | null {
+  try { return execFileSync(file, args, { encoding: "utf8", env: agentEnvironment(null, env), stdio: ["ignore", "pipe", "ignore"] }).trim(); }
   catch { return null; }
 }
 
 /** IO. Dipanggil `doctor` dan route setup; tak pernah melempar — kegagalan probe adalah data. */
 export function collectProbeFacts(env: Env): ProbeFacts {
-  const podman = run("podman", ["--version"]);
+  const podman = run("podman", ["--version"], env);
   const network = env.HANOMAN_SESSION_NETWORK ?? "hanoman-egress";
   const dir = env.HANOMAN_AGENT_CREDENTIAL_DIR;
   let credentialDirReadable = false;
   if (dir) { try { accessSync(dir, constants.R_OK); credentialDirReadable = true; } catch { /* tetap false */ } }
   return {
     podman,
-    rootless: podman ? run("podman", ["info", "--format", "{{.Host.Security.Rootless}}"]) === "true" : false,
-    networkExists: podman ? run("podman", ["network", "exists", network]) !== null : false,
+    rootless: podman ? run("podman", ["info", "--format", "{{.Host.Security.Rootless}}"], env) === "true" : false,
+    networkExists: podman ? run("podman", ["network", "exists", network], env) !== null : false,
     credentialDirReadable,
   };
 }

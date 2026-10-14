@@ -23,10 +23,10 @@ const HELP = `hanoman <command>
   doctor                                    periksa prasyarat: node, git, tmux, CLI agen, data dir
   update [--check]                          bandingkan versi dengan registry npm; pasang yang terbaru
   provision [--with=a,b] [--probe]          pasang komponen di MESIN INI (hanoman, caddy, claude,
-    [--profile=lab|production]              codex, gh, …). --probe hanya melaporkan apa yang ada.
+    [--profile=lab|production]              codex, antigravity (host/lab), gh, …). --probe hanya melaporkan apa yang ada.
     [--domain=<d>] [--dry-run] [--yes]
   mcp [--read-only] [--host <url>]          MCP server stdio untuk klien AI (Claude Code/Desktop,
-    [--max-bytes <n>]                       Codex, Cursor, Copilot). Token dari HANOMAN_AGENT_TOKEN.
+    [--max-bytes <n>]                       Codex, Antigravity, Cursor, Copilot). Token dari HANOMAN_AGENT_TOKEN.
     [--transfer-dir <d>]                    direktori tambahan untuk unggah/unduh berkas (ADR-0183)
   migrate-from-postgres --from <url>        pindahkan data Postgres lama ke SQLite
     [--to <file>] [--dry-run] [--force]

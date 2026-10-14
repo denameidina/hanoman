@@ -50,6 +50,7 @@ function coordinator(
         enabled: false,
         effective: defaults,
         claude: { model: "claude-opus-5", effort: "xhigh" },
+        antigravity: { model: "gemini-3.8-flash-high", effort: "high" },
         codex: { model: "gpt-5.6-sol", effort: "xhigh" },
       }),
       write: async () => {},

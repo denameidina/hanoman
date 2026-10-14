@@ -46,6 +46,7 @@ function coordinator(port: ReturnType<typeof fakePort>, opts: {
         enabled: opts.enabled ?? false,
         effective: defaults,
         claude: { model: "claude-opus-5", effort: "xhigh" },
+        antigravity: { model: "gemini-3.8-flash-high", effort: "high" },
         codex: { model: "gpt-5.6-sol", effort: "xhigh" },
       }),
       write: async (next) => { opts.written?.push(next); },

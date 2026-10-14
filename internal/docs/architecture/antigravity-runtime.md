@@ -1,8 +1,8 @@
 # Runtime Antigravity CLI
 
-Kontrak target SPEC-1442 / [ADR-0221](../adr/0221-antigravity-cli-runtime-interaktif-native.md).
-Dokumen ini menetapkan perilaku implementasi; status bukti live dicatat di laporan Execute,
-bukan disimpulkan dari keberadaan spec.
+Kontrak implementasi SPEC-1442 / [ADR-0221](../adr/0221-antigravity-cli-runtime-interaktif-native.md).
+Dokumen ini mencatat perilaku implementasi dan receipt terarah. Verifikasi akhir seluruh AC
+dan review Execute dicatat terpisah; receipt tidak disimpulkan dari keberadaan spec.
 
 - Runtime `antigravity`, default executable `agy`, override `HANOMAN_ANTIGRAVITY_BIN`
   efektif DB→env→default. Parent TUI interaktif `--prompt-interactive`, tmux + worktree existing;
@@ -623,3 +623,74 @@ Custom Agent availability/effort, Orchestration tiers/overflow, serta detail tel
 Browser plugin discovery kosong sehingga receipt memakai standalone Playwright + Chrome headless
 isolated profile. Semua API fixture diintercept; tidak ada Settings, token atau sesi operator yang
 berubah. Proses Vite hanya milik receipt ini ditutup melalui session/PID spesifik.
+
+
+## Distribusi, doctor dan Telegram (Task 13)
+
+`hanoman doctor` menyelesaikan biner Antigravity dari RuntimeConfig pada DB efektif, lalu
+`HANOMAN_ANTIGRAVITY_BIN`, lalu `agy`. Probe hanya `--version`, timeout 10 detik, output 16 KiB,
+semver utuh, tanpa raw diagnostic atau konfigurasi credential. Pada sandbox aktif/hardening,
+probe host Antigravity dilewati dan alasan unsupported terlihat. Host yang hanya mempunyai
+Antigravity memenuhi prasyarat CLI; ia tidak dihitung sebagai runtime sandbox production.
+Versi tersedia bukan bukti login: laporan tetap menyebut auth manual dan operator menjalankan
+TUI untuk sign-in. Tidak ada install, update, permintaan model atau perubahan Setting dari doctor.
+Metode Antigravity tetap unavailable/reason bahkan bila skill native sudah ada; status ini
+nonfatal dan tidak mengubah Start fail-open.
+
+Probe Git/tmux/Claude/Codex/gh/curl serta prerequisite Podman memakai salinan env dengan
+`GEMINI_API_KEY`/`GOOGLE_GEMINI_BASE_URL` dibuang; env pemanggil tidak diubah. Provision shell
+juga membuang kedua key sebelum menjalankan probe/installer non-inferensi. Catalog komponen
+additive `antigravity` opsional, dependency lab `base`, tidak memasukkan node atau agent-image.
+Profil production ditolak sebelum dry-run/idempotency/install dengan alasan sandbox unsupported.
+Official [installation and auth](https://antigravity.google/docs/cli/install/) diverifikasi kembali
+2026-10-14: `curl -fsSL https://antigravity.google/cli/install.sh | bash` memasang `~/.local/bin/agy`.
+Script itu hanya dijalankan ketika komponen lab dipilih dan pemasangan dikonfirmasi. Tidak
+mengarang flag installer, image Podman, auth command atau method installer. Probe component
+installed tetap `partial auth-manual <semver>`; stdout rusak/nonzero tidak diteruskan dan
+menghasilkan `partial version-unavailable auth-manual`, bukan false-ready.
+
+Installer upstream adalah per-user untuk akun yang menjalankan provision. Pada lab yang memakai
+service user Hanoman berbeda, operator memasang/login di akun service dan menyesuaikan path biner
+pada RuntimeConfig/env service; pemasangan root tidak dianggap autentikasi/availability akun service.
+Konfigurasi provider/API key/keyring tidak disalin otomatis antar akun. Tidak ada fallback host untuk
+sandbox dan tidak ada klaim production support dari keberhasilan installer.
+
+Telegram `/runtime antigravity` memakai blok parent Antigravity yang tersimpan; `/model` menggunakan
+binding katalog provider ketiga dan `/effort` hanya level model parent yang diketahui. Child tiers
+`inherit|flash|pro` tidak menjadi katalog model Telegram. Engine enabled mempertahankan runtime
+Antigravity, tanpa cabang `else` yang melabeli Claude; engine off tetap mewarisi default global.
+Ini perluasan kontrak Settings/Telegram existing, tanpa endpoint atau keputusan auth baru.
+
+Keputusan MCP final: tool versi baru read `hanoman_antigravity_version`/GLOBAL_READ; schema
+Settings/launch/Custom Agent/models existing diperluas. Methods status mempertahankan tool baca
+existing `hanoman_methods_status`/GLOBAL_READ (koreksi prosa awal ADR/Plan, bukan perubahan auth).
+Terminal/events WS tetap streaming exception dan session-events HMAC per-sesi; local MCP guide
+bukan config writer/REST installer baru. ADR-0221 dan index diperbarui bersama implementasi.
+
+
+Receipt Task 13: RED initial 14 gagal/55 lulus (doctor/runtime label/resolver, component/probe/
+installer); red env/config 8 gagal/31 lulus; actual prerequisite child env 1 gagal/6 lulus.
+GREEN pertama menyisakan fixture macOS tanpa coreutils `timeout` yang target VPS Linux miliki;
+fixture memakai stub argv Linux, tanpa melonggarkan production timeout. Review test nonzero
+valid-looking version menghasilkan RED 1 gagal/13 lulus, kemudian status pipeline diperiksa
+sebelum parser. Final scoped `170/170` test di `14` berkas lulus dengan DB temp unik dan env bersih:
+
+```bash
+env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u SSH_ASKPASS_REQUIRE -u GIT_TERMINAL_PROMPT \
+  TEST_DATABASE_URL="file:<temp-task13>/t.test.db" pnpm vitest --run \
+  cli/test/doctor.test.ts cli/test/provision.test.ts runner/test/sandbox-probe.test.ts \
+  server/test/vps-catalog-components.test.ts server/test/vps-provision-script.test.ts \
+  server/test/vps-provision.route.test.ts server/test/telegram-engine-command.test.ts \
+  server/test/telegram-engine-config.test.ts server/test/telegram-engine-session.test.ts \
+  server/test/telegram-session.test.ts server/test/telegram-engine-bootstrap.test.ts \
+  server/test/telegram-gateway.test.ts server/test/method-status.route.test.ts \
+  shared/src/method-status.test.ts --no-file-parallelism
+```
+
+Typecheck `./cli`, `./shared`, `./runner`, `./server`, `./src` masing-masing exit 0, dijalankan
+berurutan. Server dua fixture EngineContext diperluas mengikuti producer; tidak ada suppression.
+`docs index --check` → `index ok`; `git diff --check` exit 0. Original receipt/log berada di
+ignored `.superpowers/sdd/2026-10-14-spec-1442-antigravity-cli-runtime/Task13-*.log`. Tidak boot
+server, live auth, auto-install atau mengubah data operator pada task ini; curl runtime sekali
+pada Task 14. Task 0/4/5/7/8/11 sebelumnya sudah membuktikan parent/skill/native child/follow-up/
+review/MCP; scoped Task 13 tidak mengklaim pengulangan live tersebut.

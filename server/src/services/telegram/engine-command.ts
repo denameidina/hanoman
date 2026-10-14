@@ -1,5 +1,6 @@
 import {
   CODEX_MODELS, claudeEfforts, MODELS, codexEfforts, coerceCodexEffort,
+  ANTIGRAVITY_MODELS, antigravityEfforts, zAgent,
   type Agent, type AgentEngine,
 } from "@hanoman/shared";
 
@@ -14,7 +15,7 @@ import {
  * Berkas ini MURNI: nol DB, nol IO, nol Telegram. Semua keadaan masuk lewat `EngineContext`.
  */
 
-const AGENT_LABEL: Record<Agent, string> = { claude: "Claude Code", codex: "Codex CLI" };
+const AGENT_LABEL: Record<Agent, string> = { claude: "Claude Code", codex: "Codex CLI", antigravity: "Antigravity CLI" };
 
 /**
  * `kind` outbox untuk balasan yang DIKARANG server. Sengaja di luar `TELEGRAM_REPLY_KINDS`:
@@ -34,6 +35,7 @@ export type EngineContext = {
   claude: { model: string; effort: string };
   /** Blok global codex — dipakai saat `/runtime codex`. */
   codex: { model: string; effort: string };
+  antigravity: { model: string; effort: string };
 };
 
 export type EngineCommand =
@@ -47,12 +49,13 @@ const claudeModels = (): string[] =>
   [...new Set(MODELS.flatMap((m) => (m.resolved ? [m.id, m.resolved] : [m.id])))];
 const codexModels = (): string[] => CODEX_MODELS.map((m) => m.id);
 const effortsFor = (t: EngineTriple): readonly string[] =>
-  t.agent === "codex" ? codexEfforts(t.model) : claudeEfforts(t.model);
+  t.agent === "antigravity" ? antigravityEfforts(t.model)
+    : t.agent === "codex" ? codexEfforts(t.model) : claudeEfforts(t.model);
 
 const usage = [
   "Setelan runtime sesi operator Telegram:",
   "`/engine` — lihat setelan sekarang",
-  "`/runtime claude|codex` — tukar runtime",
+  "`/runtime claude|codex|antigravity` — tukar runtime",
   "`/model <id>` — tukar model",
   "`/effort <nilai>` — tukar effort",
   "`/engine off` — kembali ikut default global sesi kerja",
@@ -85,11 +88,11 @@ export function parseEngineCommand(text: string, ctx: EngineContext): EngineComm
 
   if (verb === "runtime") {
     const word = arg.toLowerCase();
-    if (word !== "claude" && word !== "codex") {
-      return { kind: "invalid", message: "Runtime hanya `claude` atau `codex`. Contoh: `/runtime codex`" };
+    if (!zAgent.options.some((agent) => agent === word)) {
+      return { kind: "invalid", message: "Runtime: `claude`, `codex`, atau `antigravity`. Contoh: `/runtime codex`" };
     }
     const agent = word as Agent;
-    const base = agent === "codex" ? ctx.codex : ctx.claude;
+    const base = ctx[agent];
     const effort = agent === "codex" ? coerceCodexEffort(base.model, base.effort) : base.effort;
     return {
       kind: "set",
@@ -100,11 +103,13 @@ export function parseEngineCommand(text: string, ctx: EngineContext): EngineComm
 
   if (verb === "model") {
     const agent = ctx.effective.agent;
-    const own = agent === "codex" ? codexModels() : claudeModels();
-    const other = agent === "codex" ? claudeModels() : codexModels();
+    const catalogs: Record<Agent, string[]> = {
+      claude: claudeModels(), codex: codexModels(), antigravity: ANTIGRAVITY_MODELS.map((model) => model.id),
+    };
+    const own = catalogs[agent];
+    const swap = zAgent.options.find((other) => other !== agent && catalogs[other].includes(arg));
     if (!own.includes(arg)) {
-      if (other.includes(arg)) {
-        const swap: Agent = agent === "codex" ? "claude" : "codex";
+      if (swap) {
         return {
           kind: "invalid",
           message: `\`${arg}\` adalah model ${AGENT_LABEL[swap]}, sedangkan runtime aktif `
@@ -113,7 +118,10 @@ export function parseEngineCommand(text: string, ctx: EngineContext): EngineComm
       }
       return { kind: "invalid", message: `Model ${AGENT_LABEL[agent]} yang sah: ${own.join(", ")}.` };
     }
-    const effort = agent === "codex" ? coerceCodexEffort(arg, ctx.effective.effort) : ctx.effective.effort;
+    const effort = agent === "codex" ? coerceCodexEffort(arg, ctx.effective.effort)
+      : agent === "antigravity" ? (antigravityEfforts(arg).includes(ctx.effective.effort)
+        ? ctx.effective.effort : antigravityEfforts(arg)[0] ?? ctx.effective.effort)
+      : ctx.effective.effort;
     return {
       kind: "set",
       engine: { enabled: true, agent, model: arg, effort },

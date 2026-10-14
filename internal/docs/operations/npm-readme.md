@@ -30,10 +30,13 @@ sebagai root. Nyalakan hardening dari wizard (atau Settings → Setup awal) begi
 |---|---|
 | `git` | tiap sesi jalan di git worktree terisolasi |
 | `tmux` | sesi agen hidup di tmux, selamat dari restart server |
-| `claude` **atau** `codex` | agen yang mengerjakan backlog |
+| `claude`, `codex` **atau** `agy` (Antigravity) | agen yang mengerjakan backlog; Antigravity host/lab saja, sandbox belum didukung |
 | `curl` | hook sesi mengirim pertanyaan agen ke server — tanpanya **hanoman-lead tak menerima satu pun pertanyaan** (SPEC-909/ADR-0146). Tidak fatal: hook selalu `exit 0` dan tak pernah memblokir agen, jadi sesi cuma kembali menunggu manusia — dan justru karena senyap, `doctor` menandainya `!` alih-alih `✗` |
 
 `hanoman doctor` melaporkan mana yang belum ada, dan keluar dengan kode ≠ 0 bila ada yang wajib.
+Antigravity-only cukup untuk host/lab. Biner mengikuti RuntimeConfig DB→`HANOMAN_ANTIGRAVITY_BIN`→`agy`;
+versi bukan bukti login, auth dilakukan manual dengan TUI. Sandbox/hardening tidak mem-probe host
+Antigravity atau melakukan fallback. [Batas runtime/distribusi](../architecture/antigravity-runtime.md#distribusi-doctor-dan-telegram-task-13).
 
 ## Perintah
 
@@ -42,7 +45,7 @@ hanoman [start]                    jalankan (migrasi + server + dashboard)
   --port <n> --host <h> --db <file> --no-migrate
 hanoman doctor                     periksa prasyarat
 hanoman update [--check]           pasang versi terbaru dari npm
-hanoman provision [--with=a,b]     pasang komponen di MESIN INI (hanoman, caddy, claude, codex, gh)
+hanoman provision [--with=a,b]     pasang komponen di MESIN INI (hanoman, caddy, claude, codex, antigravity host/lab, gh)
   [--profile=lab|production] [--domain=<d>] [--probe] [--dry-run] [--yes]
 hanoman migrate-from-postgres --from <url> [--to <file>] [--dry-run] [--force]
 hanoman mcp [--read-only]          MCP server stdio untuk klien AI

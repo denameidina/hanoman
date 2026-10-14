@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DEFAULT_METHOD, METHODS, methodSkills, methodStatus } from "@hanoman/shared";
-import { doctorReport, resolveDoctorCodexBin } from "../src/commands/doctor";
+import { doctorReport, resolveDoctorCodexBin, resolveDoctorAntigravityBin, probeDoctorVersion } from "../src/commands/doctor";
 
 const ok = {
   node: "v22.0.0", git: "git version 2.44.0", tmux: "tmux 3.4",
@@ -165,5 +168,57 @@ describe("doctorReport · metode default (SPEC-739)", () => {
   it("tanpa metode yang dilaporkan, laporan lama tak berubah", () => {
     expect(doctorReport(ok).lines.join("\n")).not.toContain("metode ");
     expect(doctorReport(ok).ok).toBe(true);
+  });
+});
+
+
+describe("SPEC-1442 · doctor Antigravity", () => {
+  it("counts an AG-only host as ready and labels authentication manual", () => {
+    const r = doctorReport({ ...ok, claude: null, codex: null, antigravity: "1.3.4" });
+    expect(r.ok).toBe(true);
+    expect(r.lines.join("\n")).toMatch(/Antigravity CLI.*1\.3\.4.*manual/i);
+  });
+  it("never treats AG as a production sandbox runtime", () => {
+    const r = doctorReport({ ...ok, claude: null, codex: null, antigravity: "1.3.4", sandboxRequired: true, sandboxReady: true });
+    expect(r.ok).toBe(false);
+    expect(r.lines.join("\n")).toMatch(/Antigravity.*sandbox.*belum didukung/i);
+  });
+  it("missing optional AG does not fail a working Claude host", () => {
+    const r = doctorReport({ ...ok, antigravity: null });
+    expect(r.ok).toBe(true);
+    expect(r.lines.join("\n")).toContain("Antigravity CLI — tak ada");
+  });
+  it("method unavailability remains explicit even when native skills exist", () => {
+    const m = METHODS[DEFAULT_METHOD]!;
+    const st = methodStatus(m, "antigravity", { skills: methodSkills(m), packages: [...m.requires] });
+    const r = doctorReport({ ...ok, antigravity: "1.3.4", methods: [st] });
+    expect(r.lines.join("\n")).toContain(st.availabilityReason!);
+    expect(r.lines.join("\n")).toContain("Antigravity CLI");
+    expect(r.lines.join("\n")).not.toContain("— siap");
+  });
+  it("resolves DB before environment and falls back safely", async () => {
+    const reads: string[] = [];
+    expect(await resolveDoctorAntigravityBin({ HANOMAN_ANTIGRAVITY_BIN: "/env/agy" }, "file:/state/db", async (_, key) => { reads.push(key); return "/db/agy"; })).toBe("/db/agy");
+    expect(reads).toEqual(["HANOMAN_ANTIGRAVITY_BIN"]);
+    expect(await resolveDoctorAntigravityBin({ HANOMAN_ANTIGRAVITY_BIN: "/env/agy" }, "file:/state/db", async () => { throw new Error("unavailable"); })).toBe("/env/agy");
+    expect(await resolveDoctorAntigravityBin({}, "file:/state/db", async () => null)).toBe("agy");
+  });
+});
+
+
+describe("SPEC-1442 · real doctor child environment", () => {
+  it("strips AG provider secrets from unrelated probes and bounds safe AG output", () => {
+    const dir = mkdtempSync(join(tmpdir(), "h1442-doctor-"));
+    const bin = join(dir, "cli with spaces");
+    try {
+      writeFileSync(bin, '#!/bin/sh\nif [ -n "${GEMINI_API_KEY:-}${GOOGLE_GEMINI_BASE_URL:-}" ]; then echo "credential_SENTINEL"; else echo "1.3.4"; fi\n', { mode: 0o700 });
+      const env = { ...process.env, GEMINI_API_KEY: "fake", GOOGLE_GEMINI_BASE_URL: "fake" };
+      expect(probeDoctorVersion(bin, ["--version"], env)).toBe("1.3.4");
+      expect(probeDoctorVersion(bin, ["--version"], env, "antigravity")).toBeNull();
+      writeFileSync(bin, '#!/bin/sh\nprintf "1.3.4\\n"\n', { mode: 0o700 });
+      expect(probeDoctorVersion(bin, ["--version"], env, "antigravity")).toBe("1.3.4");
+      expect(probeDoctorVersion(bin, ["--version"], { ...env, HANOMAN_HARDENING: "1" }, "antigravity")).toBeNull();
+      expect(probeDoctorVersion(join(dir, "missing"), ["--version"], env, "antigravity")).toBeNull();
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

@@ -79,12 +79,14 @@ describe("SPEC-492 · konteks command runtime", () => {
     await setting({
       agent: "claude", model: "claude-sonnet-5", effort: "high",
       codex: { model: "gpt-5.5", effort: "medium" },
+      antigravity: { model: "gemini-3.8-flash-high", effort: "high" },
     });
     expect(await telegramEngineContext()).toEqual({
       enabled: false,
       effective: { agent: "claude", model: "claude-sonnet-5", effort: "high" },
       claude: { model: "claude-sonnet-5", effort: "high" },
       codex: { model: "gpt-5.5", effort: "medium" },
+      antigravity: { model: "gemini-3.8-flash-high", effort: "high" },
     });
   });
 
@@ -95,5 +97,15 @@ describe("SPEC-492 · konteks command runtime", () => {
     const ctx = await telegramEngineContext();
     expect(ctx.enabled).toBe(true);
     expect(ctx.effective).toEqual({ agent: "codex", model: "gpt-5.6-luna", effort: "max" });
+  });
+});
+
+
+describe("SPEC-1442 · Telegram AG effective engine", () => {
+  beforeEach(async () => { await resetDb(); });
+  it("enabled AG engine retains its own runtime and parent values", async () => {
+    await setting({ telegram: { enabled: true, progress: true, engine: { enabled: true, agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high" } } });
+    expect(await telegramAgentDefaults()).toEqual({ agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high" });
+    expect((await telegramEngineContext()).antigravity).toEqual({ model: "gemini-3.8-flash-high", effort: "high" });
   });
 });

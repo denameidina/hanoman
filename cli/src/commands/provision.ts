@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { agentEnvironment } from "@hanoman/runner";
 import type { Ctx } from "../router";
 
 const PROFILES = ["lab", "production"];
@@ -50,7 +51,7 @@ export function localScriptPath(cwd: string = process.cwd()): string {
 
 function runScript(env: Record<string, string>, ctx: Ctx): Promise<number> {
   return new Promise((resolve) => {
-    const p = spawn("bash", [localScriptPath(ctx.cwd)], { env: { ...process.env, ...env } });
+    const p = spawn("bash", [localScriptPath(ctx.cwd)], { env: { ...agentEnvironment(null, ctx.env), ...env } });
     p.stdout.on("data", (d) => ctx.stdout(String(d)));
     p.stderr.on("data", (d) => ctx.stderr(String(d)));
     p.on("close", (code) => resolve(code ?? 1));

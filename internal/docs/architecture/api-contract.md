@@ -694,7 +694,7 @@ GET/PUT  /settings                      # Setting blob (zSetting): model, effort
 #                                         goal { enabled:false, condition:"" } (SPEC-332/ADR-0073) — default global mode goal
 #                                           sesi backlog; condition kosong = pakai default DoD bawaan. Blok selalu ADA di response
 #                                           (zod .default()), jadi baris Setting lama tetap parse tanpa migration.
-#                                         agent: "claude"|"codex" (default "claude") + codex { model:"gpt-5.6-terra",
+#                                         agent: "claude"|"codex"|"antigravity" (default "claude") + codex { model:"gpt-5.6-terra",
 #                                           effort:"medium" } (SPEC-338/ADR-0074) — mesin sesi default + katalog
 #                                           model/effort codex. model/effort di akar TETAP milik claude.
 #                                         conflict { enabled:false, agent:"claude", model:"claude-opus-5",
@@ -1022,7 +1022,7 @@ POST   /ws-tickets { target:"events"|"terminal:<sessionId>" } -> { ticket }
 #   one-use, 30 detik, bounded 2048. Browser mengirimnya sebagai subprotocol, bukan URL.
 GET    /terminal/sessions            # [{ id, projectId, specId?, flow?, cwd, branch?, exited, exitCode?, decision, agent, model?, effort?, orchestrated? }]
 #   branch? (SPEC-230): branch integrasi sesi project-level (PRD = prd/<slug>) — menyalakan review+merge di sel
-#   agent (SPEC-338/ADR-0074): "claude" | "codex" — mesin sesi, dibaca dari opsi tmux @hanoman_agent.
+#   agent (SPEC-338/ADR-0074): "claude" | "codex" | "antigravity" — mesin sesi, dibaca dari opsi tmux @hanoman_agent.
 #     Sesi yang lahir sebelum ADR-0074 (tanpa opsi itu) dilaporkan sebagai "claude".
 #   decision (SPEC-196 · SPEC-903/ADR-0143): KEADAAN TURUNAN, bukan isi marker apa adanya —
 #     marker .worktrees/.decisions/<id> terisi DAN pane tak mengeluarkan apa pun selama >= 3 dtk
@@ -1056,11 +1056,11 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #   {project, agent?, model?, effort?} (SPEC-517): TERMINAL AGEN BIASA dengan runtime PER SESI —
 #     form "Sesi baru" di halaman Terminal. Kosong → default global (Setting), jadi body {project}
 #     polos berperilaku persis seperti sebelum SPEC-517. `agent` memilih BLOK Setting yang dibaca
-#     (claude → model/effort, codex → codex.model/codex.effort), bukan sekadar menukar biner —
+#     (claude → model/effort, codex → codex.model/codex.effort, antigravity → antigravity.model/effort), bukan sekadar menukar biner —
 #     membaca blok yang salah melahirkan `codex -m claude-opus-5` (SPEC-377). Effort codex dikoersi
 #     ke katalog modelnya (SPEC-339, `terminalAgentDefaults` di services/settings.ts), dan
 #     `ensureCodexTrust` diturunkan dari agen HASIL resolusi — bukan Setting.agent, karena di jalur
-#     ini keduanya kini bisa berbeda. agent di luar claude|codex → 400.
+#     ini keduanya kini bisa berbeda. agent di luar claude|codex|antigravity → 400.
 #     Varian ini dijaga `flow: z.undefined()` di zod: ia permisif dan duduk SESUDAH semua varian
 #     ber-flow, jadi tanpa gerbang itu body flow yang CACAT (mis. {project, flow:"prd"} tanpa
 #     brief) akan lolos ke sini dan membuka terminal biasa secara SENYAP alih-alih dijawab 400.
@@ -1111,9 +1111,10 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #       tempat worktree lahir, wajib karena worktree `--detach` tak punya `main`) dan
 #       HANOMAN_VERIFY_SCOPE. BUKAN gerbang: tak ada hook yang menolak perintah (ADR-0037 utuh).
 #       Nilai di luar "changed"|"full" → 400 (ditolak zod SEBELUM lookup spec).
-#     agent?: "claude"|"codex" — override PER SESI; kosong → Setting.agent. Agen menentukan katalog
+#     agent?: "claude"|"codex"|"antigravity" — override PER SESI; kosong → Setting.agent. Agen menentukan katalog
 #       model/effort default (claude → Setting.model/effort, codex → Setting.codex.model/effort) dan
-#       bentuk argv: claude `--model/--effort/--settings`, codex `-m / -c model_reasoning_effort / -c hooks.*`.
+#       bentuk argv: claude `--model/--effort/--settings`, codex `-m / -c model_reasoning_effort / -c hooks.*`;
+#       antigravity `--model/--effort/--prompt-interactive` memakai blok Setting.antigravity, host/lab saja.
 #       Sesi project-level (reverse/prd/scaffold/breakdown) & sesi konflik TAK punya override — ikut
 #       Setting.agent (konflik: blok Setting.conflict bila dinyalakan, ADR-0081). Terminal agen biasa
 #       DIKECUALIKAN sejak SPEC-517: ia punya form pemilih runtime sendiri (lihat varian di atas).
@@ -1272,7 +1273,7 @@ GET    /terminal/cleanups            # { items: [{ sessionId, projectId, entry, 
 GET    /terminal/sessions/:id/ws     # WebSocket; close 4004 bila sesi tak ada
 #   ADR-0164 · frame {t:"phase", phases, complete}: tiap fase MAY membawa `agent` =
 #   { name, model?, effort?, status?, startedAt?, durationMs?, attempts, inputTokens?, outputTokens?,
-#     cachedTokens?, resultExcerpt?, evidence: "ok"|"pending"|"missing" } untuk sesi orchestrator.
+#     cachedTokens?, resultExcerpt?, evidence: "ok"|"pending"|"missing"|"unknown" } untuk sesi orchestrator.
 #   Frame disiarkan ulang tiap SubagentStart/Stop agen fase dan sesudah hidrasi saat attach.
 #   Review whole-branch (I-1/M-2) · seluruh field agen (kecuali `evidence` untuk fase yang sudah
 #   done/skipped SAAT SESI LAHIR) dihitung dari invocation SEJAK SESI LAHIR — baris `running`/lama
@@ -2213,8 +2214,8 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 #                   MESIN INI (stempel hidup di Setting.data, lokal, tak disync). Sidik jari yang
 #                   tak tercatat dibaca sebagai "disunting" — menandai berlebih lebih baik daripada
 #                   menjanjikan "asli bawaan" untuk isi yang tak bisa dibuktikan.
-GET    /api/custom-agents[?runtime=claude|codex] -> CustomAgentView[] # agen GLOBAL saja
-GET    /api/custom-agents?projectId=<id>[&runtime=claude|codex] -> CustomAgentView[] # himpunan EFEKTIF,
+GET    /api/custom-agents[?runtime=claude|codex|antigravity] -> CustomAgentView[] # agen GLOBAL saja
+GET    /api/custom-agents?projectId=<id>[&runtime=claude|codex|antigravity] -> CustomAgentView[] # himpunan EFEKTIF,
 #                                            baris global bertanda `inherited: true`; nama yang ditimpa
 #                                            project muncul SEKALI (versi project yang menang)
 #      runtime opsional menurunkan `available`/`availabilityReason`; tidak menyaring baris supaya
@@ -2261,7 +2262,7 @@ PATCH  /api/custom-agents/invocations/:id { disposition, note?, reworkRequired? 
 > **`name` immutable** — baris ini menyeberang changefeed yang tak punya operasi hapus; rename yang
 > mengubah id akan meninggalkan baris yatim di setiap mesin lain (ADR-0094).
 >
-> **Materialisasinya native di kedua runtime, dan tak menulis satu berkas pun ke worktree.** Sesi **claude**
+> **Materialisasi Claude/Codex native memakai berkas temp di luar worktree.** Sesi **claude**
 > lahir dengan `--agents "$(cat <file>)"` (mekanisme native; JSON di berkas tmpdir seperti prompt
 > SPEC-223, karena tmux membatasi SATU command ±16 KB). Sesi **codex** menerima
 > `agents.enabled=true` + satu `agents."name".config_file` TOML temp per child. Prompt parent kedua
@@ -2273,7 +2274,9 @@ PATCH  /api/custom-agents/invocations/:id { disposition, note?, reworkRequired? 
 > tidak memasang registry, dan tidak menghidupkan kembali roster inline. Probe mengikuti konteks
 > eksekusi sesi (host atau image Podman), berjalan sesudah config DB dimuat, refresh langsung saat
 > `HANOMAN_CODEX_BIN` berubah, dan refresh berkala lima menit untuk upgrade in-place.
-> Keduanya dirakit di titik cekik `createSession` lewat `registerCustomAgentSource`, jadi tak ada
+> Antigravity memakai registry `.agents/agents` worktree yang excluded Git dan hash/inode-owned;
+> discovery/invoke/follow-up native terverifikasi, dengan cleanup preserving operator (ADR-0221).
+> Ketiganya dirakit di titik cekik `createSession` lewat `registerCustomAgentSource`, jadi tak ada
 > route yang perlu diubah dan tak ada yang bisa lupa memasangnya.
 >
 > **Execution profile (SPEC-950):** `activation` = `always|smart`; `workspacePolicy` =
@@ -2353,7 +2356,7 @@ konfirmasi, yang juga dicegat sebelum `dispatch`.
 | `/engine` | Tampilkan sumber nilai, runtime · model · effort, dan keadaan sesi operator |
 | `/engine off` | `enabled:false` → kembali mewarisi default global sesi kerja |
 | `/engine restart` | Tutup sesi operator; pesan berikutnya lahir dengan setelan baru |
-| `/runtime claude\|codex` | Tukar runtime — model & effort ikut ke default agen itu |
+| `/runtime claude\|codex\|antigravity` | Tukar runtime — model & effort ikut ke default agen itu |
 | `/model <id>` | Tukar model (divalidasi katalog agen aktif; effort dikoersi bila codex) |
 | `/effort <nilai>` | Tukar effort (divalidasi `codexEfforts(model)` / `EFFORTS`) |
 
@@ -2477,7 +2480,7 @@ Kontrak generik entitas sync opsional tetap tersedia: `entities=` pada pull/boot
 `bootstrap?only=…` untuk catch-up, iklan `entities`, dan toleransi entitas tak dikenal.
 Saat ini tidak ada entitas memori yang diregistrasikan atau disinkron.
 
-## Kontrak tambahan SPEC-1442 — Antigravity (target implementasi)
+## Kontrak tambahan SPEC-1442 — Antigravity
 
 Rujukan: [ADR-0221](../adr/0221-antigravity-cli-runtime-interaktif-native.md) ·
 [runtime](antigravity-runtime.md) ·
@@ -2527,8 +2530,8 @@ shape validation existing; 401/403/principal/approval/capacity existing tetap me
 
 Keputusan MCP: schema tool Settings/launch/lead/Custom Agent/models existing additive;
 Terminal/events WebSocket tetap dikecualikan sebagai streaming, session-events sebagai HMAC sesi.
-Tidak menambah endpoint tulis config lokal Antigravity. Implementasi harus memperbarui
-UNWRAPPED/COOKIE_ONLY beralasan bila kontrak pengecualian tersentuh (ADR-0202).
+Tidak menambah endpoint tulis config lokal Antigravity. Keputusan pengecualian streaming/HMAC
+existing tetap tercatat pada UNWRAPPED/COOKIE_ONLY (ADR-0202), tanpa auth baru.
 
 
 SPEC-1442 Task 7: phase override transient Antigravity menggunakan model tier
@@ -2553,3 +2556,11 @@ session-create/cron/models diperluas additive; session-create menerima record ph
 nullable dengan batas shared yang sama, mode danger/capability sessions:spawn tetap. Model filter
 Antigravity membatasi response ke model/provider runtime itu. Terminal/events WS serta HMAC
 session-events mempertahankan keputusan pengecualian ADR-0202, tanpa endpoint baru.
+
+
+SPEC-1442 Task 13 memperluas enum komponen VPS existing dengan `antigravity` opsional profil lab.
+Dependency `base`; production preview/apply menolak dengan alasan sandbox unsupported. Catalog/probe/
+provision memakai route dan tool VPS existing, tanpa endpoint/config installer baru. Binary probe
+hanya version bounded, status installed `partial auth-manual`, tidak mengklaim login. Telegram
+`/runtime antigravity` membaca blok Setting ketiga, model/effort memakai katalog parent. Semua
+perubahan ini memakai auth/capability tool Settings/Telegram/VPS existing.

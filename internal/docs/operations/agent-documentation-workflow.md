@@ -32,7 +32,7 @@ hook stop`), gate Execute (`hanoman docs verify`), dan switch dashboard "Source 
 dicabut. `hanoman docs scan` tetap ada sebagai laporan coverage read-only (tak memblokir apa pun).
 
 ## Eksekusi (sesi interaktif)
-Eksekusi adalah **sesi `claude` interaktif di tmux** (`server/src/services/pty.ts`), bukan runner
+Eksekusi adalah **sesi runtime terpilih (`claude`, `codex`, atau `antigravity`) interaktif di tmux** (`server/src/services/pty.ts`), bukan runner
 headless — Agent SDK dicabut (ADR-0010), spawn headless per-run dicabut (ADR-0024). Satu backlog =
 **satu sesi** di `<repoDir>/.worktrees/<spec-id>` (ADR-0015), dengan fase sebagai giliran di dalam sesi
 itu (`echo "<Fase> done" >> $HANOMAN_PHASE_FILE`). Fase Execute tidak lagi lewat gate docs — dicabut
@@ -83,7 +83,7 @@ expected finding harus cocok (`recall=1`) dan forbidden hit harus nol. Exit live
 runtime gagal, expected hilang, atau forbidden muncul. Jangan memasukkan `agent:eval` ke install,
 boot, build, test rutin, atau CI.
 
-## Amandemen target SPEC-1442 — runtime Antigravity
+## Amandemen SPEC-1442 — runtime Antigravity
 
 [ADR-0221](../adr/0221-antigravity-cli-runtime-interaktif-native.md) menetapkan parent TUI dan child
 persistent native `invoke_subagent`, tanpa bridge/one-shot sesi kerja; lead brain internal existing
@@ -99,7 +99,8 @@ Operator tetap dapat menjawab langsung di Terminal; payload token/model child un
 Sandbox dan goal gate native ditolak eksplisit, tanpa hardening downgrade. Kontrak/bukti wajib:
 [runtime Antigravity](../architecture/antigravity-runtime.md) dan
 [18 AC EARS SPEC-1442](../../../docs/superpowers/specs/2026-10-14-spec-1442-antigravity-cli-design.md).
-Dokumen ini menetapkan target, bukan menyatakan adapter telah dirilis.
+Receipt native/helper produk dan batas yang belum didukung tercatat di runtime; review akhir
+Execute tetap diperlukan sebelum penutupan fase.
 
 
 Task 7 mengimplementasikan prompt per-runtime di kontrak tersebut: Antigravity menggunakan
@@ -117,7 +118,7 @@ Claude/Codex tetap byte-identik, dikunci dua hash parent dan dua hash definisi f
 Task 8 memastikan launch backlog/Terminal/project-level/konflik mewarisi runtime Antigravity dari
 Settings dengan parent defaults bloknya sendiri dan trust actual cwd final. Unsupported boundary
 atau native goal ditolak sebelum persiapan/approval, tanpa downgrade ke host atau runtime lain.
-Pekerjaan parent/child tetap TUI; pengecualian `-p --output-format json` hanya advisor internal lead.
+Pekerjaan parent/child tetap TUI; pengecualian one-shot `-p` dengan envelope JSON native hanya advisor internal lead.
 Telemetry phase native belum terhubung: attempts/effort/durasi/token unknown/null tidak boleh dibaca
 sebagai nol penggunaan atau kegagalan delegasi. Marker serta checked plan tetap bukti completion,
 bukan telemetry invocation. [Receipt final launcher Task 8](../architecture/antigravity-runtime.md#launch-admission-status-dan-receipt-task-8--2026-10-14).

@@ -1,7 +1,7 @@
 // SPEC-883 · provision.sh dijalankan SUNGGUHAN di mesin test dengan PATH fixture, jadi ia tak
 // pernah menyentuh mesin nyata. Ini satu-satunya lapis yang menguji skripnya sendiri; test route
 // memakai fake-ssh dan karena itu tak pernah melihat isi skrip.
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -30,7 +30,11 @@ beforeAll(() => {
   // podman) tak terlihat skrip kecuali kita men-stub-nya. `command -v` adalah builtin shell —
   // ia TIDAK bisa di-stub lewat PATH, jadi jangan mencoba.
   binDir = mkdtempSync(join(tmpdir(), "hanoman-provision-bin-"));
+  // Linux coreutils tersedia pada target VPS; fixture macOS meniru argv timeout tanpa jaringan.
+  stub("timeout", 'shift 3; exec "$@"');
 });
+
+afterAll(() => rmSync(binDir, { recursive: true, force: true }));
 
 describe("SPEC-883 · provision.sh MODE=probe", () => {
   it("melaporkan satu baris per komponen", () => {
@@ -116,4 +120,40 @@ describe("SPEC-883 · provision.sh MODE=apply", () => {
     const out = run({ MODE: "apply", ITEMS: "caddy", PROFILE: "lab" });
     expect(steps(out)[0]).toMatchObject({ item: "caddy", status: "fail" });
   });
+});
+
+
+describe("SPEC-1442 · provisioning Antigravity", () => {
+  it("reports installed agy version without claiming authentication", () => {
+    stub("agy", 'echo "1.3.4"');
+    expect(run({ MODE: "probe" })).toContain("COMP antigravity partial auth-manual 1.3.4");
+  });
+  it("missing agy remains optional and malformed output stays redacted", () => {
+    unstub("agy");
+    expect(run({ MODE: "probe" })).toContain("COMP antigravity absent");
+    stub("agy", 'echo "credential_SENTINEL 1.3.4"');
+    const out = run({ MODE: "probe" });
+    expect(out).toContain("COMP antigravity partial version-unavailable auth-manual");
+    expect(out).not.toContain("credential_SENTINEL");
+    unstub("agy");
+  });
+  it("production refuses AG before dry run or any installer", () => {
+    expect(run({ MODE: "apply", ITEMS: "antigravity", PROFILE: "production", DRY_RUN: "1" })).toContain("STEP antigravity fail sandbox-unsupported");
+  });
+  it("uses only the official installer for an explicitly selected lab component", () => {
+    unstub("agy");
+    const log = join(binDir, "agy-installer.log");
+    stub("curl", `printf '%s\\n' "$*" >> "${log}"; printf 'exit 0\\n'`);
+    const out = run({ MODE: "apply", ITEMS: "antigravity", PROFILE: "lab" });
+    expect(out).toContain("STEP antigravity ok");
+    expect(execFileSync("cat", [log], { encoding: "utf8" })).toContain("https://antigravity.google/cli/install.sh");
+  });
+});
+
+
+it("SPEC-1442 rejects failed version processes and isolates provider env from shell probes", () => {
+  stub("agy", 'echo "1.3.4"; exit 7');
+  expect(run({ MODE: "probe" })).toContain("COMP antigravity partial version-unavailable auth-manual");
+  stub("agy", '[ -z "${GEMINI_API_KEY:-}${GOOGLE_GEMINI_BASE_URL:-}" ] || exit 7; echo "1.3.4"');
+  expect(run({ MODE: "probe", GEMINI_API_KEY: "fake", GOOGLE_GEMINI_BASE_URL: "fake" })).toContain("COMP antigravity partial auth-manual 1.3.4");
 });

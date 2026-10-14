@@ -58,3 +58,14 @@ describe("SPEC-883 · katalog komponen", () => {
     expect(r.ok && r.items).toEqual(["base", "node", "hanoman"]);
   });
 });
+
+
+describe("SPEC-1442 · optional host Antigravity component", () => {
+  it("lab uses base tools without claiming a sandbox image", () => {
+    expect(componentById("antigravity")).toMatchObject({ interactiveLogin: true, profiles: ["lab"] });
+    expect(resolveComponents(["antigravity"], "lab")).toEqual({ ok: true, items: ["base", "antigravity"] });
+  });
+  it("production rejects Antigravity explicitly", () => {
+    expect(resolveComponents(["antigravity"], "production")).toMatchObject({ ok: false, error: expect.stringMatching(/sandbox.*belum didukung/) });
+  });
+});

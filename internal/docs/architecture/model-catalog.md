@@ -130,3 +130,9 @@ Probe lokal 2026-09-05 mengembalikan Fable 5.1 dan Astra beserta effort-nya.
 Kontrak metadata Claude terdokumentasi pada
 [referensi supportedModels](https://code.claude.com/docs/en/agent-sdk/typescript);
 Hanoman menggunakan protokol CLI secara langsung, tanpa menambahkan SDK eksekusi.
+
+
+Task 13 menyelaraskan `/runtime antigravity`, `/model` dan `/effort` Telegram dengan binding
+parent Antigravity yang sama. Katalog tier child tidak diterima oleh `/model`; model milik
+provider lain menjelaskan `/runtime <provider>` yang tepat. Model parent known hanya menawarkan
+effort verified; nilai stored unknown tidak diganti diam-diam ketika runtime dipilih.

@@ -11,6 +11,7 @@
 # NOL asumsi tentang SSH: skrip ini dijalankan lewat `ssh … bash -s` DAN secara lokal oleh
 # `hanoman provision`. Jangan pernah membaca $SSH_*, /dev/tty, atau berasumsi ada tty.
 # NOL rahasia: tak pernah membaca, menulis, atau meminta kredensial agen.
+unset GEMINI_API_KEY GOOGLE_GEMINI_BASE_URL
 set -uo pipefail   # sengaja TANPA -e: satu komponen gagal tak boleh membunuh laporan sisanya
 
 MODE="${MODE:-probe}"
@@ -59,9 +60,21 @@ probe_agent_cli() {
   else comp "$id" absent ""; fi
 }
 
+probe_antigravity() {
+  if [ "$PROFILE" = production ]; then comp antigravity absent sandbox-unsupported; return; fi
+  local bin="${HANOMAN_ANTIGRAVITY_BIN:-agy}" v
+  if ! have "$bin"; then comp antigravity absent ""; return; fi
+  if ! v="$(timeout -s KILL 10 "$bin" --version 2>/dev/null | head -c 16385)"; then
+    comp antigravity partial "version-unavailable auth-manual"; return
+  fi
+  if [ "${#v}" -le 16384 ] && [[ "$v" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+    comp antigravity partial "auth-manual $v"
+  else comp antigravity partial "version-unavailable auth-manual"; fi
+}
+
 do_probe() {
   probe_base; probe_node; probe_hanoman; probe_caddy; probe_podman; probe_agent_image
-  probe_agent_cli claude; probe_agent_cli codex; probe_gh
+  probe_agent_cli claude; probe_agent_cli codex; probe_antigravity; probe_gh
 }
 
 # ---------- apply ----------
@@ -80,7 +93,7 @@ deps_of() {
     podman)       echo "base" ;;
     agent-image)  echo "podman" ;;
     claude|codex) if [ "$PROFILE" = production ]; then echo "agent-image"; else echo "node"; fi ;;
-    gh)           echo "base" ;;
+    antigravity|gh) echo "base" ;;
     *)            echo "" ;;
   esac
 }
@@ -104,6 +117,11 @@ apply_node() { curl -fsSL https://deb.nodesource.com/setup_22.x 2>/dev/null | ba
 apply_gh()   { pkg_install gh; }
 apply_claude() { npm i -g @anthropic-ai/claude-code >/dev/null 2>&1; }
 apply_codex()  { npm i -g @openai/codex >/dev/null 2>&1; }
+
+# SPEC-1442: official host installer; never run it inside or as a replacement for Podman.
+apply_antigravity() {
+  curl -fsSL https://antigravity.google/cli/install.sh 2>/dev/null | bash >/dev/null 2>&1
+}
 
 apply_podman() {
   pkg_install podman || return 1
@@ -215,6 +233,7 @@ probe_one() {
     base) probe_base ;; node) probe_node ;; hanoman) probe_hanoman ;; caddy) probe_caddy ;;
     podman) probe_podman ;; agent-image) probe_agent_image ;; gh) probe_gh ;;
     claude|codex) probe_agent_cli "$1" ;;
+    antigravity) probe_antigravity ;;
   esac | awk '{print $3}'
 }
 
@@ -224,13 +243,16 @@ already_present() {
   local id="$1" st="$2"
   [ "$st" = ok ] && return 0
   if [ "$st" = partial ]; then
-    case "$id" in claude|codex|gh) return 0 ;; esac
+    case "$id" in claude|codex|antigravity|gh) return 0 ;; esac
   fi
   return 1
 }
 
 apply_one() {
   local id="$1"
+  if [ "$id" = antigravity ] && [ "$PROFILE" != lab ]; then
+    step "$id" fail "sandbox-unsupported; Antigravity hanya host/lab"; mark_failed "$id"; return
+  fi
 
   for d in $(deps_of "$id"); do
     if has_failed "$d"; then step "$id" skip "blocked-by $d"; mark_failed "$id"; return; fi
@@ -251,6 +273,7 @@ apply_one() {
     base) apply_base || rc=$? ;; node) apply_node || rc=$? ;; hanoman) apply_hanoman || rc=$? ;;
     caddy) apply_caddy || rc=$? ;; podman) apply_podman || rc=$? ;;
     agent-image) apply_agent_image || rc=$? ;; claude) apply_claude || rc=$? ;;
+    antigravity) apply_antigravity || rc=$? ;;
     codex) apply_codex || rc=$? ;; gh) apply_gh || rc=$? ;;
     *) step "$id" fail "komponen tak dikenal"; mark_failed "$id"; return ;;
   esac

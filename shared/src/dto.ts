@@ -635,7 +635,7 @@ export const PROVISION_PROFILES = ["lab", "production"] as const;
 export type ProvisionProfile = (typeof PROVISION_PROFILES)[number];
 
 export const COMPONENT_IDS = [
-  "base", "node", "hanoman", "caddy", "podman", "agent-image", "claude", "codex", "gh",
+  "base", "node", "hanoman", "caddy", "podman", "agent-image", "claude", "codex", "antigravity", "gh",
 ] as const;
 export type ComponentId = (typeof COMPONENT_IDS)[number];
 export type ComponentSection = "dasar" | "hanoman" | "ingress" | "sandbox" | "agen";

@@ -61,8 +61,9 @@ lead brain internal existing tetap one-shot. Riset ada di
     sampai installer upstream terverifikasi. Matrix installer/status runtime ketiga tidak boleh
     crash, menjalankan command kosong/fabrikasi atau mengaku ready. Skill native yang sudah
     tersedia tetap dipindai/disuntik; Start tetap fail-open, installer/status Claude/Codex utuh.
-    Methods status tetap COOKIE_ONLY sebagai properti mesin lokal; terminal install memakai
-    otorisasi/shape validation existing dan menolak unsupported sebelum shell spawn.
+    Methods status mempertahankan tool baca existing `hanoman_methods_status` pada GLOBAL_READ;
+    prosa COOKIE_ONLY awal dikoreksi dari source route/capability, bukan mengubah auth. Terminal
+    install memakai otorisasi/shape validation existing dan menolak unsupported sebelum shell spawn.
 
 ## Konsekuensi dan bukti
 
@@ -112,3 +113,17 @@ tetap mengikat. Frame phase native menyatakan telemetry `unknown` dengan attempt
 null; tidak membuat invocation sintetis. JSON advisor internal memakai envelope upstream
 SUCCESS/response, tetap satu-satunya one-shot. [Receipt](../architecture/antigravity-runtime.md#launch-admission-status-dan-receipt-task-8--2026-10-14)
 membuktikan initial/follow-up 13s/11s pada pane/proses sama dan cleanup trust owned.
+
+
+## Distribusi dan observasi akhir — Task 13
+
+Doctor membaca biner DB→env→agy, melakukan probe semver bounded hanya pada host/lab dan
+menyebut autentikasi manual. Antigravity-only memenuhi prasyarat host, tidak menggantikan CLI
+production sandbox. Catalog VPS menambah komponen opsional lab dengan installer host resmi yang
+[dibaca ulang](https://antigravity.google/docs/cli/install/) pada 2026-10-14; tidak memasang CLI
+ke image atau menyalin credential akun. Installer per-user; service user berbeda memerlukan
+pemasangan/login/path manual di akun tersebut. Semua subprocess probe unrelated membuang env
+provider Antigravity baru. Installer metode tetap unavailable; installer biner CLI terpisah
+bukan bukti upstream method/plugin installer tersedia. Telegram engine memakai runtime/default/
+katalog parent ketiga melalui kontrak Settings existing. Rincian dan receipt:
+[runtime Task 13](../architecture/antigravity-runtime.md#distribusi-doctor-dan-telegram-task-13).

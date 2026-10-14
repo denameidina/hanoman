@@ -21,6 +21,8 @@ export const COMPONENTS: ProvisionComponent[] = [
     requires: { lab: ["node"], production: ["agent-image"] }, profiles: BOTH, interactiveLogin: true, needsDomain: false },
   { id: "codex", label: "Codex CLI", section: "agen",
     requires: { lab: ["node"], production: ["agent-image"] }, profiles: BOTH, interactiveLogin: true, needsDomain: false },
+  { id: "antigravity", label: "Antigravity CLI (host/lab; sandbox belum didukung)", section: "agen",
+    requires: { lab: ["base"], production: [] }, profiles: ["lab"], interactiveLogin: true, needsDomain: false },
   { id: "gh", label: "GitHub CLI", section: "agen",
     requires: { lab: ["base"], production: ["base"] }, profiles: BOTH, interactiveLogin: true, needsDomain: false },
 ];
@@ -41,6 +43,7 @@ export function resolveComponents(ids: readonly ComponentId[], profile: Provisio
   const visit = (id: ComponentId): string | null => {
     const c = componentById(id);
     if (!c) return `komponen tak dikenal: ${id}`;
+    if (id === "antigravity" && profile === "production") return "Antigravity: sandbox production belum didukung; gunakan host/lab";
     if (!c.profiles.includes(profile)) return `komponen ${id} tak tersedia di profil ${profile}`;
     if (seen.has(id)) return null;
     if (stack.has(id)) return `siklus dependensi pada ${id}`;

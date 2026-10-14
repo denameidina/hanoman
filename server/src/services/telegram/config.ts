@@ -34,7 +34,7 @@ export async function telegramAgentDefaults(): Promise<{ agent: Agent; model: st
   if (!e.enabled) return sessionAgentDefaults();
   return e.agent === "codex"
     ? { agent: "codex", model: e.model, effort: coerceCodexEffort(e.model, e.effort) }
-    : { agent: "claude", model: e.model, effort: e.effort };
+    : { agent: e.agent, model: e.model, effort: e.effort };
 }
 
 /**
@@ -49,6 +49,7 @@ export async function telegramEngineContext(): Promise<EngineContext> {
     effective: await telegramAgentDefaults(),
     claude: { model: s.model, effort: s.effort },
     codex: { model: s.codex.model, effort: s.codex.effort },
+    antigravity: { model: s.antigravity.model, effort: s.antigravity.effort },
   };
 }
 

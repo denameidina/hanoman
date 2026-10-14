@@ -7,6 +7,7 @@ const ctx = (over: Partial<EngineContext> = {}): EngineContext => ({
   enabled: false,
   effective: { agent: "claude", model: "claude-opus-5", effort: "xhigh" },
   claude: { model: "claude-opus-5", effort: "xhigh" },
+  antigravity: { model: "gemini-3.8-flash-high", effort: "high" },
   codex: { model: "gpt-5.6-sol", effort: "xhigh" },
   ...over,
 });
@@ -106,5 +107,23 @@ describe("SPEC-492 · parser command runtime Telegram", () => {
     const next = { enabled: true, agent: "claude" as const, model: "claude-haiku-4-5", effort: "low" };
     expect(formatEngineApplied(next, "Model → claude-haiku-4-5", true)).toContain("/engine restart");
     expect(formatEngineApplied(next, "Model → claude-haiku-4-5", false)).toContain("berikutnya");
+  });
+});
+
+
+describe("SPEC-1442 · Telegram Antigravity runtime", () => {
+  it("switches to the saved Antigravity parent defaults", () => {
+    expect(parseEngineCommand("/runtime antigravity", ctx())).toMatchObject({ kind: "set", engine: { enabled: true, agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high" }, label: "Runtime → Antigravity CLI" });
+  });
+  it("accepts parent models and only known efforts, not native child tiers", () => {
+    const c = ctx({ effective: { agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high" } });
+    expect(parseEngineCommand("/model gemini-3.8-flash-high", c)?.kind).toBe("set");
+    expect(parseEngineCommand("/model flash", c)?.kind).toBe("invalid");
+    expect(parseEngineCommand("/effort high", c)?.kind).toBe("set");
+    expect(parseEngineCommand("/effort low", c)?.kind).toBe("invalid");
+    expect(formatEngineStatus(c, false)).toContain("Antigravity CLI");
+  });
+  it("points to the correct third runtime for a model mismatch", () => {
+    expect(parseEngineCommand("/model gemini-3.8-flash-high", ctx())).toMatchObject({ kind: "invalid", message: expect.stringContaining("/runtime antigravity") });
   });
 });

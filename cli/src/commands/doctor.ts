@@ -5,12 +5,13 @@ import { execFileSync } from "node:child_process";
 import { accessSync, constants, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import {
+  agentEnvironment,
   resolveDataDirs, resolveDbUrl, dbFilePath, dbUrlNotice, scanAgentSkills,
   resolveHardening, collectProbeFacts, prerequisites, allReady,
   CODEX_NATIVE_AGENTS_MIN_CLIENT, codexNativeAgentsSupported,
   codexNativeVersionProbe,
 } from "@hanoman/runner";
-import { DEFAULT_METHOD, METHODS, methodStatus, zAgent, type MethodSkillStatus } from "@hanoman/shared";
+import { DEFAULT_METHOD, METHODS, methodStatus, zAgent, type MethodSkillStatus, type Agent } from "@hanoman/shared";
 import type { Ctx } from "../router";
 import { resolveLayout } from "../layout";
 import { distDir } from "./start";
@@ -21,7 +22,7 @@ export type DirProbe = { label: string; path: string; writable: boolean; fatal: 
 
 export type Probes = {
   node: string; git: string | null; tmux: string | null;
-  claude: string | null; codex: string | null;
+  claude: string | null; codex: string | null; antigravity?: string | null;
   gh: string | null;   // SPEC-471 · opsional: tanpa gh, tarik issue lewat REST + GITHUB_TOKEN
   // SPEC-909 · ADR-0146 · hook sesi mengirim pertanyaan agen ke server lewat `curl`.
   curl: string | null;
@@ -44,6 +45,14 @@ export function doctorReport(p: Probes): { lines: string[]; ok: boolean } {
         ? `codex ${p.codex} — custom agent native ${codexNativeAgentsSupported(p.codex)
           ? "siap" : `butuh >= ${CODEX_NATIVE_AGENTS_MIN_CLIENT}; sesi parent tetap bisa berjalan`}`
         : "codex — tak ada",
+      fatal: false },
+    { mark: p.antigravity ? (p.sandboxRequired ? "!" : "✓") : "·",
+      text: p.antigravity
+        ? `Antigravity CLI ${p.antigravity} — auth manual; ${p.sandboxRequired
+          ? "sandbox belum didukung" : "host/lab; jalankan agy untuk login; autentikasi belum diverifikasi"}`
+        : p.sandboxRequired
+          ? "Antigravity CLI — host/lab saja; sandbox belum didukung; probe/login tidak dijalankan"
+          : "Antigravity CLI — tak ada (opsional; install/login manual)",
       fatal: false },
     // SPEC-471 · ADR-0095 · `gh` opsional: tanpa dia tarik issue jatuh ke HTTPS + GITHUB_TOKEN.
     { mark: p.gh ? "✓" : "·",
@@ -74,10 +83,12 @@ export function doctorReport(p: Probes): { lines: string[]; ok: boolean } {
   // SPEC-739 · ADR-0114 · NON-FATAL, sejajar dengan cara aset dashboard yang hilang dilaporkan:
   // skill yang kurang tak mematikan sesi, ia hanya menghapus gerbang yang disebut prompt.
   for (const m of p.methods) {
-    const agent = m.agent === "codex" ? "Codex CLI" : "Claude Code";
+    const agent = m.agent === "antigravity" ? "Antigravity CLI" : m.agent === "codex" ? "Codex CLI" : "Claude Code";
     rows.push({
       mark: m.ready ? "✓" : "!",
-      text: m.ready
+      text: m.available === false
+        ? `metode ${m.method} · ${agent} — tidak tersedia: ${m.availabilityReason}`
+        : m.ready
         ? `metode ${m.method} · ${agent} — siap`
         : `metode ${m.method} · ${agent} — belum siap: `
           + [...m.missingPackages, ...m.missingSkills].join(", ")
@@ -85,8 +96,8 @@ export function doctorReport(p: Probes): { lines: string[]; ok: boolean } {
       fatal: false,
     });
   }
-  if (!p.claude && !p.codex) {
-    rows.push({ mark: "✗", text: "tak ada CLI agen (claude ATAU codex wajib ada)", fatal: true });
+  if (!p.claude && !p.codex && (!p.antigravity || p.sandboxRequired)) {
+    rows.push({ mark: "✗", text: "tak ada CLI agen (claude, codex ATAU Antigravity host/lab wajib ada)", fatal: true });
   }
   return { lines: rows.map((r) => `  ${r.mark} ${r.text}`), ok: !rows.some((r) => r.fatal) };
 }
@@ -104,9 +115,25 @@ function writable(path: string): boolean {
   }
 }
 
-function version(bin: string, args: string[]): string | null {
-  try { return execFileSync(bin, args, { encoding: "utf8", timeout: 10_000, stdio: ["ignore", "pipe", "ignore"] }).trim().split("\n")[0] ?? null; }
-  catch { return null; }
+export function probeDoctorVersion(
+  bin: string, args: string[], env: NodeJS.ProcessEnv, agent: Agent | null = null,
+): string | null {
+  if (agent === "antigravity" && (resolveHardening(env)
+    || (env.HANOMAN_SESSION_SANDBOX ?? "off") !== "off")) return null;
+  try {
+    const output = execFileSync(bin, args, {
+      encoding: "utf8", env: agentEnvironment(agent, env), timeout: 10_000,
+      ...(agent === "antigravity" ? { maxBuffer: 16 * 1024, killSignal: "SIGKILL" as const } : {}),
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (agent === "antigravity") {
+      const numeric = "(?:0|[1-9]\\d*)";
+      const identifier = "(?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)";
+      const semver = new RegExp(`^${numeric}\\.${numeric}\\.${numeric}(?:-${identifier}(?:\\.${identifier})*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$`);
+      return semver.test(output) ? output : null;
+    }
+    return output.split("\n")[0] || null;
+  } catch { return null; }
 }
 
 type RuntimeConfigReader = (dbUrl: string, key: string) => Promise<string | null>;
@@ -134,6 +161,17 @@ export async function resolveDoctorCodexBin(
   return env.HANOMAN_CODEX_BIN?.trim() || "codex";
 }
 
+export async function resolveDoctorAntigravityBin(
+  env: Record<string, string | undefined>, dbUrl: string,
+  read: RuntimeConfigReader = readRuntimeConfig,
+): Promise<string> {
+  try {
+    const configured = (await read(dbUrl, "HANOMAN_ANTIGRAVITY_BIN"))?.trim();
+    if (configured) return configured;
+  } catch { /* DB belum tersedia; doctor tetap memeriksa env/default. */ }
+  return env.HANOMAN_ANTIGRAVITY_BIN?.trim() || "agy";
+}
+
 export default async function doctor(_argv: string[], ctx: Ctx): Promise<number> {
   let layout: ReturnType<typeof resolveLayout>;
   let db: string;
@@ -152,14 +190,16 @@ export default async function doctor(_argv: string[], ctx: Ctx): Promise<number>
     { label: "key SSH", path: d.sshKeys, writable: writable(d.sshKeys), fatal: false },
   ];
 
+  const version = (bin: string, args: string[]) => probeDoctorVersion(bin, args, ctx.env);
   const claude = version(ctx.env.HANOMAN_CLAUDE_BIN ?? "claude", ["--version"]);
+  const antigravity = probeDoctorVersion(await resolveDoctorAntigravityBin(ctx.env, dbUrl), ["--version"], ctx.env, "antigravity");
   const codexProbe = codexNativeVersionProbe(ctx.env, await resolveDoctorCodexBin(ctx.env, dbUrl));
   const codex = version(codexProbe.bin, codexProbe.args);
   // SPEC-739 · ADR-0114 · hanya agen yang CLI-nya ADA yang dilaporkan: kesiapan metode codex di
   // mesin tanpa codex cuma derau. Metode DEFAULT saja — itu yang dipakai sesi tanpa pilihan.
   const method = METHODS[DEFAULT_METHOD]!;
   const methods = zAgent.options
-    .filter((a) => (a === "codex" ? codex : claude) !== null)
+    .filter((a) => ({ claude, codex, antigravity })[a] !== null)
     .map((a) => {
       const s = scanAgentSkills(a, ctx.env);
       return methodStatus(method, a, { skills: s.skills.map((k) => k.id), packages: s.packages });
@@ -177,7 +217,7 @@ export default async function doctor(_argv: string[], ctx: Ctx): Promise<number>
     node: process.version,
     git: version("git", ["--version"]),
     tmux: version("tmux", ["-V"]),
-    claude, codex,
+    claude, codex, antigravity,
     gh: version(ctx.env.HANOMAN_GH_BIN ?? "gh", ["--version"]),
     curl: version("curl", ["--version"]),
     dirs, web: layout.web !== null, db, methods,
