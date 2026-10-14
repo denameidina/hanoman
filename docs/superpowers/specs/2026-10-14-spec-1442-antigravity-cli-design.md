@@ -4,7 +4,7 @@
 
 Fase Brainstorm · 2026-10-14. Base/kandidat riset:
 `c6800c59837a152e413d8b7834ced0b21adcb084`.
-Status desain: terhalang oleh kontrak native child `agy` 1.3.4. Seluruh keputusan scope diterima; tidak ada izin untuk menggantinya dengan bridge atau batas kemampuan yang lebih rendah. Belum menjadi spesifikasi implementasi.
+Status Brainstorm: selesai setelah relay keputusan manusia atas blocker native CLI. Desain memakai adapter native dengan batas kemampuan eksplisit; Objective, Spec, Plan dan Execute masih harus dikerjakan oleh fase masing-masing.
 
 ### Tujuan dan kontrak yang mengikat
 
@@ -25,14 +25,14 @@ serta [katalog model](../../../internal/docs/architecture/model-catalog.md).
 | --- | --- | --- |
 | Biner/install | `command -v agy` = `/Users/denameidina/.local/bin/agy`; `agy --version` = `1.3.4`. [Install resmi](https://antigravity.google/docs/cli/install/) memakai installer native ke `~/.local/bin/agy`. | Default biner `agy`, bukan launcher IDE `antigravity`. |
 | Interaktif | `agy --help` exit 0: `--prompt-interactive/-i`, `--model`, `--effort low\|medium\|high\|xhigh\|max`, `--dangerously-skip-permissions`. [Overview](https://antigravity.google/docs/cli/overview/) menyebut tmux. | Prompt awal wajib lewat `-i`; jangan meneruskan argv Claude/Codex. |
-| One-shot | Help mengonfirmasi `--print/-p`, `--output-format text\|json\|stream-json`, `--print-timeout`, `--continue`, `--conversation`. [Headless resmi](https://antigravity.google/docs/cli/headless/) menjelaskan error model unknown dan stream. | Lead dapat memakai `-p`; hanoman tidak perlu mengganti sesi interaktif dengan headless. |
+| One-shot | Help mengonfirmasi `--print/-p`, `--output-format text\|json\|stream-json`, `--print-timeout`, `--continue`, `--conversation`. [Headless resmi](https://antigravity.google/docs/cli/headless/) menjelaskan error model unknown dan stream. | Hanya lead brain internal existing boleh memakai `-p`; seluruh sesi kerja parent/child tetap interaktif. |
 | Auth | Docs install: keyring lokal atau browser OAuth; SSH memakai URL/code; API key membutuhkan `modelProvider: gemini` dan `GEMINI_API_KEY`; endpoint opsional `GOOGLE_GEMINI_BASE_URL`. | Kredensial tetap milik mesin; jangan menyalin ke response atau anak runtime lain. |
 | Trust | Settings lokal dibaca hanya bentuknya: `trustedWorkspaces` = list of strings. Probe PTY direktori temp, tanpa prompt/inferensi, dengan bypass tetap menampilkan `Do you trust the contents of this project?`. Proses dihentikan per-PID dan di-reap. | Bypass tool tidak menyelesaikan trust. Normalisasi realpath, matching parent/worktree dan append-preserve perlu probe lanjutan di Spec/Execute. Jangan menyatakan parent inheritance sudah terbukti. |
 | Model | `agy models` exit 0 mengembalikan `gemini-3.8-flash-{low,medium,high}`, `claude-opus-5-5-{low,medium,high}`, `claude-sonnet-5-5-{low,medium,high}`, `gpt-oss-120b-medium`. [Model resmi](https://antigravity.google/docs/models/) bergantung plan. | Discovery CLI/cache/fallback mengikuti katalog existing; jangan menawarkan semua effort help untuk setiap model tanpa bukti. |
 | Rules/skill | [Rules](https://antigravity.google/docs/rules/): root/directory `AGENTS.md` atau `GEMINI.md`, `.agents/rules`; global `.gemini`. [Skills](https://antigravity.google/docs/skills/): `.agents/skills`, global `~/.gemini/antigravity-cli/skills`. | Instruksi repo dan injeksi symlink `.agents/skills` dapat dipakai; precedence project tetap dijaga. |
 | MCP | [MCP](https://antigravity.google/docs/mcp/): global `~/.gemini/config/mcp_config.json`, workspace `.agents/mcp_config.json`, objek `mcpServers`, stdio `command/args/env` atau remote `serverUrl`. `agy mcp add --help` membuktikan env/header dan urutan flag. | Hanoman stdio `hanoman mcp` dapat dikonfigurasi; jangan memakai key config Codex atau Claude. |
 | Hook/idle | [Hooks](https://antigravity.google/docs/hooks/): workspace `.agents/hooks.json`, global config/settings; SessionStart, Pre/PostToolUse, Pre/PostInvocation, Stop. [Statusline](https://antigravity.google/docs/cli/statusline/): stdin JSON `agent_state=idle/thinking/working/tool_use/initializing`, task_count, pending-input dan confirmation. | Ada sumber native potensial; belum dibuktikan relay event/gate/foreground hanoman bekerja. Jangan mengklaim parity telemetry. |
-| Custom child | [Subagent](https://antigravity.google/docs/subagents/): `.agents/agents`, global `.gemini/config/agents`, invoke_subagent, model tier `inherit/flash/pro`, async, workspace branch. | Docs belum membuktikan exact model+effort, foreground, read-only hook dan lifecycle yang diwajibkan ADR-0159/0170. Native branch bukan bukti isolated-worktree hanoman. |
+| Custom child | [Subagent](https://antigravity.google/docs/subagents/): `.agents/agents`, global `.gemini/config/agents`, invoke_subagent, model tier `inherit/flash/pro`, async, workspace branch. | Tier native diizinkan; exact model/effort independen dan foreground bukan syarat v1. Auditor read-only unavailable sampai enforcement terbukti. Native branch belum membuktikan kontrak isolated-worktree hanoman. |
 
 ### Peta implementasi yang harus diteruskan
 
@@ -56,163 +56,124 @@ Production memakai image sesi, credential dir `/agent-home:ro`, dan worktree `/w
 login keyring host tidak otomatis tersedia. Layout config/state writable Antigravity dan image
 ber-`agy` belum dibuktikan. Jangan melonggarkan boundary produksi untuk membuat runtime baru jalan.
 
-### Alternatif pendekatan
+### Alternatif dan pendekatan yang dipilih
 
-1. **Adapter ketiga dengan batas v1 eksplisit (rekomendasi):** pertahankan pipeline dan schema
-   lama, cabang biner/argv/trust/default/model/MCP eksplisit, child atau deployment yang belum
-   terverifikasi unavailable dengan alasan. Murah diverifikasi, tetapi fitur native tertentu tertunda.
-2. **Parity native lengkap:** tambah materialisasi child, policy read-only, foreground, exact
-   model/effort, relay hooks/statusline dan sandbox auth/state. Cakupan lebih besar; perlu bukti
-   live dan amandemen ADR sebelum klaim parity.
-3. **Command kustom generik:** operator memasok shell command dan config sendiri. Lebih cepat
-   tetapi tak memenuhi pemilihan model/trust/MCP dan validasi runtime yang diminta; tidak direkomendasikan.
+1. **Adapter native dengan batas eksplisit — dipilih manusia:** runtime ketiga mengikuti
+   pipeline tmux/worktree yang ada. Parent memakai model/effort CLI exact; child native memakai
+   tier yang didukung CLI. Kemampuan yang belum terbukti ditolak/ditandai unavailable dengan
+   alasan. Ini memenuhi sesi interaktif tanpa menjanjikan parity yang belum ada.
+2. **Parity native penuh:** exact model/effort per-child, foreground, telemetry dan sandbox
+   lengkap. Riset versi 1.3.4 belum membuktikannya; bukan scope wajib SPEC ini setelah relay.
+3. **Bridge atau SDK sebagai pengganti child native:** membutuhkan arsitektur proses baru;
+   ditolak manusia. Tidak ada child `agy -p`, bridge TUI atau substitusi Python SDK.
 
-### Keputusan manusia yang diterima (relay pertama)
+### Keputusan manusia final (menggantikan requirement native penuh sebelumnya)
 
-| Butir | Putusan |
+| Area | Keputusan yang berlaku |
 | --- | --- |
-| Default | `gemini-3.8-flash-high` + `high`. |
-| Native child | Wajib lengkap dalam SPEC ini: exact model/effort, foreground, read-only enforcement, availability teruji. Sesi tunggal/unavailable bukan pengganti requirement ini. |
-| Status/decision | Observasi tmux + marker fase; batas notifikasi, gate goal dan native telemetry eksplisit. Hook policy read-only tetap diperlukan oleh keputusan native child. |
-| MCP | Global `~/.gemini/config/mcp_config.json`, merge-preserve. |
-| Deployment | Host/lab; launch sandbox ditolak jelas sampai auth/state terverifikasi. Boundary produksi tetap utuh. |
-| Versi | Additive `/api/antigravity/version` + tool MCP baca; `/api/codex/version` dipertahankan. |
+| Sesi kerja | Parent TUI di tmux + worktree; child persistent native `invoke_subagent`. Parent dan child tetap interaktif, tidak one-shot. Lead brain internal existing boleh tetap one-shot. |
+| Default parent | `gemini-3.8-flash-high` + `high`; seed additive mempertahankan pilihan operator Claude/Codex. |
+| Child model | Tier native bawaan diizinkan. Model/effort exact independen dan foreground yang belum terbukti **tidak lagi wajib**; keterbatasannya terlihat pada dashboard dan docs. |
+| Read-only | Auditor baru tersedia hanya sesudah enforcement nyata terbukti. Bila belum terbukti, `available=false` dengan alasan; instruksi prosa bukan bukti enforcement. |
+| Status | Observasi tmux + marker fase. Batas native telemetry, notifikasi keputusan, dan gate goal dijelaskan; jangan menyatakan parity hook Claude/Codex. |
+| MCP | Global `~/.gemini/config/mcp_config.json`, merge-preserve entri operator. |
+| Deployment | Host/lab; launch sandbox ditolak eksplisit sampai auth/state terverifikasi, boundary produksi tetap utuh. |
+| Versi/API | Additive `/api/antigravity/version` + tool MCP baca; endpoint Codex dipertahankan. |
+| Bridge | Tetap ditolak, termasuk bridge interaktif persisten. |
 
-### Verifikasi lanjutan native child
+Keputusan ini diterima lewat relay orchestrator setelah retry Brainstorm. Requirement awal exact
+model/effort independen dan foreground telah diamandemen **oleh manusia**; tidak diturunkan agen.
+Riset bounded sebelumnya tetap menjadi bukti batas CLI, bukan blocker scope final ini.
 
-`agy agents --help` mengonfirmasi discovery/list, tetapi tidak menyediakan flag native model/effort
-atau foreground. Docs subagent dan [changelog resmi](https://github.com/google-antigravity/antigravity-cli/blob/main/CHANGELOG.md)
-menyebut tier `inherit/flash/pro`; tidak ditemukan kontrak exact slug/effort per-child atau primitive
-blocking foreground. Inspect string schema biner menemukan `Model yaml:"model,omitempty"`,
-tanpa field `yaml:"effort` (petunjuk, bukan bukti runtime execution).
+### Desain komponen dan perilaku
 
-Probe schema-only, **nol inferensi**, menggunakan `agy -p /model --agent <probe> --output-format json`:
+- Adapter runtime eksplisit pada shared/runner/server: tidak memakai cabang `else = codex`.
+  Biner efektif `HANOMAN_ANTIGRAVITY_BIN` (default `agy`), argv `--prompt-interactive`, model,
+  effort dan permission bypass berasal dari kontrak CLI. Jalur backlog, Terminal, IDE, lead
+  mengikuti pusat launch existing; shell mentah tetap bukan agen. Metadata tmux memulihkan
+  runtime ketiga setelah restart.
+- Settings/runtime-defaults additive pada JSON existing, tanpa perubahan skema yang direncanakan.
+  Katalog model parent ditemukan lewat CLI non-inferensi, bounded/cache seperti
+  [katalog model otomatis](../../../internal/docs/architecture/model-catalog.md). Katalog
+  **child tier** dipisahkan dari slug parent agar form/phase plan tidak memancarkan slug invalid
+  atau menjanjikan effort independen. Nilai existing unsupported diberi alasan, tidak diganti
+  diam-diam. Custom Agent tetap runtime filter sesuai ADR-0101.
+- Registry Custom Agent dimaterialisasi untuk discovery native; tidak mengadopsi persona inline.
+  Native tier/inherit diteruskan apa adanya, bukan dipresentasikan sebagai model exact terkunci.
+  Kemampuan `read-only` dan `isolated-worktree` yang belum memenuhi kontrak ADR-0159 ditandai
+  unavailable. Orkestrasi fase mengikuti lifecycle persistent native; batas background/foreground
+  dijelaskan, tanpa menganggap prompt sebagai enforcement runtime.
+- Trust memakai konfigurasi Antigravity sendiri dan normalisasi realpath. Write append/merge
+  mempertahankan konfigurasi operator, idempoten dan atomik. Parent/worktree matching harus
+  dibuktikan pada Spec/Execute; bila tidak mendukung inheritance, trust cwd worktree aktual.
+  Gagal persiapan trust/config harus menghasilkan alasan nyata, bukan sesi yang dianggap siap.
+- Skill/instruksi menggunakan konvensi resmi AGENTS.md/GEMINI.md dan `.agents/skills` tanpa
+  menimpa instruksi repo. Config MCP global ditulis merge-preserve, tidak mencetak token ke
+  dashboard/log. Env runtime baru disaring mengikuti pola `inheritEnv` supaya credential tidak
+  bocor ke sesi Claude/Codex atau subprocess lain.
+- Dashboard menampilkan Antigravity pada Settings, backlog, Custom Agent dan Terminal, beserta
+  batas yang relevan saat dipilih. Versi unavailable/timeout/error terlihat; bukan version palsu.
+  Capability yang belum tersedia tidak bisa dipakai lewat API meskipun picker disabled.
+  Native telemetry/token yang tidak diukur tetap unknown/null, bukan nol.
+- Goal/notifikasi memakai perilaku tmux/marker yang terukur. Gate native, deteksi keputusan
+  semantik, dan telemetry child tidak dijanjikan oleh v1; opsi yang membutuhkan kemampuan
+  tersebut diberi alasan unsupported sesuai kontrak existing. Jangan memasang hook safety
+  umum yang telah dicabut ADR-0037.
 
-- Agen global sementara `~/.gemini/config/agents/hanoman-spec1442-probe-flash.md`, `model: flash`:
-  exit 0, `SUCCESS`, `num_turns: 0`; command model melaporkan `gemini-3.8-flash-high`, effort `high`.
-- Agen global kedua, format identik tetapi `model: gemini-3.8-flash-high`:
-  exit 1, `unknown agent ... (available: hanoman-spec1442-probe-flash)`.
-  Jadi slug exact belum bisa diperlakukan sebagai nilai frontmatter yang didukung.
-- Agen `.agents/agents` di direktori temp, termasuk repo git temp yang diberi trust eksplisit,
-  tetap menghasilkan `no custom agents are available` pada probe. Discovery worktree belum terbukti.
-- Semua proses probe selesai; dua berkas global milik probe dihapus. Hanya entri trust temp milik
-  probe dicabut kembali; entri operator dipertahankan. Tidak ada kredensial/account yang dicetak.
+### Bukti native dan batas verifikasi
 
-Probe read-only slash di primary agent membuktikan discovery, **bukan** actual model execution child,
-foreground, atau policy enforcement. Klaim parity membutuhkan live invocation dan bukti lifecycle.
-Dengan kontrak yang ditemukan, requirement native child lengkap tidak boleh dianggap sudah feasible.
+Probe schema-only terdahulu memakai `agy -p /model --agent <probe> --output-format json`,
+read-only slash dengan nol inferensi (`num_turns: 0`), bukan rancangan pekerjaan child.
+Kontrol **nama/file sama** menghasilkan `flash` exit 0 SUCCESS, slug
+`gemini-3.8-flash-high` exit 1 unknown agent, `flash` kembali exit 0, `inherit` exit 0,
+`claude-opus-5-5-high` exit 1. Biner memuat validasi tier
+`inherit|flash_lite|flash|pro`. `agy plugin validate` menerima tier dan slug invalid sama-sama
+exit 0, sehingga validator plugin bukan bukti loader runtime. Berkas global/temp probe telah
+dibersihkan; tidak ada plugin di-install.
 
-### Steering manusia: sesi tetap interaktif
+Audit retry pada kandidat `c8837707ee14dfdd8067372dd5f82462d0f8ad13` memeriksa hipotesis
+transient/settings/SDK: [kontrak tools](https://antigravity.google/docs/hooks) tidak memberikan
+parameter exact model/effort pada `define_subagent`/`invoke_subagent`;
+[Settings](https://antigravity.google/docs/settings) menjelaskan override sesi;
+[changelog](https://www.antigravity.google/docs/changelog?tab=cli) membedakan tier CLI dan model
+child independen SDK. [SDK](https://antigravity.google/docs/sdk/subagents/) bukan TUI `agy`.
+Accessor internal `SubagentSpec.GetModel/GetModelTier/GetRunAsTask` dan
+`InvokeSubagent.GetTaskMode` ditemukan lewat `strings`, tetapi bukan kontrak publik atau
+bukti live execution. Tidak boleh dipancarkan hanya berdasarkan nama simbol.
 
-Manusia menyatakan: "saya mau sesi nya tetap interaktip no oneshot prompt".
-Usulan bridge child `agy -p` **tidak disetujui dan ditarik**. `-p /model` di riset terdahulu
-hanya probe read-only slash dengan nol inferensi; bukan rancangan sesi kerja.
-Sesi parent sudah direncanakan `agy --prompt-interactive` di tmux/worktree, dan tetap demikian.
+Dokumentasi native [subagents](https://antigravity.google/docs/subagents/) mendukung lifecycle
+running/idle, auto-wake dari pesan dan retensi konteks; ini mendasari interaktivitas persistent
+child tanpa proses one-shot baru. Model tier dan lifecycle yang terdokumentasi belum membuktikan
+semua konfigurasi yang akan ditulis hanoman bekerja; Spec/Execute perlu smoke materialisasi native.
+Probe `.agents/agents` temp sebelumnya tidak discover agent, sedangkan global berhasil;
+discovery sesi terisolasi harus diselesaikan sebelum klaim availability. Jangan menimpa registry
+operator atau membocorkan agent khusus satu sesi ke sesi tetangga.
 
-Dua jalur yang masih dapat dibandingkan tanpa menganggapnya telah disetujui:
+Read-only: `PreToolUse` dengan `decision: deny` adalah jalur potensial. Warisan/scope child dan
+blocking tool mutasi nyata belum dibuktikan; karena manusia menyetujui unavailable dengan alasan,
+ketidaktersediaan auditor read-only adalah hasil v1 yang sah hingga bukti enforcement ada.
 
-- **Native interaktif:** parent TUI menggunakan `invoke_subagent`, child native discovery.
-  Ini paling dekat requirement 2B; exact model/effort dan blocking foreground tetap belum
-  mempunyai bukti runtime. Definisi tier `flash` ditemukan, slug exact tidak ditemukan.
-  Riset native harus diselesaikan sebelum memilih schema/flag, bukan melengkapi field dari asumsi.
-- **Bridge interaktif persisten (alternatif baru, belum terverifikasi):** hanoman mengelola TUI
-  `agy -i` per child di tmux dengan model/effort pada argv, pesan susulan ke conversation yang
-  sama, dan lifecycle/wait terkontrol. Konteks child tetap hidup lintas giliran; tidak memakai
-  `-p` untuk pekerjaan child. Ini mengubah arsitektur dari native `invoke_subagent` menjadi
-  proses interaktif terkelola, sehingga membutuhkan persetujuan amandemen requirement 2B.
-  Read-only enforcement, termination, readiness, limit concurrency, relaying keputusan dan
-  completion evidence perlu desain serta probe; belum ada bukti yang mengizinkan klaim parity.
+### Dokumentasi dan keputusan MCP fase implementasi
 
-Cakupan larangan one-shot belum jelas: `lead/brain.ts` existing adalah one-shot internal keputusan,
-terpisah dari sesi kerja lead yang interaktif. Melarang keduanya akan memperluas SPEC ke redesign
-lead brain; membiarkan pengecualian internal itu juga tidak boleh diputuskan sendiri.
+ADR baru harus mengamandemen ADR-0074/0101/0159/0164/0170 untuk runtime ketiga dan batasnya;
+nomor ADR diregistrasi lintas branch saat ditulis. Docs model-catalog, API, operations/agent,
+frontend/runtime, serta `docs/agent-integration.md` yang tersentuh diperbarui dan di-link pada
+index dalam commit implementasi yang sama. Tidak diperlukan migration dari desain ini; bila
+fase Spec menemukan kebutuhan perubahan DB, keputusan skema harus direlay dahulu.
 
-### Keputusan manusia relay berikutnya
-
-- Seluruh sesi kerja **parent dan child** harus interaktif; lead brain internal existing boleh
-  tetap one-shot. Read-only slash command untuk probe schema tidak menjadi pekerjaan child.
-- Native `invoke_subagent` tetap wajib. **Bridge ditolak**, termasuk bridge TUI persisten.
-- Exact model/effort, foreground dan enforcement read-only tetap syarat keras; instruksi prosa
-  bukan pengganti kemampuan runtime. Semua keputusan awal pada tabel di atas tetap berlaku.
-
-### Penghalang konkret setelah riset bounded
-
-Hipotesis loader membatasi model ke tier diuji ulang dengan **berkas dan nama agent yang sama**
-agar nama file, registry stale dan penambahan berkas baru tidak menjadi confounder. Berkas global
-sementara `hanoman-spec1442-loader-control.md` ditulis ulang; tiap pemanggilan `agy -p /model
---agent hanoman-spec1442-loader-control --output-format json` adalah read-only slash, nol inferensi,
-`num_turns: 0`. Hasil berurutan pada biner 1.3.4:
-
-| Frontmatter model | Exit | Hasil discovery |
-| --- | --- | --- |
-| `flash` | 0 | SUCCESS |
-| `gemini-3.8-flash-high` | 1 | unknown agent; no custom agents are available |
-| `flash` (kontrol balik) | 0 | SUCCESS |
-| `inherit` | 0 | SUCCESS |
-| `claude-opus-5-5-high` | 1 | unknown agent; no custom agents are available |
-
-Biner juga memuat pesan validasi eksplisit `model must be 'inherit', 'flash_lite', 'flash', or
-'pro', got %q` dan schema `ModelTier`. Bersama kontrol balik dan docs resmi, ini membuktikan
-**frontmatter native tidak mendukung pemilihan slug exact per-child** pada CLI yang diuji.
-`inherit` bukan pengganti konfigurasi exact model/effort independen setiap child.
-
-Hipotesis bahwa validator plugin memberi schema lebih luas diuji melalui `agy plugin validate
-<direktori-temp>`: tier **dan slug invalid sama-sama exit 0**, `agents: 1 processed`. Maka hasil
-validator plugin tidak boleh dipakai sebagai bukti dukungan model native—loader aktual yang menentukan.
-Tidak ada plugin di-install dan berkas probe global telah dihapus; semua proses selesai.
-
-Foreground: dokumentasi native menyatakan async dan tool `invoke_subagent` mendokumentasikan
-Prompt/Role/TypeName/Workspace, tanpa wait/blocking. Biner memiliki field internal `task_mode` /
-`allow_task_mode`, tetapi ini **bukan API publik terverifikasi**; jangan memancarkannya atau mengklaim
-foreground dari nama simbol. Tidak ada live lifecycle proof foreground.
-
-Read-only: kontrak hooks mendukung `PreToolUse` output `decision: deny`, conversationId, modelName
-serta frontmatter `hooks` pada schema biner. Ini memberi jalur potensial penegakan; scope per-child,
-warisan hooks dan enforcement pada invocation nyata belum dibuktikan. Allowlist tool/instruksi
-prosa saja tidak memenuhi syarat keras ADR-0159.
-
-Kesimpulan fase: **terhalang**, bukan selesai. Exact per-child yang diwajibkan ditolak loader;
-foreground/read-only belum mempunyai bukti execution. Tidak ada alternatif native berbeda yang
-sudah terverifikasi memenuhi requirement. Melanjutkan implementasi sebagai parity penuh akan
-mengambil asumsi yang dilarang. Keputusan terbuka: `-`; keputusan scope sudah jelas dan tetap
-mengikat, penghalangnya kemampuan runtime pada versi yang diuji.
-
-### Audit independen retry Brainstorm (percobaan 2/2)
-
-Audit pada kandidat `c8837707ee14dfdd8067372dd5f82462d0f8ad13` tidak mengulang
-probe loader. Hipotesis baru: override exact model/effort mungkin tersedia lewat definisi
-transient, setting sesi, atau kontrak SDK yang berlaku juga pada CLI. Biner tetap `agy` 1.3.4
-(`agy --version`, exit 0); `agy agents --help` hanya menyediakan discovery. `agy --help`
-menempatkan `--model` dan `--effort` pada **sesi CLI saat ini**, bukan setiap native child.
-
-- [Kontrak tools resmi](https://antigravity.google/docs/hooks) mendokumentasikan
-  `define_subagent` tanpa parameter model/effort dan `invoke_subagent` tanpa override keduanya.
-  Maka definisi transient tidak memberi jalur publik terverifikasi untuk requirement ini.
-- [Settings CLI](https://antigravity.google/docs/settings) menjelaskan override per-sesi;
-  pencarian `subagent` pada halaman tersebut tidak menghasilkan kontrak per-child.
-- [Changelog resmi](https://www.antigravity.google/docs/changelog?tab=cli) membedakan model
-  frontmatter CLI **tier** dari model target child independen pada **SDK**. Contoh
-  [subagent SDK](https://antigravity.google/docs/sdk/subagents/) memakai Python `Agent.chat`,
-  bukan TUI `agy`. SDK bukan bukti kontrak CLI; mengganti runtime ke SDK akan mengubah scope.
-- Pemeriksaan `strings` biner menemukan accessor internal `SubagentSpec.GetModel`,
-  `GetModelTier`, `GetRunAsTask` serta `InvokeSubagent.GetTaskMode`. Ini mempersempit kesimpulan:
-  **loader frontmatter** exact ditolak pada probe sebelumnya, tetapi audit tidak membuktikan
-  semua primitive internal mustahil. Primitive internal tersebut tetap tidak mempunyai
-  kontrak publik dan bukti invocation native yang memenuhi exact model/effort/foreground.
-  Tidak ada alasan menganggap field internal ini aman dipancarkan dari konfigurasi hanoman.
-
-Hasil: **terhalang kembali**. Belum ditemukan jalur native CLI resmi terverifikasi yang
-memenuhi seluruh syarat keras. Requirement tetap utuh, termasuk interaktivitas parent/child,
-penolakan bridge, dan pengecualian lead brain internal. Read-only child tetap memerlukan
-bukti enforcement nyata. Audit ini tidak membuat konfigurasi/proses/model-call baru dan tidak
-menyentuh credential. Perubahan hanya catatan Brainstorm dan link index. Orchestrator perlu
-merelay blocker setelah retry kedua sesuai kontrak sesi; tidak ada izin menurunkan requirement.
+Keputusan MCP: endpoint versi baru memakai tool baca dan capability sesuai ADR-0202; Settings,
+Custom Agent dan launch yang menerima enum/runtime baru memperbarui schema tool yang ada.
+Kontrak cookie-only/WS tetap mempunyai pengecualian beralasan yang tercatat. Tidak membuat API
+baru tanpa tool atau pengecualian di commit yang sama.
 
 ### Aturan verifikasi fase berikutnya
 
-Test harus mencakup biner efektif, argv/escaping prompt, trust/realpath/preservasi config, seed
-runtime-defaults/user edits, katalog model, capability unavailable, env credential terisolasi,
-parsing metadata setelah restart, dan regresi argv Claude/Codex. Semua route/kontrak berubah
-punya keputusan MCP di commit yang sama. Uji server serial dengan DB temp unik, bersihkan
-`HANOMAN_CONTROL_ORIGINS`/`SSH_ASKPASS`; typecheck paket tersentuh dan satu smoke endpoint nyata.
-Docs internal yang berubah + ADR baru terindeks dalam commit implementasi yang sama.
+Test mencakup biner efektif, argv interaktif/escaping prompt, trust/realpath/preservasi config,
+seed runtime-defaults/user edits, katalog parent versus child tier, capability unavailable,
+env credential terisolasi, parsing metadata sesudah restart dan regresi argv Claude/Codex.
+Materialisasi native diuji dari berkas sesungguhnya; availability tidak didasarkan pada plugin
+validate saja. Auditor hanya tersedia bila live enforcement terbukti; jika belum, unavailable.
+Satu smoke endpoint nyata di akhir; test server serial dengan DB temp unik, bersihkan
+`HANOMAN_CONTROL_ORIGINS`/`SSH_ASKPASS`, typecheck paket tersentuh, tanpa suite penuh rutin.
+
+Keputusan terbuka: -.
