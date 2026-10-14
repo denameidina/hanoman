@@ -740,6 +740,7 @@ GET/PUT  /settings                      # Setting blob (zSetting): model, effort
 #                                           (telegramReloadNeeded) — reload memanggil getMe() dan bisa
 #                                           menjatuhkan readiness ke `error` gara-gara satu dropdown.
 #                                         PUT ganti seluruh blob (full replace).
+GET      /antigravity/version           # { version: string|null, error: string|null } (SPEC-1442/ADR-0221)
 GET      /codex/version                 # { version: string|null, minRequired: "0.144.0", ok: boolean }  (SPEC-339)
 #   Baca-global (ADR-0187): agent token mana pun, tanpa capability. Tool MCP: `hanoman_codex_version`.
 GET      /session-results?projectId&limit  # SessionResultView[] terbaru dulu · limit default 200, maks 1000 (SPEC-213/ADR-0047)
@@ -2510,7 +2511,12 @@ existing; schema/tool/otorisasi Terminal yang ada diperluas, tidak ada endpoint 
 
 Endpoint baru `GET /api/antigravity/version`: authenticated admin atau agent-token `GLOBAL_READ`,
 200 `{version:string|null,error:string|null}`, error aman tanpa raw output/token/path home.
-Cache keyed bin efektif/boundary 5 menit, timeout 10 dtk; bin change invalidasi segera.
+Cache keyed bin efektif/boundary 5 menit, timeout 10 dtk, stdout/stderr masing-masing maksimal
+16 KiB; bin/boundary change invalidasi segera. Refresh satu key di-coalesce; completion probe
+lama dibuang termasuk error, dan tidak dapat menghapus refresh key baru. Parser menerima hanya
+semver utuh keluaran `agy --version`, bukan angka di diagnostic. Sandbox aktif/hardening
+menghasilkan version null + alasan aman tanpa probe host. Observasi gagal tetap 200 dan tidak
+menjadi penghalang sendiri bagi launch host; tidak ada minimum client atau installer otomatis.
 Tool baru `hanoman_antigravity_version`, mode read, capability null (`GLOBAL_READ`), test katalog/
 coverage dan docs/agent-integration wajib bersama implementasi. Endpoint Codex tetap sama.
 

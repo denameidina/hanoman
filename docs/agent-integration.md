@@ -564,6 +564,7 @@ Panduan siap salin untuk keempat klien, berikut tabel tool → capability, ada d
 | `hanoman_scheduler_queue_cancel`, `hanoman_scheduler_queue_requeue` | tulis | `settings:write`; requeue baris `failed` juga menuntut `sessions:spawn` (ADR-0204, 403 bila tak ada) |
 | `hanoman_lead_ask` | tulis | `lead:write` |
 | `hanoman_health`, `hanoman_models`, `hanoman_codex_version`, `hanoman_methods_status` | baca | — (`GLOBAL_READ`, ADR-0187) |
+| `hanoman_antigravity_version` | baca | — (`GLOBAL_READ`, ADR-0221) |
 | `hanoman_overview_get` | baca | — (`GLOBAL_READ`, ADR-0220) |
 | `hanoman_activity_list` | baca | `activity:read` |
 | `hanoman_activity_purge` | **berbahaya** | `activity:write` |
@@ -714,3 +715,17 @@ gagal 500 `antigravity-config-failed` teredaksi. Tidak ada fallback host/runtime
 `evidence:unknown` dan attempts/effort/durasi/token null; ini bukan bukti nol penggunaan atau gagal
 delegasi. Completion tetap berdasarkan marker lengkap dan checked plan. Sesi kerja tetap
 interaktif; hanya advisor internal lead memakai JSON one-shot.
+
+### Versi Antigravity (SPEC-1442 / ADR-0221)
+
+`hanoman_antigravity_version` membungkus `GET /api/antigravity/version`: cookie admin atau
+agent token sah tanpa capability tambahan memperoleh 200 `{version,error}`. Version semver
+atau null dengan alasan aman untuk biner hilang, timeout, output cacat/berlebih, dan sandbox
+yang belum didukung; tidak mengungkap stdout/stderr mentah, path home, atau token. Properti
+mesin ini read-only: method tulis dan path lain di bawah `/antigravity` tetap cookie-only.
+
+Cache lima menit keyed biner efektif DB→env→`agy` dan boundary eksekusi; perubahan biner/
+boundary langsung membuang cache dan hasil in-flight lama. Probe hanya `--version`, maksimum
+10 detik dan 16 KiB per stream; sandbox aktif/hardening tidak mem-probe host. Kegagalan
+observasi tidak memblokir sesi host. Tool tidak memasang CLI atau mengubah konfigurasi dan
+endpoint/tool versi Codex tidak berubah.

@@ -60,6 +60,8 @@ describe("capabilityForRoute", () => {
     ["GET", "/api/models", "GLOBAL_READ"],
     ["GET", "/api/methods/status", "GLOBAL_READ"],
     ["GET", "/api/codex/version", "GLOBAL_READ"],
+    ["GET", "/api/antigravity/version", "GLOBAL_READ"],
+    ["PUT", "/api/antigravity/version", "COOKIE_ONLY"],
     ["POST", "/api/models", "COOKIE_ONLY"],
     ["POST", "/api/methods/status", "COOKIE_ONLY"],
     ["PUT", "/api/codex/version", "COOKIE_ONLY"],

@@ -107,6 +107,7 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // semata karena ia lahir sebagai data picker dashboard (SPEC-339); katalognya sudah di-allowlist
   // parser sehingga detail akun CLI tak pernah tersimpan. Method tulis tetap cookie-only.
   // ADR-0220 · `overview` = agregat angka tanpa id/judul (preseden grup `pending`).
+  if (top === "antigravity") return read && seg.length === 2 && seg[1] === "version" ? "GLOBAL_READ" : "COOKIE_ONLY";
   if (top === "limits" || top === "update" || top === "events" || top === "fs" || top === "health"
     || top === "models" || top === "methods" || top === "codex" || top === "overview")
     return read ? "GLOBAL_READ" : "COOKIE_ONLY";

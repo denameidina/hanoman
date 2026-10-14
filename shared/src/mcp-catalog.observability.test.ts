@@ -7,11 +7,17 @@ import { MCP_TOOLS, mcpToolsFor } from "./mcp";
 const byName = (n: string) => MCP_TOOLS.find((t) => t.name === n)!;
 
 describe("katalog observabilitas mesin (ADR-0187)", () => {
-  it("keempat tool tak menuntut capability dan semuanya baca-saja", () => {
-    for (const n of ["hanoman_health", "hanoman_models", "hanoman_codex_version", "hanoman_methods_status"]) {
+  it("tool observasi tak menuntut capability dan semuanya baca-saja", () => {
+    for (const n of ["hanoman_health", "hanoman_models", "hanoman_codex_version", "hanoman_antigravity_version", "hanoman_methods_status"]) {
       expect(byName(n).capability, n).toBeNull();
       expect(byName(n).mode, n).toBe("read");
     }
+  });
+
+  it("Antigravity version uses the additive read route and preserves its safe DTO", () => {
+    const tool = byName("hanoman_antigravity_version");
+    expect(tool.build({})).toEqual({ method: "GET", path: "/antigravity/version" });
+    expect(tool.shape({ version: "1.3.4", error: null }, {})).toEqual({ version: "1.3.4", error: null });
   });
 
   it("hanoman_health benar-benar memanggil /health (beda dari about yang build() = null)", () => {

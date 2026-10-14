@@ -1038,3 +1038,5 @@ export const zSchedulerCronRun = z.object({
   manual: z.boolean(), createdAt: z.string(),
 });
 export type SchedulerCronRunView = z.infer<typeof zSchedulerCronRun>;
+
+export type AntigravityVersionInfo = { version: string | null; error: string | null };

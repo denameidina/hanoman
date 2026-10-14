@@ -62,7 +62,7 @@ describe("properti mesin: terbaca tanpa capability, tak bisa ditulis (ADR-0187)"
   it("token TANPA capability apa pun → 200 di /models, /methods/status, /codex/version, /health", async () => {
     await seed(null);
     const h = await bearer([]);
-    for (const url of ["/api/models", "/api/methods/status", "/api/codex/version", "/api/health"])
+    for (const url of ["/api/models", "/api/methods/status", "/api/codex/version", "/api/antigravity/version", "/api/health"])
       expect((await app.inject({ method: "GET", url, headers: h })).statusCode, url).toBe(200);
   });
 
@@ -79,7 +79,7 @@ describe("properti mesin: terbaca tanpa capability, tak bisa ditulis (ADR-0187)"
   // sana harus cookie-only, bukan ikut terbuka karena prefix-nya `GLOBAL_READ`.
   it("method tulis di prefix yang sama diputus cookie-only — bahkan untuk token berkapasitas penuh", () => {
     const all = [...CAPABILITY_IDS];
-    for (const [method, url] of [["POST", "/api/models"], ["POST", "/api/methods/status"], ["PUT", "/api/codex/version"], ["DELETE", "/api/models"]] as const)
+    for (const [method, url] of [["POST", "/api/models"], ["POST", "/api/methods/status"], ["PUT", "/api/codex/version"], ["PUT", "/api/antigravity/version"], ["DELETE", "/api/models"]] as const)
       expect(checkAgentCapability(all, method, url), `${method} ${url}`).toEqual({ ok: false, status: 403, reason: "cookie-only" });
   });
 

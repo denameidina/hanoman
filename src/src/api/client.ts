@@ -1,5 +1,5 @@
 import { paths, type Paginated, type ProjectView, type Spec, type SpecListItem, type Setting, type Notification, type VpsView, type VpsCheck, type ChecklistView, type RemediateStep, type AuthStatus, type UserView, type LimitsDTO, type PrdDoc, type DeviceTokenView, type SessionResultView, type SessionHistoryView, type ConfigResponse, type ConfigEntryView, type TicketView, type TicketDetail, type TicketEditInput, type AgentTokenView, type CapabilityInfo, type SyncConflictView, type BreakdownDoc, type BreakdownItem, type Scheduler, type SchedulerConfigView, type SchedulerStateView, type SchedulerQueueItemView, type Agent, type AgentRuntime, type AuditEscalationView, type VerifyScope, type Lead, type LeadStatusView, type LeadDecisionView, type LeadFlowView, type CustomAgentView, type CreateCustomAgent, type UpdateCustomAgent, type AgentCatalogView, type AgentMetricsView, type AgentInvocationView, type AgentDisposition, type GithubIssueView, type TelegramGatewayStatus, type TelegramCredentialsView, type TelegramTestResult, type TelegramClearResult, type WebhookEndpointView, type WebhookDeliveryView, type WebhookTestResult, type CreateWebhookEndpoint, type UpdateWebhookEndpoint, type AutoMerge, type ClientAccountView, type SchedulerCronView, type SchedulerCronRunView, type MethodStatusResponse, type WorktreeCleanupView, type TerminalWorkspaceSnapshot, type TerminalWorkspaceWrite, type SpecAttachmentView, type HandledByEntry, type PresenceView,
-  type ProvisionComponent, type ComponentProbe, type ComponentId, type ProvisionProfile,
+  type AntigravityVersionInfo, type ProvisionComponent, type ComponentProbe, type ComponentId, type ProvisionProfile,
   type ProvisionStep, type ProvisionResult,
   type SessionDialogAnswer, type SessionDialogPayload,
   type SetupStatus, type SetupApplyResult, type PhaseOverrides,
@@ -336,6 +336,7 @@ export function createApi(o: { base?: string } = {}) {
   deleteTelegramCredentials: () => j<TelegramClearResult>(paths.telegramCredentials, { method: "DELETE" }),
   // SPEC-339 · versi codex CLI; dipakai catatan "CLI terlalu tua" di Settings & picker Start.
   getCodexVersion: () => j<{ version: string | null; minRequired: string; ok: boolean }>(paths.codexVersion),
+  getAntigravityVersion: () => j<AntigravityVersionInfo>(paths.antigravityVersion),
   // SPEC-739 · ADR-0114 · kesiapan skill metode per agen. LOCAL-only, diturunkan live dari disk.
   getMethodStatus: () => j<MethodStatusResponse>(paths.methodStatus),
   // SPEC-215 · config runtime

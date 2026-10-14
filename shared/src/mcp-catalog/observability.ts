@@ -1,7 +1,7 @@
 // ADR-0187 · ADR-0188 · ADR-0189 · katalog tool domain observabilitas mesin, log aktivitas, dan
 // obrolan portal sisi operator. Tiga kelompok, tiga capability berbeda:
 //
-//   - `/health`, `/models`, `/codex/version`, `/methods/status` → `GLOBAL_READ` (ADR-0187):
+//   - `/health`, `/models`, `/codex/version`, `/antigravity/version`, `/methods/status` → `GLOBAL_READ` (ADR-0187):
 //     properti MESIN, bukan properti akun, tanpa satu pun capability. `capability: null`.
 //   - `/session-results` → `activity:read` / `activity:write` (ADR-0188).
 //   - `/portal-chat/*` → `portal-chat:read` / `portal-chat:write` (ADR-0189).
@@ -95,6 +95,16 @@ const OBSERVE: readonly McpToolDef[] = [
     inputSchema: obj({ properties: {} }),
     mode: "read", capability: null, samplePath: "/codex/version", sampleMethod: "GET",
     build: () => ({ method: "GET", path: "/codex/version" }),
+    shape: (raw) => raw,
+  },
+  {
+    name: "hanoman_antigravity_version",
+    title: "Versi Antigravity CLI",
+    description:
+      "Versi Antigravity CLI pada boundary sesi saat ini: `{version,error}`. Versi semver atau null beserta alasan aman bila biner hilang, timeout, keluaran tidak dikenal, atau sandbox belum didukung. Tidak memuat keluaran CLI mentah atau kredensial; kegagalan observasi tidak memblokir sesi host. Cache 5 menit, invalidasi saat biner/boundary berubah. Tak menuntut capability apa pun.",
+    inputSchema: obj({ properties: {} }),
+    mode: "read", capability: null, samplePath: "/antigravity/version", sampleMethod: "GET",
+    build: () => ({ method: "GET", path: "/antigravity/version" }),
     shape: (raw) => raw,
   },
   {

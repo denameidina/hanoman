@@ -528,3 +528,37 @@ Shared typecheck exit0. Server hanya pending label Telegram Task13; frontend han
 defaults/EngineValue Task12, tanpa error Task9. Log teredaksi disimpan pada ignored workspace
 `.superpowers/sdd/2026-10-14-spec-1442-antigravity-cli-runtime/Task9-*.log`.
 Smoke endpoint akhir tetap Task 14.
+
+## Observasi versi additive (Task 10)
+
+`antigravity-version.ts` membaca biner efektif DB→env→`agy` lewat resolver Task 3 dan
+`GET /api/antigravity/version` terdaftar pada `app.ts` (registrasi route milik aplikasi,
+bukan entrypoint server). Versi nyata biner lokal `agy --version` teramati `1.3.4`; parser
+hanya menerima semver lengkap, termasuk prerelease/build sah, bukan angka di diagnostic.
+Probe berjalan dengan env Antigravity, argumen tunggal `--version`, timeout 10 detik dengan
+SIGKILL per-child dan output maksimal 16 KiB tiap stdout/stderr. Error DTO selalu pesan
+statis yang membedakan missing, timeout, parse, output-bound, dan boundary unsupported.
+Raw stdout/stderr, credential, home, atau argv tidak pernah dibawa ke API/cache.
+
+Service cache 5 menit keyed biner efektif dan mode sandbox/hardening. Read serentak pada key
+yang sama berbagi promise; bin/boundary change membuang cache dan memulai generasi baru.
+Completion memeriksa ulang key/generation dan cleanup memeriksa identity promise, sehingga
+success/error lama tidak menimpa cache atau menghapus refresh baru. Boundary sandbox aktif/
+hardening mengembalikan null + reason tanpa spawn executable host; gagal observasi bukan
+gerbang launch host. `getAntigravityVersion()` client hanya tersedia sebagai getter, tanpa
+fetch tambahan di UI lama atau minimum client rekaan.
+
+Keputusan MCP ADR-0202: tool baru `hanoman_antigravity_version` mode read/capability null,
+backed by `GLOBAL_READ` hanya pada GET/HEAD `/antigravity/version`. Method tulis dan sibling
+route tetap cookie-only. Auth anonim 401, cookie admin/token kosong capability 200. Endpoint
+Codex dan DTO `{version,minRequired,ok}` unchanged. Test route/cache/parser/fake executable,
+auth dan MCP catalog/capability/coverage terarah; smoke server nyata sekali akhir Task 14.
+
+Verification Task 10: RED selected 4 files (9 failed, 151 passed; absent service/route/tool/
+authorization); corrected route test seed to a valid existing Settings blob after tracing its
+401 to master-off fallback. Final targeted 10 files/265 tests passed, including 11 version
+probe/cache tests, 5 route tests, 6 unchanged Codex version tests, catalog/capability/coverage,
+observability gate and existing API client consumers. Real fake-executable timeout 10.006 s.
+Shared typecheck exit 0; server reports only pending Task 13 Telegram runtime label, frontend
+only pending Task 12 RuntimeDefs/EngineValue/default fields; no Task 10 diagnostic or suppression.
+Logs are in ignored `.superpowers/sdd/2026-10-14-spec-1442-antigravity-cli-runtime/Task10-*.log`.
