@@ -29,6 +29,9 @@ import { CronReports } from "./CronReports";
 import "./styles/scheduler.css";
 
 const PAGE = 10;
+// Mode "Semua project" memuat seluruh cron sekaligus lalu mengelompokkan & memaginasi di klien:
+// jumlah cron per mesin kecil, dan pengelompokan per project tak mungkin benar bila dipotong server.
+const ALL_LIMIT = 500;
 
 // 409 dan penolakan lain membawa kalimatnya sendiri di `detail.error`; itu lebih berguna daripada
 // "gagal" saja, jadi didahulukan.
@@ -137,7 +140,12 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
   const zone = timeZone ?? browserTimeZone();
   const at: At = (iso) => fmtAt(iso, zone);
   // SPEC-740 · ADR-0115 · project yang dipilih & seksi riwayat yang ter-expand bertahan.
-  const [projectId, setProjectId] = usePersistedState("scheduler", "cronProject", projects[0]?.id ?? "", isStr);
+  // "" = Semua project (default). ID tersimpan yang project-nya sudah tiada dianggap "Semua".
+  const [savedProject, setProjectId] = usePersistedState("scheduler", "cronProject", "", isStr);
+  const projectId = projects.some((p) => p.id === savedProject) ? savedProject : "";
+  const [page, setPage] = usePersistedState("scheduler", "cronListPage", 1, isNum);
+  // Project tujuan cron BARU saat daftar sedang menampilkan semua project.
+  const [createProject, setCreateProject] = React.useState("");
   const [items, setItems] = React.useState<SchedulerCronView[]>([]);
   const [loaded, setLoaded] = React.useState(false);
   const [listError, setListError] = React.useState<string | null>(null);
@@ -151,15 +159,27 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
   const project = projects.find((p) => p.id === projectId);
 
   const load = React.useCallback(() => {
-    if (!projectId) { setItems([]); setListError(null); setLoaded(true); return; }
-    api.listCrons({ projectId, page: 1, limit: 100 })
+    if (projects.length === 0) { setItems([]); setListError(null); setLoaded(true); return; }
+    api.listCrons({ projectId: projectId || undefined, page: 1, limit: ALL_LIMIT })
       .then((r) => { setItems(r.items); setListError(null); setLoaded(true); })
       .catch((e) => { setListError(failureMessage("memuat daftar cron", e)); setLoaded(true); });
-  }, [projectId]);
+  }, [projectId, projects.length]);
   // Ganti project = kosongkan dulu daftar project lama, supaya cron-nya tak tampil di bawah nama baru.
   React.useEffect(() => { setItems([]); setLoaded(false); load(); }, [load]);
 
-  const openForm = (c?: SchedulerCronView) => { setEditing(c ?? null); setDraft(draftFrom(c)); setFormTab("dasar"); };
+  const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? "Project lain";
+  // Urut menurut urutan project (stabil), lalu pembuatan terbaru dulu (urutan server dipertahankan).
+  const ordered = React.useMemo(() => {
+    const rank = new Map(projects.map((p, i) => [p.id, i]));
+    return [...items].sort((a, b) => (rank.get(a.projectId) ?? 1e9) - (rank.get(b.projectId) ?? 1e9));
+  }, [items, projects]);
+  const sp = serverPage(ordered.length, page, PAGE);
+  const visible = ordered.slice((sp.page - 1) * PAGE, sp.page * PAGE);
+
+  const openForm = (c?: SchedulerCronView) => {
+    setEditing(c ?? null); setDraft(draftFrom(c)); setFormTab("dasar");
+    setCreateProject(projectId || projects[0]?.id || "");
+  };
 
   const expr = exprOf(draft);
   const validExpr = parseCron(expr) !== null;
@@ -177,7 +197,7 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
         });
       } else {
         await api.createCron({
-          project: projectId, name: draft.name, expr, prompt: draft.prompt, enabled: draft.enabled,
+          project: createProject, name: draft.name, expr, prompt: draft.prompt, enabled: draft.enabled,
           agent: draft.agent || undefined, model: draft.model || undefined, effort: draft.effort || undefined,
         });
       }
@@ -208,7 +228,7 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
       title: "Hapus cron ini?",
       eyebrow: "scheduler · cronjob",
       impact: [
-        `Cron "${c.name}" di project ${project?.name ?? "ini"} dihapus permanen.`,
+        `Cron "${c.name}" di project ${projectName(c.projectId)} dihapus permanen.`,
         "Jadwalnya berhenti dan tidak akan dijalankan lagi.",
         "Tindakan ini tidak bisa dibatalkan.",
       ],
@@ -252,9 +272,9 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
     <div className="hn-sched-panel">
       <div className="hn-sched-toolbar">
         <Select value={projectId} aria-label="Project"
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setProjectId(e.target.value)}
-          options={projects.map((p) => ({ value: p.id, label: p.name }))} />
-        <Button size="sm" leftIcon="plus" disabled={!projectId} onClick={() => openForm()}>Cron baru</Button>
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setProjectId(e.target.value); setPage(1); }}
+          options={[{ value: "", label: "Semua project" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]} />
+        <Button size="sm" leftIcon="plus" disabled={projects.length === 0} onClick={() => openForm()}>Cron baru</Button>
       </div>
       <p className="hn-sched-caption">
         Jam ditampilkan dalam zona server <b>{zone}</b>
@@ -282,7 +302,7 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
         : !loaded
           ? <SkeletonList rows={3} label="Memuat daftar cron…" />
           : items.length === 0
-            ? <p className="hn-sched-empty">Belum ada cron di project ini.</p>
+            ? <p className="hn-sched-empty">{projectId ? "Belum ada cron di project ini." : "Belum ada cron di project mana pun."}</p>
             : (
               <LocalOverflow>
                 <table className="hn-sched-table">
@@ -296,8 +316,20 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((c) => (
+                    {visible.map((c, i) => (
                       <React.Fragment key={c.id}>
+                        {!projectId && c.projectId !== visible[i - 1]?.projectId && (
+                          <tr className="hn-sched-group-row">
+                            <th scope="colgroup" colSpan={5}>
+                              <span className="hn-sched-row-head">
+                                <span className="hn-sched-group-title">{projectName(c.projectId)}</span>
+                                <Badge tone="neutral" size="sm">{ordered.filter((x) => x.projectId === c.projectId).length} cron</Badge>
+                                {projects.find((p) => p.id === c.projectId)?.schedulerOptIn === false &&
+                                  <Badge tone="warn" size="sm">belum diizinkan</Badge>}
+                              </span>
+                            </th>
+                          </tr>
+                        )}
                         <tr>
                           <td data-label="Cron">
                             <span className="hn-sched-row-head">
@@ -325,11 +357,14 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
                 </table>
               </LocalOverflow>
             )}
+      {!listError && loaded && ordered.length > PAGE && (
+        <Pager page={sp.page} pageCount={sp.pageCount} total={ordered.length} from={sp.from} to={sp.to} onPage={setPage} unit="cron" />
+      )}
 
-      {projectId && (
+      {projects.length > 0 && (
         <section className="hn-sched-reports" aria-label="Laporan run cron">
           <h3>Laporan run cron</h3>
-          <CronReports projectId={projectId} />
+          <CronReports projectId={projectId || undefined} projectName={projectName} />
         </section>
       )}
 
@@ -344,6 +379,13 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
         <Tabs tabs={[{ value: "dasar", label: "Dasar" }, { value: "lanjutan", label: "Lanjutan" }]}
           value={formTab} onChange={(v) => setFormTab(v as FormTab)}>
           <TabPanel value="dasar" className="hn-sched-panel">
+            {!editing && !projectId && (
+              <Field label="Project">
+                <Select aria-label="Project cron baru" value={createProject}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCreateProject(e.target.value)}
+                  options={projects.map((p) => ({ value: p.id, label: p.name }))} />
+              </Field>
+            )}
             <Field label="Nama cron">
               <Input aria-label="Nama cron" placeholder="mis. Cek error produksi pagi" value={draft.name}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDraft((d) => ({ ...d, name: e.target.value }))} />

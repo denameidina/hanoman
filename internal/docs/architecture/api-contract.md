@@ -2342,6 +2342,11 @@ GET    /api/telegram/audit?chatId&updateId&take&skip
 
 POST   /api/terminal/sessions/:id/steer { text }
 POST   /api/terminal/sessions/:id/interrupt
+PATCH  /api/terminal/sessions/:id { name }   # rename sesi: nama kustom (maks 80 char, satu baris) di opsi tmux
+                                              #   @hanoman_name → muncul sebagai `name` di GET /terminal/sessions
+                                              #   dan siar `sessions`. name "" menghapusnya (respons `name: null`).
+                                              #   400 body cacat · 404 sesi tak ada. Capability sessions:write;
+                                              #   MCP: hanoman_session_rename (ADR-0202).
 ```
 
 ### Command runtime — dicegat server (SPEC-492)

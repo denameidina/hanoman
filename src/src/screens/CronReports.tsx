@@ -46,7 +46,7 @@ function ReportBody({ id }: { id: string }) {
   );
 }
 
-export function CronReports({ projectId }: { projectId: string }) {
+export function CronReports({ projectId, projectName }: { projectId?: string; projectName?: (id: string) => string }) {
   const [items, setItems] = React.useState<CronReportView[]>([]);
   const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(1);
@@ -68,11 +68,21 @@ export function CronReports({ projectId }: { projectId: string }) {
   if (!loaded) return <SkeletonList rows={2} label="Memuat laporan cron…" />;
   if (total === 0) return <p className="hn-sched-empty">Belum ada laporan. Laporan tersimpan otomatis dari pesan akhir tiap run cron.</p>;
   const sp = serverPage(total, page, PAGE);
+  // Mode "Semua project": kelompokkan per project dalam halaman yang tampil (urutan kemunculan,
+  // terbaru dulu), dengan judul project di atas tiap kelompok.
+  const grouped = !projectId && projectName;
+  const shown = grouped
+    ? [...items].sort((a, b) => items.findIndex((x) => x.projectId === a.projectId) - items.findIndex((x) => x.projectId === b.projectId))
+    : items;
   return (
     <>
       <RowList label="Laporan run cron">
-        {items.map((r) => (
-          <DenseRow key={r.id}>
+        {shown.map((r, i) => (
+          <React.Fragment key={r.id}>
+          {grouped && r.projectId !== shown[i - 1]?.projectId && (
+            <h4 className="hn-sched-group-title hn-sched-group-sub">{projectName(r.projectId)}</h4>
+          )}
+          <DenseRow>
             <span className="hn-sched-row-text">
               <span className="hn-sched-row-head">
                 <span className="hn-sched-row-title">{r.cronName}</span>
@@ -86,6 +96,7 @@ export function CronReports({ projectId }: { projectId: string }) {
               {open === r.id && <ReportBody id={r.id} />}
             </span>
           </DenseRow>
+          </React.Fragment>
         ))}
       </RowList>
       <Pager page={sp.page} pageCount={sp.pageCount} total={total} from={sp.from} to={sp.to} onPage={setPage} unit="laporan" />

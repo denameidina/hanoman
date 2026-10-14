@@ -50,6 +50,8 @@ export type TerminalSession = {
   decisionAt?: string;
   // ADR-0164 · model/effort orchestrator (argv saat lahir) dan penanda sesi diorkestrasi.
   model?: string; effort?: string; orchestrated?: boolean;
+  /** Nama kustom hasil rename operator; absen = label turunan (project · spec · judul). */
+  name?: string;
 };
 // SPEC-167 · respons dry-run PATCH /specs/:id saat revert akan menghapus artefak.
 export type RevertPending = { pending: true; stage: string; wouldDelete: string[] };
@@ -543,6 +545,9 @@ export function createApi(o: { base?: string } = {}) {
   // memang tak punya worktree).
   deleteTerminal: (id: string) =>
     j<{ cleanup: string | null }>(paths.terminalSession(id), { method: "DELETE" }),
+  // Rename sesi: nama kosong menghapus nama kustom (server mengembalikan `name: null`).
+  renameTerminal: (id: string, name: string) =>
+    j<{ id: string; name: string | null }>(paths.terminalSession(id), { method: "PATCH", ...body({ name }) }),
   listCleanups: () => j<{ items: WorktreeCleanupView[] }>(paths.terminalCleanups),
   // SPEC-919 · ADR-0147 · muat awal halaman Klien; sesudah itu grup siar `presence` yang mendorong.
   presence: () => j<PresenceView>(paths.presence),

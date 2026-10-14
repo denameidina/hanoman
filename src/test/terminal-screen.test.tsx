@@ -47,6 +47,7 @@ const listTerminals = vi.fn();
 const createTerminal = vi.fn();
 const createShell = vi.fn();
 const deleteTerminal = vi.fn();
+const renameTerminal = vi.fn();
 const startSession = vi.fn();
 const listSpecs = vi.fn();   // SPEC-198 · picker startable via API
 // SPEC-517 · "Sesi baru" membuka form runtime yang membaca setelan global + versi codex CLI.
@@ -63,6 +64,7 @@ vi.mock("../src/api/client", () => ({
     createTerminal: (...a: unknown[]) => createTerminal(...a),
     createShell: (...a: unknown[]) => createShell(...a),
     deleteTerminal: (...a: unknown[]) => deleteTerminal(...a),
+    renameTerminal: (...a: unknown[]) => renameTerminal(...a),
     listBranches: vi.fn(async () => ({ branches: [], remotes: [] })),
     startSession: (...a: unknown[]) => startSession(...a),
     listSpecs: (...a: unknown[]) => listSpecs(...a),
@@ -1282,6 +1284,20 @@ describe("TerminalScreen · aksi tetap terjangkau saat sempit (SPEC-800)", () =>
     expect(within(menu).getByRole("menuitem", { name: "Review perubahan" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Lepas dari grid" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Layar penuh" })).toBeInTheDocument();
+  });
+
+  it("Ganti nama: menu ⋯ membuka dialog, menyimpan lewat API, dan nama kustom jadi judul sel", async () => {
+    stubResizeObserver(900);
+    oneSession();
+    renameTerminal.mockResolvedValue({ id: "aaaa1111", name: "Perbaiki login" });
+    render(<TerminalScreen projects={projects} onOpenReview={() => {}} />);
+    await screen.findByTestId("pane");
+    await cellAction("aaaa1111", "Ganti nama");
+    const input = await screen.findByLabelText("Nama sesi");
+    fireEvent.change(input, { target: { value: "Perbaiki login" } });
+    fireEvent.click(screen.getByRole("button", { name: "Simpan" }));
+    await waitFor(() => expect(renameTerminal).toHaveBeenCalledWith("aaaa1111", "Perbaiki login"));
+    expect(await screen.findByText(/Perbaiki login · aaaa11/)).toBeInTheDocument();
   });
 
   it("aksi sekunder juga di menu pada sel lebar; tak ada yang inline selain Tutup", async () => {

@@ -1039,6 +1039,9 @@ Berkas (`src/src/screens/qa/`; CSS baru di `src/src/screens/styles/qa.css`, dimu
 
 - `QaWorkspace.tsx`: toolbar lima kontrol (Project, Sinkronkan QA, Laporan baru, Impor, Unduh template). Daftar memuat
   dengan `SkeletonList`. Modal impor dan buat laporan memakai `Field` DS; berkas native diberi `aria-label`.
+  Default `/qa` = **Semua project**: daftar tiap project diambil paralel di klien (API laporan tetap per project, tanpa
+  endpoint baru), dikelompokkan per project, dipaginasi 10 laporan/halaman; modal baru/impor memuat kolom "Project
+  tujuan". `/qa/<projectId>` tetap membuka satu project.
 - `QaReportList.tsx`: `RowList`. Baris = kode · status (`Badge` titik) · judul · versi dan penguji · lulus n/m · temuan ·
   keputusan · "Diubah …" (`relativeTime`). Satu pintu unduh per baris: ZIP.
 - `QaReportEditor.tsx`: 
@@ -1319,7 +1322,7 @@ menyapu sisanya. Nilai yang gagal di-parse atau salah bentuk jatuh ke default, t
 | backlog | — | `tab`, `view`, `q`, `stage`, `prio`, `dateField`, `from`, `to`, `page`, `detailId`, scroll |
 | triage | — | `tab`, `project`, `status`, `q`, `page`, `openId`, scroll |
 | team | — | `view`, `q`, `col`, `member`, `zoom` (ADR-0153), `expanded` (ADR-0154) — **tanpa `page`**: papan tim tak dipaginasi (ADR-0151) |
-| scheduler | — | `queue-<status>-page`, `cronRunsPage`, `cronProject`, `cronOpenRuns` |
+| scheduler | — | `queue-<status>-page`, `cronRunsPage`, `cronProject` (""=Semua project, default), `cronListPage`, `cronOpenRuns` |
 | lead | — | `filter`, `decPage`, `flowPage` |
 | terminal | — | `project`; mapping grid kanonik di server per user (ADR-0118) |
 | ide | project | `tab`, `viewRef`, `selected`, `selKind`, `mdView`, `stagedView`, `changedView`, `diffTab` |

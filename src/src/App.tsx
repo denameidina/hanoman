@@ -1843,13 +1843,13 @@ function AppInner() {
       </Shell>
     );
   } else if (section === "qa") {
-    // Workspace QA · /qa → project pertama; /qa/<projectId> → laporan project itu.
-    const qaProjectId = route?.projectId ?? projects[0]?.id;
+    // Workspace QA · /qa → semua project; /qa/<projectId> → laporan project itu.
+    const qaProjectId = route?.projectId;
     screen = (
       <Shell active="qa" title="QA" wide onNavigate={setSection} breadcrumb="qa · laporan per project">
         {hubTabs}
-        {gate(<QaWorkspace key={qaProjectId ?? "none"} projects={projects} projectId={qaProjectId}
-          onSelectProject={(id) => navigate(routePath({ section: "qa", projectId: id }))} onToast={showToast}
+        {gate(<QaWorkspace key={qaProjectId ?? "all"} projects={projects} projectId={qaProjectId}
+          onSelectProject={(id) => navigate(routePath({ section: "qa", projectId: id || undefined }))} onToast={showToast}
           onOpenSession={(id) => { setFocusSession(id); setSection("terminal"); }} />)}
       </Shell>
     );

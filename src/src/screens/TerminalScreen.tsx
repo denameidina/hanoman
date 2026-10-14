@@ -1,6 +1,6 @@
 import React from "react";
 import { subscribeTick } from "../lib/shared-ticker";
-import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Badge, StatusPill, Callout,
+import { Button, IconButton, Icon, Select, StateBlock, Modal, Input, Field, Badge, StatusPill, Callout,
   ProductStateIllustration, Tabs, OverflowActions, useResponsiveTier, useCoarsePointer, usePopoverFocus,
   useConfirm, useToast, Toast, type OverflowItem } from "../ds";
 import { failureMessage } from "../lib/report-error";
@@ -138,6 +138,9 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   // Tampilan (font, papan tombol, ketik responsif, diagnostik) di ponsel: sheet dari menu ⋯, bukan
   // baris toolbar. Di tablet/desktop ia tetap menjadi panel dari tombol "Tampilan terminal".
   const [displayOpen, setDisplayOpen] = React.useState(false);
+  // Rename sesi: id yang sedang diubah namanya + isi kolom. Nama kosong = hapus nama kustom.
+  const [renaming, setRenaming] = React.useState<{ id: string; value: string } | null>(null);
+  const [renameBusy, setRenameBusy] = React.useState(false);
   const [sessionDialog, setSessionDialog] = React.useState<{ kind: SessionDialogKind; sessionId: string } | null>(null);
   const launchAdmission = useLaunchAdmission();
   // Tutup sesi hidup menghentikan agen: selalu lewat dialog aplikasi, bukan confirm native.
@@ -431,6 +434,24 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
       showToast(failureMessage(`menutup sesi ${id.slice(0, 6)}`, e), "err", "x-circle");
     });
   }
+  async function submitRename() {
+    if (!renaming || renameBusy) return;
+    const { id, value } = renaming;
+    setRenameBusy(true);
+    try {
+      const r = await api.renameTerminal(id, value);
+      // Optimistis; siaran `sessions` berikutnya membawa nama yang sama dari tmux.
+      setSessions((list) => list.map((x) => {
+        if (x.id !== id) return x;
+        const { name: _old, ...rest } = x;
+        return r.name ? { ...rest, name: r.name } : rest;
+      }));
+      setRenaming(null);
+      showToast(r.name ? "Nama sesi disimpan" : "Nama kustom dihapus", "ok");
+    } catch (e) {
+      showToast(failureMessage("mengganti nama sesi", e), "err", "x-circle");
+    } finally { setRenameBusy(false); }
+  }
   // Menutup sesi yang masih berjalan = menghentikan agennya, jadi selalu dikonfirmasi (tone danger).
   // Nama sesi disebut di judul supaya dialog ini tak mungkin menutup sesi lain.
   async function requestKill(id: string) {
@@ -462,13 +483,14 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
   const current = {
     killSession, requestKill, detach: (id: string) => { void mutateWorkspace((c) => W.detach(c, id)); }, markExited, setFullId,
     openDialog: (kind: SessionDialogKind, sessionId: string) => setSessionDialog({ kind, sessionId }),
+    openRename: (id: string) => setRenaming({ id, value: byId(id)?.name ?? "" }),
     props: { onOpenReview, onOpenSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf },
   };
   const latest = React.useRef(current);
   latest.current = current;
   const cellHandlers = React.useRef(new Map<string, {
     onClose: () => void; onForget: () => void; onDetach: () => void; onExit: (code: number) => void;
-    onFullscreen: () => void; onDialog: (kind: SessionDialogKind) => void;
+    onFullscreen: () => void; onDialog: (kind: SessionDialogKind) => void; onRename: () => void;
   }>());
   const handlersFor = (id: string) => {
     let h = cellHandlers.current.get(id);
@@ -478,6 +500,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         onDetach: () => latest.current.detach(id),
         onExit: (code) => latest.current.markExited(id, code), onFullscreen: () => latest.current.setFullId(id),
         onDialog: (kind) => latest.current.openDialog(kind, id),
+        onRename: () => latest.current.openRename(id),
       };
       cellHandlers.current.set(id, h);
     }
@@ -506,6 +529,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
     onDetach: handlersFor(s.id).onDetach,
     onFullscreen: handlersFor(s.id).onFullscreen,
     onKill: () => void requestKill(s.id),
+    onRename: handlersFor(s.id).onRename,
   });
   const stableProps = React.useRef({
     onOpenReview: (specId: string) => latest.current.props.onOpenReview?.(specId),
@@ -978,6 +1002,23 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
           onClose={() => setSessionDialog(null)} />
       )}
 
+      {renaming && (
+        <Modal open title="Ganti nama sesi" eyebrow="terminal" width={420} onClose={() => { if (!renameBusy) setRenaming(null); }}
+          footer={
+            <>
+              <Button size="sm" variant="ghost" disabled={renameBusy} onClick={() => setRenaming(null)}>Batal</Button>
+              <Button size="sm" leftIcon="save" disabled={renameBusy} onClick={() => void submitRename()}>Simpan</Button>
+            </>
+          }>
+          <Field label="Nama sesi" hint="Maksimal 80 karakter. Kosongkan untuk kembali ke nama otomatis.">
+            <Input aria-label="Nama sesi" autoFocus maxLength={80} value={renaming.value}
+              placeholder={byId(renaming.id) ? cellLabel({ ...byId(renaming.id)!, name: undefined }, nameOf, titleOf) : undefined}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRenaming({ id: renaming.id, value: e.target.value })}
+              onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter") void submitRename(); }} />
+          </Field>
+        </Modal>
+      )}
+
       {fullId && byId(fullId) && (
         <FullscreenTerminal session={byId(fullId)!}
           label={cellLabel(byId(fullId)!, nameOf, titleOf)}
@@ -999,6 +1040,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
 // sesi tanpa spec). Dipakai bersama oleh Cell dan FullscreenTerminal.
 function cellLabel(s: TerminalSession, nameOf: (pid: string) => string,
   titleOf?: (specId: string) => string | undefined): string {
+  if (s.name) return s.name;
   const proj = nameOf(s.projectId);
   const title = s.specId ? titleOf?.(s.specId) : undefined;
   if (s.specId) return `${proj} · ${s.specId}${title ? ` · ${title}` : ""}`;
@@ -1329,11 +1371,12 @@ export function PhaseStrip({ phases, compact = false, now }: {
 
 const Cell = React.memo(CellImpl);
 
-function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, screenReader, fullscreen, onFullscreen, onDialog, paneHidden }: {
+function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, screenReader, fullscreen, onFullscreen, onDialog, onRename, paneHidden }: {
   session: TerminalSession; nameOf: (pid: string) => string;
   onClose: () => void; onForget: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
   // Dialog dokumen/integrasi dipegang layar (satu tempat untuk sel, rail, dan pane fokus).
   onDialog: (kind: SessionDialogKind) => void;
+  onRename: () => void;
   onReview?: (specId: string) => void;
   onSessionReview?: (sessionId: string, title: string) => void;
   titleOf?: (specId: string) => string | undefined;
@@ -1395,7 +1438,7 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
   // memegang tombol × sendiri, jadi menunya tak memuat "Tutup".
   const menuItems = sessionMenuItems(session, {
     label, canArrange, specOf, onReview, onSessionReview, onIntegrate, onIntegrateSession,
-    onDialog, onDetach, onFullscreen,
+    onDialog, onDetach, onFullscreen, onRename,
   });
   return (
     <>
@@ -1481,6 +1524,7 @@ type SessionMenuCtx = {
   onDialog: (kind: SessionDialogKind) => void;
   onDetach: () => void;
   onFullscreen: () => void;
+  onRename?: () => void;
   onKill?: () => void;
 };
 
@@ -1514,6 +1558,10 @@ export function sessionMenuItems(s: TerminalSession, c: SessionMenuCtx): Overflo
   if (branchSession && c.onIntegrateSession) {
     items.push({ key: "integrate-session", label: "Rebase / Merge branch", icon: "git-merge",
       title: "Rebase / Merge branch sesi", onSelect: () => c.onDialog("sessIntegrate") });
+  }
+  if (c.onRename) {
+    items.push({ key: "rename", label: "Ganti nama", icon: "pencil",
+      title: "Beri nama kustom pada sesi ini", onSelect: c.onRename });
   }
   items.push({ key: "detach", label: "Lepas dari grid", icon: "unlink", disabled: !c.canArrange,
     title: "Lepas dari grid (sesi tetap hidup)", onSelect: c.onDetach });

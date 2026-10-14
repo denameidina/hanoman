@@ -124,3 +124,8 @@ export const zTerminalSteerInput = z.object({
   text: z.string().trim().min(1).max(16_000),
 });
 export type TerminalSteerInput = z.infer<typeof zTerminalSteerInput>;
+
+/** Rename sesi terminal: nama kustom operator. String kosong = hapus nama kustom (kembali ke label turunan). */
+export const SESSION_NAME_MAX = 80;
+export const zTerminalRenameInput = z.object({ name: z.string().max(SESSION_NAME_MAX * 4) });
+export type TerminalRenameInput = z.infer<typeof zTerminalRenameInput>;

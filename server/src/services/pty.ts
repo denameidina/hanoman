@@ -12,7 +12,7 @@ import {
   writeSubagentStatusline, agentContractOf, type AgentContractFile, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
 import {
-  BUILTIN_AGENTS, coerceCodexEffort, isPhaseAgentName, isTerminalResponse, resolveChoices, type SessionKind,
+  BUILTIN_AGENTS, SESSION_NAME_MAX, coerceCodexEffort, isPhaseAgentName, isTerminalResponse, resolveChoices, type SessionKind,
 } from "@hanoman/shared";
 import {
   enrichPhases, readPhases, readPhasesAsync, sessionComplete, sessionCompleteAsync, trackDoneSeen, type Phase, type PhaseInvocation,
@@ -165,6 +165,8 @@ export type SessionInfo = {
   // ADR-0164 · model/effort orchestrator (argv saat lahir) + penanda sesi diorkestrasi. Absen untuk
   // sesi lama; `orchestrated` hanya ikut DTO bila true.
   model?: string; effort?: string; orchestrated?: boolean;
+  /** Nama kustom yang diberi operator (rename). Absen = UI memakai label turunan (spec/flow/project). */
+  name?: string;
 };
 export type Pane = SessionInfo & {
   // ADR-0161: metadata tmux internal; klasifikasi tidak mengubah hitungan semua pane hidup.
@@ -497,6 +499,8 @@ export const FMT = [
   "#{@hanoman_done_at_birth}",
   // SPEC-1218 · AC-C2 · geometri pane untuk frame `geometry` stream relay — di UJUNG juga.
   "#{pane_width}", "#{pane_height}",
+  // Nama kustom sesi (rename dari UI/MCP) — di UJUNG juga. Opsi tmux, jadi selamat dari restart API.
+  "#{@hanoman_name}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -536,7 +540,7 @@ export function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
       alternate, activity, eventHook, created, agentRoster, launchClass, model, effort,
-      orchestrated, doneAtBirth, paneWidth, paneHeight] = line.split("\t");
+      orchestrated, doneAtBirth, paneWidth, paneHeight, customName] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
     const activityAt = Number(activity);
@@ -573,6 +577,7 @@ export function parsePanes(out: string): Pane[] {
       // SPEC-1218 · AC-C2 · kosong (tmux lama tanpa kolom ini) → undefined, bukan NaN.
       width: paneWidth ? Number(paneWidth) : undefined,
       height: paneHeight ? Number(paneHeight) : undefined,
+      name: customName?.trim() || undefined,
     }];
   });
 }
@@ -600,7 +605,7 @@ function parseAgentRoster(value: string | undefined): SessionAgentMeta[] {
 }
 
 const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch, decision, agent,
-  decisionFile, activityAt, model, effort, orchestrated }: Pane): SessionInfo => ({
+  decisionFile, activityAt, model, effort, orchestrated, name }: Pane): SessionInfo => ({
   id, projectId, specId, flow, cwd, exited, branch, decision, agent,
   // Hanya untuk pane mati: `pane_dead_status` kosong pada pane hidup, dan `exitCode: 0` di sana
   // akan terbaca sebagai "sudah berakhir sukses".
@@ -609,6 +614,7 @@ const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch,
   ...(model ? { model } : {}),
   ...(effort ? { effort } : {}),
   ...(orchestrated ? { orchestrated: true } : {}),
+  ...(name ? { name } : {}),
 });
 
 export const listSessions = (): SessionInfo[] => listPanes().map(toSessionInfo);
@@ -1338,6 +1344,21 @@ export async function sendToPane(id: string, text: string, chunkMs = 50, choices
     io.enter();
     return true;
   } catch { return false; }                   // sesi lenyap di tengah pengetikan
+}
+
+/** Beri nama kustom pada sesi (hidup ATAU sudah berakhir tapi panenya masih ada). Nama kosong = hapus nama
+ * kustom. `false` = sesi tak ditemukan. Disimpan sebagai opsi tmux (pola @hanoman_agent). */
+export function renameSession(id: string, rawName: string): boolean {
+  if (!getSession(id)) return false;
+  // Satu baris saja: FMT dipisah tab/newline, jadi karakter kontrol akan merusak parsing daftar sesi.
+  const clean = rawName.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, SESSION_NAME_MAX);
+  try {
+    if (clean) tmux("set-option", "-t", name(id), "@hanoman_name", clean);
+    else tmux("set-option", "-u", "-t", name(id), "@hanoman_name");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Interrupt satu pane agen tanpa menyentuh proses/sesi tetangga. Escape adalah kontrak TUI

@@ -4,15 +4,18 @@
 // menggantikan state-nya — tak ada penghitungan nomor/statistik di klien.
 import React from "react";
 import type { QaReportDetail, QaReportView } from "@hanoman/shared";
-import { Button, Callout, Field, Input, Modal, Select, SkeletonList, StateBlock } from "../../ds";
+import { Button, Callout, Field, Input, Modal, Pager, Select, SkeletonList, StateBlock, serverPage } from "../../ds";
 import { useApi } from "../../api/instance";
 import "../styles/qa.css";
 import { QaReportEditor } from "./QaReportEditor";
 import { QaReportList } from "./QaReportList";
 import { errText } from "./qa-ui";
 
+const PAGE = 10;
+
 type Props = {
   projects: { id: string; name: string }[];
+  /** `undefined` dengan project yang ada = "Semua project" (default). */
   projectId: string | undefined;
   onSelectProject: (id: string) => void;
   onToast?: (m: string) => void;
@@ -21,6 +24,11 @@ type Props = {
 
 export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onOpenSession }: Props) {
   const api = useApi();
+  const all = !projectId && projects.length > 0;
+  // Project tujuan laporan BARU / impor saat daftar menampilkan semua project.
+  const [target, setTarget] = React.useState(projects[0]?.id ?? "");
+  const pid = projectId ?? target;
+  const [page, setPage] = React.useState(1);
   const [syncBusy, setSyncBusy] = React.useState(false);
   const [reports, setReports] = React.useState<QaReportView[] | null>(null);
   const [error, setError] = React.useState(false);
@@ -37,18 +45,22 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onO
   const [importWarnings, setImportWarnings] = React.useState<string[]>([]);
 
   const reload = React.useCallback(async () => {
-    if (!projectId) return;
+    if (!projectId && !all) return;
     setError(false);
-    try { setReports((await api.qaReports(projectId)).items); } catch { setError(true); }
-  }, [api, projectId]);
-  React.useEffect(() => { setOpen(null); setFreshId(null); setReports(null); setImportWarnings([]); setImporting(false); setImportFile(undefined); setAttachments([]); void reload(); }, [reload]);
+    try {
+      if (projectId) setReports((await api.qaReports(projectId)).items);
+      // Semua project: API laporan per project, jadi dikumpulkan paralel; urutan mengikuti urutan project.
+      else setReports((await Promise.all(projects.map((p) => api.qaReports(p.id)))).flatMap((r) => r.items));
+    } catch { setError(true); }
+  }, [api, projectId, all, projects]);
+  React.useEffect(() => { setOpen(null); setFreshId(null); setReports(null); setImportWarnings([]); setImporting(false); setImportFile(undefined); setAttachments([]); setPage(1); void reload(); }, [reload]);
 
-  if (!projectId) {
+  if (!projectId && !all) {
     return <StateBlock kind="empty" title="Belum ada project" hint="Buat atau muat project di halaman Projects, lalu buka QA lagi." />;
   }
 
-  const openReport = async (id: string) => {
-    try { setOpen(await api.qaReport(projectId, id)); } catch (e) { onToast?.(errText(e)); }
+  const openReport = async (r: Pick<QaReportView, "projectId" | "id">) => {
+    try { setOpen(await api.qaReport(r.projectId, r.id)); } catch (e) { onToast?.(errText(e)); }
   };
   const synchronize = async () => {
     if (syncBusy) return;
@@ -57,7 +69,7 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onO
       const result = await api.syncNow();
       if (!result.ok) { onToast?.(result.reason === "not-configured" ? "Sinkronisasi belum dikonfigurasi. Hubungkan server dan device token di Settings." : result.reason ?? "Sinkronisasi gagal"); return; }
       await reload();
-      if (open) setOpen(await api.qaReport(projectId, open.id));
+      if (open) setOpen(await api.qaReport(open.projectId, open.id));
       onToast?.("QA disinkronkan. Lampiran dipindahkan bertahap pada siklus sinkronisasi.");
     } catch (e) { onToast?.(errText(e)); }
     finally { setSyncBusy(false); }
@@ -66,7 +78,7 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onO
     const t = title.trim();
     if (!t) return;
     try {
-      const d = await api.createQaReport(projectId, { title: t });
+      const d = await api.createQaReport(pid, { title: t });
       setCreating(false); setTitle(""); setFreshId(d.id); setOpen(d); void reload();
     } catch (e) { onToast?.(errText(e)); }
   };
@@ -74,22 +86,30 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onO
     if (!importFile || importBusy) return;
     setImportBusy(true); setImportError(""); setImportWarnings([]);
     try {
-      const r = await api.importQaReport(projectId, importFile, attachments);
+      const r = await api.importQaReport(pid, importFile, attachments);
       const rej = r.attachments.rejected.length ? `, ${r.attachments.rejected.length} lampiran ditolak` : "";
       onToast?.(`${r.created ? "Diimpor" : "Diperbarui"}: ${r.cases} test case, ${r.findings} temuan, ${r.attachments.saved} lampiran${rej}`);
       setImportWarnings(r.attachments.rejected.map((a) => `${a.filename}: ${a.reason === "missing" ? "Berkas belum disertakan. Lampirkan dari laporan yang diimpor." : a.reason === "type" ? "Tipe berkas tidak didukung." : a.reason}`));
       setImporting(false); setImportFile(undefined); setAttachments([]);
       await reload();
-      await openReport(r.reportId);
+      await openReport({ projectId: pid, id: r.reportId });
     } catch (e) { setImportError(errText(e)); }
     finally { setImportBusy(false); }
   };
 
+  const paged = serverPage(reports?.length ?? 0, page, PAGE);
+  const targetField = all && (
+    <Field label="Project">
+      <Select aria-label="Project tujuan" value={target} onChange={(e) => setTarget(e.target.value)}
+        options={projects.map((p) => ({ value: p.id, label: p.name }))} />
+    </Field>
+  );
+
   return (
     <div className="hn-qa-stack">
       <div className="hn-qa-toolbar">
-        <Select aria-label="Project" className="hn-qa-toolbar-project" value={projectId} onChange={(e) => onSelectProject(e.target.value)}
-          options={projects.map((p) => ({ value: p.id, label: p.name }))} />
+        <Select aria-label="Project" className="hn-qa-toolbar-project" value={projectId ?? ""} onChange={(e) => onSelectProject(e.target.value)}
+          options={[{ value: "", label: "Semua project" }, ...projects.map((p) => ({ value: p.id, label: p.name }))]} />
         <Button variant="secondary" disabled={syncBusy} loading={syncBusy} onClick={() => void synchronize()}>Sinkronkan QA</Button>
         {!open && (
           <>
@@ -110,7 +130,7 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onO
         </div>
       )}
       {open ? (
-        <QaReportEditor key={open.id} detail={open} projectId={projectId} onChange={setOpen} onToast={onToast} onOpenSession={onOpenSession}
+        <QaReportEditor key={open.id} detail={open} projectId={open.projectId} onChange={setOpen} onToast={onToast} onOpenSession={onOpenSession}
           startOpen={open.id === freshId}
           onBack={() => { setOpen(null); setFreshId(null); void reload(); }}
           onDeleted={() => { setOpen(null); void reload(); }} />
@@ -119,12 +139,19 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onO
       ) : reports === null ? (
         <SkeletonList rows={3} label="Memuat laporan QA…" rowHeight={64} />
       ) : (
-        <QaReportList projectId={projectId} reports={reports} onOpen={(id) => void openReport(id)} />
+        <>
+          <QaReportList projects={all ? projects : undefined} reports={reports.slice((paged.page - 1) * PAGE, paged.page * PAGE)}
+            onOpen={(r) => void openReport(r)} />
+          {reports.length > PAGE && (
+            <Pager page={paged.page} pageCount={paged.pageCount} total={reports.length} from={paged.from} to={paged.to} onPage={setPage} unit="laporan" />
+          )}
+        </>
       )}
 
       <Modal open={importing} title="Impor laporan QA" width={620} onClose={() => { if (!importBusy) setImporting(false); }}
         footer={<><Button variant="ghost" disabled={importBusy} onClick={() => setImporting(false)}>Batal</Button><Button disabled={!importFile || importBusy} loading={importBusy} onClick={() => void doImport()}>Impor laporan</Button></>}>
         <div className="hn-qa-modal-stack">
+          {targetField}
           <p className="hn-qa-note">Isi template Excel, lalu pilih berkasnya di bawah. Laporan hasil ekspor juga dapat diimpor kembali.</p>
           <Field label="Berkas laporan (wajib)" hint="Excel (.xlsx), ZIP dengan Excel dan lampiran, atau Markdown (.md).">
             <input type="file" className="hn-qa-file" aria-label="Berkas laporan (wajib)" accept=".xlsx,.zip,.md" disabled={importBusy}
@@ -141,6 +168,7 @@ export function QaWorkspace({ projects, projectId, onSelectProject, onToast, onO
 
       <Modal open={creating} title="Laporan QA baru" onClose={() => setCreating(false)}
         footer={<><Button variant="ghost" onClick={() => setCreating(false)}>Batal</Button><Button onClick={() => void create()} disabled={!title.trim()}>Buat</Button></>}>
+        {targetField}
         <Field label="Judul" hint="Contoh: Pengujian fitur login versi 1.0">
           <Input value={title} autoFocus placeholder="mis. Regresi rilis 1.1" onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
             onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter") void create(); }} />
