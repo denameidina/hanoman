@@ -9,7 +9,7 @@ export type Autonomy = "full-control" | "butuh-keputusan";
 
 // SPEC-338 · ADR-0074 · mesin sesi. Cermin `zAgent` di @hanoman/shared (pola yang sama dipakai
 // Flow/zFlow): zod untuk validasi di batas HTTP, union TS untuk lapis runner/server.
-export type Agent = "claude" | "codex";
+export type Agent = "claude" | "codex" | "antigravity";
 
 // SPEC-376 · ADR-0080 · scope verifikasi sesi. Cermin `zVerifyScope` di @hanoman/shared (pola
 // yang sama dipakai Flow/zFlow dan Agent/zAgent).

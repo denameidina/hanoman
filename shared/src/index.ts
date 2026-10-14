@@ -51,3 +51,5 @@ export * from "./team";
 export * from "./model-catalog";
 export * from "./runtime-defaults";
 export * from "./skills";
+
+export * from "./antigravity";

@@ -2,14 +2,16 @@
 // Tanpa tabel, tanpa kolom, tanpa cache: status instalasi akan basi persis pada saat ia paling
 // menyesatkan — sesudah operator memasang skill yang kurang (cermin coverage docs ADR-0011/0018).
 import {
-  zAgent, METHODS, METHOD_IDS, methodStatus,
+  ANTIGRAVITY_METHOD_UNAVAILABLE_REASON, zAgent, METHODS, METHOD_IDS, methodStatus,
   type MethodStatusResponse, type MethodDef, type Agent,
 } from "@hanoman/shared";
 import { scanAgentSkills } from "@hanoman/runner";
 import { shellBin } from "./pty";
 
 export function methodStatusReport(env: NodeJS.ProcessEnv = process.env): MethodStatusResponse {
-  const scans = zAgent.options.map((a) => scanAgentSkills(a, env));
+  const scans = zAgent.options.map((a) => a === "antigravity"
+    ? { agent: a, home: "", roots: [], skills: [], packages: [] }
+    : scanAgentSkills(a, env));
   return {
     agents: scans.map((s) => ({ agent: s.agent, home: s.home, roots: s.roots, skills: s.skills.length })),
     methods: scans.flatMap((s) => {
@@ -27,5 +29,6 @@ export function methodStatusReport(env: NodeJS.ProcessEnv = process.env): Method
  * untuk pane tmux (ADR-0056; ADR-0037 & ADR-0087/0088 utuh).
  */
 export function installCommand(m: MethodDef, agent: Agent, shell = shellBin()): string[] {
+  if (agent === "antigravity") throw new Error(ANTIGRAVITY_METHOD_UNAVAILABLE_REASON);
   return [shell, "-lc", `${m.install[agent].join(" && ")}; exec '${shell}' -l`];
 }

@@ -18,6 +18,10 @@ export const zBuiltinRuntimeDefaults = z.object({
     model: zRuntimeDefaultState.default("seeded"),
     effort: zRuntimeDefaultState.default("seeded"),
   }).default({}),
+  antigravity: z.object({
+    model: zRuntimeDefaultState.default("seeded"),
+    effort: zRuntimeDefaultState.default("seeded"),
+  }).default({}),
   orchestration: z.record(z.string(), zRuntimeDefaultState).default({}),
 });
 export type BuiltinRuntimeDefaults = z.infer<typeof zBuiltinRuntimeDefaults>;
@@ -49,6 +53,7 @@ export const LEGACY_ORCHESTRATION_FLOW_DEFAULT = {
   executeMode: "inline",
   claude: {},
   codex: {},
+  antigravity: {},
 } as const;
 
 type PhaseCellDefault = { model: string; effort: string };
@@ -57,6 +62,7 @@ type FlowDefault = {
   executeMode: "inline" | "subagent";
   claude: Record<string, PhaseCellDefault>;
   codex: Record<string, PhaseCellDefault>;
+  antigravity: Record<string, { model: string; effort: null }>;
 };
 
 const cell = (model: string, effort: string): PhaseCellDefault => ({ model, effort });
@@ -64,7 +70,9 @@ const flow = (
   claude: Record<string, PhaseCellDefault>,
   codex: Record<string, PhaseCellDefault>,
   enabled = true,
-): FlowDefault => ({ enabled, executeMode: "inline", claude, codex });
+): FlowDefault => ({ enabled, executeMode: "inline", claude, codex,
+  antigravity: Object.fromEntries(Object.keys(claude).map((phase) => [phase, { model: "inherit", effort: null }])),
+});
 
 // Rekomendasi operasional (v2): effort mengikuti PERAN fase, bukan seragam.
 // - Fase penentu arah (Spec, Plan, Audit qa, Analisis, Doc index, PRD) → Opus/Sol · high: salahnya
@@ -183,7 +191,7 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
 
 const seededFlows = Object.fromEntries(ORCHESTRATION_FLOWS.flatMap((flow) => [
   [`${flow}.enabled`, "seeded"],
-  ...(["claude", "codex"] as const).flatMap((runtime) =>
+  ...(["claude", "codex", "antigravity"] as const).flatMap((runtime) =>
     FLOW_PHASES[flow].flatMap((phase) => [
       [`${flow}.${runtime}.${phase}.model`, "seeded"],
       [`${flow}.${runtime}.${phase}.effort`, "seeded"],
@@ -194,5 +202,6 @@ export const BUILTIN_RUNTIME_DEFAULTS: BuiltinRuntimeDefaults = {
   version: RUNTIME_DEFAULTS_VERSION,
   claude: { model: "seeded", effort: "seeded" },
   codex: { model: "seeded", effort: "seeded" },
+  antigravity: { model: "seeded", effort: "seeded" },
   orchestration: seededFlows,
 };

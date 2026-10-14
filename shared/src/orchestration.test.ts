@@ -7,6 +7,8 @@ import { CODEX_MODELS, MODELS, ORCHESTRATION_DEFAULTS, replaceModelCatalog, zOrc
 import { BUILTIN_ORCHESTRATION_DEFAULTS } from "./runtime-defaults";
 import { AGENT_NAME_RE } from "./custom-agent";
 
+import * as shared from "./index";
+
 const orchestrator = { model: "claude-opus-5", effort: "xhigh" };
 
 describe("FLOW_PHASES (ADR-0164)", () => {
@@ -54,7 +56,7 @@ describe("Setting.orchestration", () => {
   });
   it("sel parsial diisi null, flow lain tetap default", () => {
     const o = zOrchestration.parse({ qa: { enabled: false, executeMode: "inline" as const, claude: { Plan: { model: "claude-sonnet-5" } } } });
-    expect(o.qa).toEqual({ enabled: false, executeMode: "inline", claude: { Plan: { model: "claude-sonnet-5", effort: null } }, codex: {} });
+    expect(o.qa).toEqual({ enabled: false, executeMode: "inline", claude: { Plan: { model: "claude-sonnet-5", effort: null } }, codex: {}, antigravity: {} });
     expect(o.feature.enabled).toBe(true);
   });
 });
@@ -62,7 +64,7 @@ describe("Setting.orchestration", () => {
 describe("executeMode (amandemen ADR-0170 P2)", () => {
   it("default inline — di bawaan, di Setting lama tanpa field, dan di flow parsial", () => {
     for (const flow of ORCHESTRATION_FLOWS) expect(ORCHESTRATION_DEFAULTS[flow].executeMode).toBe("inline");
-    const legacy = zSetting.parse({ autoDefault: true, autoScaffold: true, notifyFail: true, orchestration: { feature: { enabled: true, executeMode: "inline" as const, claude: {}, codex: {} } } });
+    const legacy = zSetting.parse({ autoDefault: true, autoScaffold: true, notifyFail: true, orchestration: { feature: { enabled: true, executeMode: "inline" as const, claude: {}, codex: {}, antigravity: {} } } });
     expect(legacy.orchestration.feature.executeMode).toBe("inline");
     expect(zOrchestration.parse({ qa: { executeMode: "subagent" } }).qa.executeMode).toBe("subagent");
   });
@@ -80,7 +82,7 @@ describe("resolvePhasePlan", () => {
     orchestration: ORCHESTRATION_DEFAULTS, orchestrator, nativeAgents: true,
   };
   it("flow mati → null", () => {
-    const orchestration = { ...ORCHESTRATION_DEFAULTS, feature: { enabled: false, executeMode: "inline" as const, claude: {}, codex: {} } };
+    const orchestration = { ...ORCHESTRATION_DEFAULTS, feature: { enabled: false, executeMode: "inline" as const, claude: {}, codex: {}, antigravity: {} } };
     expect(resolvePhasePlan({ ...base, orchestration })).toBeNull();
   });
   it("runtime tanpa agen native → null", () => {
@@ -125,7 +127,7 @@ describe("resolvePhasePlan", () => {
       efforts: ["max", "xhigh", "high", "medium", "low"] }], CODEX_MODELS);
     try {
       const orchestration = { ...ORCHESTRATION_DEFAULTS,
-        feature: { enabled: true, executeMode: "inline" as const, claude: { Plan: { model: "fable", effort: null } }, codex: {} } };
+        feature: { enabled: true, executeMode: "inline" as const, claude: { Plan: { model: "fable", effort: null } }, codex: {}, antigravity: {} } };
       const plan = resolvePhasePlan({ ...base, orchestration, orchestrator: { model: "opus", effort: "ultracode" } })!;
       expect(plan.phases.find((p) => p.phase === "Plan")).toMatchObject({ model: "fable", effort: "xhigh" });
     } finally { replaceModelCatalog(before, CODEX_MODELS); }
@@ -133,7 +135,7 @@ describe("resolvePhasePlan", () => {
   it("codex membaca kolom codex dan mengoreksi effort ke fallback model", () => {
     const orchestration = { ...ORCHESTRATION_DEFAULTS, qa: { enabled: true, executeMode: "inline" as const,
       claude: { Execute: { model: "claude-sonnet-5", effort: "low" } },
-      codex: { Execute: { model: "gpt-5.6-luna", effort: null } } } };
+      codex: { Execute: { model: "gpt-5.6-luna", effort: null } }, antigravity: {} } };
     const plan = resolvePhasePlan({ ...base, flow: "qa", runtime: "codex", orchestration,
       orchestrator: { model: "gpt-5.6-sol", effort: "ultra" } })!;
     expect(plan.phases.find((p) => p.phase === "Execute")).toMatchObject({ model: "gpt-5.6-luna", effort: "xhigh" });
@@ -143,7 +145,7 @@ describe("resolvePhasePlan", () => {
   // atau `inherit`. Orchestrator ber-`default` yang diwarisi sel kosong harus jadi `inherit`.
   it("claude: `default` warisan orchestrator dirender `inherit`, bukan `default`", () => {
     const orchestration = { ...ORCHESTRATION_DEFAULTS,
-      feature: { enabled: true, executeMode: "inline" as const, claude: { Spec: { model: "opus", effort: null } }, codex: {} } };
+      feature: { enabled: true, executeMode: "inline" as const, claude: { Spec: { model: "opus", effort: null } }, codex: {}, antigravity: {} } };
     const plan = resolvePhasePlan({ ...base, orchestration,
       orchestrator: { model: "default", effort: "medium" },
       phaseOverrides: { Plan: { model: "default", effort: "low" } } })!;
@@ -183,7 +185,7 @@ describe("resolvePhasePlan", () => {
   });
   it("kunci fase asing di matriks tak menambah fase", () => {
     const orchestration = { ...ORCHESTRATION_DEFAULTS,
-      goal: { enabled: true, executeMode: "inline" as const, claude: { Foo: { model: "x", effort: "low" } }, codex: {} } };
+      goal: { enabled: true, executeMode: "inline" as const, claude: { Foo: { model: "x", effort: "low" } }, codex: {}, antigravity: {} } };
     expect(resolvePhasePlan({ ...base, flow: "goal", orchestration })!.phases.map((p) => p.phase))
       .toEqual(["Goal", "Verifikasi"]);
   });
@@ -196,4 +198,35 @@ describe("codexNativeAgentsSupported", () => {
     expect(codexNativeAgentsSupported("0.150.9")).toBe(false);
     expect(codexNativeAgentsSupported(null)).toBe(false);
   });
+});
+
+
+describe("Antigravity additive settings (SPEC-1442)", () => {
+  it("parses runtime/defaults in legacy rows and preserves future parent slugs", () => {
+    expect(shared.zAgent.parse("antigravity")).toBe("antigravity");
+    const legacy = { autoDefault: true, autoScaffold: true, notifyFail: true };
+    expect(zSetting.parse(legacy).antigravity).toEqual({ model: "gemini-3.8-flash-high", effort: "high" });
+    expect(zSetting.parse({ ...legacy, antigravity: { model: "future-model", effort: "future" } }).antigravity)
+      .toEqual({ model: "future-model", effort: "future" });
+    expect(shared.ANTIGRAVITY_CHILD_TIERS).toEqual(["inherit", "flash", "pro"]);
+    expect(zSetting.parse(legacy).builtinRuntimeDefaults.antigravity).toEqual({ model: "seeded", effort: "seeded" });
+  });
+  it("resolves native phase tiers with null effort separately from parent slugs", () => {
+    const settings = zSetting.parse({ autoDefault: true, autoScaffold: true, notifyFail: true,
+      orchestration: { feature: { antigravity: { Plan: { model: "flash", effort: null } } } } });
+    const plan = resolvePhasePlan({ flow: "feature", runtime: "antigravity", nativeAgents: true,
+      orchestrator: { model: "gemini-3.8-flash-high", effort: "high" }, orchestration: settings.orchestration });
+    expect(plan?.phases.find((p) => p.phase === "Plan")).toMatchObject({ model: "flash", effort: null });
+    expect(plan?.phases[0]).toMatchObject({ model: "inherit", effort: null });
+    expect(plan?.reviewer).toMatchObject({ model: "inherit", effort: null });
+  });
+});
+
+
+it("rejects incompatible native phase cells instead of silently choosing inherit", () => {
+  for (const cell of [{ model: "gemini-3.8-flash-high", effort: null }, { model: "flash", effort: "high" }]) {
+    const orchestration = zOrchestration.parse({ feature: { antigravity: { Plan: cell } } });
+    expect(() => resolvePhasePlan({ flow: "feature", runtime: "antigravity", nativeAgents: true,
+      orchestrator, orchestration })).toThrow(/tier native/);
+  }
 });

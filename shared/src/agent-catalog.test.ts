@@ -2,12 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   AGENT_RUNTIMES, ALL_TOOLS, ALL_TOOLS_ENTRY, BUILTIN_AGENT_TOOLS, mcpToolEntry,
   modelsForRuntime, expandTools, DEFAULT_AGENT_TOOLS, resolveTools, MENTION_TOOL,
-  effortsForRuntimeModel,
+  effortsForRuntimeModel, antigravityEfforts, AGENT_RUNTIME_LABELS,
 } from "./index";
 
 describe("AGENT_RUNTIMES", () => {
-  it("hanya dua mesin sesi, urut claude → codex", () => {
-    expect(AGENT_RUNTIMES).toEqual(["claude", "codex"]);
+  it("tiga mesin sesi, urut claude → codex → antigravity", () => {
+    expect(AGENT_RUNTIMES).toEqual(["claude", "codex", "antigravity"]);
   });
 });
 
@@ -96,4 +96,18 @@ describe("ALL_TOOLS_ENTRY", () => {
     expect(ALL_TOOLS_ENTRY.id).toBe(ALL_TOOLS);
     expect(ALL_TOOLS_ENTRY.group).toBe("shortcut");
   });
+});
+
+
+it("Antigravity child catalog contains tiers rather than parent models or effort", () => {
+  expect(modelsForRuntime("antigravity").map((entry) => entry.id)).toEqual(["inherit", "flash", "pro"]);
+  expect(effortsForRuntimeModel("antigravity", "flash")).toEqual([]);
+});
+
+
+it("Antigravity parent effort uses verified slug levels and preserves unknowns", () => {
+  expect(AGENT_RUNTIME_LABELS.antigravity).toBe("Antigravity CLI");
+  expect(antigravityEfforts("gemini-3.8-flash-high")).toEqual(["high"]);
+  expect(antigravityEfforts("gemini-future-low")).toEqual(["low"]);
+  expect(antigravityEfforts("future-unspecified")).toEqual([]);
 });

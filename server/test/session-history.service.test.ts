@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { prisma } from "../src/db";
 import {
   beginSession, finishSession, listHistory, getHistory, transcriptOf, purgeHistory, reconcileHistory,
-  reconcileTranscripts, reconciledSpecIdsSince,
+  reconcileTranscripts, reconciledSpecIdsSince, reconciledRuntimesSince,
 } from "../src/services/session-history";
 import { transcriptDir } from "../src/services/transcript-store";
 
@@ -303,4 +303,13 @@ describe("reconcileTranscripts (SPEC-845)", () => {
     expect(await reconcileTranscripts({ dryRun: true })).toMatchObject({ orphans: 1 });
     expect(existsSync(yatim)).toBe(true);
   });
+});
+
+
+it("preserves Antigravity runtime/model during reconciliation instead of resuming Claude", async () => {
+  await beginSession(birth({ agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high" }));
+  const cutoff = new Date();
+  await reconcileHistory([]);
+  expect((await reconciledRuntimesSince(cutoff)).get("SPEC-362"))
+    .toEqual({ agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high" });
 });

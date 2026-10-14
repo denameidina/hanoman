@@ -412,7 +412,8 @@ describe("terminal routes", () => {
       id: "spec-route-at", decisionFile, command: ["/bin/sleep", "30"],
     });
     try {
-      writeFileSync(decisionFile, "1755840000\n");
+      const onsetSecs = Math.floor(bornMs / 1_000) - 1;
+      writeFileSync(decisionFile, `${onsetSecs}\n`);
       // SPEC-903 · pil menyala hanya sesudah pane terbukti diam (PANE_QUIET_MS); pane mentah
       // mematok `#{window_activity}` pada waktu lahirnya.
       await new Promise((r) => setTimeout(r, PANE_QUIET_MS + 750));
@@ -423,8 +424,13 @@ describe("terminal routes", () => {
       expect(row.decision).toBe(true);
       // SPEC-903 · ADR-0143 · yang menyeberang adalah awal episode yang SEDANG berlangsung, bukan
       // onset marker yang lebih tua.
-      expect(Date.parse(row.decisionAt!)).toBeGreaterThan(1755840000_000);
+      expect(Date.parse(row.decisionAt!)).toBeGreaterThan(onsetSecs * 1_000);
       expect(Date.parse(row.decisionAt!)).toBeGreaterThanOrEqual(bornMs - 2_000);
+      writeFileSync(decisionFile, "1755840000\n");
+      const stale = (await app.inject({ method: "GET", url: "/api/terminal/sessions" })).json()
+        .find((x: { id: string }) => x.id === s.id);
+      expect(stale.decision).toBe(false);
+      expect(stale.decisionAt).toBeUndefined();
     } finally {
       killSession(s.id);
     }

@@ -178,3 +178,10 @@ describe("zCreateCustomAgent", () => {
     expect(r.success).toBe(true);
   });
 });
+
+
+it("preserves a stored future Antigravity child slug without write-time remapping", async () => {
+  const { zCustomAgent } = await import("../src/custom-agent");
+  expect(zCustomAgent.parse(agent({ name: "future", runtime: "antigravity", model: "future-native-tier" })).model)
+    .toBe("future-native-tier");
+});

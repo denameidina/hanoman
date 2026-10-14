@@ -60,12 +60,13 @@ describe("methodStatus", () => {
 // Invarian SUMBER (pola SPEC-490/AC-7 ADR-0113): ditegakkan di katalog, bukan di render — nol
 // test UI bisa menangkap entri metode ketiga yang lupa membawa perintah pemasangannya.
 describe("katalog · MethodDef.install", () => {
-  it("setiap metode punya perintah untuk SETIAP agen, non-kosong", () => {
+  it("setiap metode punya entri per agen, installer Antigravity belum tersedia", () => {
     for (const id of METHOD_IDS) {
       const m = METHODS[id]!;
       expect(Object.keys(m.install).sort()).toEqual([...zAgent.options].sort());
       for (const a of zAgent.options) {
-        expect(m.install[a].length).toBeGreaterThan(0);
+        if (a === "antigravity") expect(m.install[a]).toEqual([]);
+        else expect(m.install[a].length).toBeGreaterThan(0);
         for (const cmd of m.install[a]) expect(cmd.trim()).not.toBe("");
       }
     }
@@ -75,6 +76,7 @@ describe("katalog · MethodDef.install", () => {
     for (const id of METHOD_IDS) {
       const m = METHODS[id]!;
       for (const a of zAgent.options) {
+        if (a === "antigravity") continue;
         const joined = m.install[a].join(" ");
         expect(m.requires.some((r) => joined.includes(r))).toBe(true);
       }
@@ -94,6 +96,16 @@ describe("kesiapan Agent Skills", () => {
     expect(st.missingPackages).toEqual(["superpowers"]);
     expect(st.missingSkills).toEqual(["superpowers:verification-before-completion"]);
     expect(methodStatus(m, agent, { packages: [...m.requires], skills: methodSkills(m) }).ready)
-      .toBe(true);
+      .toBe(agent !== "antigravity");
+  });
+});
+
+
+describe("Antigravity method installation (SPEC-1442)", () => {
+  it("is explicitly unavailable even when all required skills exist", () => {
+    for (const m of Object.values(METHODS)) {
+      expect(methodStatus(m, "antigravity", { packages: [...m.requires], skills: methodSkills(m) }))
+        .toMatchObject({ available: false, ready: false, install: [], availabilityReason: expect.stringMatching(/terverifikasi/) });
+    }
   });
 });

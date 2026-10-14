@@ -16,6 +16,7 @@ import { sessionPhasePlan } from "../services/orchestration";
 import { withSessionAdmission, createAgentSession, createOperatorSession } from "../services/session-launch-gate";
 import { approveLaunch, launchPrincipal } from "../services/launch-authority";
 import { admitBrowserWs, openWsConnection, revalidateWsPrincipal, createPrincipalWatch, WsMessageGuard } from "../services/ws-admission";
+import { ANTIGRAVITY_METHOD_UNAVAILABLE_REASON } from "@hanoman/shared";
 import { installCommand } from "../services/method-status";
 import { resolveRepoDir } from "../services/local-binding";
 import { ownsWorktree } from "../services/session-worktree";
@@ -189,6 +190,9 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         // tak dikenal berarti menjalankan perintah yang tak diminta siapa pun.
         const m = METHODS[inst.method];
         if (!m) return reply.code(400).send({ error: `metode "${inst.method}" tak dikenal` });
+        if (inst.agent === "antigravity") return reply.code(400).send({
+          error: ANTIGRAVITY_METHOD_UNAVAILABLE_REASON,
+        });
         const s = await createOperatorSession(project.id, repoDir, { command: installCommand(m, inst.agent) });
         return reply.code(201).send({ id: s.id });
       }

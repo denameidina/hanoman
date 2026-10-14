@@ -6,7 +6,11 @@ discovery parent `agy models` mengikuti cache/batas probe di bawah; picker child
 native publik `inherit|flash|pro` terpisah dari slug parent. Effort help CLI bukan bukti dukungan
 effort per-model atau per-child. Default parent `gemini-3.8-flash-high`/`high` additive,
 tanpa mengganti ownership user atau rekomendasi Claude/Codex existing. Bukti implementasinya
-merupakan AC-03/04/05/12 SPEC-1442; dokumen ini belum mengklaim live smoke telah lulus.
+merupakan AC-03/04/05/12 SPEC-1442. Task 1 menambahkan helper parent minimal
+`antigravityEfforts`: slug bersuffix `low|medium|high` hanya memberi level itu; slug unknown
+menghasilkan opsi kosong. Picker Custom Agent memakai tuple child dan effort kosong, bukan
+katalog parent. Nilai stored asing dipertahankan. Discovery/cache provider ketiga masih Task 9;
+dokumen ini belum mengklaim live smoke produk telah lulus.
 
 Hanoman menemukan model dari CLI terpasang saat startup dan setiap **5 menit**. Katalog bawaan
 (fallback offline) claude hanya berisi alias native `default`, `opus`, `sonnet`, `haiku`, `fable`;

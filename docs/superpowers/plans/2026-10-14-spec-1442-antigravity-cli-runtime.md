@@ -91,6 +91,17 @@ Gunakan nama direktori baru tiap run server yang berpotensi bersamaan. Exit 0 **
 - [ ] **Step 4:** Jalankan test sama dan typecheck `./shared` + `./runner`; perbaiki nullable effort caller secara eksplisit, tanpa assertion/suppression untuk menutup gap.
 - [ ] **Step 5:** Commit intermediate kandidat dengan explicit paths dan perubahan SoT model/runtime + link index yang bersangkutan; commit/push final tetap milik orchestrator setelah semua marker fase sah.
 
+**Receipt implementer Task 1 (2026-10-14, menunggu review Execute):** Red awal 6 berkas,
+5 gagal assertion fitur / 98 lulus; guard kontrak HTTP tambahan red 409 vs target 400.
+Final scoped 11 berkas / **284 test lulus**, shared + runner typecheck exit 0,
+`git diff --check` bersih. Union/default/marker/tier-null, stored unknown, phase resolution,
+presence/history dan guard installer sebelum spawn teruji. Fixture Terminal timestamp lama
+diperbaiki memakai onset numerik saat lahir + negative stale marker, tanpa ubah detector
+baseline `acfaff6c`. Scanner native status tetap pekerjaan Task 4/13, tidak dinyatakan siap.
+Koreksi dokumentasi factual MCP methods/status mengikuti tool baca `GLOBAL_READ` existing;
+UI/launch/input schemas native dan MCP parent/provider tetap task berikutnya. Kotak Task 1
+menunggu review parent sebelum ditandai selesai.
+
 ### Task 2: Defaults/ownership dan Settings lama
 
 **Files:** Modify `server/src/services/{settings,runtime-defaults}.ts`, `server/src/routes/settings.ts`, shared defaults; Test `server/src/services/runtime-defaults.test.ts`, `server/test/settings.test.ts`, `server/test/terminal-agent-defaults.test.ts`, `server/test/orchestration.service.test.ts`.

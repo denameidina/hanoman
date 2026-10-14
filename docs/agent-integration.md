@@ -659,3 +659,9 @@ Memori project dan changelog dihapus (ADR-0182). Tool `hanoman_memory_*` dan
 `/api/projects/:id/changelog*` tidak terdaftar. Token tidak lagi memiliki
 capability `memory:*` atau allowlist project khusus memori. Fungsi context/memory
 kanal Telegram tetap tersedia melalui domain `telegram`.
+
+
+SPEC-1442 memperluas response `hanoman_methods_status` additive: untuk Antigravity,
+`available:false`, `availabilityReason`, `ready:false`, `install:[]` sampai installer upstream
+terverifikasi. Tool tetap baca `GLOBAL_READ`. Terminal install Antigravity ditolak 400
+`{error:string}` sebelum spawn lewat route existing; tidak menambah installer endpoint/tool.

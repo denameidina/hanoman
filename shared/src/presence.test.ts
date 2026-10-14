@@ -11,6 +11,10 @@ const s = (over: Partial<PresenceSession> = {}): PresenceSession => ({
 const frame = (sessions: PresenceSession[]) => ({ t: "presence", v: PRESENCE_PROTOCOL, sessions });
 
 describe("kontrak wire presence", () => {
+  it("preserves Antigravity on the presence wire", () => {
+    expect(zPresenceFrame.parse(frame([s({ agent: "antigravity" })])).sessions[0]?.agent).toBe("antigravity");
+  });
+
   it("menerima frame minimal", () => {
     expect(zPresenceFrame.safeParse(frame([s()])).success).toBe(true);
   });

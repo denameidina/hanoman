@@ -82,3 +82,20 @@ describe("runtimeOf", () => {
     expect(runtimeOf(7)).toBeNull();
   });
 });
+
+
+describe("Antigravity native contract (SPEC-1442)", () => {
+  it("accepts the runtime and native child tiers without independent effort", () => {
+    expect(runtimeOf("antigravity")).toBe("antigravity");
+    for (const model of ["inherit", "flash", "pro"]) {
+      expect(zCreateCustomAgent.safeParse({ ...base, runtime: "antigravity", model, effort: null }).success).toBe(true);
+      expect(zUpdateCustomAgent.safeParse({ runtime: "antigravity", model, effort: null }).success).toBe(true);
+    }
+  });
+  it("rejects parent model slugs and independent child effort on writes", () => {
+    for (const profile of [{ model: "gemini-3.8-flash-high" }, { model: "flash", effort: "high" }]) {
+      expect(zCreateCustomAgent.safeParse({ ...base, runtime: "antigravity", ...profile }).success).toBe(false);
+      expect(zUpdateCustomAgent.safeParse({ runtime: "antigravity", ...profile }).success).toBe(false);
+    }
+  });
+});

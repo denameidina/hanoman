@@ -129,3 +129,32 @@ Tidak ada timeout atau diagnosis fallback yang dibutuhkan. Receipt ini membuka
 Task 1; tetap wajib mengulang live smoke lewat helper produk pada Task 4/5/7/8.
 MCP global, sandbox, read-only enforcement, telemetry dan exact child
 model/effort tidak diuji oleh probe ini.
+
+
+## Receipt kontrak Task 1 — 2026-10-14
+
+Kontrak shared/runner menerima runtime ketiga; JSON Setting lama memperoleh default parent
+`gemini-3.8-flash-high`/`high` dan marker seeded additive tanpa mengubah versi rekomendasi
+Claude/Codex. Sel orkestrasi native default `inherit`/effort `null`, termasuk reviewer; model
+parent tidak dipakai sebagai fallback child. Write explicit child hanya menerima tier publik
+`inherit|flash|pro` dan effort null/absen; stored slug asing tetap terbaca untuk diagnosis.
+History resume dan presence mempertahankan enum Antigravity; persiapan/argv produk belum
+merupakan bukti live Task 3–8.
+
+Status metode `available:false`, `ready:false`, `availabilityReason` dan `install:[]` memberi
+alasan installer upstream belum terverifikasi. Aksi shell install ditolak 400 `{error:string}`
+sebelum pane dibuat, termasuk guard helper internal. Scanner native/injeksi serta daftar
+missing berdasarkan observasi disk belum diimplementasikan dalam Task 1; diselesaikan pada
+Task 4/13. Status sementara tidak mengklaim readiness dari scan kosong.
+
+Keputusan MCP Task 1: status memakai tool baca existing `hanoman_methods_status` (`GLOBAL_READ`);
+Settings/Custom Agent/launch tetap tool/capability existing, perluasan input enum dijadwalkan
+Task 6/9–10. Tidak menambah endpoint/tool installer. Test kontrak membuktikan parent/child
+terpisah, legacy JSON, nilai stored asing, penolakan installer sebelum spawn, history/presence.
+Fixture Terminal `decisionAt` sebelumnya memakai onset tetap Agustus 2025 yang ditolak
+`markerCurrent` baseline `acfaff6c` (activity sekarang lebih baru >10 detik); fixture kini
+mengontrol onset saat lahir dan tetap menguji marker usang menghasilkan false/kolom absen.
+
+Bukti verifikasi scoped Task 1: 11 berkas / 284 test lulus (`vitest run` path eksplisit,
+`--no-file-parallelism`, DB temp unik dan env operator dibersihkan); typecheck shared/runner
+exit 0, diff-check bersih. Bukti ini belum menutup seluruh AC SPEC-1442.

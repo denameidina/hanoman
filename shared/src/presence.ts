@@ -1,3 +1,4 @@
+import { zAgent } from "./enums";
 import { z } from "zod";
 import { zLaunchStatus, type LaunchStatus } from "./session-admission";
 import type { RemoteCapability } from "./relay";
@@ -44,7 +45,7 @@ export const zPresenceSession = z.object({
   flow: z.string().max(40).optional(),
   /** Fase `active` dari `readPhases()`. Absen = sesi tanpa berkas fase (mis. konsol VPS). */
   phase: z.string().max(80).optional(),
-  agent: z.enum(["claude", "codex"]),
+  agent: zAgent,
   status: z.enum(["working", "waiting", "exited"]),
   startedAt: z.string().max(40),
 }).strict();

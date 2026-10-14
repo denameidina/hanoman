@@ -9,7 +9,7 @@ export const zDocStatus = z.enum(["ok","drift","broken"]);
 export const zPriority = z.enum(["tinggi","sedang","rendah"]);
 export const zProjectKind = z.enum(["from-scratch","existing"]);
 // SPEC-338 · ADR-0074 · mesin sesi. claude = Claude Code (default & historis), codex = Codex CLI.
-export const zAgent = z.enum(["claude", "codex"]);
+export const zAgent = z.enum(["claude", "codex", "antigravity"]);
 export const zSeverity = z.enum(["critical","major","minor"]);
 export const zTicketCategory = z.enum(["bug","fitur","pertanyaan","lainnya"]);  // SPEC-253 · kategori keluhan
 export const zTicketStatus = z.enum(["new","accepted","rejected"]);  // SPEC-253 · status triase tiket

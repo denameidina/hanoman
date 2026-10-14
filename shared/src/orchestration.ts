@@ -1,3 +1,4 @@
+import type { Agent } from "./entities";
 // ADR-0164 · orkestrasi subagent per fase — konstanta & tipe TANPA impor. `entities.ts` membangun
 // skema `Setting.orchestration`, sementara resolver yang butuh katalog model hidup di
 // `orchestration-plan.ts`: menaruh keduanya di satu berkas menutup lingkaran impor.
@@ -52,7 +53,7 @@ export const EXECUTE_MODE_FLOWS: ReadonlySet<OrchestrationFlow> = new Set(
   ORCHESTRATION_FLOWS.filter((f) => FLOW_PHASES[f].some((p) => p === "Execute" || p === "Goal")),
 );
 
-export type PhasePlanEntry = { phase: string; agentName: string; model: string; effort: string };
+export type PhasePlanEntry = { phase: string; agentName: string; model: string; effort: string | null };
 
 // ADR-0170 P2 · reviewer independen hasil Execute (feature & qa). BUKAN fase pipeline — FLOW_PHASES,
 // peta stage, UI fase, dan data lama tak berubah. Ia agen ber-generate per sesi dengan awalan yang
@@ -62,14 +63,15 @@ export type PhasePlanEntry = { phase: string; agentName: string; model: string; 
 // `phaseOverrides.Review` meng-override default di bawah.
 export const REVIEWER_CELL = "Review";
 export const REVIEWER_FLOWS: ReadonlySet<OrchestrationFlow> = new Set(["feature", "qa"]);
-export const REVIEWER_DEFAULTS: Readonly<Record<"claude" | "codex", { model: string; effort: string }>> = {
+export const REVIEWER_DEFAULTS: Readonly<Record<Agent, { model: string; effort: string | null }>> = {
   claude: { model: "opus", effort: "high" },
   codex: { model: "gpt-5.6-sol", effort: "high" },
+  antigravity: { model: "inherit", effort: null },
 };
-export type PhaseReviewerEntry = { agentName: string; phase: "Execute"; model: string; effort: string };
+export type PhaseReviewerEntry = { agentName: string; phase: "Execute"; model: string; effort: string | null };
 
 export type PhasePlan = {
-  flow: OrchestrationFlow; runtime: "claude" | "codex"; phases: PhasePlanEntry[];
+  flow: OrchestrationFlow; runtime: Agent; phases: PhasePlanEntry[];
   /** ADR-0170 P2 · hanya flow `REVIEWER_FLOWS`; absen = tanpa reviewer (prompt tak berubah). */
   reviewer?: PhaseReviewerEntry;
   /** Amandemen ADR-0170 P2 · absen (pemanggil lama) = `inline`. */

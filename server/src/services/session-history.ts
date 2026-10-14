@@ -246,7 +246,7 @@ export async function reconciledSpecIdsSince(cutoff: Date): Promise<string[]> {
 // S4c · runtime SAAT LAHIR sesi yang direkonsiliasi, per spec (baris terbaru pada sapuan ini).
 // Auto-resume (ADR-0169) melanjutkan sesi yang SAMA (ADR-0084): agen/model/effort-nya ikut, bukan
 // Setting global — sesi codex tak boleh lanjut sebagai claude. Nilai null tak diteruskan.
-export type SessionRuntime = { agent: "claude" | "codex"; model?: string; effort?: string };
+export type SessionRuntime = { agent: "claude" | "codex" | "antigravity"; model?: string; effort?: string };
 export async function reconciledRuntimesSince(cutoff: Date): Promise<Map<string, SessionRuntime>> {
   const rows = await prisma.sessionHistory.findMany({
     where: { endedReason: RECONCILED, reconciledAt: { gte: cutoff }, specId: { not: null } },
@@ -258,7 +258,7 @@ export async function reconciledRuntimesSince(cutoff: Date): Promise<Map<string,
     if (out.has(r.specId!)) continue;
     out.set(r.specId!, {
       // `agent` kolom String — nilai asing jatuh ke claude, cermin pembacaan @hanoman_agent (pty.ts).
-      agent: r.agent === "codex" ? "codex" : "claude",
+      agent: r.agent === "antigravity" ? "antigravity" : r.agent === "codex" ? "codex" : "claude",
       ...(r.model ? { model: r.model } : {}), ...(r.effort ? { effort: r.effort } : {}),
     });
   }

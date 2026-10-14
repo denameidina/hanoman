@@ -58,7 +58,7 @@ afterEach(() => {
 const get = () => app.inject({ method: "GET", url: "/api/methods/status" });
 
 describe("GET /api/methods/status (SPEC-739)", () => {
-  it("melaporkan setiap metode untuk KEDUA agen", async () => {
+  it("melaporkan setiap metode untuk setiap agen", async () => {
     const res = await get();
     expect(res.statusCode).toBe(200);
     const body = res.json();
@@ -66,8 +66,9 @@ describe("GET /api/methods/status (SPEC-739)", () => {
     for (const id of Object.keys(METHODS)) {
       expect(pairs).toContain(`${id}/claude`);
       expect(pairs).toContain(`${id}/codex`);
+      expect(pairs).toContain(`${id}/antigravity`);
     }
-    expect(body.agents.map((a: { agent: string }) => a.agent).sort()).toEqual(["claude", "codex"]);
+    expect(body.agents.map((a: { agent: string }) => a.agent).sort()).toEqual(["antigravity", "claude", "codex"]);
   });
 
   it("akar kosong → semua metode belum siap, dengan sebab spesifik", async () => {
@@ -152,5 +153,23 @@ describe("installCommand (SPEC-739)", () => {
   it("perintah jamak dirangkai `&&` — langkah kedua tak jalan bila yang pertama gagal", () => {
     const argv = installCommand(METHODS.superpowers!, "claude", "/bin/zsh");
     expect(argv[2]).toContain(" && ");
+  });
+});
+
+
+describe("Antigravity method guard (SPEC-1442)", () => {
+  it("reports unavailable and refuses installation before creating any pane", async () => {
+    const body = (await get()).json();
+    const rows = body.methods.filter((m: { agent: string }) => m.agent === "antigravity");
+    expect(rows).toHaveLength(Object.keys(METHODS).length);
+    for (const row of rows) expect(row).toMatchObject({ available: false, ready: false, install: [],
+      availabilityReason: expect.stringMatching(/terverifikasi/) });
+    const before = listSessions().map((s) => s.id);
+    const response = await app.inject({ method: "POST", url: "/api/terminal/sessions",
+      payload: { project: "p1", shell: true, install: { method: "superpowers", agent: "antigravity" } } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: expect.stringMatching(/terverifikasi/) });
+    expect(listSessions().map((s) => s.id)).toEqual(before);
+    expect(() => installCommand(METHODS.superpowers!, "antigravity", "/bin/zsh")).toThrow(/terverifikasi/);
   });
 });

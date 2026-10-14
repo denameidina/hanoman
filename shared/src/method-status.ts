@@ -6,7 +6,11 @@
 import type { Agent } from "./entities";
 import type { MethodDef } from "./method-catalog";
 
+export const ANTIGRAVITY_METHOD_UNAVAILABLE_REASON = "Installer metode Antigravity belum terverifikasi dari upstream";
+
 export interface MethodSkillStatus {
+  readonly available?: boolean;
+  readonly availabilityReason?: string;
   readonly method: string;
   readonly label: string;
   readonly agent: Agent;
@@ -49,7 +53,8 @@ export function methodStatus(
   const missingSkills = methodSkills(m).filter((id) => !haveSkills.has(id));
   return {
     method: m.id, label: m.label, agent,
-    ready: missingPackages.length === 0 && missingSkills.length === 0,
+    ...(agent === "antigravity" ? { available: false, availabilityReason: ANTIGRAVITY_METHOD_UNAVAILABLE_REASON } : {}),
+    ready: agent !== "antigravity" && missingPackages.length === 0 && missingSkills.length === 0,
     missingPackages, missingSkills,
     install: [...m.install[agent]],
   };

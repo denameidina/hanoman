@@ -371,7 +371,7 @@ Kegagalan observasi tidak menjadi 500 atau alasan sendiri memblokir sesi host.
 | GET `/api/models` dan frame models | Schema katalog/tool models existing additive; otorisasi HTTP/WS existing tidak dilonggarkan |
 | Terminal WS/events WS/session-events | Tetap pengecualian beralasan existing: streaming WebSocket atau HMAC per-sesi, bukan REST agent-token; enum runtime diperluas tanpa kanal baru |
 | Config/MCP format UI | Tool/config sensitive existing tetap gated; tidak membuat endpoint tulis config lokal Antigravity baru |
-| Methods status/install (relay Plan Q1 B) | Status `/api/methods/status` tetap `COOKIE_ONLY` beralasan sebagai kesiapan mesin lokal untuk dashboard; response unavailable/reason additive. Terminal install mengikuti schema/tool/otorisasi existing, input Antigravity unavailable ditolak sebelum shell spawn; tidak menambah installer endpoint/tool |
+| Methods status/install (relay Plan Q1 B) | Status `/api/methods/status` mempertahankan tool baca existing `hanoman_methods_status` (`GLOBAL_READ`); response unavailable/reason additive (koreksi fakta existing Task 1). Terminal install mengikuti schema/tool/otorisasi existing, input Antigravity unavailable ditolak sebelum shell spawn; tidak menambah installer endpoint/tool |
 
 Launch Antigravity pada boundary sandbox aktif/required ditolak **sebelum spawn** dengan
 `409` dan `error:"antigravity-sandbox-unsupported"` beserta alasan aman. Hardening produksi

@@ -1,4 +1,4 @@
-import type { Flow, SpecBrief, ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd, Autonomy, VerifyScope, ResumeCtx, AttachmentCtx } from "./types";
+import type { Agent, Flow, SpecBrief, ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd, Autonomy, VerifyScope, ResumeCtx, AttachmentCtx } from "./types";
 import { resolveMethod, FLOW_PHASES, type ExecuteMode, type MethodDef, type PhasePlan } from "@hanoman/shared";
 import { REVERSE_STANDARD } from "./reverse-standard";
 import { verifyScopeClause } from "./verify-scope";
@@ -123,7 +123,7 @@ export function guideLine(guide: string, phase: string): string {
 // Amandemen ADR-0170 P2 · dan hanya bila operator memilih `executeMode: "subagent"` untuk flow itu —
 // default `inline` (subagent per task terukur terlalu lambat untuk dipakai tanpa diminta).
 export function phaseSkillsFor(
-  flow: Flow, phase: string, method: MethodDef, agentRuntime?: "claude" | "codex",
+  flow: Flow, phase: string, method: MethodDef, agentRuntime?: Agent,
   executeMode: ExecuteMode = "inline",
 ): string[] {
   const orchestrated = agentRuntime === "claude" && executeMode === "subagent";

@@ -1,3 +1,4 @@
+import { ANTIGRAVITY_CHILD_TIERS } from "./antigravity";
 import { DEFAULT_AGENT_TOOLS, type AgentEffort, type AgentRuntime } from "./custom-agent";
 import { EFFORTS, CODEX_MODELS, claudeEfforts, claudeModel, subagentClaudeModels } from "./entities";
 
@@ -50,9 +51,11 @@ export type AgentModelInfo = { id: string; label: string; runtime: AgentRuntime 
 export function modelsForRuntime(rt: AgentRuntime | null): AgentModelInfo[] {
   const claude: AgentModelInfo[] = subagentClaudeModels().map((m) => ({ id: m.id, label: m.label, runtime: "claude" }));
   const codex: AgentModelInfo[] = CODEX_MODELS.map((m) => ({ id: m.id, label: m.label, runtime: "codex" }));
+  const antigravity: AgentModelInfo[] = ANTIGRAVITY_CHILD_TIERS.map((id) => ({ id, label: id, runtime: "antigravity" }));
+  if (rt === "antigravity") return antigravity;
   if (rt === "claude") return claude;
   if (rt === "codex") return codex;
-  return [...claude, ...codex];
+  return [...claude, ...codex, ...antigravity];
 }
 
 /**
@@ -62,7 +65,7 @@ export function modelsForRuntime(rt: AgentRuntime | null): AgentModelInfo[] {
  */
 export function modelKnownForRuntime(rt: AgentRuntime | null, model: string): boolean {
   if (modelsForRuntime(rt).some((m) => m.id === model)) return true;
-  return rt !== "codex" && model !== "default" && claudeModel(model)?.resolved === model;
+  return rt !== "codex" && rt !== "antigravity" && model !== "default" && claudeModel(model)?.resolved === model;
 }
 
 const codexCommonEfforts = (): AgentEffort[] => {
@@ -75,6 +78,7 @@ export function effortsForRuntimeModel(
   runtime: AgentRuntime | null,
   model: string | null,
 ): AgentEffort[] {
+  if (runtime === "antigravity") return [];
   if (runtime === "claude" || (!runtime && model && claudeModel(model))) {
     return [...claudeEfforts(model ?? "")] as AgentEffort[];
   }

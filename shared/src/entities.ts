@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS } from "./antigravity";
 import { zStage, zSpecSource, zDocStatus, zPriority, zProjectKind, zAgent, zVerifyScope } from "./enums";
 import { TELEGRAM_DEFAULTS, zTelegramSettings } from "./telegram";
 import { zAgentEngine, type AgentEngine } from "./agent-engine";
@@ -298,6 +299,12 @@ export const zCodex = z.object({
 });
 export type Codex = z.infer<typeof zCodex>;
 export const CODEX_DEFAULTS: Codex = zCodex.parse({});
+export const zAntigravity = z.object({
+  model: z.string().default(BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS.model),
+  effort: z.string().default(BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS.effort),
+});
+export type Antigravity = z.infer<typeof zAntigravity>;
+export const ANTIGRAVITY_DEFAULTS: Antigravity = zAntigravity.parse({});
 
 // SPEC-294 · ADR-0072 · otomasi default MATI; gerbang peluncuran default aktif (ADR-0161).
 // Ditambahkan ke zSetting sebagai
@@ -449,6 +456,7 @@ export const zFlowOrchestration = z.object({
   executeMode: z.enum(["inline", "subagent"]).catch("inline").default("inline"),
   claude: z.record(z.string(), zPhaseCell).default({}),
   codex: z.record(z.string(), zPhaseCell).default({}),
+  antigravity: z.record(z.string(), zPhaseCell).default({}),
 });
 export type FlowOrchestration = z.infer<typeof zFlowOrchestration>;
 // Kunci eksplisit, bukan `Object.fromEntries`: tipe hasilnya harus tetap `Record<flow, …>` penuh.
@@ -478,6 +486,7 @@ export const zSetting = z.object({
   goal: zGoal.default(GOAL_DEFAULTS),                                     // SPEC-332 · ADR-0073 · mode goal (default mati)
   agent: zAgent.default("claude"),                                        // SPEC-338 · ADR-0074 · mesin sesi default
   codex: zCodex.default(CODEX_DEFAULTS),                                  // SPEC-338 · ADR-0074 · model/effort codex
+  antigravity: zAntigravity.default(ANTIGRAVITY_DEFAULTS),
   verifyScope: zVerifyScope.default("changed"),                           // SPEC-376 · ADR-0080 · scope verifikasi sesi
   // SPEC-734 · ADR-0113 · metode workflow default. LENIENT (`z.string()`, bukan `z.enum`):
   // instance yang di-sync dari hub bisa membawa id metode yang belum ada di build ini, dan itu

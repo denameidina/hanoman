@@ -2487,8 +2487,8 @@ Tidak ada perubahan skema DB atau principal/capability launch existing.
 
 Relay manusia Plan Q1 **B**: `/api/methods/status` menambah status Antigravity unavailable
 beralasan sampai installer upstream terverifikasi, tanpa mengklaim readiness/install command.
-Tetap COOKIE_ONLY karena properti kesiapan mesin lokal untuk dashboard (pengecualian MCP
-existing dipertahankan). Skill native yang sudah ada tetap dipindai/disuntik dan Start fail-open.
+Tool baca existing `hanoman_methods_status`/otorisasi `GLOBAL_READ` dipertahankan; response
+menambah `available:false`, `availabilityReason`, `ready:false` dan `install:[]`. Skill native yang sudah ada tetap dipindai/disuntik dan Start fail-open.
 Terminal shell install Antigravity ditolak sebelum spawn lewat shape validation 400 `{error:string}`
 existing; schema/tool/otorisasi Terminal yang ada diperluas, tidak ada endpoint installer baru.
 

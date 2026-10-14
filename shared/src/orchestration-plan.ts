@@ -1,3 +1,5 @@
+import type { Agent } from "./entities";
+import { isAntigravityChildTier } from "./antigravity";
 import {
   CLAUDE_DEFAULT_ALIAS, ORCHESTRATION_DEFAULTS, cmpVersion, coerceClaudeEffort, coerceCodexEffort,
   type Orchestration, type PhaseOverrides,
@@ -23,7 +25,7 @@ export function codexNativeAgentsSupported(version: string | null): boolean {
 
 export type PhasePlanInput = {
   flow: OrchestrationFlow;
-  runtime: "claude" | "codex";
+  runtime: Agent;
   /** `undefined` = respons Setting lama tanpa blok ini → `ORCHESTRATION_DEFAULTS` (matriks bawaan,
    *  `no_effort` mati — amandemen 2026-09-17), sama dengan `.default()` zSetting di server. */
   orchestration: Orchestration | undefined;
@@ -41,13 +43,20 @@ export function resolvePhasePlan(input: PhasePlanInput): PhasePlan | null {
   // Effort dikoersi ke model HASIL resolusi: sel Luna yang mewarisi `ultra` harus turun ke
   // fallback Luna sebelum sampai ke `model_reasoning_effort`.
   const coerce = input.runtime === "codex" ? coerceCodexEffort : coerceClaudeEffort;
-  const resolve = (key: string, fallback: { model: string; effort: string }) => {
+  const resolve = (key: string, fallback: { model: string; effort: string | null }) => {
     const cell = cells[key];
     const override = input.phaseOverrides?.[key];
+    if (input.runtime === "antigravity") {
+      const model = override?.model ?? cell?.model ?? "inherit";
+      if (!isAntigravityChildTier(model) || override?.effort != null || cell?.effort != null) {
+        throw new Error("Antigravity child memakai tier native tanpa effort independen");
+      }
+      return { model, effort: null };
+    }
     const picked = override?.model ?? cell?.model ?? fallback.model;
     // `default` hanya sah untuk `--model` sesi; `--agents` claude menerimanya sebagai `inherit`.
     const model = input.runtime === "claude" && picked === CLAUDE_DEFAULT_ALIAS ? CLAUDE_SUBAGENT_INHERIT : picked;
-    return { model, effort: coerce(model, override?.effort ?? cell?.effort ?? fallback.effort) };
+    return { model, effort: coerce(model, override?.effort ?? cell?.effort ?? fallback.effort ?? "medium") };
   };
   // ADR-0170 P2 · reviewer TIDAK mewarisi orchestrator: default-nya konstanta peran (penilai
   // independen butuh model kuat walau orchestrator murah), sel/override `Review` menimpanya.

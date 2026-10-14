@@ -16,7 +16,7 @@
 // DEFAULT_METHOD dari berkas ini, jadi impor balik menutup lingkaran — dan berkas ini sengaja
 // bebas dependensi. Cerminnya tak bisa hanyut: `method-status.test.ts` mengadu kunci `install`
 // dengan `zAgent.options`.
-type MethodAgent = "claude" | "codex";
+type MethodAgent = "claude" | "codex" | "antigravity";
 
 export interface MethodDef {
   readonly id: string;
@@ -119,6 +119,7 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
     exitSkills: [VERIFICATION_GATE],
     requires: ["superpowers"],
     install: {
+      antigravity: [],
       claude: [
         "claude plugin marketplace add obra/superpowers-marketplace",
         "claude plugin install superpowers@superpowers-marketplace",
@@ -153,6 +154,7 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
     // dari sana (INVARIAN 2). codex belum punya plugin native mattpocock — jalur resminya
     // `npx skills`, dan ia INTERAKTIF; itu justru alasan pemasangan hidup di pane yang ditonton.
     install: {
+      antigravity: [],
       claude: [
         "claude plugin install mattpocock-skills",
         "claude plugin marketplace add obra/superpowers-marketplace",
@@ -189,6 +191,7 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
     requires: ["agent-skills", "superpowers"],
     // Manifest upstream: marketplace Claude = addy-agent-skills, Codex = agent-skills.
     install: {
+      antigravity: [],
       claude: [
         "claude plugin marketplace add addyosmani/agent-skills",
         "claude plugin install agent-skills@addy-agent-skills",

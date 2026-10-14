@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isAntigravityChildTier } from "./antigravity";
 import { PHASE_AGENT_PREFIX, isPhaseAgentName } from "./orchestration";
 
 // SPEC-450 · ADR-0094 · kontrak murni custom agent. Nol I/O: dipakai server (validasi + resolusi
@@ -10,13 +11,14 @@ import { PHASE_AGENT_PREFIX, isPhaseAgentName } from "./orchestration";
  * agent sementara katalog membutuhkan `DEFAULT_AGENT_TOOLS` dari berkas ini — menaruhnya di sana
  * membuat impor melingkar, dan konstanta yang dibaca saat modul dievaluasi jadi `undefined`.
  */
-export const AGENT_RUNTIMES = ["claude", "codex"] as const;
+export const AGENT_RUNTIMES = ["claude", "codex", "antigravity"] as const;
 export type AgentRuntime = (typeof AGENT_RUNTIMES)[number];
 export const zAgentRuntime = z.enum(AGENT_RUNTIMES);
 
 export const AGENT_RUNTIME_LABELS: Record<AgentRuntime, string> = {
   claude: "Claude Code",
   codex: "Codex CLI",
+  antigravity: "Antigravity CLI",
 };
 
 export const AGENT_ACTIVATIONS = ["always", "smart"] as const;
@@ -97,15 +99,29 @@ const zCreateCustomAgentFields = z.object({
 });
 
 function validateCreateWorkspacePolicy(
-  value: { runtime?: AgentRuntime | null; workspacePolicy?: AgentWorkspacePolicy },
+  value: { runtime?: AgentRuntime | null; workspacePolicy?: AgentWorkspacePolicy; model?: string | null; effort?: string | null },
   ctx: z.RefinementCtx,
 ) {
+  validateAntigravityChild(value, ctx);
   if (value.workspacePolicy === "isolated-worktree" && value.runtime !== "claude") {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["workspacePolicy"],
       message: "isolated-worktree hanya tersedia untuk Claude Code",
     });
+  }
+}
+
+function validateAntigravityChild(
+  value: { runtime?: AgentRuntime | null; model?: string | null; effort?: string | null },
+  ctx: z.RefinementCtx,
+) {
+  if (value.runtime !== "antigravity") return;
+  if (value.model != null && !isAntigravityChildTier(value.model)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["model"], message: "Antigravity child memakai tier inherit, flash, atau pro" });
+  }
+  if (value.effort != null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["effort"], message: "Antigravity child tidak mendukung effort independen" });
   }
 }
 
@@ -119,6 +135,7 @@ export const zUpdateCustomAgent = zCreateCustomAgentFields
   .omit({ name: true, projectId: true })
   .partial()
   .superRefine((value, ctx) => {
+    validateAntigravityChild(value, ctx);
     if (value.workspacePolicy === "isolated-worktree"
       && value.runtime !== undefined && value.runtime !== "claude") {
       ctx.addIssue({
