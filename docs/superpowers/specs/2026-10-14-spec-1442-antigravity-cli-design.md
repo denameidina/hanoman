@@ -85,6 +85,36 @@ Keputusan ini diterima lewat relay orchestrator setelah retry Brainstorm. Requir
 model/effort independen dan foreground telah diamandemen **oleh manusia**; tidak diturunkan agen.
 Riset bounded sebelumnya tetap menjadi bukti batas CLI, bukan blocker scope final ini.
 
+## Objective
+
+Dalam satu rilis, operator dapat memilih `antigravity` untuk melahirkan sesi kerja interaktif di
+tmux + worktree melalui backlog, Terminal, IDE, dan lead, dengan konfigurasi runtime yang
+terdeteksi dan batas kemampuan yang dinyatakan jelas; Claude dan Codex tetap berperilaku sama.
+
+Kriteria sukses:
+
+- **SC1 — Peluncuran:** `Agent` dan metadata sesi menerima `antigravity`; jalur backlog, Terminal,
+  IDE, dan lead meluncurkan TUI `agy` interaktif dengan prompt awal, default model/effort, dan
+  permission bypass sesuai kontrak CLI. Parent dan child native tetap interaktif; hanya lead brain
+  internal existing yang boleh memakai mode one-shot.
+- **SC2 — Konfigurasi runtime:** `HANOMAN_ANTIGRAVITY_BIN` memilih biner efektif, versi tampil di
+  Settings melalui endpoint versi aditif dan tool MCP baca, serta default parent
+  `gemini-3.8-flash-high`/`high` dapat diubah tanpa mengubah pilihan Claude/Codex yang sudah ada.
+- **SC3 — Konfigurasi workspace:** trust worktree, aturan/instruksi, skill, dan server MCP Hanoman
+  memakai format Antigravity; pembaruan trust dan MCP merge-preserve konfigurasi operator, dan
+  kredensial runtime tidak bocor ke proses Claude/Codex atau subprocess yang tidak terkait.
+- **SC4 — Ketersediaan UI/API:** Settings, backlog, Custom Agent, dan Terminal menampilkan pilihan
+  Antigravity. Native child menggunakan tier yang didukung; exact model/effort independen dan
+  foreground bukan jaminan. Auditor read-only dan capability lain yang belum terbukti ditolak
+  dengan alasan yang dapat dilihat, termasuk pada jalur API.
+- **SC5 — Observabilitas dan batas:** status sesi memakai observasi tmux dan marker fase. Batas
+  telemetry native, notifikasi keputusan, goal gate, isolated-worktree Custom Agent, dan launch
+  sandbox host harus dinyatakan; sandbox ditolak sampai auth/state terverifikasi.
+- **SC6 — Bukti regresi dan dokumentasi:** test memverifikasi pemilihan biner, argv sesi interaktif,
+  trust, runtime-defaults, dan tidak berubahnya perilaku Claude/Codex; docs internal serta ADR dan
+  keputusan MCP untuk API baru diperbarui dan ditautkan di index dalam commit implementasi yang
+  sama.
+
 ### Desain komponen dan perilaku
 
 - Adapter runtime eksplisit pada shared/runner/server: tidak memakai cabang `else = codex`.
