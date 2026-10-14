@@ -11,6 +11,61 @@ afterAll(async () => { await resetDb(); await app.close(); });
 // SPEC-1215 · ADR-0165 §4 / ADR-0166 §7–8 · agent token ber-`settings:write` tak boleh menyalakan
 // kendali jarak jauh ke mesinnya sendiri, menyalakan ekspor transkrip, atau memendekkan retensi audit.
 describe("PUT /settings tak menulis kunci LOCAL-only SPEC-1215 (AC-A3)", () => {
+  it("old clients omitting Antigravity defaults and phase matrix preserve operator choices", async () => {
+    const current = applyRuntimeDefaults(undefined)!.data;
+    current.antigravity = { model: "future-parent", effort: "low" };
+    current.orchestration.feature.antigravity.Plan = { model: "pro", effort: null };
+    current.builtinRuntimeDefaults.antigravity = { model: "user", effort: "user" };
+    current.builtinRuntimeDefaults.orchestration["feature.antigravity.Plan.model"] = "user";
+    await makeSetting(current);
+    const { antigravity: _antigravity, ...oldBody } = structuredClone(current);
+    for (const flow of Object.values(oldBody.orchestration)) Reflect.deleteProperty(flow, "antigravity");
+    const put = await app.inject({ method: "PUT", url: "/api/settings", payload: { ...oldBody, notifyDone: false } });
+    expect(put.statusCode).toBe(200);
+    const after = await getSetting();
+    expect(after.antigravity).toEqual(current.antigravity);
+    expect(after.orchestration.feature.antigravity).toEqual(current.orchestration.feature.antigravity);
+    expect(after.builtinRuntimeDefaults.antigravity).toEqual(current.builtinRuntimeDefaults.antigravity);
+    expect(after.builtinRuntimeDefaults.claude).toEqual(current.builtinRuntimeDefaults.claude);
+    expect(after.builtinRuntimeDefaults.codex).toEqual(current.builtinRuntimeDefaults.codex);
+  });
+
+  it("PUT Antigravity edits mark ownership while keeping native phase effort null", async () => {
+    const before = applyRuntimeDefaults(undefined)!.data;
+    await makeSetting(before);
+    const next = structuredClone(before);
+    next.antigravity = { model: "future-parent", effort: "medium" };
+    next.orchestration.feature.antigravity.Plan = { model: "flash", effort: null };
+    const put = await app.inject({ method: "PUT", url: "/api/settings", payload: next });
+    expect(put.statusCode).toBe(200);
+    const after = await getSetting();
+    expect(after.builtinRuntimeDefaults.antigravity).toEqual({ model: "user", effort: "user" });
+    expect(after.builtinRuntimeDefaults.orchestration["feature.antigravity.Plan.model"]).toBe("user");
+    expect(after.builtinRuntimeDefaults.claude).toEqual(before.builtinRuntimeDefaults.claude);
+  });
+
+  it.each([{ model: "gemini-3.8-flash-high", effort: null }, { model: "flash", effort: "high" }])(
+    "PUT rejects a new incompatible native phase cell %j without writing", async (cell) => {
+      const before = applyRuntimeDefaults(undefined)!.data;
+      await makeSetting(before);
+      const next = structuredClone(before);
+      next.orchestration.feature.antigravity.Plan = cell;
+      const put = await app.inject({ method: "PUT", url: "/api/settings", payload: next });
+      expect(put.statusCode).toBe(400);
+      expect((await getSetting()).orchestration.feature.antigravity.Plan)
+        .toEqual(before.orchestration.feature.antigravity.Plan);
+    },
+  );
+
+  it("PUT unrelated edits preserve legacy incompatible native phase cells", async () => {
+    const before = applyRuntimeDefaults(undefined)!.data;
+    before.orchestration.feature.antigravity.Plan = { model: "legacy-slug", effort: "high" };
+    await makeSetting(before);
+    const put = await app.inject({ method: "PUT", url: "/api/settings", payload: { ...before, notifyDone: false } });
+    expect(put.statusCode).toBe(200);
+    expect((await getSetting()).orchestration.feature.antigravity.Plan)
+      .toEqual(before.orchestration.feature.antigravity.Plan);
+  });
   it("default kunci baru: grant mati, hanya lajur event, retensi 90/7/30", () => {
     expect(DEFAULT_SETTING.remoteControl).toEqual({ enabled: false, capabilities: [] });
     expect(DEFAULT_SETTING.logShipping).toEqual({ event: true, server: false, transcript: false });

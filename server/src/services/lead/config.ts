@@ -28,9 +28,8 @@ export async function leadAgentDefaults(): Promise<{ agent: Agent; model: string
   const s = await getSetting();
   const e = s.lead.engine;
   if (!e.enabled) return sessionAgentDefaults();
-  return e.agent === "codex"
-    ? { agent: "codex", model: e.model, effort: coerceCodexEffort(e.model, e.effort) }
-    : { agent: "claude", model: e.model, effort: e.effort };
+  return { agent: e.agent, model: e.model,
+    effort: e.agent === "codex" ? coerceCodexEffort(e.model, e.effort) : e.effort };
 }
 
 /**

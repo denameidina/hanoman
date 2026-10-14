@@ -22,7 +22,7 @@ export const SETTINGS_TOOLS: readonly McpToolDef[] = [
     name: "hanoman_settings_get",
     title: "Baca setelan instance",
     description:
-      "Seluruh setelan instance: agen & model default, effort, notifikasi, mode goal, verifikasi, dan blok Telegram. Panggil ini sebelum hanoman_settings_set — setelan disimpan sebagai satu blok.",
+      "Seluruh setelan instance: runtime Claude/Codex/Antigravity, model parent, effort, tier child native Antigravity, notifikasi, mode goal, verifikasi, dan blok Telegram. Panggil ini sebelum hanoman_settings_set — setelan disimpan sebagai satu blok.",
     inputSchema: obj({ properties: {} }),
     mode: "read", capability: "settings:read",
     samplePath: "/settings", sampleMethod: "GET",
@@ -33,7 +33,7 @@ export const SETTINGS_TOOLS: readonly McpToolDef[] = [
     name: "hanoman_settings_set",
     title: "Simpan setelan instance",
     description:
-      "Menyimpan setelan instance. MENGGANTI blok penuh — kirim hasil hanoman_settings_get yang sudah diubah, bukan potongan. Panggil hanoman_settings_get TEPAT sebelum tool ini (jangan memakai hasil lama) dan ubah HANYA field yang dimaksud: setiap model/effort/sel orkestrasi yang berbeda dari nilai tersimpan ditandai milik operator dan tak lagi diperbarui default bawaan saat update. Setelan ini berlaku untuk SETIAP sesi baru di seluruh workspace. Menyentuh blok Telegram akan memuat ulang gateway.",
+      "Menyimpan setelan instance. MENGGANTI blok penuh — kirim hasil hanoman_settings_get yang sudah diubah, bukan potongan. Panggil hanoman_settings_get TEPAT sebelum tool ini (jangan memakai hasil lama) dan ubah HANYA field yang dimaksud: setiap model/effort/sel orkestrasi yang berbeda dari nilai tersimpan ditandai milik operator dan tak lagi diperbarui default bawaan saat update. Parent Antigravity memakai blok antigravity.model/effort; sel orchestration.<flow>.antigravity hanya menerima tier inherit|flash|pro atau model null dan effort null, bukan slug parent. Blok runtime Antigravity yang hilang dari klien lama dipertahankan. Setelan ini berlaku untuk SETIAP sesi baru di seluruh workspace. Menyentuh blok Telegram akan memuat ulang gateway.",
     inputSchema: obj({ properties: { settings: WHOLE_BLOCK("setelan") }, required: ["settings"] }),
     mode: "write", capability: "settings:write",
     samplePath: "/settings", sampleMethod: "PUT",

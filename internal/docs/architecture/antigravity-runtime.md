@@ -158,3 +158,48 @@ mengontrol onset saat lahir dan tetap menguji marker usang menghasilkan false/ko
 Bukti verifikasi scoped Task 1: 11 berkas / 284 test lulus (`vitest run` path eksplisit,
 `--no-file-parallelism`, DB temp unik dan env operator dibersihkan); typecheck shared/runner
 exit 0, diff-check bersih. Bukti ini belum menutup seluruh AC SPEC-1442.
+
+## Receipt default/ownership Task 2 — 2026-10-14
+
+`DEFAULT_SETTING` serta default sesi/Terminal/konflik/lead memilih blok parent Antigravity
+secara eksplisit. Override lead engine mempertahankan runtime ketiga; argv/biner/isolasi env
+lead tetap pekerjaan Task 3. Pembacaan tidak meremap slug parent asing atau tier child ke model
+Claude/Codex. Fase native default `inherit`/effort null terpisah dari parent high/high.
+
+Seed `applyRuntimeDefaults` dan marker `markRuntimeDefaultsUserEdited` menambah kepemilikan
+Antigravity granular, menginferensikan nilai parent/fase yang lebih dahulu tersimpan tanpa
+marker, mempertahankan user edits dan idempoten. Versi rekomendasi tetap `2026-09-23-v2`;
+seed current-marker tidak memperbarui nilai/saklar/marker Claude/Codex hanya karena ekstensi
+runtime ketiga. Migrasi historis v1 dan baris tanpa marker tetap sama dengan baseline yang
+ditetapkan test existing; SPEC-1442 tidak menghapus migrasi lama tersebut.
+
+PUT dari client lama yang tidak mengirim `antigravity` atau matriks native per-flow
+mempertahankan blok dan provenance DB. Sel native baru/diubah divalidasi terpisah sebagai
+`inherit|flash|pro|null`, effort null; parent slug/effort independen ditolak 400 sebelum write.
+Sel legacy incompatible yang tidak berubah tetap tersimpan untuk diagnosis runtime berikutnya.
+Keputusan MCP: `hanoman_settings_get/set` existing (capability `settings:read|write`), body
+objek penuh existing tetap menerima blok runtime additive; deskripsi tool dan panduan
+[agent integration](../../../docs/agent-integration.md) menjelaskan parent/tier/effort dan
+preservasi client lama. Tidak ada endpoint/capability/skema DB baru pada Task 2.
+
+Bukti RED dibaca: 11 failed/45 passed (6 files) untuk default/ownership/preservasi; 3 failed/9
+passed (2 files) untuk validasi sel native dan override lead; 1 failed/10 passed untuk ownership
+fase yang marker-nya belum ada. Final GREEN: **99/99 test, 9/9 files**, command:
+
+```bash
+env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" \
+  pnpm vitest --run server/src/services/runtime-defaults.test.ts server/test/settings.test.ts \
+  server/test/terminal-agent-defaults.test.ts server/test/settings-remote-keys.test.ts \
+  server/test/conflict-session-defaults.test.ts server/test/orchestration.service.test.ts \
+  server/test/antigravity-lead-defaults.test.ts server/test/lead-engine-argv.test.ts \
+  shared/src/mcp-catalog.test.ts --no-file-parallelism
+```
+
+`pnpm --filter ./shared typecheck` exit 0. `pnpm --filter ./server typecheck` exit 2 dengan
+lima error pada seam belum dikerjakan: custom-agents runtime args, pty native/runtime maps,
+Telegram runtime label. Tidak ada error pada berkas implementasi Task 2; typecheck server
+tetap wajib hijau sesudah task adapter berikutnya, bukan diterima sebagai hasil akhir Execute.
+Vitest mencetak warning inisialisasi WAL `database is locked` pada satu test; test-nya tetap
+lulus dengan DB temp unik. Final server+curl sekali di akhir Execute tetap wajib untuk Settings
+sebagaimana seluruh endpoint tersentuh. Receipt Task 2 mencakup AC-04 dan sebagian AC-17/18;
+belum menutup seluruh acceptance criteria SPEC-1442.

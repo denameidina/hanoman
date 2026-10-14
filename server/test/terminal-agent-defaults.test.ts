@@ -53,4 +53,16 @@ describe("terminalAgentDefaults", () => {
     expect(await terminalAgentDefaults({ agent: "claude", model: "claude-fable-5", effort: "ultracode" }))
       .toEqual({ agent: "claude", model: "claude-fable-5", effort: "ultracode" });
   });
+
+  it("Antigravity selection and overrides never take the Claude/Codex parent block", async () => {
+    await makeSetting({ agent: "claude", model: "claude-opus-5", effort: "xhigh",
+      antigravity: { model: "gemini-3.8-flash-high", effort: "high" } });
+    expect(await terminalAgentDefaults({ agent: "antigravity" }))
+      .toEqual({ agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high" });
+    expect(await terminalAgentDefaults({ agent: "antigravity", model: "future-model", effort: "low" }))
+      .toEqual({ agent: "antigravity", model: "future-model", effort: "low" });
+    await makeSetting({ agent: "antigravity", antigravity: { model: "custom-parent", effort: "medium" } });
+    expect(await terminalAgentDefaults({})).toEqual(await sessionAgentDefaults());
+    expect(await terminalAgentDefaults({})).toEqual({ agent: "antigravity", model: "custom-parent", effort: "medium" });
+  });
 });

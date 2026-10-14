@@ -1,5 +1,5 @@
 import {
-  BUILTIN_CLAUDE_RUNTIME_DEFAULTS, BUILTIN_CODEX_RUNTIME_DEFAULTS, BUILTIN_ORCHESTRATION_DEFAULTS,
+  BUILTIN_CLAUDE_RUNTIME_DEFAULTS, BUILTIN_CODEX_RUNTIME_DEFAULTS, BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS, BUILTIN_ORCHESTRATION_DEFAULTS,
   BUILTIN_RUNTIME_DEFAULTS, LEGACY_CLAUDE_RUNTIME_DEFAULTS, LEGACY_CODEX_RUNTIME_DEFAULTS,
   LEGACY_ORCHESTRATION_FLOW_DEFAULT, ORCHESTRATION_FLOWS, RUNTIME_DEFAULTS_VERSION,
   FLOW_PHASES, zBuiltinRuntimeDefaults, zFlowOrchestration, zSetting,
@@ -10,6 +10,7 @@ import { prisma } from "../db";
 type RuntimeDefaultStates = {
   claude: { model: RuntimeDefaultState; effort: RuntimeDefaultState };
   codex: { model: RuntimeDefaultState; effort: RuntimeDefaultState };
+  antigravity: { model: RuntimeDefaultState; effort: RuntimeDefaultState };
   orchestration: Record<string, RuntimeDefaultState>;
 };
 
@@ -32,6 +33,7 @@ const markerFrom = (states: RuntimeDefaultStates): BuiltinRuntimeDefaults => ({
   version: RUNTIME_DEFAULTS_VERSION,
   claude: states.claude,
   codex: states.codex,
+  antigravity: states.antigravity,
   orchestration: states.orchestration,
 });
 
@@ -55,7 +57,7 @@ function inferLegacyStates(raw: unknown): RuntimeDefaultStates {
       const flowObject = isRecord(rawFlow) ? rawFlow : {};
       if (Object.prototype.hasOwnProperty.call(flowObject, "enabled") && flowObject.enabled !== true)
         orchestration[`${flow}.enabled`] = "user";
-      for (const runtime of ["claude", "codex"] as const) {
+      for (const runtime of ["claude", "codex", "antigravity"] as const) {
         const rawRuntime = isRecord(flowObject[runtime]) ? flowObject[runtime] : {};
         for (const phase of FLOW_PHASES[flow]) {
           const rawCell = rawRuntime[phase];
@@ -79,22 +81,37 @@ function inferLegacyStates(raw: unknown): RuntimeDefaultStates {
   return {
     claude: { model: claudeModel, effort: claudeEffort },
     codex: { model: codexModel, effort: codexEffort },
+    antigravity: inferAntigravityStates(object.antigravity),
     orchestration,
   };
 }
 
-function statesFor(raw: unknown, setting: Setting): RuntimeDefaultStates {
+function inferAntigravityStates(raw: unknown): RuntimeDefaultStates["antigravity"] {
+  const block = isRecord(raw) ? raw : {};
+  const state = (field: "model" | "effort"): RuntimeDefaultState =>
+    block[field] === undefined || block[field] === BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS[field] ? "seeded" : "user";
+  return { model: state("model"), effort: state("effort") };
+}
+
+function statesFor(raw: unknown): RuntimeDefaultStates {
   const object = isRecord(raw) ? raw : {};
   const marker = zBuiltinRuntimeDefaults.safeParse(object.builtinRuntimeDefaults);
   if (marker.success) {
     const orchestration = seededFlowStates();
+    const inferred = inferLegacyStates(raw);
+    for (const [key, state] of Object.entries(inferred.orchestration)) {
+      if (key.includes(".antigravity.")) orchestration[key] = state;
+    }
     for (const flow of ORCHESTRATION_FLOWS) {
       const prefix = `${flow}.`;
       for (const [key, state] of Object.entries(marker.data.orchestration)) {
         if (key.startsWith(prefix)) orchestration[key] = state;
       }
     }
-    return { claude: marker.data.claude, codex: marker.data.codex, orchestration };
+    const rawMarker = isRecord(object.builtinRuntimeDefaults) ? object.builtinRuntimeDefaults : {};
+    return { claude: marker.data.claude, codex: marker.data.codex,
+      antigravity: rawMarker.antigravity === undefined ? inferAntigravityStates(object.antigravity) : marker.data.antigravity,
+      orchestration };
   }
   return inferLegacyStates(raw);
 }
@@ -110,17 +127,23 @@ export function applyRuntimeDefaults(raw: unknown): { data: Setting; changed: bo
     : zSetting.safeParse(raw);
   if (!parsed.success) return null;
 
-  const states = statesFor(raw, parsed.data);
+  const states = statesFor(raw);
+  // Adding a runtime is not a new Claude/Codex recommendation. Historical v1/unmarked
+  // upgrades still run, but the current marker must leave existing runtime values untouched.
+  const object = isRecord(raw) ? raw : {};
+  const marker = zBuiltinRuntimeDefaults.safeParse(object.builtinRuntimeDefaults);
+  const upgradeExisting = isFresh || !marker.success || marker.data.version !== RUNTIME_DEFAULTS_VERSION;
   const orchestration = { ...parsed.data.orchestration };
   for (const flow of ORCHESTRATION_FLOWS) {
     const builtIn = BUILTIN_ORCHESTRATION_DEFAULTS[flow];
     const existing = parsed.data.orchestration[flow];
     const nextFlow = {
       ...existing,
-      enabled: states.orchestration[`${flow}.enabled`] !== "user" ? builtIn.enabled : existing.enabled,
-      claude: { ...existing.claude }, codex: { ...existing.codex },
+      enabled: upgradeExisting && states.orchestration[`${flow}.enabled`] !== "user" ? builtIn.enabled : existing.enabled,
+      claude: { ...existing.claude }, codex: { ...existing.codex }, antigravity: { ...existing.antigravity },
     };
-    for (const runtime of ["claude", "codex"] as const) {
+    for (const runtime of ["claude", "codex", "antigravity"] as const) {
+      if (runtime !== "antigravity" && !upgradeExisting) continue;
       for (const phase of FLOW_PHASES[flow]) {
         const existingCell = nextFlow[runtime][phase] ?? { model: null, effort: null };
         const builtInCell = builtIn[runtime][phase]!;
@@ -136,11 +159,15 @@ export function applyRuntimeDefaults(raw: unknown): { data: Setting; changed: bo
   }
   const data = zSetting.parse({
     ...parsed.data,
-    model: states.claude.model === "seeded" ? BUILTIN_CLAUDE_RUNTIME_DEFAULTS.model : parsed.data.model,
-    effort: states.claude.effort === "seeded" ? BUILTIN_CLAUDE_RUNTIME_DEFAULTS.effort : parsed.data.effort,
+    model: upgradeExisting && states.claude.model === "seeded" ? BUILTIN_CLAUDE_RUNTIME_DEFAULTS.model : parsed.data.model,
+    effort: upgradeExisting && states.claude.effort === "seeded" ? BUILTIN_CLAUDE_RUNTIME_DEFAULTS.effort : parsed.data.effort,
     codex: {
-      model: states.codex.model === "seeded" ? BUILTIN_CODEX_RUNTIME_DEFAULTS.model : parsed.data.codex.model,
-      effort: states.codex.effort === "seeded" ? BUILTIN_CODEX_RUNTIME_DEFAULTS.effort : parsed.data.codex.effort,
+      model: upgradeExisting && states.codex.model === "seeded" ? BUILTIN_CODEX_RUNTIME_DEFAULTS.model : parsed.data.codex.model,
+      effort: upgradeExisting && states.codex.effort === "seeded" ? BUILTIN_CODEX_RUNTIME_DEFAULTS.effort : parsed.data.codex.effort,
+    },
+    antigravity: {
+      model: states.antigravity.model === "seeded" ? BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS.model : parsed.data.antigravity.model,
+      effort: states.antigravity.effort === "seeded" ? BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS.effort : parsed.data.antigravity.effort,
     },
     orchestration,
     builtinRuntimeDefaults: markerFrom(states),
@@ -169,6 +196,7 @@ export function markRuntimeDefaultsUserEdited(before: Setting, next: Setting): B
     ...BUILTIN_RUNTIME_DEFAULTS,
     claude: { ...BUILTIN_RUNTIME_DEFAULTS.claude },
     codex: { ...BUILTIN_RUNTIME_DEFAULTS.codex },
+    antigravity: { ...BUILTIN_RUNTIME_DEFAULTS.antigravity },
     orchestration: { ...BUILTIN_RUNTIME_DEFAULTS.orchestration },
   };
   const orchestration = { ...seededFlowStates(), ...current.orchestration };
@@ -176,10 +204,12 @@ export function markRuntimeDefaultsUserEdited(before: Setting, next: Setting): B
   if (before.effort !== next.effort) current.claude.effort = "user";
   if (before.codex.model !== next.codex.model) current.codex.model = "user";
   if (before.codex.effort !== next.codex.effort) current.codex.effort = "user";
+  if (before.antigravity.model !== next.antigravity.model) current.antigravity.model = "user";
+  if (before.antigravity.effort !== next.antigravity.effort) current.antigravity.effort = "user";
   for (const flow of ORCHESTRATION_FLOWS) {
     if (before.orchestration[flow].enabled !== next.orchestration[flow].enabled)
       orchestration[`${flow}.enabled`] = "user";
-    for (const runtime of ["claude", "codex"] as const) {
+    for (const runtime of ["claude", "codex", "antigravity"] as const) {
       for (const phase of FLOW_PHASES[flow]) {
         for (const field of ["model", "effort"] as const) {
           if (before.orchestration[flow][runtime][phase]?.[field]
@@ -193,6 +223,7 @@ export function markRuntimeDefaultsUserEdited(before: Setting, next: Setting): B
     version: RUNTIME_DEFAULTS_VERSION,
     claude: { ...current.claude },
     codex: { ...current.codex },
+    antigravity: { ...current.antigravity },
     orchestration,
   };
 }

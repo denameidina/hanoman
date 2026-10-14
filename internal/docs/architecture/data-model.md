@@ -283,15 +283,24 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   dari skema `zSetting`; baris `Setting` lama yang masih memuatnya tetap parse (key asing diabaikan).
   Model/effort tetap `z.string()` (lenient); daftar pilihan valid (`MODELS`/`EFFORTS`, memuat
   `claude-fable-5` · `max` · `ultracode`) hidup di `@hanoman/shared` untuk picker Start.
+- `antigravity` ([ADR-0221](../adr/0221-antigravity-cli-runtime-interaktif-native.md), SPEC-1442) —
+  blok parent `{model:"gemini-3.8-flash-high",effort:"high"}` yang ditambahkan ke JSON Setting
+  tanpa migration. `agent:"antigravity"` memilih blok ini pada default sesi/Terminal/konflik/lead;
+  override runtime tidak mengambil model Claude/Codex. Slug parent tersimpan yang belum dikenal
+  tetap dikembalikan apa adanya, bukan dipetakan ke alias/tier lain.
 - `orchestration` ([ADR-0164](../adr/0164-orkestrasi-subagent-per-fase.md)) — satu kunci per flow
   (`feature`…`no_effort`) berbentuk `{ enabled, claude: {<Fase>: {model|null, effort|null}},
-  codex: {…} }`. Default bawaan mengisi model/effort rekomendasi tiap fase (`no_effort.enabled=false`);
+  codex: {…}, antigravity: {…} }`. Default bawaan mengisi model/effort rekomendasi tiap fase (`no_effort.enabled=false`);
   nilai `null` pada konfigurasi user tetap berarti warisan orchestrator. Sesi ber-flow aktif lahir sebagai
   orchestrator; tiap fase dikerjakan subagent native `hanoman-fase-<slug>`. Baris lama tanpa blok ini
   parse dan di-seed tanpa migration. Kunci sel `Review` (ADR-0170, hanya `feature`/`qa`) bukan fase:
   ia meng-override model/effort reviewer independen `hanoman-fase-review` (default claude `opus`·`high`,
   codex `gpt-5.6-sol`·`high`, TIDAK mewarisi orchestrator; `phaseOverrides.Review` juga berlaku). Belum
   tampil di tab Orkestrasi — tetap tersimpan karena kunci sel lenient.
+  Antigravity memakai tier native `inherit|flash|pro` (default `inherit`) dan effort `null`,
+  termasuk reviewer: tidak mewarisi slug/effort parent. Pembacaan baris lama tetap lenient;
+  PUT menolak sel Antigravity baru/diubah yang membawa slug parent atau effort independen dengan
+  400 validation shape existing. Sel legacy yang tidak berubah tetap tersimpan untuk diagnosis.
 - `builtinRuntimeDefaults` (LOCAL-only, tanpa migration) — marker provenance versi seed. `seeded`
   boleh diperbarui saat Hanoman membawa rekomendasi baru; `user` dipertahankan. Marker granular per
   model/effort global, saklar flow, dan field model/effort sel fase. Pada `POST /terminal/sessions`
@@ -305,6 +314,14 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   melakukan GET segar lalu `rebaseEdits(snapshot, snapshot+perubahan, DB)` (berurutan lewat antrean)
   sebelum PUT — tab yang terbuka melewati update/seed tak lagi membalik seed baru ke id lama dan
   menguncinya `user`. Tool MCP `hanoman_settings_set` menyuruh agen memanggil `_get` tepat sebelumnya.
+  SPEC-1442 menambah `builtinRuntimeDefaults.antigravity.{model,effort}` dan provenance sel native
+  secara additive. Versi rekomendasi Claude/Codex tetap `2026-09-23-v2`: extension marker runtime
+  ketiga tidak menjalankan ulang seed untuk nilai/saklar/marker Claude/Codex dengan versi current.
+  Upgrade historis v1/baris tanpa marker tetap mengikuti migrasi rekomendasi existing. Nilai
+  Antigravity tanpa marker diinferensikan seeded/user, edit PUT ditandai user dan seed idempoten.
+  PUT client lama yang menghilangkan blok `antigravity` atau matriks runtime ini per-flow
+  mempertahankan nilai DB beserta marker ownership-nya. Keputusan MCP memakai tool Settings
+  existing dan capability `settings:read|write`; tidak menambah endpoint/capability baru.
 - `remoteControl`, `logShipping`, `logRetention` (SPEC-1215 · [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md)/[ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md),
   sudah di `zSetting` sejak turunan A; `logShipping`/`logRetention` baru dibaca SPEC-1217) — LOCAL-only, tanpa migration.
   - `remoteControl = { enabled:false, capabilities:[] }`: grant kendali jarak jauh dari hub, dengan

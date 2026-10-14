@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS } from "./antigravity";
+import { ANTIGRAVITY_CHILD_TIERS, BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS } from "./antigravity";
 import { zStage, zSpecSource, zDocStatus, zPriority, zProjectKind, zAgent, zVerifyScope } from "./enums";
 import { TELEGRAM_DEFAULTS, zTelegramSettings } from "./telegram";
 import { zAgentEngine, type AgentEngine } from "./agent-engine";
@@ -436,6 +436,11 @@ export const zPhaseCell = z.object({
   effort: z.string().nullable().default(null),
 });
 export type PhaseCell = z.infer<typeof zPhaseCell>;
+// Stored cells remain lenient for legacy reads; newly edited native child cells use this schema.
+export const zAntigravityPhaseCell = z.object({
+  model: z.enum(ANTIGRAVITY_CHILD_TIERS).nullable().default(null),
+  effort: z.null().default(null),
+});
 // Override ini hidup hanya selama satu peluncuran. Tidak disimpan di Setting karena ia adalah
 // keputusan operator untuk sesi tertentu, sedangkan matriks di bawah adalah default instance.
 // S6 · input transient dari body request (modal Start / relay) yang berakhir di definisi agen & argv:

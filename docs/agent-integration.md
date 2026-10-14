@@ -306,6 +306,14 @@ Tool MCP-nya (semua tulis bermode `danger`, hanya tampil dengan `--danger`):
 | `GET /api/scheduler/queue` | `settings:read` | antrean scheduler (`?status=queued\|launched\|done\|failed`). `GET /api/scheduler/state` **tak lagi** memuat `queue` — ia memuat `queueCounts`. |
 | `POST /api/lead/decisions` | `lead:write` | minta putusan — baca **§8** dan **§11** dulu. |
 
+Settings memakai tool existing `hanoman_settings_get`/`hanoman_settings_set` dan capability
+`settings:read|write` untuk runtime Antigravity (SPEC-1442/ADR-0221). Panggil `_get` tepat sebelum
+`_set`, kirim objek terbaru dengan perubahan yang diperlukan. Default parent berada di
+`antigravity.model/effort`; sel `orchestration.<flow>.antigravity` menerima tier native
+`inherit|flash|pro` atau model `null`, dengan effort `null`. Slug parent/effort independen pada
+sel baru/diubah ditolak 400. Sel legacy yang tidak berubah tetap terbaca untuk diagnosis;
+blok runtime ketiga yang tidak dikirim client lama dipertahankan beserta ownership-nya.
+
 ## 7. `POST /api/specs` — bentuk payload per `source`
 
 `source` dan bentuk `payload` **saling mengikat**. Salah pasang → **400**

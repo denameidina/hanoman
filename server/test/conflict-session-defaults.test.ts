@@ -9,6 +9,13 @@ beforeAll(async () => { await resetDb(); });
 afterAll(async () => { await resetDb(); });
 
 describe("conflictSessionDefaults", () => {
+  it("Antigravity inherits its own parent block or uses the explicit conflict block", async () => {
+    await makeSetting({ agent: "antigravity", antigravity: { model: "custom-parent", effort: "high" } });
+    expect(await conflictSessionDefaults()).toEqual({ agent: "antigravity", model: "custom-parent", effort: "high" });
+    await makeSetting({ agent: "claude",
+      conflict: { enabled: true, agent: "antigravity", model: "conflict-parent", effort: "low" } });
+    expect(await conflictSessionDefaults()).toEqual({ agent: "antigravity", model: "conflict-parent", effort: "low" });
+  });
   it("mati → mewarisi default global claude, sama persis dengan sessionAgentDefaults", async () => {
     await makeSetting({ agent: "claude", model: "claude-sonnet-5", effort: "medium",
       conflict: { enabled: false, agent: "codex", model: "gpt-5.6-terra", effort: "low" } });

@@ -86,6 +86,20 @@ describe("settings", () => {
     expect(await sessionAgentDefaults()).toEqual({ agent: "claude", model: "sonnet", effort: "medium" });
   });
 
+  it("Antigravity uses its parent block and preserves unknown slugs and native phase tiers", async () => {
+    await prisma.setting.create({ data: { id: 1, data: {
+      ...DEFAULT_SETTING, agent: "antigravity",
+      antigravity: { model: "future-antigravity", effort: "low" },
+      orchestration: { feature: { antigravity: { Plan: { model: "pro", effort: null } } } },
+    } } });
+    expect(await sessionAgentDefaults())
+      .toEqual({ agent: "antigravity", model: "future-antigravity", effort: "low" });
+    expect((await getSetting()).orchestration.feature.antigravity.Plan).toEqual({ model: "pro", effort: null });
+    expect(normalizePhaseOverrides("antigravity", { Plan: { model: "inherit" } }))
+      .toEqual({ Plan: { model: "inherit" } });
+    expect(DEFAULT_SETTING.antigravity).toEqual({ model: "gemini-3.8-flash-high", effort: "high" });
+  });
+
   it("baris Setting lama (tanpa agent/codex) tetap claude — tanpa migration", async () => {
     await prisma.setting.create({ data: { id: 1, data: BARIS_LAMA } });
     const s = await getSetting();
