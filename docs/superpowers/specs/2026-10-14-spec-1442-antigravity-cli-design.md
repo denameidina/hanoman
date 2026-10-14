@@ -102,9 +102,35 @@ Probe read-only slash di primary agent membuktikan discovery, **bukan** actual m
 foreground, atau policy enforcement. Klaim parity membutuhkan live invocation dan bukti lifecycle.
 Dengan kontrak yang ditemukan, requirement native child lengkap tidak boleh dianggap sudah feasible.
 
-### Keputusan terbuka lanjutan untuk relay
+### Steering manusia: sesi tetap interaktif
 
-1. Karena `agy` 1.3.4 menerima native tier `flash` tetapi tidak menemukan definisi dengan slug exact, sementara effort per-child dan foreground belum punya kontrak terverifikasi, jalur mana yang dipilih: A pertahankan 2B sebagai syarat keras dan tahan desain native sampai riset/probe menemukan kontrak yang memenuhi semuanya (rekomendasi menjaga requirement), B izinkan bridge child yang dikelola hanoman lewat proses `agy -p --model --effort` dengan kontrol blocking dan read-only tersendiri—mengamandemen tuntutan native `invoke_subagent`, atau C amandemen 2B menjadi child native tier/inherit dengan batas exact model/effort/foreground diumumkan eksplisit?
+Manusia menyatakan: "saya mau sesi nya tetap interaktip no oneshot prompt".
+Usulan bridge child `agy -p` **tidak disetujui dan ditarik**. `-p /model` di riset terdahulu
+hanya probe read-only slash dengan nol inferensi; bukan rancangan sesi kerja.
+Sesi parent sudah direncanakan `agy --prompt-interactive` di tmux/worktree, dan tetap demikian.
+
+Dua jalur yang masih dapat dibandingkan tanpa menganggapnya telah disetujui:
+
+- **Native interaktif:** parent TUI menggunakan `invoke_subagent`, child native discovery.
+  Ini paling dekat requirement 2B; exact model/effort dan blocking foreground tetap belum
+  mempunyai bukti runtime. Definisi tier `flash` ditemukan, slug exact tidak ditemukan.
+  Riset native harus diselesaikan sebelum memilih schema/flag, bukan melengkapi field dari asumsi.
+- **Bridge interaktif persisten (alternatif baru, belum terverifikasi):** hanoman mengelola TUI
+  `agy -i` per child di tmux dengan model/effort pada argv, pesan susulan ke conversation yang
+  sama, dan lifecycle/wait terkontrol. Konteks child tetap hidup lintas giliran; tidak memakai
+  `-p` untuk pekerjaan child. Ini mengubah arsitektur dari native `invoke_subagent` menjadi
+  proses interaktif terkelola, sehingga membutuhkan persetujuan amandemen requirement 2B.
+  Read-only enforcement, termination, readiness, limit concurrency, relaying keputusan dan
+  completion evidence perlu desain serta probe; belum ada bukti yang mengizinkan klaim parity.
+
+Cakupan larangan one-shot belum jelas: `lead/brain.ts` existing adalah one-shot internal keputusan,
+terpisah dari sesi kerja lead yang interaktif. Melarang keduanya akan memperluas SPEC ke redesign
+lead brain; membiarkan pengecualian internal itu juga tidak boleh diputuskan sendiri.
+
+### Keputusan terbuka untuk relay berikutnya
+
+1. Larangan one-shot berlaku pada cakupan mana: A seluruh sesi kerja parent dan child tetap interaktif tetapi lead brain internal existing boleh tetap one-shot (rekomendasi mempertahankan arsitektur lead), B semua pemakaian Antigravity termasuk lead brain wajib interaktif persisten, atau C hanya sesi parent wajib interaktif sedangkan child/lead brain boleh one-shot?
+2. Untuk exact model/effort + foreground + read-only requirement 2B, pilih A tetap wajib native `invoke_subagent` dan tahan desain sampai kontrak native lengkap terbukti (rekomendasi menjaga requirement yang telah dipilih), atau B setujui amandemen 2B ke bridge child TUI interaktif persisten yang dikelola hanoman, tanpa `agy -p` untuk pekerjaan child, setelah feasibility/kontraknya diverifikasi?
 
 ### Aturan verifikasi fase berikutnya
 
