@@ -8,7 +8,7 @@
 //   /backlog/<specId>                  Backlog dengan SpecDetail item itu terbuka
 //   /review/<spec|session>/<id>        layar review worktree (section transien `review`)
 //   /skills[/<projectId>]              skill global + per project, atau satu project saja
-//   /qa[/<projectId>]                  laporan QA project terpilih (default: project pertama)
+//   /qa[/<projectId>]                  laporan QA semua project (default) atau satu project
 //   /                                  → dialihkan ke halaman terakhir yang tersimpan (ADR-0115)
 //
 // Hash lama `#spec=<id>` (ADR-0071) TETAP dibaca saat mount

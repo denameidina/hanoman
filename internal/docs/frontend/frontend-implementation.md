@@ -1039,6 +1039,9 @@ Berkas (`src/src/screens/qa/`; CSS baru di `src/src/screens/styles/qa.css`, dimu
 
 - `QaWorkspace.tsx`: toolbar lima kontrol (Project, Sinkronkan QA, Laporan baru, Impor, Unduh template). Daftar memuat
   dengan `SkeletonList`. Modal impor dan buat laporan memakai `Field` DS; berkas native diberi `aria-label`.
+  Default `/qa` = **Semua project**: daftar tiap project diambil paralel di klien (API laporan tetap per project, tanpa
+  endpoint baru), dikelompokkan per project, dipaginasi 10 laporan/halaman; modal baru/impor memuat kolom "Project
+  tujuan". `/qa/<projectId>` tetap membuka satu project.
 - `QaReportList.tsx`: `RowList`. Baris = kode · status (`Badge` titik) · judul · versi dan penguji · lulus n/m · temuan ·
   keputusan · "Diubah …" (`relativeTime`). Satu pintu unduh per baris: ZIP.
 - `QaReportEditor.tsx`: 

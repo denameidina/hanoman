@@ -481,3 +481,26 @@ describe("Field · label dan hint di drawer Info laporan", () => {
     expect(summary.getAttribute("aria-label")).toBeNull();
   });
 });
+
+describe("QaWorkspace · Semua project", () => {
+  it("tanpa projectId: memuat tiap project, mengelompokkan per project, dan membuka laporan dengan project-nya", async () => {
+    const v2 = { ...view, id: "r2", projectId: "p2", code: "QA-001", title: "Regresi Beta" };
+    mockFetch((u, init) => {
+      if (init?.method && init.method !== "GET") return null;
+      if (u.endsWith("/api/projects/p2/qa/reports")) return json({ items: [v2], total: 1 });
+      if (u.endsWith("/api/projects/p2/qa/reports/r2")) return json({ ...detail, ...v2 });
+      return null;
+    });
+    renderWs({ projectId: undefined });
+    expect(await screen.findByText("Smoke 0.9")).toBeTruthy();
+    expect(screen.getByText("Regresi Beta")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Alpha" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Beta" })).toBeTruthy();
+    expect((screen.getByLabelText("Project") as HTMLSelectElement).value).toBe("");
+    expect(screen.getAllByRole("link", { name: "Unduh ZIP QA-001" }).map((a) => a.getAttribute("href")))
+      .toEqual(["/api/projects/p1/qa/reports/r1/export", "/api/projects/p2/qa/reports/r2/export"]);
+    fireEvent.click(screen.getByText("Regresi Beta"));
+    // Editor terbuka → daftar (dan judul kelompok) hilang; detail diambil dari project laporan itu.
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Alpha" })).toBeNull());
+  });
+});
