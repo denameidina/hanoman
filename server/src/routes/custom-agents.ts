@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { CODEX_NATIVE_AGENTS_MIN_CLIENT } from "@hanoman/runner";
 import {
-  activationOf, effortOf, maxTurnsOf, timeoutSecondsOf, workspacePolicyOf,
+  activationOf, effortOf, maxTurnsOf, timeoutSecondsOf, workspacePolicyOf, antigravityCustomAgentProblem,
   zCreateCustomAgent, zUpdateCustomAgent, customAgentId, mentionsOf, toolsOf, runtimeOf,
   modelsForRuntime, modelKnownForRuntime, effortsForRuntimeModel, ALL_TOOLS, AGENT_RUNTIMES, AGENT_RUNTIME_LABELS, BUILTIN_AGENT_NAMES,
   type AgentRuntime, type AgentCatalogView,
@@ -42,6 +42,10 @@ const availabilityOf = (r: CustomAgentRow, requestedRuntime?: AgentRuntime) => {
       available: false,
       availabilityReason: "isolated-worktree belum tersedia untuk subagent Codex",
     };
+  }
+  if (effectiveRuntime === "antigravity") {
+    const reason = antigravityCustomAgentProblem(r);
+    if (reason) return { available: false, availabilityReason: reason };
   }
   if (effectiveRuntime === "codex") {
     const support = currentCustomAgentRuntimeSupport();
@@ -93,6 +97,8 @@ const view = (
     builtinEdited: builtin ? stamps[r.name] !== rowFingerprint(r) : false,
     ...availability,
     selectionReason: selectionReasonOf(r, availability),
+    ...((requestedRuntime ?? runtimeOf(r.runtime)) === "antigravity"
+      ? { executionLimits: "instructional" as const } : {}),
     ...(projectId ? { inherited: r.projectId === null } : {}),
   };
 };
@@ -152,7 +158,7 @@ export default async function (app: FastifyInstance) {
     const projectId = query.projectId;
     const requestedRuntime = query.runtime;
     if (requestedRuntime && !AGENT_RUNTIMES.includes(requestedRuntime as AgentRuntime)) {
-      return reply.code(400).send({ error: "runtime harus claude atau codex" });
+      return reply.code(400).send({ error: "runtime harus claude, codex, atau antigravity" });
     }
     const rows = await prisma.customAgent.findMany({
       where: projectId ? { OR: [{ projectId: null }, { projectId }] } : { projectId: null },

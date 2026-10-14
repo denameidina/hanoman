@@ -194,3 +194,27 @@ describe("agentDefsFor · penyaring runtime & ekspansi *", () => {
     expect(def.tools).toContain("Read");
   });
 });
+
+
+describe("Antigravity registry selection", () => {
+  it("filters incompatible stored profiles without changing Claude/Codex or data", async () => {
+    await mk(null, "compatible", { maxTurns: 4, timeoutSeconds: 120 });
+    await mk(null, "readonly", { workspacePolicy: "read-only" });
+    await mk(null, "limited", { tools: ["Read"] });
+    await mk(null, "parent-slug", { model: "gemini-3.8-flash-high" });
+    await mk(null, "independent", { effort: "high" });
+    await loadCustomAgents();
+    expect(agentDefsFor("p1", "antigravity")).toMatchObject([{ name: "compatible", model: null, tools: null }]);
+    const context = { projectId: "p1", runtime: "antigravity" as const, cwd: "/repo", changedFiles: [] };
+    expect(agentDefsFor(context).map(d => d.name)).toEqual(["compatible"]);
+    expect(agentDefsFor("p1", "claude")).toHaveLength(5);
+    expect(agentDefsFor("p1", "codex")).toHaveLength(5);
+    expect((await prisma.customAgent.findUnique({ where: { id: "global:parent-slug" } }))?.model).toBe("gemini-3.8-flash-high");
+  });
+  it("never invents an Antigravity builtin model or erases a stored incompatible model", async () => {
+    await mk(null, "scout", { runtime: "antigravity", tools: null, effort: null, workspacePolicy: "inherit" });
+    await loadCustomAgents();
+    expect(agentDefsFor("p1", "antigravity")[0]).toMatchObject({ name: "scout", model: null, effort: null, tools: null });
+    expect(agentDefsFor("p1", "antigravity")[0]).not.toHaveProperty("kind");
+  });
+});

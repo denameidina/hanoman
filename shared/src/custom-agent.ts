@@ -219,6 +219,19 @@ export function resolveTools(a: { tools?: string[] | null; mentions?: string[] |
   return out;
 }
 
+export function antigravityCustomAgentProblem(profile: {
+  model: string | null; effort?: unknown; tools: unknown; workspacePolicy?: unknown;
+}): string | null {
+  const policy = workspacePolicyOf(profile.workspacePolicy);
+  if (policy !== "inherit") return `${policy} belum tersedia untuk subagent Antigravity`;
+  if (profile.model !== null && !isAntigravityChildTier(profile.model)) {
+    return "Antigravity child memakai tier inherit, flash, atau pro; model tersimpan tidak kompatibel";
+  }
+  if (profile.effort != null) return "effort independen belum tersedia untuk subagent Antigravity";
+  if (toolsOf(profile.tools) !== null) return "pembatasan tool belum tersedia untuk subagent Antigravity";
+  return null;
+}
+
 /**
  * Bentuk yang dikirim `/api/custom-agents`. `inherited` HANYA muncul saat diminta per-project
  * (true = baris global yang berlaku di sana, read-only dari permukaan project). `createdAt`/
@@ -253,6 +266,8 @@ export type CustomAgentView = {
   available?: boolean;
   availabilityReason?: string;
   selectionReason?: string;
+  /** Native Antigravity maxTurns/timeout are instructions, not runtime enforcement. */
+  executionLimits?: "instructional";
   inherited?: boolean;
 };
 

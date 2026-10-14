@@ -2229,7 +2229,7 @@ POST   /api/custom-agents { projectId?, name, description, instructions, tools?,
 #      -> 201 CustomAgentView
 #         400 slug nama tak sah · projectId tak ada · mention tak dikenal { unknown: string[] }
 #         400 tool tak dikenal { unknownTools: string[] } · `*` bercampur nama lain
-#         400 model tak dikenal untuk runtime-nya { model, runtime } · runtime di luar {claude,codex}
+#         400 model tak dikenal untuk runtime-nya { model, runtime } · runtime di luar {claude,codex,antigravity}
 #         400 effort tak didukung pasangan efektif { effort, model, runtime }
 #         409 nama sudah dipakai di scope itu · mention membentuk siklus { scope, cycle: string[] }
 PATCH  /api/custom-agents/:id { description?, instructions?, tools?, model?, mentions?, runtime?,
@@ -2484,6 +2484,19 @@ Setting JSON additive `antigravity:{model,effort}` dan marker seeded/user; paren
 `gemini-3.8-flash-high`/`high`. Child Antigravity menggunakan tier publik `inherit|flash|pro`,
 tidak menerima explicit effort independen; legacy incompatible ditampilkan unavailable beralasan.
 Tidak ada perubahan skema DB atau principal/capability launch existing.
+
+Custom Agent `GET /api/custom-agents?runtime=antigravity` mempertahankan profil tersimpan,
+termasuk slug warisan, dan menurunkan `available:false`/`availabilityReason` untuk policy
+`read-only`/`isolated-worktree`, model selain tier `inherit|flash|pro`, effort independen, atau
+allowlist tool eksplisit (termasuk `[]` dan `["*"]`). `tools:null` tidak mengklaim pembatasan
+native. Definisi kompatibel masuk roster native; profil incompatible tidak diremap. Pembacaan
+Claude/Codex tidak berubah. Pada respons berkonteks Antigravity, `executionLimits:"instructional"`
+menjelaskan `maxTurns`/`timeoutSeconds` sebagai instruksi, bukan enforcement runtime.
+Create/update explicit Antigravity memvalidasi model/effort; PATCH memeriksa pasangan efektif
+hasil gabungan dengan baris lama saat runtime/model/effort berubah. PATCH konten atau enabled
+pada profil warisan tetap diperbolehkan. Awalan `hanoman-fase-` tetap reserved; field `kind`
+dari custom API tidak masuk definisi runner, sehingga tak bisa mendapatkan pengecualian reviewer
+generated. Global builtin tidak mengarang recommendation model Antigravity dari kolom Claude/Codex.
 
 Relay manusia Plan Q1 **B**: `/api/methods/status` menambah status Antigravity unavailable
 beralasan sampai installer upstream terverifikasi, tanpa mengklaim readiness/install command.

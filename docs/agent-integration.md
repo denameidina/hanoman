@@ -143,6 +143,17 @@ membuat token; endpoint katalognya (`GET /api/agent-tokens/capabilities`) kini t
 | `sync` | `GET /api/sync/{conflicts,pending}`, `POST /api/sync/now`, `POST /api/sync/conflicts/:entity/:recordId/resolve` | **hanya tiga permukaan UI sync** (ADR-0199): antrean konflik & hapus-tertunda (`sync:read`), pemicu sync manual (`sync:write`), memutuskan konflik (`sync:resolve`, akses `danger` — **membuang data satu sisi tanpa jalan pulang**, tak diimplikasikan `sync:write`). Kanal mesin-ke-mesin (`/api/sync/{pull,bootstrap,push,logs,attachments,qa-attachments,ws,relay}`) tetap bukan milik agen — lihat §5 |
 | `instance` | `POST /api/update/apply`, `POST /api/restart` | satu capability `instance:admin` (akses `danger`, ADR-0200): memasang versi hanoman terbaru dari registry npm dan me-**restart** proses server. Hanya sah bila instance punya supervisor (`canApply` di `GET /api/update`); wajib `{ "confirm": true }` dan balasan 202 dikirim **sebelum** proses keluar |
 
+SPEC-1442 / ADR-0221: tool Custom Agent existing diperluas additive, tanpa endpoint/tool baru.
+`hanoman_agent_create` dan `hanoman_agent_update` menerima runtime `antigravity`; model child
+hanya tier `inherit|flash|pro`, bukan slug parent dan bukan effort independen. Mode `write` dan
+capability `agents:write` tetap. `hanoman_agents_list` menerima filter `runtime` opsional untuk
+menampilkan availability terhadap parent itu, dengan mode `read`/`agents:read` tetap. Profil
+warisan yang tidak kompatibel tetap terbaca dengan `availabilityReason`; auditor read-only,
+isolated-worktree dan allowlist tool eksplisit unavailable pada Antigravity. `maxTurns`/timeout
+bersifat instruksional (`executionLimits:"instructional"`), bukan jaminan native. Runtime tetap
+penyaring persona, bukan pemilih proses anak. Keputusan MCP ini memenuhi ADR-0202 untuk perluasan
+kontrak existing; tak ada pengecualian auth baru.
+
 ## 4. Aturan gate & kode status
 
 Gate `onRequest` yang sama menegakkan semuanya:

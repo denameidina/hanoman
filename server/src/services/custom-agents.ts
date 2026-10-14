@@ -2,7 +2,7 @@ import { prisma } from "../db";
 import {
   activationOf, effortOf, effectiveAgents, detectCycle, maxTurnsOf, mentionsOf, toolsOf,
   runtimeOf, timeoutSecondsOf, workspacePolicyOf, expandTools, ALL_TOOLS, GLOBAL_SCOPE,
-  BUILTIN_AGENTS, modelKnownForRuntime, claudeSubagentEfforts,
+  BUILTIN_AGENTS, modelKnownForRuntime, claudeSubagentEfforts, antigravityCustomAgentProblem,
   type CustomAgent, type AgentNode, type Agent,
 } from "@hanoman/shared";
 import { codexNativeAgentsSupported, type AgentDef } from "@hanoman/runner";
@@ -54,6 +54,7 @@ export function selectAgentRows(
     if (!row.enabled) return false;
     const runtime = runtimeOf(row.runtime);
     if (runtime !== null && runtime !== context.runtime) return false;
+    if (context.runtime === "antigravity" && antigravityCustomAgentProblem(row)) return false;
     if (workspacePolicyOf(row.workspacePolicy) === "isolated-worktree"
       && context.runtime !== "claude") return false;
     return true;
@@ -100,6 +101,7 @@ export function toDef(r: CustomAgentRow): AgentDef {
 
 function recommendedModel(row: CustomAgentRow, runtime: Agent): string | null {
   if (row.model) return row.model;
+  if (runtime === "antigravity") return null;
   if (row.projectId !== null) return null;
   const builtin = BUILTIN_AGENTS.find((agent) => agent.name === row.name);
   if (!builtin) return null;
@@ -158,12 +160,7 @@ export function agentDefsFor(
   // Semua definisi enabled + runtime/policy-compatible hidup sepanjang sesi. `activation=smart`
   // mengarahkan parent kapan mendelegasikan berdasarkan pekerjaan TERKINI; ia tidak boleh
   // membekukan capability dari flow/diff saat sesi lahir.
-  const eff = legacy
-    ? effectiveRows.filter((row) => row.enabled
-      && (runtimeOf(row.runtime) === null || runtimeOf(row.runtime) === context.runtime)
-      && !(workspacePolicyOf(row.workspacePolicy) === "isolated-worktree"
-        && context.runtime !== "claude"))
-    : selectAgentRows(effectiveRows, context);
+  const eff = selectAgentRows(effectiveRows, context);
   // Katalog hanya dihitung bila ada yang benar-benar memakai `*` — pembacaan berkas konfigurasi
   // tak perlu terjadi di setiap kelahiran sesi.
   const needsCatalog = eff.some((row) => (toolsOf(row.tools) ?? []).includes(ALL_TOOLS));

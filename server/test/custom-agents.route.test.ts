@@ -320,8 +320,9 @@ describe("GET /api/custom-agents/catalog", () => {
     expect(b.tools[0].id).toBe("*");
     expect(b.tools.map((t: { id: string }) => t.id)).toContain("Read");
     expect(b.models.map((m: { id: string }) => m.id)).toContain("opus");
+    expect(b.models.filter((m: { runtime: string }) => m.runtime === "antigravity").map((m: { id: string }) => m.id)).toEqual(["inherit", "flash", "pro"]);
     expect(b.models.map((m: { id: string }) => m.id)).toContain("gpt-5.6-sol");
-    expect(b.runtimes.map((x: { id: string }) => x.id)).toEqual(["claude", "codex"]);
+    expect(b.runtimes.map((x: { id: string }) => x.id)).toEqual(["claude", "codex", "antigravity"]);
   });
 
   it("dipetakan ke agents:read (baca, bukan tulis)", () => {
@@ -468,5 +469,81 @@ describe("field turunan agen bawaan", () => {
       .json() as Array<Record<string, unknown>>;
     const proj = list1.find((a) => a.projectId === "p1")!;
     expect(proj.builtin).toBe(false);
+  });
+});
+
+
+describe("Antigravity Custom Agent boundary and availability", () => {
+  const base = { name: "native-child", description: "d", instructions: "i", runtime: "antigravity" };
+  it.each([null, "inherit", "flash", "pro"])("accepts child tier %s without independent effort", async (model) => {
+    const r = await post({ ...base, model });
+    expect(r.statusCode).toBe(201);
+    expect(r.json()).toMatchObject({ model, runtime: "antigravity", available: true });
+  });
+  it.each([
+    { model: "gemini-3.8-flash-high" }, { effort: "high" },
+  ])("rejects parent slug or independent effort %j", async (profile) => {
+    expect((await post({ ...base, ...profile })).statusCode).toBe(400);
+  });
+  it.each([
+    [{ model: "haiku" }, { runtime: "antigravity" }],
+    [{ effort: "high" }, { runtime: "antigravity" }],
+    [{ runtime: "antigravity" }, { model: "gemini-3.8-flash-high" }],
+    [{ runtime: "antigravity" }, { effort: "high" }],
+  ])("validates merged PATCH profile %j then %j", async (before, payload) => {
+    await post({ name: "native-child", description: "d", instructions: "i", ...before });
+    const r = await app.inject({ method: "PATCH", url: "/api/custom-agents/global:native-child", payload });
+    expect(r.statusCode).toBe(400);
+  });
+  it.each([
+    ["read-only", {}, "read-only"], ["isolated-worktree", {}, "isolated-worktree"],
+    ["inherit", { model: "future-parent-slug" }, "tier"],
+    ["inherit", { effort: "high" }, "effort"],
+    ["inherit", { tools: ["Read"] }, "tool"],
+    ["inherit", { tools: [] }, "tool"],
+    ["inherit", { tools: ["*"] }, "tool"],
+  ])("preserves legacy %s %j with unavailable reason", async (workspacePolicy, profile, reason) => {
+    await prisma.customAgent.create({ data: {
+      id: "global:legacy", name: "legacy", description: "d", instructions: "i", workspacePolicy,
+      ...profile,
+    } as never });
+    const r = await app.inject({ method: "GET", url: "/api/custom-agents?runtime=antigravity" });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()[0]).toMatchObject({ workspacePolicy, ...profile, available: false,
+      availabilityReason: expect.stringContaining(reason), selectionReason: "tidak masuk registry runtime ini" });
+    const patched = await app.inject({ method: "PATCH", url: "/api/custom-agents/global:legacy", payload: { enabled: false } });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json()).toMatchObject({ workspacePolicy, ...profile });
+  });
+  it("does not let kind spoofing turn a custom auditor into a phase reviewer", async () => {
+    const r = await post({ ...base, workspacePolicy: "read-only", kind: "phase" });
+    expect(r.statusCode).toBe(201);
+    expect(r.json()).toMatchObject({ available: false, workspacePolicy: "read-only" });
+    expect(agentDefsFor("p1", "antigravity")).toEqual([]);
+    expect((await post({ ...base, name: "hanoman-fase-review", kind: "phase" })).statusCode).toBe(400);
+  });
+  it("keeps compatible inherited definitions and instructional limits available", async () => {
+    await post({ name: "compatible", description: "d", instructions: "i", maxTurns: 4, timeoutSeconds: 120 });
+    const r = await app.inject({ method: "GET", url: "/api/custom-agents?runtime=antigravity" });
+    expect(r.json()[0]).toMatchObject({ available: true, maxTurns: 4, timeoutSeconds: 120,
+      executionLimits: "instructional" });
+  });
+});
+
+
+describe("Antigravity PATCH profile repair", () => {
+  it("changes runtime only when merged model and effort are made compatible", async () => {
+    await post({ name: "repairable", description: "d", instructions: "i", model: "haiku", effort: "high" });
+    const r = await app.inject({ method: "PATCH", url: "/api/custom-agents/global:repairable",
+      payload: { runtime: "antigravity", model: "flash", effort: null } });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toMatchObject({ runtime: "antigravity", model: "flash", effort: null, available: true });
+  });
+  it("keeps Antigravity read-only policy after a separate runtime patch", async () => {
+    await post({ name: "auditor", description: "d", instructions: "i", workspacePolicy: "read-only" });
+    const r = await app.inject({ method: "PATCH", url: "/api/custom-agents/global:auditor", payload: { runtime: "antigravity" } });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toMatchObject({ workspacePolicy: "read-only", available: false,
+      availabilityReason: expect.stringContaining("read-only") });
   });
 });

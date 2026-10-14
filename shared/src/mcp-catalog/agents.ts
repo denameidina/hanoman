@@ -2,6 +2,7 @@
 // Dipetakan MENURUT METHOD (ADR-0094): menulis definisi agen mengubah apa yang dilihat SETIAP sesi
 // baru di seluruh workspace, jadi izin baca tak pernah cukup untuk itu.
 import { bool, enumStr, obj, str, strArray } from "../mcp-schema";
+import { AGENT_RUNTIMES } from "../custom-agent";
 import { enc, query, s } from "./helpers";
 import type { McpToolDef } from "./types";
 
@@ -25,11 +26,14 @@ export const AGENTS_TOOLS: readonly McpToolDef[] = [
     description:
       "Persona custom yang aktif. Tanpa `project` hanya yang global; dengan `project` ia menggabung global + milik project, dan nama yang ditimpa project muncul SEKALI dengan versi project yang menang.",
     inputSchema: obj({
-      properties: { project: str("Id project. Kosongkan untuk hanya persona global.") },
+      properties: {
+        project: str("Id project. Kosongkan untuk hanya persona global."),
+        runtime: enumStr(AGENT_RUNTIMES, "Runtime parent untuk availability dan alasan ketidaktersediaan persona."),
+      },
     }),
     mode: "read", capability: "agents:read",
     samplePath: "/custom-agents", sampleMethod: "GET",
-    build: (a) => ({ method: "GET", path: "/custom-agents", query: query({ projectId: s(a.project) }) }),
+    build: (a) => ({ method: "GET", path: "/custom-agents", query: query({ projectId: s(a.project), runtime: s(a.runtime) }) }),
     shape: (raw) => raw,
   },
   {
@@ -44,9 +48,9 @@ export const AGENTS_TOOLS: readonly McpToolDef[] = [
         instructions: str("Instruksi persona (1–20.000 karakter). Inilah yang dibaca agen."),
         project: str("Id project. Kosongkan untuk persona GLOBAL yang berlaku di semua project."),
         tools: strArray("Tool yang boleh dipakai persona ini. Harus ada di hanoman_agents_catalog. Kosongkan untuk mewarisi."),
-        model: str("Model. Harus sah untuk `runtime` yang dipilih."),
+        model: str("Model child. Antigravity hanya tier inherit|flash|pro; effort independen unavailable. Harus sah untuk `runtime` yang dipilih."),
         mentions: strArray("Nama persona lain yang boleh dipanggil."),
-        runtime: enumStr(["claude", "codex"], "Penyaring mesin sesi. Kosongkan untuk mengikuti sesi induk."),
+        runtime: enumStr(AGENT_RUNTIMES, "Penyaring mesin sesi. Kosongkan untuk mengikuti sesi induk."),
         enabled: bool("Aktif atau tidak. Default aktif."),
       },
       required: ["name", "description", "instructions"],
@@ -76,9 +80,9 @@ export const AGENTS_TOOLS: readonly McpToolDef[] = [
         description: str("Deskripsi baru."),
         instructions: str("Instruksi baru."),
         tools: strArray("Daftar tool baru."),
-        model: str("Model baru."),
+        model: str("Model child baru. Antigravity hanya tier inherit|flash|pro; effort independen unavailable."),
         mentions: strArray("Daftar mention baru."),
-        runtime: enumStr(["claude", "codex"], "Penyaring mesin sesi."),
+        runtime: enumStr(AGENT_RUNTIMES, "Penyaring mesin sesi."),
         enabled: bool("Aktif atau tidak."),
       },
       required: ["agent"],

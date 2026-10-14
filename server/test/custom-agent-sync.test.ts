@@ -3,6 +3,7 @@ import { prisma } from "../src/db";
 import { SYNCED, snapshot, applyPush, __FIELDS } from "../src/services/sync";
 import { PG_ORDER } from "../../cli/src/commands/migrate-pg";
 import { customAgentId } from "@hanoman/shared";
+import { agentDefsFor, loadCustomAgents } from "../src/services/custom-agents";
 
 // SPEC-450 · ADR-0094 gotcha 7 · entitas baru WAJIB ikut PG_ORDER dan seluruh kolomnya wajib ada
 // di FIELDS: `upsert` yang tak menyebut kolom ber-default TETAP BERHASIL, jadi kolom yang terlewat
@@ -87,5 +88,24 @@ describe("wiring sync entitas customAgent", () => {
     expect(r.ok).toBe(true);
     const row = await prisma.customAgent.findUnique({ where: { id } });
     expect(row?.runtime).toBe("codex");
+  });
+});
+
+
+describe("Antigravity sync retains operator definitions", () => {
+  it("keeps compatible native tier and incompatible legacy model without migration", async () => {
+    for (const [name, model] of [["native", "pro"], ["legacy", "future-parent-slug"]]) {
+      const id = customAgentId(null, name!);
+      const result = await applyPush("customAgent", id, 0, {
+        projectId: null, name, model, description: "d", instructions: "i", tools: null,
+        mentions: [], runtime: "antigravity", enabled: true, effort: null, workspacePolicy: "inherit",
+        createdAt: "2026-08-01T00:00:00.000Z", updatedAt: "2026-08-01T00:00:00.000Z",
+      });
+      expect(result.ok).toBe(true);
+      expect((await snapshot("customAgent", id))?.data).toMatchObject({ runtime: "antigravity", model });
+    }
+    await loadCustomAgents();
+    expect(agentDefsFor("p1", "antigravity").map(d => d.name)).toEqual(["native"]);
+    expect((await prisma.customAgent.findUnique({ where: { id: "global:legacy" } }))?.model).toBe("future-parent-slug");
   });
 });

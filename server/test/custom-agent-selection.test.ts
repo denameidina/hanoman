@@ -71,3 +71,14 @@ describe("collectChangedFiles", () => {
     expect(collectChangedFiles("/missing", "abc123", run)).toEqual([]);
   });
 });
+
+
+describe("Antigravity compatible selection", () => {
+  it("keeps native tier inherit policy but excludes unsupported auditor and tool restrictions", () => {
+    const compatible = builtin("scout", { projectId: "p1", name: "native-reader", model: "flash", effort: null, tools: null, workspacePolicy: "inherit" });
+    const rows = [compatible, builtin("scout"), builtin("edge-case-hunter"),
+      { ...compatible, id: "p1:limited", name: "limited", tools: [] }];
+    expect(selectAgentRows(rows, context({ runtime: "antigravity" })).map(a => a.name)).toEqual(["native-reader"]);
+    expect(selectAgentRows(rows, context()).map(a => a.name)).toHaveLength(4);
+  });
+});

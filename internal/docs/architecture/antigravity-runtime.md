@@ -362,3 +362,29 @@ terkena, seluruh roster fase dibatalkan sambil mempertahankan perubahan operator
 Verification rework scoped: **19 test registry + 44 test prompt = 63/63 lulus**, typecheck runner
 exit 0; `Task5-rework-red-ownership.log` dan `Task5-rework-green-ownership.log` di workspace
 ignored plan. Argv/loader tidak berubah; receipt native di atas tidak dijalankan ulang.
+
+
+## Receipt Task 6 — Custom Agent boundary dan availability
+
+`antigravityCustomAgentProblem` menjadi seam murni bersama respons CRUD dan selection roster.
+Native compatible: `model:null|inherit|flash|pro`, `effort:null`, `tools:null`, policy `inherit`.
+Profil lain tetap disimpan/readable tetapi unavailable beralasan untuk parent Antigravity saja;
+policy atau explicit slug tidak diremap. Builtin model recommendation Claude/Codex tidak dipakai
+untuk parent ini. PATCH runtime/model/effort memvalidasi profil merged existing; perubahan konten
+atau enabled profil warisan tetap boleh. Custom API tidak meneruskan `kind`, dan nama fase reserved;
+pengecualian reviewer fase generated tidak bisa dimiliki Custom Agent auditor.
+
+`executionLimits:"instructional"` additive pada view berkonteks Antigravity memperjelas limit
+turn/timeout. `hanoman_agent_create`/`hanoman_agent_update` schema enum additive dan
+`hanoman_agents_list(runtime?)` menyampaikan availability parent; mode/capability existing
+`agents:write` / `agents:read` dipertahankan (keputusan ADR-0202, lihat
+[API contract](api-contract.md) dan
+[agent integration](../../../docs/agent-integration.md)).
+
+TDD original RED 3 berkas: **14 failed / 76 passed**. GREEN scoped 9 berkas: **199/199 passed**
+(route CRUD/merged PATCH/policy/kind/limit label, service cached roster, selection, sync native tier
+& unknown slug preservation, shared schema/reserved-name, MCP enum/filter/mode/capability).
+Test server serial memakai DB SQLite temp berbeda dan membersihkan env origin/SSH_ASKPASS.
+Shared typecheck exit 0. Server typecheck tersisa hanya dua seam task selanjutnya:
+`pty.ts` status runtime (Task 8) dan Telegram engine label (Task 13); tidak disuppress.
+Endpoint live smoke dijadwalkan sekali pada Task 14 bersama perubahan runtime lain.
