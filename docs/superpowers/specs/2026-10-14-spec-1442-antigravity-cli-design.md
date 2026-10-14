@@ -4,7 +4,7 @@
 
 Fase Brainstorm · 2026-10-14. Base/kandidat riset:
 `c6800c59837a152e413d8b7834ced0b21adcb084`.
-Status desain: enam keputusan awal diterima; kontrak native child masih membutuhkan keputusan lanjutan. Belum menjadi spesifikasi implementasi.
+Status desain: terhalang oleh kontrak native child `agy` 1.3.4. Seluruh keputusan scope diterima; tidak ada izin untuk menggantinya dengan bridge atau batas kemampuan yang lebih rendah. Belum menjadi spesifikasi implementasi.
 
 ### Tujuan dan kontrak yang mengikat
 
@@ -127,10 +127,55 @@ Cakupan larangan one-shot belum jelas: `lead/brain.ts` existing adalah one-shot 
 terpisah dari sesi kerja lead yang interaktif. Melarang keduanya akan memperluas SPEC ke redesign
 lead brain; membiarkan pengecualian internal itu juga tidak boleh diputuskan sendiri.
 
-### Keputusan terbuka untuk relay berikutnya
+### Keputusan manusia relay berikutnya
 
-1. Larangan one-shot berlaku pada cakupan mana: A seluruh sesi kerja parent dan child tetap interaktif tetapi lead brain internal existing boleh tetap one-shot (rekomendasi mempertahankan arsitektur lead), B semua pemakaian Antigravity termasuk lead brain wajib interaktif persisten, atau C hanya sesi parent wajib interaktif sedangkan child/lead brain boleh one-shot?
-2. Untuk exact model/effort + foreground + read-only requirement 2B, pilih A tetap wajib native `invoke_subagent` dan tahan desain sampai kontrak native lengkap terbukti (rekomendasi menjaga requirement yang telah dipilih), atau B setujui amandemen 2B ke bridge child TUI interaktif persisten yang dikelola hanoman, tanpa `agy -p` untuk pekerjaan child, setelah feasibility/kontraknya diverifikasi?
+- Seluruh sesi kerja **parent dan child** harus interaktif; lead brain internal existing boleh
+  tetap one-shot. Read-only slash command untuk probe schema tidak menjadi pekerjaan child.
+- Native `invoke_subagent` tetap wajib. **Bridge ditolak**, termasuk bridge TUI persisten.
+- Exact model/effort, foreground dan enforcement read-only tetap syarat keras; instruksi prosa
+  bukan pengganti kemampuan runtime. Semua keputusan awal pada tabel di atas tetap berlaku.
+
+### Penghalang konkret setelah riset bounded
+
+Hipotesis loader membatasi model ke tier diuji ulang dengan **berkas dan nama agent yang sama**
+agar nama file, registry stale dan penambahan berkas baru tidak menjadi confounder. Berkas global
+sementara `hanoman-spec1442-loader-control.md` ditulis ulang; tiap pemanggilan `agy -p /model
+--agent hanoman-spec1442-loader-control --output-format json` adalah read-only slash, nol inferensi,
+`num_turns: 0`. Hasil berurutan pada biner 1.3.4:
+
+| Frontmatter model | Exit | Hasil discovery |
+| --- | --- | --- |
+| `flash` | 0 | SUCCESS |
+| `gemini-3.8-flash-high` | 1 | unknown agent; no custom agents are available |
+| `flash` (kontrol balik) | 0 | SUCCESS |
+| `inherit` | 0 | SUCCESS |
+| `claude-opus-5-5-high` | 1 | unknown agent; no custom agents are available |
+
+Biner juga memuat pesan validasi eksplisit `model must be 'inherit', 'flash_lite', 'flash', or
+'pro', got %q` dan schema `ModelTier`. Bersama kontrol balik dan docs resmi, ini membuktikan
+**frontmatter native tidak mendukung pemilihan slug exact per-child** pada CLI yang diuji.
+`inherit` bukan pengganti konfigurasi exact model/effort independen setiap child.
+
+Hipotesis bahwa validator plugin memberi schema lebih luas diuji melalui `agy plugin validate
+<direktori-temp>`: tier **dan slug invalid sama-sama exit 0**, `agents: 1 processed`. Maka hasil
+validator plugin tidak boleh dipakai sebagai bukti dukungan model native—loader aktual yang menentukan.
+Tidak ada plugin di-install dan berkas probe global telah dihapus; semua proses selesai.
+
+Foreground: dokumentasi native menyatakan async dan tool `invoke_subagent` mendokumentasikan
+Prompt/Role/TypeName/Workspace, tanpa wait/blocking. Biner memiliki field internal `task_mode` /
+`allow_task_mode`, tetapi ini **bukan API publik terverifikasi**; jangan memancarkannya atau mengklaim
+foreground dari nama simbol. Tidak ada live lifecycle proof foreground.
+
+Read-only: kontrak hooks mendukung `PreToolUse` output `decision: deny`, conversationId, modelName
+serta frontmatter `hooks` pada schema biner. Ini memberi jalur potensial penegakan; scope per-child,
+warisan hooks dan enforcement pada invocation nyata belum dibuktikan. Allowlist tool/instruksi
+prosa saja tidak memenuhi syarat keras ADR-0159.
+
+Kesimpulan fase: **terhalang**, bukan selesai. Exact per-child yang diwajibkan ditolak loader;
+foreground/read-only belum mempunyai bukti execution. Tidak ada alternatif native berbeda yang
+sudah terverifikasi memenuhi requirement. Melanjutkan implementasi sebagai parity penuh akan
+mengambil asumsi yang dilarang. Keputusan terbuka: `-`; keputusan scope sudah jelas dan tetap
+mengikat, penghalangnya kemampuan runtime pada versi yang diuji.
 
 ### Aturan verifikasi fase berikutnya
 
