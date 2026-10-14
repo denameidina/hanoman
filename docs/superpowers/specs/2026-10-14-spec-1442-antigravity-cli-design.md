@@ -4,7 +4,9 @@
 
 Fase Brainstorm · 2026-10-14. Base/kandidat riset:
 `c6800c59837a152e413d8b7834ced0b21adcb084`.
-Status Brainstorm: selesai setelah relay keputusan manusia atas blocker native CLI. Desain memakai adapter native dengan batas kemampuan eksplisit; Objective, Spec, Plan dan Execute masih harus dikerjakan oleh fase masing-masing.
+Status Brainstorm: selesai setelah relay keputusan manusia atas blocker native CLI. Desain memakai
+adapter native dengan batas kemampuan eksplisit. Objective dan Spec ditambahkan oleh agen fase
+masing-masing; Plan dan Execute meneruskan kontrak serta bukti wajib di dokumen ini.
 
 ### Tujuan dan kontrak yang mengikat
 
@@ -80,6 +82,7 @@ ber-`agy` belum dibuktikan. Jangan melonggarkan boundary produksi untuk membuat 
 | Deployment | Host/lab; launch sandbox ditolak eksplisit sampai auth/state terverifikasi, boundary produksi tetap utuh. |
 | Versi/API | Additive `/api/antigravity/version` + tool MCP baca; endpoint Codex dipertahankan. |
 | Bridge | Tetap ditolak, termasuk bridge interaktif persisten. |
+| Reviewer fase (relay Spec 1A) | Generated `hanoman-fase-review` boleh native child `inherit` dengan batas read-only **instruksional**, mengikuti ADR-0170; bukan enforcement runtime. Custom Agent auditor read-only tetap unavailable sampai enforcement terbukti. |
 
 Keputusan ini diterima lewat relay orchestrator setelah retry Brainstorm. Requirement awal exact
 model/effort independen dan foreground telah diamandemen **oleh manusia**; tidak diturunkan agen.
@@ -207,3 +210,229 @@ Satu smoke endpoint nyata di akhir; test server serial dengan DB temp unik, bers
 `HANOMAN_CONTROL_ORIGINS`/`SSH_ASKPASS`, typecheck paket tersentuh, tanpa suite penuh rutin.
 
 Keputusan terbuka: -.
+
+## Spec — kontrak implementasi
+
+Fase Spec · 2026-10-14. Base `c6800c59837a152e413d8b7834ced0b21adcb084`,
+kandidat masuk `40800f7cce009b3a4e92c2f1059bd62a2d67fb5f`. Bagian ini menurunkan SC1–SC6;
+keputusan manusia pada bagian sebelumnya tetap mengikat. [ADR-0221](../../../internal/docs/adr/0221-antigravity-cli-runtime-interaktif-native.md)
+adalah keputusan arsitekturnya. Kontrak di bawah adalah target implementasi, bukan klaim kode
+atau live smoke telah lulus. Plan/Execute wajib menyertakan bukti AC per ID.
+
+### S1. Arsitektur dan batas ownership
+
+| Lapis | Tanggung jawab | Titik perubahan |
+| --- | --- | --- |
+| Shared | Union runtime, label, setting/default marker, katalog parent/child, availability, DTO/API/MCP | `enums.ts`, `custom-agent.ts`, `entities.ts`, `runtime-defaults.ts`, `orchestration*.ts`, `model-catalog*.ts`, `agent-catalog.ts`, `config-registry.ts`, `mcp-catalog/*` |
+| Runner | Argv interaktif runtime, renderer Markdown native, prompt fase/relay, policy dan cleanup | `types.ts`, `agent-cli.ts`, `custom-agents.ts`, `phase-agents.ts`, `prompt.ts` |
+| Server | Effective bin, prepare trust/injeksi, launch admission, tmux metadata/detector, probe version/models, materialisasi roster | `services/pty.ts`, `session-launch.ts`, `skill-inject.ts`, `runtime-defaults.ts`, `custom-agents.ts`, `model-catalog-probe.ts`, service Antigravity khusus |
+| Routes | Validasi enum/pasangan model, error launch, endpoint versi baru | Settings, specs/start, Terminal, IDE/ide, lead, Custom Agent |
+| Dashboard | Runtime ketiga di seluruh pemakai katalog; batas kemampuan di konteks pengguna | Settings runtime/orkestrasi/MCP, modal Start/New Terminal, Custom Agent, label sesi/phase |
+| Distribusi | Config registry, doctor/VPS katalog dan panduan installer/auth resmi | CLI doctor, VPS components/provisioning yang mengenali CLI |
+
+Alur kelahiran: request tervalidasi → defaults efektif → launch admission existing → worktree
+existing → persiapan Antigravity → argv native → tmux → metadata/history/presence existing.
+Persiapan mencakup trust cwd aktual, instruksi/skill dan roster; shell mentah melewati seluruh
+persiapan agen seperti sebelumnya. Semua jalur otomatis/manual wajib melewati pemeriksaan
+runtime yang sama; memperbaiki picker saja tidak cukup. Tidak ada dispatcher process child baru,
+SDK eksekusi, atau bridge. Tidak ada tabel/kolom/migration baru: runtime tersimpan pada string
+dan JSON yang sudah ada. Parser/validator sync/history yang mencerminkan enum ikut diperluas.
+
+### S2. Biner, argv, defaults dan env
+
+- Biner efektif: config DB `HANOMAN_ANTIGRAVITY_BIN` → env → `agy`, metadata registry
+  `kind=path`, `apply=new-session`, `category=knob`, mengikuti ADR-0049. Nilainya adalah executable,
+  bukan shell command/daftar flag. Probe dan launch menggunakan resolver yang sama.
+- Sesi kerja menghasilkan `agy [--model <slug>] [--effort <effort>]
+  --dangerously-skip-permissions --prompt-interactive <prompt>`; prompt panjang tetap memakai
+  berkas sesi 0600 dan quoting existing, sebagai satu argumen setelah flag interaktif.
+  Tidak meneruskan `--settings`, `--agents` Claude, `-c` TOML Codex, `--print`, `exec`, atau
+  `--sandbox` sebagai substitusi boundary Podman.
+- Tanpa prompt awal, parent tetap TUI interaktif. Prompt berikutnya dikirim lewat PTY yang sama;
+  tidak spawn ulang per giliran. Metadata `@hanoman-agent`/history/presence menyimpan
+  `antigravity`, dan restore sesudah restart tidak menganggapnya Claude/Codex.
+- `Setting.agent` menerima nilai ketiga. `Setting.antigravity={model,effort}` dan marker
+  `builtinRuntimeDefaults.antigravity={model:"seeded"|"user",effort:"seeded"|"user"}`
+  additive. Default parent `gemini-3.8-flash-high`/`high`; override sesi → default runtime.
+  Read/write Setting lama yang belum membawa blok ini tetap sah. Seed mempertahankan runtime
+  global operator, seluruh edit Claude/Codex, serta marker `user`; tidak menjalankan ulang
+  perubahan rekomendasi Claude/Codex hanya karena versi marker Antigravity bertambah.
+- Parent catalog: `agy models`, timeout 20 dtk/output 4 MiB/cache 0600/refresh 5 menit mengikuti
+  model-catalog. Parsing mengambil hanya slug/label dan effort yang benar-benar diketahui.
+  Slug dengan suffix `low|medium|high` memberi batas effort konservatif itu sampai CLI memberi
+  metadata lebih kuat; daftar `--help` tidak menjadi bukti semua effort berlaku untuk semua model.
+  Katalog fallback minimal memuat default yang telah terverifikasi; kegagalan probe mempertahankan
+  hasil terakhir. Unknown stored slug tetap terlihat, tidak diremap diam-diam.
+- Credential OAuth/keyring tetap lokal dan login dilakukan operator lewat installer/auth resmi.
+  API-key mode memerlukan konfigurasi provider milik operator; Hanoman tidak mengubah
+  `modelProvider` atau menyalin credential. `GEMINI_API_KEY` dan konektivitas
+  `GOOGLE_GEMINI_BASE_URL` hanya diteruskan ke proses Antigravity bila disediakan; bila
+  diregistrasi sebagai config, `inheritEnv` tetap tidak menjadi izin menyuntik ke semua runtime.
+  Env builder launch/probe/lead harus menghapus kedua nilai dari Claude/Codex/raw shell dan
+  subprocess Hanoman yang tidak membutuhkan mereka, termasuk environment tmux daemon lama.
+  Jangan menghapus `GOOGLE_*` secara wildcard karena project lain dapat memerlukan variabel berbeda.
+- `lead/brain.ts` mendapat cabang Antigravity eksplisit dengan `-p`, model/effort/bypass dan
+  kontrak JSON advisor existing. Ini satu-satunya pengecualian one-shot untuk runtime ini;
+  sesi kerja yang dilahirkan lead tetap interaktif. Portal chat yang restricted Claude-only
+  tetap demikian; union runtime tidak boleh membuka fallback argv Claude untuk Antigravity.
+
+### S3. Trust, instruksi, skill dan MCP
+
+Trust ditulis di `~/.gemini/antigravity-cli/settings.json`, field `trustedWorkspaces: string[]`
+yang bentuknya telah diperiksa tanpa mencetak nilainya. Gunakan realpath cwd worktree aktual,
+append idempoten tanpa bergantung pada inheritance parent yang belum terbukti. JSON root dan
+field lain dipertahankan. File malformed, field trust salah tipe, symlink/ownership tak aman,
+atau write gagal harus gagal persiapan dengan alasan; jangan reset config operator. Write memakai
+read/merge terbaru, serialisasi per path, temp 0600 + rename atomik untuk launch concurrent.
+Live smoke harus membuktikan cwd yang ditulis membuka TUI tanpa dialog trust, bukan hanya fixture.
+CLI `--dangerously-skip-permissions` sendiri tidak membuktikan trust.
+
+Repo `AGENTS.md`/`GEMINI.md` tidak ditimpa. Skill global Hanoman memakai `.agents/skills`
+symlink + Git common-dir exclude bertanda existing; skill project dengan nama sama menang.
+Sumber global user `~/.gemini/antigravity-cli/skills` dikenali library bila pemindai tersentuh.
+Child dan parent mendapat instruksi/konteks fase melalui konvensi native yang terbukti dibaca.
+Injeksi skill tetap fail-open dengan warning sebagaimana ADR-0172; trust tidak fail-open.
+
+MCP global memakai `~/.gemini/config/mcp_config.json`, objek `mcpServers.hanoman`:
+`command: "hanoman"`, `args: ["mcp"]`, env `HANOMAN_HOST` dan `HANOMAN_AGENT_TOKEN` dari
+konfigurasi/token yang dipilih operator. Settings → Akses AI Agent menyediakan format Antigravity
+dan petunjuk merge, menggunakan alur token existing; tidak otomatis menerbitkan token baru atau
+menaikkan capability. Writer bila disediakan hanya mengubah entri Hanoman yang dikelolanya,
+mempertahankan sibling/unknown fields, menolak JSON rusak dan collision entri operator berbeda
+tanpa menggantinya. Simpan 0600; redaksi token di log/response. Konfigurasi workspace MCP operator
+tidak diubah. `/mcp`/tools-list native dan `hanoman_about` membuktikan koneksi, tanpa membocorkan token.
+
+### S4. Child native, orkestrasi dan availability
+
+- `CustomAgent.runtime="antigravity"` adalah filter runtime (ADR-0101), bukan spawn executable
+  lintas runtime. `null` tetap inherit parent. Untuk Antigravity, `model:null` berarti native
+  `inherit`, nilai explicit hanya tier publik `inherit|flash|pro`; slug parent bukan child tier.
+  `flash_lite` yang ditemukan lewat binary internal tidak dipasarkan sampai kontrak publik terbukti.
+- Form child/sel orkestrasi Antigravity memakai picker tier terpisah berlabel **tier native**.
+  Effort child independen tidak dipancarkan; UI menjelaskan inherited/native dan menonaktifkan
+  picker effort independen. Definisi baru explicit Antigravity dengan slug/effort independen
+  invalid ditolak 400; definisi legacy/inherit dengan konfigurasi tak kompatibel tetap tersimpan
+  tetapi unavailable untuk Antigravity dengan alasan, tanpa memengaruhi runtime lain.
+- Sel per fase/reviewer Antigravity additive pada JSON orkestrasi existing, default tier `inherit`
+  dan tanpa effort independen. Override memakai validasi child, bukan koersi katalog parent.
+  Metadata/prompt melabeli tier dan effort unknown/native; jangan mengklaim model exact terkunci.
+  Alur relay/marker/review existing tetap berlaku, tapi pemanggilan native memakai `invoke_subagent`
+  dan pesan ke ID child yang sama untuk putaran keputusan/rework. Parent menunggu hasil sebelum
+  fase berikutnya secara protokol; tidak ada klaim runtime memaksa foreground.
+- Renderer native menulis Markdown frontmatter `name`, `description`, `model`,
+  `mainAgent:false`, `subagent:true` dan body instruksi. Lokasi workspace `.agents/agents`
+  harus dibuktikan discovery pada cwd worktree aktual. Batas native tool-name mapping wajib
+  diverifikasi; jangan meneruskan nama Claude `Read|Task|Bash` sebagai nama tool Antigravity.
+  Field policy/maxTurns/timeout yang belum punya enforcement tidak dipasarkan sebagai jaminan.
+- Registry per-sesi dikelola/excluded Git tanpa menyentuh definisi operator atau registry global.
+  File/folder sesi 0700/0600, namespace dan manifest ownership sesi; collision nama yang sudah
+  ada tidak boleh ditimpa. Cleanup hanya berkas yang ownership/hash-nya masih milik Hanoman;
+  sesi lain dan instruksi repo tidak disentuh. Amandemen ADR-0159 mengizinkan adapter ini menaruh
+  registry sesi di worktree karena CLI tidak mempunyai `--agents`/config-dir sesi terverifikasi.
+  Prompt tidak mengadopsi persona inline dan discovery global bukan pengganti isolasi per-sesi.
+- `workspacePolicy=inherit` tersedia setelah materialisasi/discovery berhasil. `read-only`
+  unavailable dengan alasan sampai uji mutasi nyata membuktikan enforcement per-child;
+  instruksi atau `tools` allowlist saja tidak cukup. `isolated-worktree` unavailable untuk
+  Antigravity: fitur native `branch` belum membuktikan handoff kandidat/hasil ADR-0159.
+  Peran auditor tidak boleh diam-diam diremap ke `inherit` agar tersedia.
+- Reviewer generated `kind:phase` memakai `inherit` tanpa policy read-only enforced seperti
+  kontrak ADR-0170 existing, sesuai relay manusia 1A. Instruksi melarang perubahan worktree;
+  UI/docs tidak menyebut pembatasan itu enforcement runtime. Pengecualian ini hanya reviewer
+  fase generated, tidak mengubah availability Custom Agent auditor read-only.
+- Satu Custom Agent gagal tidak mematikan parent; availability/selectionReason menjelaskan
+  kegagalan. Materialisasi phase plan all-or-nothing mengikuti fallback sesi tunggal existing
+  hanya dengan warning yang terlihat; metadata `orchestrated` harus jujur. Smoke sukses roster
+  dan child adalah AC wajib, bukan alasan mengirim fitur yang seluruh native child-nya unavailable.
+
+### S5. API, MCP dan galat
+
+Endpoint baru `GET /api/antigravity/version` (auth seperti versi Codex, `GLOBAL_READ` untuk
+agent token sah) mengembalikan 200 `{version:string|null,error:string|null}`. `version` adalah
+semver terdeteksi, `error` alasan aman bila missing/timeout/parse gagal atau runtime sandbox
+tidak didukung. Tidak mengembalikan raw stdout/stderr, credential, home path, atau minimum
+client rekaan. Cache 5 menit keyed effective binary/execution mode, timeout 10 dtk dan output
+bounded; invalidasi config bin segera dan serialisasi refresh mencegah hasil probe lama menang.
+Kegagalan observasi tidak menjadi 500 atau alasan sendiri memblokir sesi host.
+
+| Kontrak tersentuh | Keputusan MCP dalam commit implementasi |
+| --- | --- |
+| GET `/api/antigravity/version` | Tool baru `hanoman_antigravity_version`, mode `read`, capability `null` yang dibuktikan route `GLOBAL_READ`; entri observability + test coverage/catalog + docs/agent-integration |
+| Settings/runtimeDefaults/orchestration | Perluas schema tool Settings existing dan response type; capability lama tidak berubah |
+| Launch backlog/Terminal/IDE/lead | Perluas enum schema/input tool existing serta validasi final launcher; pertahankan danger/capability launch/approval existing |
+| Custom Agent create/update/list | Tool agents existing menerima runtime/tier ketiga; availability response additive dan enforcement server |
+| GET `/api/models` dan frame models | Schema katalog/tool models existing additive; otorisasi HTTP/WS existing tidak dilonggarkan |
+| Terminal WS/events WS/session-events | Tetap pengecualian beralasan existing: streaming WebSocket atau HMAC per-sesi, bukan REST agent-token; enum runtime diperluas tanpa kanal baru |
+| Config/MCP format UI | Tool/config sensitive existing tetap gated; tidak membuat endpoint tulis config lokal Antigravity baru |
+
+Launch Antigravity pada boundary sandbox aktif/required ditolak **sebelum spawn** dengan
+`409` dan `error:"antigravity-sandbox-unsupported"` beserta alasan aman. Hardening produksi
+tidak boleh dimatikan otomatis dan tidak fallback host. Launch yang meminta goal gate native
+ditolak `409`, `error:"antigravity-goal-unsupported"`; marker untuk flow goal boleh menjadi
+pelaporan progres tetapi bukan enforcement Stop gate. Trust/config preparation gagal memakai
+galat launch `500`, `error:"antigravity-config-failed"` dengan pesan teredaksi. Input tier/effort
+child invalid → 400 lewat validation shape route existing. Error 401/403/404/principal/capacity
+existing tetap mendahului tindakan yang tidak diizinkan; jalur agent-token tidak dapat melewati
+unsupported/capability gate. Biner missing/exit langsung tetap terlihat sebagai kegagalan launch
+atau pane exited dengan diagnosis, tidak fallback runtime lain.
+
+### S6. Status dan pengalaman operator
+
+Antigravity ditampilkan di picker Settings, Start backlog, New Terminal, IDE/ide dan lead yang
+menggunakan Agent. Label sesi/history/presence dan runtime filter Custom Agent mengikuti union
+shared. Picker model parent dan effort memakai katalog parent; child selalu tier native.
+
+Saat Antigravity dipilih, jelaskan host/lab, tier/effort child native, asynchronous child dan
+telemetry/notifikasi/goal yang belum tersedia. Capability unsupported tampil alasan spesifik,
+bukan disabled tanpa sebab. Goal gate ditolak juga oleh API, bukan checkbox yang diam-diam diabaikan.
+Settings menampilkan versi/null+alasan dan panduan login/install resmi; Hanoman tidak auto-install
+atau auto-update `agy` karena membuka Settings.
+
+Pane/status membaca tmux movement/dead dan marker fase existing. Terminal completion tetap
+mensyaratkan semua fase terminal + plan lengkap dan `exited` menang. Idle heuristic hanya boleh
+ditambahkan dari capture TUI nyata yang telah diperiksa; jangan menyalin regex prompt Claude/Codex.
+Tanpa bukti semantik, status waiting tidak disebut keputusan manusia. Token/durasi/model child
+yang tidak diketahui tetap null/unknown; tidak membuat AgentInvocation sintetis atau angka nol
+seolah telemetry native telah terhubung. Routing keputusan lewat hook/notifikasi native/lead
+tidak dijamin; operator dapat menjawab langsung di Terminal, sementara protokol agen tetap
+melaporkan `Keputusan terbuka` sebelum marker. Tidak memasang Stop/PreToolUse guardrail parent.
+
+### S7. Acceptance criteria (EARS)
+
+| ID / SC | Kriteria | Bukti wajib |
+| --- | --- | --- |
+| AC-01 / SC1 | WHEN runtime Antigravity dipilih melalui backlog, Terminal, IDE/ide atau launch lead, THE SYSTEM SHALL melahirkan parent TUI interaktif dalam tmux + worktree yang benar dengan metadata `antigravity`. | Test setiap jalur + satu smoke tmux/worktree nyata; attach/send follow-up pada pane yang sama |
+| AC-02 / SC1 | WHEN prompt awal/model/effort berisi karakter shell atau newline, THE SYSTEM SHALL meneruskannya sebagai argv utuh dengan `--prompt-interactive`, tanpa flag one-shot pada parent/child kerja. | Test argv/quoting + output help biner terpasang |
+| AC-03 / SC2 | WHEN config biner berubah, THE SYSTEM SHALL menggunakan DB→env→agy pada launch, model discovery, versi dan lead brain berikutnya serta menginvalidasi cache probe lama. | Test resolver/config refresh concurrency + fake biner executable |
+| AC-04 / SC2 | WHEN Setting lama/fresh di-seed atau operator menyunting defaults, THE SYSTEM SHALL menambah default `gemini-3.8-flash-high`/`high` dan marker tanpa menimpa pilihan/runtime/edit Claude/Codex. | Test fresh, legacy, seeded, user, idempotensi dan PUT schema |
+| AC-05 / SC2 | WHEN probe models sukses/gagal/offline, THE SYSTEM SHALL mengganti katalog provider dari CLI atau mempertahankan cache terakhir, serta hanya menawarkan effort parent yang diketahui dan tier child terpisah. | Fixture parser/timeouts/cache/future model + UI mounted picker |
+| AC-06 / SC3 | WHEN cwd worktree Antigravity disiapkan, THE SYSTEM SHALL menambah realpath cwd ke trust secara atomik/idempoten dan mempertahankan field operator, termasuk dua launch concurrent. | Test JSON corrupt/tipe/collision/realpath/concurrency + live TUI tanpa trust prompt pada cwd yang dipersiapkan |
+| AC-07 / SC3 | WHEN skill/instruksi diinjeksi, THE SYSTEM SHALL mempertahankan AGENTS.md/GEMINI.md/project skill yang ada dan membuat skill global terbaca native tanpa tracked dirty changes. | Test precedence/exclude/cleanup + discovery skill native |
+| AC-08 / SC3 | WHEN operator mengonfigurasi MCP Hanoman untuk Antigravity, THE SYSTEM SHALL menyediakan format global yang valid dan mempertahankan entri operator serta credential teredaksi. | Fixture merge/corrupt/collision + live `/mcp`/tools-list dan `hanoman_about` |
+| AC-09 / SC3 | WHEN proses runtime/subprocess dibentuk, THE SYSTEM SHALL meneruskan env Antigravity hanya ke pemakai yang membutuhkan dan tidak membocorkannya ke Claude/Codex/raw shell/probe unrelated. | Test env parent/lead/probe dan tmux inherited env dengan sentinel credential; laporan hanya boolean/nama key |
+| AC-10 / SC4 | WHEN Custom Agent inherit atau Antigravity-compatible dipilih, THE SYSTEM SHALL mendaftarkan child native dari roster sesi tanpa persona inline, global registry collision atau slug parent sebagai tier. | Test renderer/native names/ownership/isolation + live discover/invoke satu child dari TUI parent |
+| AC-11 / SC1,4 | WHEN child native selesai lalu menerima pesan lanjutan, THE SYSTEM SHALL memakai ID child yang sama dengan konteks yang bertahan tanpa `agy -p`/bridge baru. | Live native lifecycle dan follow-up; jumlah/id child yang diamati dicatat |
+| AC-12 / SC4,5 | IF read-only/isolated-worktree atau explicit model/effort child tidak didukung, THEN THE SYSTEM SHALL menolak input baru atau menyatakan availability false beralasan tanpa fallback policy/model senyap. | Test API create/update/list, legacy/inherit roster dan UI reason; read-only boleh tetap unavailable |
+| AC-13 / SC4 | WHEN phase orchestration Antigravity aktif, THE SYSTEM SHALL memakai tier native, relay keputusan/rework ke child sama, marker hanya sesudah hasil/review dan menyatakan batas foreground/effort/native telemetry. | Test phase renderer/plan/prompt/overrides + live satu fase child; reviewer tetap prosedur independen, bukan klaim policy read-only |
+| AC-14 / SC2,4 | WHEN GET `/api/antigravity/version` dipanggil oleh principal sah, THE SYSTEM SHALL mengembalikan 200 dengan semver atau null+alasan aman, dan menawarkan tool MCP baca tanpa mengubah versi Codex. | Test parser/missing/timeout/cache/auth/capability/catalog/coverage + curl server nyata sekali di akhir |
+| AC-15 / SC5 | IF boundary sandbox aktif/required atau goal gate native diminta, THEN THE SYSTEM SHALL menolak Antigravity secara eksplisit sebelum spawn tanpa host fallback atau hardening downgrade. | Test final launcher pada semua entrypoint, lead brain boundary dan goal request; UI unavailable reason |
+| AC-16 / SC5 | WHILE Antigravity berjalan atau telah menyelesaikan fase, THE SYSTEM SHALL menampilkan status tmux/marker yang terukur serta null/unknown untuk telemetry yang tidak tersedia, dengan completion dan exited precedence existing. | Test tmux parser/restart/presence/completion + capture TUI nyata untuk setiap regex idle baru |
+| AC-17 / SC6 | WHEN Claude/Codex/portal Claude-only digunakan setelah integrasi, THE SYSTEM SHALL mempertahankan argv/default/trust/native roster/goal/boundary existing di luar penyaringan credential Antigravity baru. | Regression tests existing yang tersentuh; typecheck paket tersentuh |
+| AC-18 / SC6 | WHEN implementasi dinyatakan selesai, THE SYSTEM SHALL memiliki keputusan MCP semua kontrak tersentuh, ADR-0221 dan docs/index terbaru dalam commit perubahan terkait, serta AC→bukti tanpa test kosong. | MCP coverage/catalog, docs links/diff-check, test serial DB unik/env bersih, typecheck; daftar semua AC di laporan Execute |
+
+### S8. Ketidakpastian teknis yang harus dibuktikan
+
+Spec membaca ulang docs resmi [subagents](https://antigravity.google/docs/subagents/),
+[Settings](https://antigravity.google/docs/settings/), [MCP](https://antigravity.google/docs/mcp/)
+dan [skills](https://antigravity.google/docs/skills/) pada 2026-10-14, serta
+`agy --version`, `--help`, `agents --help`, `models --help` (exit 0, versi 1.3.4).
+Probe temp Git repo dengan `.agents/agents/hanoman-spec1442-probe.md` menjalankan
+`agy agents` dengan/tanpa `--add-dir`: keduanya exit 0, stdout/stderr kosong. Ini **tidak**
+membuktikan discovery berhasil maupun gagal; daftar non-PTY kosong bukan loader TUI.
+Temp probe dibersihkan. Trust lokal dibaca hanya tipenya (`list`, seluruh elemen `string`).
+
+Discovery per-worktree, trust bypass sesudah write, native skill/MCP, dan invoke/follow-up
+memerlukan live smoke bounded pada Execute. Bila bukti gagal, cari penyebab/config terdokumentasi;
+jangan menggantinya dengan global child registry atau bridge. Bila ternyata kontrak native
+per-sesi tidak dapat dipenuhi, laporkan terhalang/Keputusan terbuka melalui orchestrator.
+Unavailable policy read-only/isolated-worktree yang telah disetujui manusia bukan blocker;
+ketiadaan seluruh child native yang diwajibkan SC1/4 tetap blocker.

@@ -1,5 +1,13 @@
 # Katalog model otomatis
 
+Kontrak provider ketiga SPEC-1442 ditetapkan di
+[runtime Antigravity](antigravity-runtime.md) dan [ADR-0221](../adr/0221-antigravity-cli-runtime-interaktif-native.md):
+discovery parent `agy models` mengikuti cache/batas probe di bawah; picker child memakai tier
+native publik `inherit|flash|pro` terpisah dari slug parent. Effort help CLI bukan bukti dukungan
+effort per-model atau per-child. Default parent `gemini-3.8-flash-high`/`high` additive,
+tanpa mengganti ownership user atau rekomendasi Claude/Codex existing. Bukti implementasinya
+merupakan AC-03/04/05/12 SPEC-1442; dokumen ini belum mengklaim live smoke telah lulus.
+
 Hanoman menemukan model dari CLI terpasang saat startup dan setiap **5 menit**. Katalog bawaan
 (fallback offline) claude hanya berisi alias native `default`, `opus`, `sonnet`, `haiku`, `fable`;
 codex memuat GPT-6 Astra (`gpt-6-astra`).

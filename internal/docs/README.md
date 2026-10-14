@@ -345,7 +345,9 @@ gerbang mekanis (guardrail dicabut, ADR-0023). Kategori mengikuti vocabulary tet
 - [0001 — Docs sebagai Source of Truth](adr/0001-docs-as-source-of-truth.md) — *superseded by 0023*
 
 ## operations
-- [SPEC-1442 — Runtime Antigravity CLI: objective, konteks, riset primer dan keputusan scope](../../docs/superpowers/specs/2026-10-14-spec-1442-antigravity-cli-design.md) — objective terukur dan enam kriteria sukses untuk parent/child interaktif native, tier child, konfigurasi/version, workspace/MCP, batas capability dan regresi; Brainstorm menetapkan host/lab, MCP global, versi additive, serta auditor unavailable sampai enforcement terbukti.
+- [SPEC-1442 — Runtime Antigravity CLI: objective, spec, kontrak dan 18 AC EARS](../../docs/superpowers/specs/2026-10-14-spec-1442-antigravity-cli-design.md) — enam kriteria sukses, adapter interaktif/native tier, trust/skill/MCP, versi additive, galat eksplisit, regresi dan live smoke wajib; reviewer generated read-only instruksional, Custom Agent auditor unavailable sampai enforcement.
+- [0221 — Antigravity CLI: runtime interaktif ketiga dan batas native](adr/0221-antigravity-cli-runtime-interaktif-native.md) — Accepted.
+- [Runtime Antigravity](architecture/antigravity-runtime.md) — kontrak target SPEC-1442; parent interaktif, child tier native, host/lab dan capability unavailable yang terlihat.
 - [Agent pembuatan dan dukungan aplikasi](operations/app-support-agents.md) — delapan peran baru, pemilihan tugas, profil runtime, prompt parent tanpa duplikasi metadata native, bukti dan batas verifikasi; [spec](../../docs/superpowers/specs/2026-09-05-app-support-agents-design.md) dan [plan](../../docs/superpowers/plans/2026-09-05-app-support-agents.md).
 - [roadmap](operations/roadmap.md) · [gtm](operations/gtm.md) · [agent-documentation-workflow](operations/agent-documentation-workflow.md)
 - [production](operations/production.md) — menjalankan instance prod di samping dev (`HANOMAN_HOME` + port terpisah)

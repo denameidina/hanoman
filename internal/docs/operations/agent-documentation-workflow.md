@@ -82,3 +82,21 @@ Test rutin tidak menjalankan model. Ia hanya menjalankan scorer terhadap `frozen
 expected finding harus cocok (`recall=1`) dan forbidden hit harus nol. Exit live nonzero bila CLI
 runtime gagal, expected hilang, atau forbidden muncul. Jangan memasukkan `agent:eval` ke install,
 boot, build, test rutin, atau CI.
+
+## Amandemen target SPEC-1442 — runtime Antigravity
+
+[ADR-0221](../adr/0221-antigravity-cli-runtime-interaktif-native.md) menetapkan parent TUI dan child
+persistent native `invoke_subagent`, tanpa bridge/one-shot sesi kerja; lead brain internal existing
+tetap boleh one-shot. Per-fase Antigravity adalah tier native/inherit, bukan slug model exact atau
+effort independen. Relay keputusan/rework memakai ID child yang sama; orchestrator tetap penulis
+marker tunggal dan menunggu laporan/review sebelum marker, meskipun runtime asynchronous.
+Foreground runtime tidak dijamin. Reviewer generated phase boleh native inherit dengan batas
+read-only instruksional sesuai relay manusia 1A/ADR-0170, tanpa klaim enforcement runtime;
+Custom Agent read-only tetap unavailable sampai enforcement terbukti.
+
+Status tmux/marker tidak membuktikan native telemetry/decision notification/goal gate bekerja.
+Operator tetap dapat menjawab langsung di Terminal; payload token/model child unknown tetap null.
+Sandbox dan goal gate native ditolak eksplisit, tanpa hardening downgrade. Kontrak/bukti wajib:
+[runtime Antigravity](../architecture/antigravity-runtime.md) dan
+[18 AC EARS SPEC-1442](../../../docs/superpowers/specs/2026-10-14-spec-1442-antigravity-cli-design.md).
+Dokumen ini menetapkan target, bukan menyatakan adapter telah dirilis.

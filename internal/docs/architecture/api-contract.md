@@ -2472,3 +2472,31 @@ dihapus; skema tool versi 2. Model dan data dihapus oleh migration ADR-0182.
 Kontrak generik entitas sync opsional tetap tersedia: `entities=` pada pull/bootstrap/WS,
 `bootstrap?only=…` untuk catch-up, iklan `entities`, dan toleransi entitas tak dikenal.
 Saat ini tidak ada entitas memori yang diregistrasikan atau disinkron.
+
+## Kontrak tambahan SPEC-1442 — Antigravity (target implementasi)
+
+Rujukan: [ADR-0221](../adr/0221-antigravity-cli-runtime-interaktif-native.md) ·
+[runtime](antigravity-runtime.md) ·
+[spec/AC](../../../docs/superpowers/specs/2026-10-14-spec-1442-antigravity-cli-design.md).
+
+`Agent` menerima `antigravity` pada launch/Settings/lead/history/presence serta filter Custom Agent.
+Setting JSON additive `antigravity:{model,effort}` dan marker seeded/user; parent default
+`gemini-3.8-flash-high`/`high`. Child Antigravity menggunakan tier publik `inherit|flash|pro`,
+tidak menerima explicit effort independen; legacy incompatible ditampilkan unavailable beralasan.
+Tidak ada perubahan skema DB atau principal/capability launch existing.
+
+Endpoint baru `GET /api/antigravity/version`: authenticated admin atau agent-token `GLOBAL_READ`,
+200 `{version:string|null,error:string|null}`, error aman tanpa raw output/token/path home.
+Cache keyed bin efektif/boundary 5 menit, timeout 10 dtk; bin change invalidasi segera.
+Tool baru `hanoman_antigravity_version`, mode read, capability null (`GLOBAL_READ`), test katalog/
+coverage dan docs/agent-integration wajib bersama implementasi. Endpoint Codex tetap sama.
+
+Launch sandbox aktif/required → 409 `antigravity-sandbox-unsupported`, native goal gate → 409
+`antigravity-goal-unsupported`, config/trust gagal → 500 `antigravity-config-failed` (pesan teredaksi).
+Tidak spawn/fallback host/runtime lain pada unsupported. Validation child tier/effort → 400 dalam
+shape validation existing; 401/403/principal/approval/capacity existing tetap mengikat.
+
+Keputusan MCP: schema tool Settings/launch/lead/Custom Agent/models existing additive;
+Terminal/events WebSocket tetap dikecualikan sebagai streaming, session-events sebagai HMAC sesi.
+Tidak menambah endpoint tulis config lokal Antigravity. Implementasi harus memperbarui
+UNWRAPPED/COOKIE_ONLY beralasan bila kontrak pengecualian tersentuh (ADR-0202).
