@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ANTIGRAVITY_CHILD_TIERS, BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS } from "./antigravity";
+import { ANTIGRAVITY_CHILD_TIERS, BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS, replaceAntigravityModelCatalog, type AntigravityModel } from "./antigravity";
 import { zStage, zSpecSource, zDocStatus, zPriority, zProjectKind, zAgent, zVerifyScope } from "./enums";
 import { TELEGRAM_DEFAULTS, zTelegramSettings } from "./telegram";
 import { zAgentEngine, type AgentEngine } from "./agent-engine";
@@ -173,9 +173,10 @@ export let CODEX_MODELS: readonly CodexModel[] = [
 ];
 
 /** Installed only by the runtime catalog boundary; defaults and persisted selections stay intact. */
-export function replaceModelCatalog(claude: readonly ClaudeModel[], codex: readonly CodexModel[]): void {
+export function replaceModelCatalog(claude: readonly ClaudeModel[], codex: readonly CodexModel[], antigravity?: readonly AntigravityModel[]): void {
   MODELS = claude;
   CODEX_MODELS = codex;
+  if (antigravity) replaceAntigravityModelCatalog(antigravity);
 }
 
 /** Cari per alias, lalu per id terpatok — setelan lama `claude-sonnet-5` tetap dapat metadata `sonnet`. */

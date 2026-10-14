@@ -9,8 +9,8 @@ tanpa mengganti ownership user atau rekomendasi Claude/Codex existing. Bukti imp
 merupakan AC-03/04/05/12 SPEC-1442. Task 1 menambahkan helper parent minimal
 `antigravityEfforts`: slug bersuffix `low|medium|high` hanya memberi level itu; slug unknown
 menghasilkan opsi kosong. Picker Custom Agent memakai tuple child dan effort kosong, bukan
-katalog parent. Nilai stored asing dipertahankan. Discovery/cache provider ketiga masih Task 9;
-dokumen ini belum mengklaim live smoke produk telah lulus.
+katalog parent. Nilai stored asing dipertahankan. Provider ketiga memakai probe/cache yang sama (Task 9); live smoke endpoint produk
+dijadwalkan sekali di akhir pipeline, terpisah dari receipt parser/transport.
 
 Hanoman menemukan model dari CLI terpasang saat startup dan setiap **5 menit**. Katalog bawaan
 (fallback offline) claude hanya berisi alias native `default`, `opus`, `sonnet`, `haiku`, `fable`;
@@ -47,10 +47,22 @@ install/update; pilihan yang sudah diedit operator tidak diganti.
   terpatok yang dipakai runtime (`claude-opus-5`), bukan alias katalog.
 - Codex: `codex debug models`, tanpa `--bundled`, mengambil slug, nama, effort dan minimum
   client bila diberikan. Entri `visibility: hide` tidak masuk hasil discovery.
-- Biner memakai `HANOMAN_CLAUDE_BIN`/`HANOMAN_CODEX_BIN` efektif. Dalam Podman,
-  probe memakai image, credential mount RO, network dan proxy sesi yang sama.
+- Antigravity: `agy models` stdout berupa `slug<TAB>label` (receipt CLI 1.3.4, 2026-10-14:
+  sepuluh baris/462 byte, fixture `server/test/fixtures/antigravity-models-1.3.4.tsv`).
+  Parser mengambil hanya slug/label; suffix `low|medium|high` menjadi satu effort diketahui.
+  Slug lain tetap tersedia dengan effort kosong. Child tetap memakai tier `inherit|flash|pro`,
+  bukan katalog ini. Diagnostics stderr dibuang, tanpa inferensi atau login otomatis.
+- Biner memakai `HANOMAN_CLAUDE_BIN`/`HANOMAN_CODEX_BIN`/`HANOMAN_ANTIGRAVITY_BIN` efektif. Dalam Podman,
+  probe Claude/Codex memakai image, credential mount RO, network dan proxy sesi yang sama.
+  Probe Antigravity ditolak pada sandbox/hardening sebelum membuat proses host; status provider
+  menjelaskan dukungan host/lab saja, sambil mempertahankan katalog terakhir. Env probe memakai
+  builder runtime: kedua credential Antigravity hanya pada Antigravity, `GOOGLE_*` lain utuh.
 - Satu refresh aktif, provider diperiksa serial; timeout per proses **20 detik**, stdout
   maksimal **4 MiB**. CLI yang macet dihentikan per proses, tidak dengan pola nama.
+- Refresh dikoaleskan untuk biner/mode yang sama. Key biner efektif dan sandbox/hardening dibaca
+  saat admission serta sesudah await. Perubahan konfigurasi membatalkan hasil generasi lama
+  (success/error/status/cache); refresh baru dapat berjalan tanpa menunggu probe lama. `finally`
+  lama tidak boleh melepas promise baru. Cache commit memeriksa key kembali sebelum rename.
 
 CLI yang terpasang adalah sumber RESMI begitu ia berhasil menjawab — hasilnya MENGGANTIKAN
 katalog per-provider itu, bukan digabung selamanya dengan fallback bawaan statis. Fallback
@@ -65,14 +77,22 @@ CLI sendiri mungkin memakai cache internal atau katalog bundled-nya.
 
 Cache `$HANOMAN_HOME/model-catalog.json` ditulis atomik, permission 0600, LOCAL-only.
 Hanya field katalog yang disimpan; akun, token, prompt dan keluaran mentah CLI tidak ikut.
-Cache rusak/absen memakai fallback; kegagalan write terlihat dalam status.
+Cache lama tanpa provider Antigravity mendapat fallback minimal provider ini; unknown field
+dibuang, effort Antigravity dihitung ulang dari slug konservatif. Temp file unik dibuat `wx`
+0600 dan dihapus sesudah commit/dibatalkan. Cache rusak/absen memakai fallback; kegagalan write
+terlihat dalam status.
 
 ## Distribusi dan pemakai
 
-`GET /api/models` hanya admin-cookie, mengembalikan snapshot tanpa memulai probe.
+`GET /api/models` menerima cookie atau agent token (`GLOBAL_READ`, ADR-0187), mengembalikan
+snapshot tanpa memulai probe. `hanoman_models` existing menerima filter `antigravity`; penambahan
+provider/WS merupakan perluasan DTO tool existing tanpa capability atau route baru (ADR-0202).
 Frame `{t:"models",catalog}` menumpang WebSocket events yang sudah ada, cookie-only,
 diperiksa untuk perubahan setiap 3 detik. Browser melakukan satu fetch saat pemakai pertama
 mount dan menerima push berikutnya; response HTTP yang kalah cepat dari WS diabaikan.
+Response server versi lama tanpa Antigravity dinormalisasi ke fallback minimal.
+`replaceModelCatalog(claude,codex,antigravity?)` mempertahankan pemanggil dua-argumen lama;
+argumen ketiga memperbarui binding parent Antigravity untuk picker yang telah terpasang.
 
 `replaceModelCatalog` memasang binding katalog shared untuk pemakai lama sekaligus:
 Settings, Start, New Terminal, cron, custom agent, validasi custom agent, pemilihan effort,

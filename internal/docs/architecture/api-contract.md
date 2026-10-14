@@ -1334,10 +1334,13 @@ DELETE /terminal/history?projectId&before
 Katalog model runtime: `GET /api/models` (cookie ATAU agent token tanpa capability — `GLOBAL_READ`, ADR-0187;
 tanpa query/body) mengembalikan
 `{claude: [{id,label,efforts?}], codex: [{id,label,efforts,fallback,minClient}],
-providers: {claude,codex}}`. Status provider = `{source:"bundled"|"cache"|"cli",
+antigravity: [{id,label,efforts}], providers: {claude,codex,antigravity}}`. Status provider = `{source:"bundled"|"cache"|"cli",
 checkedAt:string|null, updatedAt:string|null, error:string|null}`.
 Frame cookie-only `{t:"models",catalog}` membawa snapshot yang sama; discovery server 5 menit,
-distribusi perubahan setiap 3 detik, tanpa polling browser. Lihat [kontrak katalog](model-catalog.md).
+distribusi perubahan setiap 3 detik, tanpa polling browser. Antigravity additive (SPEC-1442):
+katalog parent berbeda dari tier child; cache/klien lama tanpa provider ini menggunakan fallback
+minimal. Keputusan MCP ADR-0202: perluasan snapshot tool baca existing `hanoman_models` (filter
+antigravity), tanpa route/capability baru; WS tetap cookie-only. Lihat [kontrak katalog](model-catalog.md).
 
 ```
 GET    /events/ws                    # WebSocket siar dashboard (global). Auth = gate /api (cookie).

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ClaudeModel, CodexModel, ModelCatalog } from "@hanoman/shared";
+import { bundledModelCatalog, type AntigravityModel, type ClaudeModel, type CodexModel, type ModelCatalog } from "@hanoman/shared";
 
 const id = z.string().min(1).max(200).regex(/^[a-zA-Z0-9][a-zA-Z0-9._:/[\]-]*$/);
 const label = z.string().min(1).max(300);
@@ -63,6 +63,23 @@ export function parseCodexModels(raw: unknown): CodexModel[] {
   return [...new Map(models.map((m) => [m.id, m])).values()];
 }
 
+const antigravityRow = z.object({ id, label }).transform((row): AntigravityModel => ({
+  ...row, efforts: /-(low|medium|high)$/.exec(row.id)?.slice(1) ?? [],
+}));
+
+/** `agy models` stdout is TSV, not the CLI JSON inference protocol. */
+export function parseAntigravityModels(raw: unknown): AntigravityModel[] {
+  const text = z.string().max(4 * 1024 * 1024).parse(raw);
+  const lines = text.trim().split(/\r?\n/);
+  const rows = lines.map((line) => {
+    const fields = line.split("\t");
+    if (fields.length !== 2) throw new Error("invalid model row");
+    return { id: fields[0], label: fields[1] };
+  });
+  const models = z.array(antigravityRow).min(1).max(500).parse(rows);
+  return [...new Map(models.map((model) => [model.id, model])).values()];
+}
+
 /** Allowlist persisted fields: raw initialize includes account details and must never be cached. */
 export function parseCachedCatalog(raw: unknown): ModelCatalog {
   const status = z.object({
@@ -74,6 +91,8 @@ export function parseCachedCatalog(raw: unknown): ModelCatalog {
       .min(1).max(1000),
     codex: z.array(z.object({ id, label, efforts: efforts.min(1), fallback: id, minClient: z.string() }))
       .min(1).max(1000),
-    providers: z.object({ claude: status, codex: status }),
+    antigravity: z.array(antigravityRow).min(1).max(1000).default([...bundledModelCatalog().antigravity]),
+    providers: z.object({ claude: status, codex: status,
+      antigravity: status.default(bundledModelCatalog().providers.antigravity) }),
   }).parse(raw);
 }

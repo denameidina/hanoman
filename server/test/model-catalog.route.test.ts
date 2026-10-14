@@ -27,6 +27,8 @@ describe("model discovery API", () => {
       const response = await local.inject({ url: "/api/models" });
       expect(response.statusCode).toBe(200);
       expect(response.json()).toEqual(modelCatalogService.snapshot());
+      expect(response.json().antigravity).toEqual([{ id: "gemini-3.8-flash-high", label: "Gemini 3.8 Flash High", efforts: ["high"] }]);
+      expect(response.json().providers.antigravity.source).toBe("bundled");
       expect(JSON.stringify(response.json())).not.toContain("account");
     } finally { await local.close(); }
   });
@@ -50,10 +52,11 @@ describe("model discovery API", () => {
   });
   it("sends the models frame to admin subscribers but not token subscribers", async () => {
     for (const maySubscribe of [false, true]) {
-      const frames: { t: string }[] = [];
+      const frames: { t: string; catalog?: { antigravity?: { id: string }[] } }[] = [];
       const client = { send: (raw: string) => frames.push(JSON.parse(raw)), close: () => {} };
       await attach(client, { maySubscribe });
       expect(frames.some((f) => f.t === "models")).toBe(maySubscribe);
+      if (maySubscribe) expect(frames.find((f) => f.t === "models")?.catalog?.antigravity?.[0]?.id).toBe("gemini-3.8-flash-high");
       detach(client);
     }
   });

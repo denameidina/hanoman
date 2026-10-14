@@ -2,9 +2,12 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { agentEnvironment, resolveHardening } from "@hanoman/runner";
+import type { Agent } from "@hanoman/shared";
+import { antigravityBin } from "./antigravity-runtime";
 import { effectiveStr } from "../config";
-import { sandboxArgvFromEnv } from "./session-sandbox";
-import { parseClaudeModels, parseCodexModels } from "./model-catalog-parser";
+import { assertAntigravityLaunch, sandboxArgvFromEnv } from "./session-sandbox";
+import { parseAntigravityModels, parseClaudeModels, parseCodexModels } from "./model-catalog-parser";
 
 const MAX_BYTES = 4 * 1024 * 1024;
 const TIMEOUT_MS = 20_000;
@@ -15,9 +18,11 @@ export const CLAUDE_CATALOG_ARGS = [
   "--mcp-config", '{"mcpServers":{}}', "--settings", '{"disableAllHooks":true}',
 ];
 
-export function catalogCommand(agent: "claude" | "codex", cwd: string, env: NodeJS.ProcessEnv) {
-  const bin = env[agent === "claude" ? "HANOMAN_CLAUDE_BIN" : "HANOMAN_CODEX_BIN"] ?? agent;
-  const args = agent === "claude" ? CLAUDE_CATALOG_ARGS : ["debug", "models"];
+export function catalogCommand(agent: Agent, cwd: string, env: NodeJS.ProcessEnv) {
+  assertAntigravityLaunch(agent, undefined, env);
+  const bin = agent === "antigravity" ? env.HANOMAN_ANTIGRAVITY_BIN ?? antigravityBin()
+    : env[agent === "claude" ? "HANOMAN_CLAUDE_BIN" : "HANOMAN_CODEX_BIN"] ?? agent;
+  const args = agent === "claude" ? CLAUDE_CATALOG_ARGS : agent === "codex" ? ["debug", "models"] : ["models"];
   const sandbox = sandboxArgvFromEnv({ command: [bin, ...args].map(quote).join(" "),
     worktree: cwd, worktreeMode: "ro", env });
   if (!sandbox) return { bin, args };
@@ -27,11 +32,12 @@ export function catalogCommand(agent: "claude" | "codex", cwd: string, env: Node
 }
 
 export function runCatalogCommand(
-  command: { bin: string; args: string[] }, agent: "claude" | "codex",
+  command: { bin: string; args: string[] }, agent: Agent,
   cwd: string, env: NodeJS.ProcessEnv, timeoutMs = TIMEOUT_MS,
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command.bin, command.args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
+    assertAntigravityLaunch(agent, undefined, env);
+    const child = spawn(command.bin, command.args, { cwd, env: agentEnvironment(agent, env), stdio: ["pipe", "pipe", "pipe"] });
     let buffer = "", bytes = 0, settled = false;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
     const finish = (error: Error | null, result?: unknown) => {
@@ -73,7 +79,7 @@ export function runCatalogCommand(
       clearTimeout(killTimer);
       if (settled) return;
       if (code !== 0 || agent === "claude") return finish(new Error("CLI tidak mengembalikan katalog model"));
-      try { finish(null, JSON.parse(buffer)); }
+      try { finish(null, agent === "antigravity" ? buffer : JSON.parse(buffer)); }
       catch { finish(new Error("Katalog CLI bukan JSON yang sah")); }
     });
     if (agent === "claude") child.stdin.write(JSON.stringify({
@@ -83,10 +89,11 @@ export function runCatalogCommand(
   });
 }
 
-export async function probeModelCatalog(agent: "claude" | "codex") {
+export async function probeModelCatalog(agent: Agent) {
+  assertAntigravityLaunch(agent);
   const cwd = await mkdtemp(join(tmpdir(), "hanoman-models-"));
-  const env = { ...process.env };
-  for (const key of ["HANOMAN_CLAUDE_BIN", "HANOMAN_CODEX_BIN", "HANOMAN_PODMAN_BIN"]) {
+  const env = agentEnvironment(agent, process.env);
+  for (const key of ["HANOMAN_CLAUDE_BIN", "HANOMAN_CODEX_BIN", "HANOMAN_PODMAN_BIN", "HANOMAN_ANTIGRAVITY_BIN"]) {
     const value = effectiveStr(key);
     if (value) env[key] = value;
   }
@@ -95,6 +102,15 @@ export async function probeModelCatalog(agent: "claude" | "codex") {
   if (env.HANOMAN_CLAUDE_HOME) env.CLAUDE_CONFIG_DIR = env.HANOMAN_CLAUDE_HOME;
   try {
     const raw = await runCatalogCommand(catalogCommand(agent, cwd, env), agent, cwd, env);
-    return agent === "claude" ? parseClaudeModels(raw) : parseCodexModels(raw);
+    return agent === "claude" ? parseClaudeModels(raw)
+      : agent === "codex" ? parseCodexModels(raw) : parseAntigravityModels(raw);
   } finally { await rm(cwd, { recursive: true, force: true }); }
+}
+
+/** Read on both refresh admission and completion: config edits invalidate outstanding results. */
+export function catalogProbeKey(): string {
+  return JSON.stringify([
+    effectiveStr("HANOMAN_CLAUDE_BIN"), effectiveStr("HANOMAN_CODEX_BIN"), antigravityBin(),
+    process.env.HANOMAN_SESSION_SANDBOX ?? "off", resolveHardening(process.env),
+  ]);
 }

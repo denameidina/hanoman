@@ -8,11 +8,15 @@ export const BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS = {
   effort: "high",
 } as const;
 
-export const ANTIGRAVITY_MODELS: readonly AntigravityModel[] = [{
+export let ANTIGRAVITY_MODELS: readonly AntigravityModel[] = [{
   id: BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS.model,
   label: "Gemini 3.8 Flash High",
   efforts: [BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS.effort],
 }];
+
+export function replaceAntigravityModelCatalog(models: readonly AntigravityModel[]): void {
+  ANTIGRAVITY_MODELS = models;
+}
 
 export function antigravityEfforts(modelId: string): readonly string[] {
   const known = ANTIGRAVITY_MODELS.find((model) => model.id === modelId);

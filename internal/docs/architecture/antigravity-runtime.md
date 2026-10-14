@@ -501,3 +501,30 @@ diagnostik existing. Test actual executable yang mencetak sentinel di dua stream
 membuktikan rejection hanya berisi kategori aman; RED 5 gagal/1 lulus sebelum perbaikan.
 Scoped `lead-brain.test.ts` + `lead-engine-argv.test.ts` sesudah perbaikan lulus 38/38;
 server typecheck hanya menyisakan Telegram engine label milik Task 13.
+
+
+## Receipt Task 9 — katalog parent, cache dan invalidasi konfigurasi
+
+CLI host `agy` 1.3.4 `models` exit 0 pada 2026-10-14: sepuluh baris TSV/462 byte,
+fixture non-sensitive `server/test/fixtures/antigravity-models-1.3.4.tsv`. Fetch notice stderr
+bukan katalog; parser mengambil id/label dan satu effort suffix konservatif. Parent katalog CLI
+menggantikan fallback minimal ketika sukses; failure/empty/malformed/oversize/timeout mempertahankan
+last-good. Native child `inherit|flash|pro` tetap terpisah.
+
+Refresh dibatasi 20 detik/4 MiB dan interval lima menit. Key resolver DB→env→`agy` serta mode
+sandbox/hardening dibaca kembali setelah await; hasil/error generasi lama tidak publish/cache,
+`finally` lama tidak melepas refresh baru. Writer menormalisasi snapshot, temp unik `wx`0600,
+memeriksa generation guard sebelum rename dan membersihkan temp. Cache lama tanpa provider
+Antigravity mendapat fallback minimal. Mode sandbox ditolak sebelum host spawn dengan alasan aman.
+
+Subprocess fixture nyata membuktikan DB override atas env, credential Antigravity hadir hanya pada
+probe Antigravity, hilang pada Codex, dan `GOOGLE_PROJECT_ID` project tetap utuh. HTTP/WS snapshot
+menambah provider tanpa mengubah capability tool `hanoman_models` existing (ADR-0202); klien
+mounted menerima push, nilai tersimpan asing tetap opsi, HTTP lama tidak menimpa WS baru.
+Verification Task 9: RED 4 berkas/9 gagal yang diharapkan +14 lulus; RED cache 1 missing-writer
+failure +15 lulus. Final targeted 6 berkas/42 test lulus (parser9, lifecycle/cache10, probe8,
+HTTP/WS3, mounted client3, existing shared picker9); default timeout nyata 20.003 detik.
+Shared typecheck exit0. Server hanya pending label Telegram Task13; frontend hanya pending
+defaults/EngineValue Task12, tanpa error Task9. Log teredaksi disimpan pada ignored workspace
+`.superpowers/sdd/2026-10-14-spec-1442-antigravity-cli-runtime/Task9-*.log`.
+Smoke endpoint akhir tetap Task 14.

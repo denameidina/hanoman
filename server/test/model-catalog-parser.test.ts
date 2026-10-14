@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { parseClaudeModels, parseCodexModels } from "../src/services/model-catalog-parser";
+import { parseAntigravityModels, parseCachedCatalog, parseClaudeModels, parseCodexModels } from "../src/services/model-catalog-parser";
 
 describe("CLI model discovery", () => {
   it("discovers future Codex IDs and efforts without a code allowlist; hides internal models", () => {
@@ -64,5 +65,41 @@ describe("CLI model discovery", () => {
     expect(() => parseCodexModels({ models: [] })).toThrow();
     expect(() => parseClaudeModels([{ value: "bad\nmodel" }])).toThrow();
     expect(() => parseCodexModels({ models: [{ slug: "gpt-x", visibility: "list" }] })).toThrow();
+  });
+});
+
+// `agy models` 1.3.4, host 2026-10-14: tab-separated stdout, fetch notice on stderr.
+describe("Antigravity parent model parser", () => {
+  it("normalizes only slug/label and conservative suffix effort from installed CLI output", () => {
+    expect(parseAntigravityModels("gemini-3.8-flash-high\tGemini 3.8 Flash (High)\nclaude-opus-5-5-low\tClaude Opus 5.5 (Low)\nfuture-preview\tFuture Preview\n"))
+      .toEqual([
+        { id: "gemini-3.8-flash-high", label: "Gemini 3.8 Flash (High)", efforts: ["high"] },
+        { id: "claude-opus-5-5-low", label: "Claude Opus 5.5 (Low)", efforts: ["low"] },
+        { id: "future-preview", label: "Future Preview", efforts: [] },
+      ]);
+  });
+  it("parses all ten rows captured from the installed agy 1.3.4 non-inference command", () => {
+    const raw = readFileSync(new URL("./fixtures/antigravity-models-1.3.4.tsv", import.meta.url), "utf8");
+    const models = parseAntigravityModels(raw);
+    expect(models).toHaveLength(10);
+    expect(models[0]).toEqual({ id: "gemini-3.8-flash-high", label: "Gemini 3.8 Flash (High)", efforts: ["high"] });
+    expect(models[9]).toEqual({ id: "gpt-oss-120b-medium", label: "GPT-OSS 120B (Medium)", efforts: ["medium"] });
+  });
+  it("rejects empty, malformed, excessive or injection-shaped rows", () => {
+    for (const raw of ["", "Fetching available models...", "bad slug\tLabel", "future\t", "future\tLabel\tsecret", [], "a\t" + "x".repeat(301), "a\tA\n".repeat(501)])
+      expect(() => parseAntigravityModels(raw)).toThrow();
+    expect(parseAntigravityModels("future-high\tFuture\nfuture-high\tFuture\n")).toHaveLength(1);
+  });
+  it("loads pre-Antigravity caches with bundled defaults and strips secrets/unknown effort", async () => {
+    const { bundledModelCatalog } = await import("@hanoman/shared");
+    const old = bundledModelCatalog();
+    const { antigravity: unused, ...legacy } = old;
+    const { antigravity: unusedStatus, ...providers } = old.providers;
+    expect(parseCachedCatalog({ ...legacy, providers }).antigravity[0]?.id).toBe("gemini-3.8-flash-high");
+    const sanitized = parseCachedCatalog({ ...old, secret: "secret", antigravity: [{
+      id: "future-high", label: "Future", efforts: ["max", "high"], token: "secret",
+    }] });
+    expect(sanitized.antigravity).toEqual([{ id: "future-high", label: "Future", efforts: ["high"] }]);
+    expect(JSON.stringify(sanitized)).not.toContain("secret");
   });
 });
