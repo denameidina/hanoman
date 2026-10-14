@@ -31,6 +31,8 @@ export const CONFIG_REGISTRY: ConfigEntry[] = [
   { key: "HANOMAN_CLAUDE_BIN", group: "claude", label: "Biner claude", kind: "path", apply: "new-session", category: "knob", example: "/opt/homebrew/bin/claude", default: "claude" },
   // codex (SPEC-338 · ADR-0074)
   { key: "HANOMAN_CODEX_BIN", group: "claude", label: "Biner codex", kind: "path", apply: "new-session", category: "knob", example: "/opt/homebrew/bin/codex", default: "codex" },
+  { key: "HANOMAN_ANTIGRAVITY_BIN", group: "claude", label: "Biner Antigravity", kind: "path", apply: "new-session", category: "knob", example: "/opt/homebrew/bin/agy", default: "agy",
+    help: "Executable Antigravity CLI, bukan shell command atau daftar flag." },
   { key: "CLAUDE_CONFIG_DIR", group: "claude", label: "Dir config Claude", kind: "path", apply: "new-session", category: "knob", example: "~/.claude",
     help: "Default ~/.claude. Sumber .credentials.json untuk panel usage/limit." },
   // vps

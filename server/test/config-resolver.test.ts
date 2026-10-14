@@ -86,3 +86,27 @@ describe("suppressedInheritKeys", () => {
     await clearConfig("CLAUDE_CODE_OAUTH_TOKEN"); await clearConfig("ANTHROPIC_API_KEY");
   });
 });
+
+
+describe("Antigravity executable resolver", () => {
+  it("DB → env → agy berubah pada pembacaan berikutnya tanpa cache biner tersendiri", async () => {
+    const { antigravityBin } = await import("../src/services/antigravity-runtime");
+    const original = process.env.HANOMAN_ANTIGRAVITY_BIN;
+    try {
+      delete process.env.HANOMAN_ANTIGRAVITY_BIN;
+      expect(antigravityBin()).toBe("agy");
+      process.env.HANOMAN_ANTIGRAVITY_BIN = "/tmp/env executable";
+      expect(antigravityBin()).toBe("/tmp/env executable");
+      await cfg.setConfig("HANOMAN_ANTIGRAVITY_BIN", "/tmp/db executable");
+      expect(antigravityBin()).toBe("/tmp/db executable");
+      await prisma.runtimeConfig.update({ where: { key: "HANOMAN_ANTIGRAVITY_BIN" }, data: { value: "/tmp/refreshed executable" } });
+      await cfg.loadConfig();
+      expect(antigravityBin()).toBe("/tmp/refreshed executable");
+      await cfg.clearConfig("HANOMAN_ANTIGRAVITY_BIN");
+      expect(antigravityBin()).toBe("/tmp/env executable");
+    } finally {
+      if (original === undefined) delete process.env.HANOMAN_ANTIGRAVITY_BIN;
+      else process.env.HANOMAN_ANTIGRAVITY_BIN = original;
+    }
+  });
+});

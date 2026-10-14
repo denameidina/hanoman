@@ -79,3 +79,9 @@ describe("config-registry", () => {
     expect(parseConfigValue(configEntry("HANOMAN_CLAUDE_BIN")!, "claude")).toEqual({ ok: true, value: "claude" });
   });
 });
+
+
+it("Antigravity biner adalah knob executable new-session tanpa inherit credential", () => {
+  expect(configEntry("HANOMAN_ANTIGRAVITY_BIN")).toMatchObject({ kind: "path", apply: "new-session", category: "knob", default: "agy" });
+  expect(configEntry("HANOMAN_ANTIGRAVITY_BIN")?.inheritEnv).not.toBe(true);
+});

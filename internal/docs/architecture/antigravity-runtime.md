@@ -203,3 +203,53 @@ Vitest mencetak warning inisialisasi WAL `database is locked` pada satu test; te
 lulus dengan DB temp unik. Final server+curl sekali di akhir Execute tetap wajib untuk Settings
 sebagaimana seluruh endpoint tersentuh. Receipt Task 2 mencakup AC-04 dan sebagian AC-17/18;
 belum menutup seluruh acceptance criteria SPEC-1442.
+
+
+## Receipt biner, argv dan env Task 3 — 2026-10-14
+
+`antigravityBin()` memakai resolver sinkron existing `effectiveStr`, tanpa cache biner sendiri.
+Registry `HANOMAN_ANTIGRAVITY_BIN` adalah `kind:path`, `apply:new-session`, `category:knob`,
+default `agy`, tanpa `inheritEnv`. Test DB→env→default, refresh `loadConfig`, dan dua launch
+berturut-turut setelah `setConfig` membuktikan executable baru dipakai pada launch berikutnya,
+termasuk executable path dengan spasi. Probe katalog/versi dan lead akan memakai helper ini
+pada Task 8–10; receipt ini belum membuktikan integrasi caller tersebut.
+
+`agentFlags` punya cabang native tanpa `--settings`, `--agents`, hook Codex, `--print`, `exec`
+atau `-p`. `createSession` menempatkan flags model/effort/bypass lalu tepat satu
+`--prompt-interactive` sebelum argumen prompt; tanpa prompt tidak ada flag prompt.
+Fake executable aktual di tmux merekam argv dan membuktikan prompt multiline/backtick/`$()`/
+kutip serta model/effort berkarakter shell utuh; sentinel command injection tidak terbentuk.
+Berkas prompt 0600 dan command substitution quoted existing dipertahankan. Argv Claude/Codex
+regression existing tetap lulus.
+
+`agentEnvironment(agent|null, env)` mengklon input dan hanya menghapus dua key Antigravity
+untuk runtime lain/raw/unrelated. Tmux sync/async/attach mendapat env unrelated; per-pane
+`env -u GEMINI_API_KEY -u GOOGLE_GEMINI_BASE_URL` membersihkan nilai daemon lama. Hanya pane
+Antigravity menambahkan supplied env terbaru (override pemanggil → env server). Test daemon
+berisi sentinel lama membuktikan Claude/Codex/raw tidak menerima dua key, Antigravity menerima
+nilai terbaru atau tidak menerima key bila absen, `GOOGLE_CLOUD_PROJECT` tetap ada, dan env
+daemon/sesi tetangga unchanged. Receipt/log env hanya boolean dan nama key, bukan nilainya.
+Helper siap untuk parent/lead/probe; caller lead/probe actual diverifikasi pada Task 8–10.
+
+RED awal menangkap helper/resolver belum ada, registry belum ada dan flags jatuh ke Claude.
+RED retry scoped (5 files) memberi **5 failed / 105 passed**: registry, dua test argv timeout
+karena executable yang salah, boolean credential leak, dan satu fixture raw-SSH tercemar env
+harness. Initial tmux error `server exited unexpectedly` tidak berulang dengan socket pendek
+unik. Final GREEN **111/111 tests, 5/5 files** dibaca dari run path eksplisit:
+
+```bash
+env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u SSH_ASKPASS_REQUIRE -u GIT_TERMINAL_PROMPT \
+  CLAUDE_CODE_OAUTH_TOKEN=task3-unused-fixture ANTHROPIC_API_KEY=task3-unused-fixture \
+  TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db" HANOMAN_TMUX_SOCKET="t3f$$" \
+  pnpm vitest --run runner/test/agent-cli.test.ts runner/test/agent-env.test.ts \
+  server/test/config-resolver.test.ts server/test/config-registry.test.ts server/test/pty.test.ts \
+  --no-file-parallelism
+```
+
+Pembersihan `SSH_ASKPASS_REQUIRE`/`GIT_TERMINAL_PROMPT` diperlukan karena env sesi operator
+membuat assertion raw shell existing membaca `force`/`0`; tidak mengubah produk. Kredensial
+fixture non-secret mencegah fake-Claude existing mencetak token warisan bila assertion gagal;
+log awal dipertahankan teredaksi. Typecheck shared dan runner exit 0; server masih exit 2
+pada lima seam task berikutnya: custom-agent adapter (Task 6), phase/skill union (Task 4–7),
+runtime label pty/Telegram (Task 8). Tidak ada suppression atau perubahan skema/API pada Task 3;
+metadata config memakai kontrak/tool config existing, bukan endpoint baru.

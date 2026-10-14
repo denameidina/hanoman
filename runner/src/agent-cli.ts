@@ -2,8 +2,8 @@ import type { Agent } from "./types";
 import { guardSettings } from "./settings";
 import { codexHookArgs } from "./codex-settings";
 
-// SPEC-338 · ADR-0074 — satu tempat yang tahu bentuk argv tiap agen. pty.ts hanya mengutip &
-// merangkai; perbedaan CLI (claude vs codex) tak bocor ke lapis proses/tmux. Murni & tanpa I/O
+// SPEC-338/1442 · ADR-0074/0221 — satu tempat yang tahu bentuk argv tiap agen. pty.ts hanya
+// mengutip & merangkai; perbedaan CLI tak bocor ke lapis proses/tmux. Murni & tanpa I/O
 // supaya bisa dites tanpa men-spawn apa pun.
 export type AgentFlagsOpts = {
   agent: Agent;
@@ -22,6 +22,13 @@ export type AgentFlagsOpts = {
 
 /** Flag agen TANPA binary dan TANPA prompt positional — pemanggil yang mengutip tiap elemen. */
 export function agentFlags(o: AgentFlagsOpts): string[] {
+  if (o.agent === "antigravity") {
+    return [
+      ...(o.model ? ["--model", o.model] : []),
+      ...(o.effort ? ["--effort", o.effort] : []),
+      "--dangerously-skip-permissions",
+    ];
+  }
   if (o.agent === "codex") {
     return [
       ...(o.model ? ["-m", o.model] : []),

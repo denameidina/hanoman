@@ -1,8 +1,8 @@
-import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { fileURLToPath } from "node:url";
 import {
   appendFileSync, chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, statSync,
-  writeFileSync,
+  writeFileSync, existsSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1091,4 +1091,107 @@ describe("hook riwayat sesi (SPEC-362)", () => {
       killSession(s.id);
     }, TMUX_SPAWN_TIMEOUT);
   });
+});
+
+
+describe("Antigravity argv dan env tmux", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  const captureExecutable = (dir: string): string => {
+    const bin = join(dir, "fake agy executable");
+    writeFileSync(bin, `#!${process.execPath}
+const fs = require("node:fs");
+fs.writeFileSync(process.env.CAPTURE_RESULT, JSON.stringify({ args: process.argv.slice(2), executable: process.argv[1],
+  keyPresent: Object.hasOwn(process.env, "GEMINI_API_KEY"),
+  basePresent: Object.hasOwn(process.env, "GOOGLE_GEMINI_BASE_URL"),
+  keyCurrent: process.env.GEMINI_API_KEY === "current-fixture-key",
+  baseCurrent: process.env.GOOGLE_GEMINI_BASE_URL === "https://current.invalid",
+  projectPreserved: process.env.GOOGLE_CLOUD_PROJECT === "unrelated-project" }));
+process.stdin.resume();
+`, { mode: 0o700 });
+    return bin;
+  };
+  const captured = async (path: string) => {
+    await waitFor(() => existsSync(path));
+    return JSON.parse(readFileSync(path, "utf8")) as { args: string[]; executable: string; keyPresent: boolean; basePresent: boolean;
+      keyCurrent: boolean; baseCurrent: boolean; projectPreserved: boolean };
+  };
+  it("path dengan spasi dan multiline shell-special prompt/model/effort adalah argv utuh", async () => {
+    const bin = captureExecutable(repoDir);
+    const result = join(repoDir, "argv.json");
+    const sentinel = join(repoDir, "injection-sentinel");
+    const prompt = `baris satu\n'kutip' \`touch ${sentinel}\` $(touch ${sentinel}) "double"`;
+    const model = `model'; touch ${sentinel}; #`;
+    const effort = `high$(touch ${sentinel})`;
+    vi.stubEnv("HANOMAN_ANTIGRAVITY_BIN", bin);
+    createSession("agy-argv", repoDir, { agent: "antigravity", prompt, model, effort, env: { CAPTURE_RESULT: result } });
+    const actual = await captured(result);
+    expect(actual.args).toEqual(["--model", model, "--effort", effort, "--dangerously-skip-permissions", "--prompt-interactive", prompt]);
+    expect(actual.args.filter((a) => a === "--prompt-interactive")).toHaveLength(1);
+    expect(existsSync(sentinel)).toBe(false);
+  }, TMUX_SPAWN_TIMEOUT);
+  it("tanpa prompt tetap bare TUI, tanpa flag prompt one-shot", async () => {
+    vi.stubEnv("HANOMAN_ANTIGRAVITY_BIN", captureExecutable(repoDir));
+    const result = join(repoDir, "bare.json");
+    createSession("agy-bare", repoDir, { agent: "antigravity", env: { CAPTURE_RESULT: result } });
+    expect((await captured(result)).args).toEqual(["--dangerously-skip-permissions"]);
+  }, TMUX_SPAWN_TIMEOUT);
+  it("override DB baru memilih executable berikutnya tanpa mengubah env proses", async () => {
+    const { setConfig, clearConfig } = await import("../src/config");
+    const firstBin = captureExecutable(repoDir);
+    const secondBin = join(repoDir, "second agy executable");
+    copyFileSync(firstBin, secondBin);
+    vi.stubEnv("HANOMAN_ANTIGRAVITY_BIN", "/nonexistent-env-agy");
+    try {
+      for (const [index, bin] of [firstBin, secondBin].entries()) {
+        await setConfig("HANOMAN_ANTIGRAVITY_BIN", bin);
+        const result = join(repoDir, `db-bin-${index}.json`);
+        createSession(`agy-db-${index}`, repoDir, { agent: "antigravity", env: { CAPTURE_RESULT: result } });
+        expect((await captured(result)).executable).toBe(bin);
+        expect(process.env.HANOMAN_ANTIGRAVITY_BIN).toBe("/nonexistent-env-agy");
+      }
+    } finally { await clearConfig("HANOMAN_ANTIGRAVITY_BIN"); }
+  }, TMUX_SPAWN_TIMEOUT);
+  it("per-pane env membersihkan daemon lama tanpa mengubah env sesi tetangga", async () => {
+    const bin = captureExecutable(repoDir);
+    const socket = process.env.HANOMAN_TMUX_SOCKET ?? "hanoman-test";
+    const tmux = (...args: string[]) => execFileSync("tmux", ["-L", socket, "-f", "/dev/null", ...args], { encoding: "utf8" });
+    const neighbor = createSession("env-bootstrap", repoDir, { command: ["/bin/cat"] });
+    for (const [key, value] of Object.entries({ GEMINI_API_KEY: "old-fixture-key", GOOGLE_GEMINI_BASE_URL: "https://old.invalid", GOOGLE_CLOUD_PROJECT: "unrelated-project" }))
+      tmux("set-environment", "-g", key, value);
+    for (const key of ["GEMINI_API_KEY", "GOOGLE_GEMINI_BASE_URL"])
+      tmux("set-environment", "-t", `hanoman-${neighbor.id}`, key, "neighbor-fixture");
+    for (const key of ["GEMINI_API_KEY", "GOOGLE_GEMINI_BASE_URL"]) {
+      const newValue = key === "GEMINI_API_KEY" ? "current-fixture-key" : "https://current.invalid";
+      vi.stubEnv(key, newValue);
+    }
+    vi.stubEnv("HANOMAN_ANTIGRAVITY_BIN", bin);
+    vi.stubEnv("HANOMAN_CLAUDE_BIN", bin);
+    vi.stubEnv("HANOMAN_CODEX_BIN", bin);
+    for (const agent of ["claude", "codex", null, "antigravity"] as const) {
+      const result = join(repoDir, `env-${agent}.json`);
+      const env = { CAPTURE_RESULT: result, GEMINI_API_KEY: "current-fixture-key", GOOGLE_GEMINI_BASE_URL: "https://current.invalid" };
+      createSession(`env-${agent}`, repoDir, agent === null ? { command: [bin], env } : { agent, env });
+      const actual = await captured(result);
+      expect(actual.keyPresent).toBe(agent === "antigravity");
+      expect(actual.basePresent).toBe(agent === "antigravity");
+      if (agent === "antigravity") {
+        expect(actual.keyCurrent).toBe(true);
+        expect(actual.baseCurrent).toBe(true);
+      }
+      expect(actual.projectPreserved).toBe(true);
+    }
+    for (const [key, value] of Object.entries({ GEMINI_API_KEY: "old-fixture-key", GOOGLE_GEMINI_BASE_URL: "https://old.invalid" })) {
+      expect(tmux("show-environment", "-g", key).trim() === `${key}=${value}`).toBe(true);
+      expect(tmux("show-environment", "-t", `hanoman-${neighbor.id}`, key).trim() === `${key}=neighbor-fixture`).toBe(true);
+    }
+    vi.unstubAllEnvs();
+    vi.stubEnv("HANOMAN_ANTIGRAVITY_BIN", bin);
+    vi.stubEnv("GEMINI_API_KEY", undefined);
+    vi.stubEnv("GOOGLE_GEMINI_BASE_URL", undefined);
+    const emptyResult = join(repoDir, "empty.json");
+    createSession("env-empty", repoDir, { agent: "antigravity", env: { CAPTURE_RESULT: emptyResult } });
+    const empty = await captured(emptyResult);
+    expect(empty.keyPresent).toBe(false);
+    expect(empty.basePresent).toBe(false);
+  }, TMUX_SPAWN_TIMEOUT);
 });

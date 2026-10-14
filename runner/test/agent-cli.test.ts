@@ -63,3 +63,18 @@ describe("agentFlags · subagentStatusLine (ADR-0164)", () => {
     expect(agentFlags({ agent: "codex", subagentStatusLine: "node x" }).join(" ")).not.toContain("node x");
   });
 });
+
+
+describe("agentFlags · antigravity", () => {
+  it("memakai flags native interaktif tanpa hook atau config runtime lain", () => {
+    const flags = agentFlags({ agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high",
+      decisionFile: "/tmp/decision", goal: "goal", goalGate: "/tmp/gate", eventHook: true,
+      subagentStatusLine: "node statusline" });
+    expect(flags).toEqual(["--model", "gemini-3.8-flash-high", "--effort", "high", "--dangerously-skip-permissions"]);
+    for (const unwanted of ["--settings", "--agents", "exec", "--print", "-p", "--no-alt-screen", "-c"])
+      expect(flags).not.toContain(unwanted);
+  });
+  it("tanpa model/effort tetap menjalankan TUI", () => {
+    expect(agentFlags({ agent: "antigravity" })).toEqual(["--dangerously-skip-permissions"]);
+  });
+});

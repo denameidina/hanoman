@@ -299,4 +299,14 @@ ADR-0024), bukan dari parsing output terminal.
 
 **Hapus kredensial warisan** (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`; `inheritEnv`). `DELETE /config/:key` menyimpan baris DB berisi string kosong sebagai penanda ("dikosongkan operator", `suppressedInheritKeys()` di `server/src/config.ts`), bukan sekadar menghapus baris. Sebelumnya nilai dari env proses (plist launchd/shell) muncul lagi sesudah "Hapus" — dan `claude` mewarisi env dari tmux server, bukan dari `process.env` server ini, jadi `createSession` memasang prefix `env -u <KEY>` untuk kunci yang dikosongkan supaya sesi baru memakai default `claude`. Berlaku untuk sesi BARU; sesi yang sudah hidup tak berubah.
 
+**Env Antigravity per runtime** (SPEC-1442/[ADR-0221](../adr/0221-antigravity-cli-runtime-interaktif-native.md)).
+`agentEnvironment(agent|null, env)` di runner mengklon env dan menghapus hanya
+`GEMINI_API_KEY`/`GOOGLE_GEMINI_BASE_URL` dari Claude/Codex/raw shell serta child tmux unrelated.
+Tidak menghapus `GOOGLE_*` lain. Setiap pane diawali `env -u` untuk dua key ini, lalu pane
+Antigravity saja mendapat nilai supplied terbaru (override pemanggil → env server); environment
+daemon tmux dan sesi tetangga tidak dimutasi. Biner `HANOMAN_ANTIGRAVITY_BIN` adalah knob path
+new-session DB→env→`agy`, bukan credential atau shell command. Prompt interaktif tetap satu
+argumen dari berkas 0600 melalui `--prompt-interactive`; tanpa prompt tetap TUI.
+Lihat [kontrak runtime dan receipt Task 3](antigravity-runtime.md#receipt-biner-argv-dan-env-task-3--2026-10-14).
+
 **Mulai ulang manual di dashboard** (`UpdateIndicator`, `waitForServerBack` di `src/src/api/update.ts`). Sesudah `POST /api/restart` → `202`, klien memoll `/api/health` sampai server terlihat mati lalu hidup lagi (atau ≥3 dtk), lalu memuat ulang tab; lewat 90 dtk ia menampilkan pesan gagal. Restart manual tak mengganti versi sehingga tak ada drift yang memicu badge "muat ulang" — sebelumnya popover diam selamanya di "Menjalankan ulang…" dan tab memegang bundle serta koneksi lama.

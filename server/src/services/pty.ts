@@ -7,7 +7,7 @@ import { stat } from "node:fs/promises";
 import { dirname, resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
 import {
-  goalOneLine, goalChunks, agentFlags, codexGoalScript, ensureSpawnHelper, spawnWithHelperRecovery,
+  goalOneLine, goalChunks, agentFlags, agentEnvironment, ANTIGRAVITY_ENV_KEYS, codexGoalScript, ensureSpawnHelper, spawnWithHelperRecovery,
   renderAgentsJson, agentDelegationClause, materializeCodexAgents, writeReadOnlyHook, withPhaseDelegation,
   writeSubagentStatusline, agentContractOf, type AgentContractFile, type AgentDef, type Flow, type Agent,
 } from "@hanoman/runner";
@@ -18,6 +18,7 @@ import {
   enrichPhases, readPhases, readPhasesAsync, sessionComplete, sessionCompleteAsync, trackDoneSeen, type Phase, type PhaseInvocation,
 } from "./session-phases";
 import { sessionIdForSpec } from "./session-id";
+import { antigravityBin } from "./antigravity-runtime";
 import { injectGlobalSkills } from "./skill-inject";
 import { skillsHome } from "./skill-library";
 import { dropSessionUploads } from "./uploads";
@@ -272,7 +273,10 @@ const claudeBin = () => effectiveStr("HANOMAN_CLAUDE_BIN") ?? "claude";
 export const shellBin = (): string => effectiveStr("HANOMAN_SHELL") ?? process.env.SHELL ?? "/bin/bash";
 // SPEC-338 · ADR-0074 · cermin HANOMAN_CLAUDE_BIN untuk Codex CLI.
 const codexBin = () => effectiveStr("HANOMAN_CODEX_BIN") ?? "codex";
-const agentBin = (agent: Agent): string => (agent === "codex" ? codexBin() : claudeBin());
+const agentBin = (agent: Agent): string => {
+  if (agent === "antigravity") return antigravityBin();
+  return agent === "codex" ? codexBin() : claudeBin();
+};
 
 // Claude CLI menolak `--dangerously-skip-permissions` saat uid 0 ("cannot be used with root/sudo
 // privileges for security reasons") dan langsung `process.exit(1)` — sesi lahir lalu MATI seketika.
@@ -432,7 +436,7 @@ function tmux(...args: string[]): string {
     // stderr di-pipe, bukan diwariskan: `list-panes` pada tmux server yang belum jalan
     // adalah keadaan normal (belum ada sesi), bukan sesuatu yang layak dicetak ke log.
     return execFileSync("tmux", ["-L", socket(), "-f", "/dev/null", ...args], {
-      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: agentEnvironment(null, process.env),
     });
   } catch (e) {
     const err = e as NodeJS.ErrnoException & { stderr?: string };
@@ -453,7 +457,7 @@ function tmux(...args: string[]): string {
 // dengan `tmux()`; pemanggil sekali-jalan (route, launch) tetap memakai yang sinkron.
 function tmuxAsync(...args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile("tmux", ["-L", socket(), "-f", "/dev/null", ...args], { encoding: "utf8" },
+    execFile("tmux", ["-L", socket(), "-f", "/dev/null", ...args], { encoding: "utf8", env: agentEnvironment(null, process.env) },
       (e, stdout, stderr) => {
         if (!e) { resolve(stdout); return; }
         const err = e as NodeJS.ErrnoException;
@@ -1059,7 +1063,9 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     } catch (e) {
       process.stderr.write(`hanoman: penyuntikan skill global gagal: ${(e as Error).message}\n`);
     }
-    argv = [sq(agentBin(agent)), promptArg, flags, agentsArg, nativeAgentArgs, skillsArg]
+    argv = (agent === "antigravity"
+      ? [sq(agentBin(agent)), flags, ...(promptArg ? ["--prompt-interactive", promptArg] : [])]
+      : [sq(agentBin(agent)), promptArg, flags, agentsArg, nativeAgentArgs, skillsArg])
       .filter(Boolean).join(" ");
   }
 
@@ -1093,11 +1099,24 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   }
   if (opts.attachmentsDir) envPairs.push(`HANOMAN_ATTACHMENTS_DIR=${sq(opts.attachmentsDir)}`);
   // Env tambahan dari pemanggil lewat jalur yang sama.
-  for (const [k, v] of Object.entries(opts.env ?? {})) envPairs.push(`${k}=${sq(v)}`);
+  const runtime = opts.command ? null : agent;
+  for (const [k, v] of Object.entries(agentEnvironment(runtime, opts.env ?? {}))) {
+    if (v !== undefined) envPairs.push(`${k}=${sq(v)}`);
+  }
+  // Daemon tmux membekukan env saat lahir; nilai runtime harus dibaca lagi per-pane,
+  // dan env -u melepas credential lama tanpa mutasi daemon atau sesi tetangga.
+  if (runtime === "antigravity") {
+    const current = agentEnvironment(runtime, { ...process.env, ...opts.env });
+    for (const key of ANTIGRAVITY_ENV_KEYS) {
+      const value = current[key];
+      if (value !== undefined) envPairs.push(`${key}=${sq(value)}`);
+    }
+  }
   // Kredensial warisan yang dikosongkan operator: `claude` mewarisi env dari tmux server (lahir
   // dengan env server ini), jadi hanya `env -u` yang benar-benar melepasnya dari sesi baru.
-  const unsets = opts.command ? []
-    : [...suppressedInheritKeys(), ...hanomanDbInheritUnsets()].flatMap((k) => ["-u", k]);
+  const unsets = [...ANTIGRAVITY_ENV_KEYS,
+    ...(!opts.command ? [...suppressedInheritKeys(), ...hanomanDbInheritUnsets()] : []),
+  ].flatMap((key) => ["-u", key]);
   let cmd = unsets.length ? ["env", ...unsets, ...envPairs, argv].join(" ")
     : envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
   if (!opts.command) {
@@ -1770,7 +1789,7 @@ function spawnPty(...args: string[]): IPty {
   try {
     return spawnWithHelperRecovery(() => spawn("tmux", ["-L", socket(), "-f", "/dev/null", ...args], {
       name: "xterm-256color", cols: 80, rows: 24,
-      env: process.env as Record<string, string>,
+      env: agentEnvironment(null, process.env) as Record<string, string>,
     }), repair);
   } catch (e) {
     const msg = (e as Error).message;
