@@ -58,7 +58,8 @@ export function resolvePhasePlan(input: PhasePlanInput): PhasePlan | null {
     if (input.runtime === "antigravity") {
       const picked = override?.model !== undefined ? override.model : cell?.model;
       const model = picked ?? "inherit";
-      if (!isAntigravityChildTier(model) || override?.effort != null || cell?.effort != null) {
+      const effort = override?.effort !== undefined ? override.effort : cell?.effort;
+      if (!isAntigravityChildTier(model) || effort != null) {
         throw new Error("Antigravity child memakai tier native tanpa effort independen");
       }
       return { model, effort: null };

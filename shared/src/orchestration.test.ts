@@ -254,3 +254,11 @@ it("explicit null native override resets a stored tier to inherit", () => {
   expect(plan?.phases.find(p => p.phase === "Plan")).toMatchObject({ model: "inherit", effort: null });
   expect(plan?.reviewer).toMatchObject({ model: "inherit", effort: null });
 });
+
+it("explicit null native effort overrides an incompatible legacy stored effort", () => {
+  const orchestration = zOrchestration.parse({ feature: { antigravity: { Plan: { model: "flash", effort: "high" } } } });
+  const input = { flow: "feature" as const, runtime: "antigravity" as const, nativeAgents: true, orchestrator, orchestration };
+  expect(() => resolvePhasePlan(input)).toThrow(/tier native/);
+  const plan = resolvePhasePlan({ ...input, phaseOverrides: { Plan: { model: "inherit", effort: null } } });
+  expect(plan?.phases.find(p => p.phase === "Plan")).toMatchObject({ model: "inherit", effort: null });
+});

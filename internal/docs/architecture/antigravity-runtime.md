@@ -433,3 +433,10 @@ parent dan dua hash definisi fase menjaga Claude/Codex byte-identik. Shared dan 
 hijau; server masih memiliki dua seam yang menjadi milik task berikutnya: pty idle map dan
 Telegram engine label. Tidak ada endpoint baru; MCP existing Settings/session phases diperbarui
 bersama schema null dan API/workflow/ADR/index, sesuai ADR-0202.
+
+Review Task 7 memperbaiki precedence effort transient: `effort:null` eksplisit menggantikan
+legacy effort tersimpan yang tidak kompatibel, sama seperti override model. Resolver menilai
+hanya effort efektif (override bila dikirim, selain itu sel Settings); tanpa override, sel
+legacy `flash/high` tetap ditolak. Ini tidak memperluas dukungan effort child independen.
+Regresi terfokus mula-mula 1 gagal/29 lulus karena override null masih membaca sel legacy;
+sesudah perbaikan, `shared/src/orchestration.test.ts` lulus 30/30 dan typecheck shared hijau.
