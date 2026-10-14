@@ -516,9 +516,10 @@ capability yang sama** — bukan jalur otorisasi baru — jadi seluruh aturan §
 
 Prasyarat: `npm i -g hanoman` di mesin tempat klien AI-nya jalan.
 
-**Claude Code / Claude Desktop / Cursor / Copilot** (`~/.claude.json`,
+**Claude Code / Claude Desktop / Cursor / Copilot / Antigravity** (`~/.claude.json`,
 `claude_desktop_config.json`, `~/.cursor/mcp.json`, `.vscode/mcp.json` — Cursor & Copilot memakai
-kunci `"servers"` alih-alih `"mcpServers"`):
+kunci `"servers"` alih-alih `"mcpServers"`; Antigravity memakai global
+`~/.gemini/config/mcp_config.json`):
 
 ```json
 {
@@ -544,7 +545,25 @@ args = ["mcp"]
 env = { HANOMAN_HOST = "https://hanoman.example", HANOMAN_AGENT_TOKEN = "hnm_agt_…" }
 ```
 
-Panduan siap salin untuk keempat klien, berikut tabel tool → capability, ada di dashboard:
+**Antigravity — pemasangan global oleh operator (SPEC-1442/ADR-0221):** gunakan blok JSON
+`mcpServers.hanoman` di atas. Pilih token instance ini lewat alur **Akses AI Agent** existing,
+lalu ganti placeholder secara lokal. Untuk konfigurasi yang sudah ada, gabungkan **hanya** entri
+`mcpServers.hanoman`; pertahankan semua server lain dan field root yang tidak dikenal. Jangan
+mengganti seluruh berkas dengan contoh. Jika JSON rusak, bentuk root/`mcpServers` tidak berupa
+objek, atau entri `hanoman` operator berbeda sudah ada, hentikan pemasangan dan lakukan
+rekonsiliasi manual. Simpan berkas global dengan izin `0600`. Konfigurasi workspace
+`.agents/mcp_config.json` tetap utuh. Dashboard hanya menyediakan panduan/snippet; tidak ada
+writer konfigurasi lokal, endpoint baru, penerbitan token otomatis, atau penambahan capability.
+
+Pilihan tingkat tetap sama: `args: ["mcp"]` untuk default, `["mcp", "--read-only"]` untuk
+baca-saja, atau `["mcp", "--danger"]` untuk menampilkan tool berbahaya; jangan gabungkan dua
+flag itu. Tingkat tampilan bukan otorisasi tambahan dan token tetap tunduk pada capability
+existing. Buka sesi TUI Antigravity baru, periksa `/mcp` atau daftar tools native, lalu panggil
+`hanoman_about`. Receipt cukup mencatat nama tool/status hasil; jangan menyalin token, host,
+atau config credential mentah ke log/dokumen. Keberhasilan snippet/fixture sendiri belum
+membuktikan koneksi native.
+
+Panduan siap salin untuk klien di atas, berikut tabel tool → capability, ada di dashboard:
 **Settings → Akses AI Agent → MCP server**.
 
 ### Tool

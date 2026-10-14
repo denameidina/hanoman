@@ -12,11 +12,12 @@ import { MCP_TOOLS, MCP_TOOL_SCHEMA_VERSION } from "@hanoman/shared";
 import { Button, Card } from "../ds";
 import "./styles/integrations.css";
 
-type Client = "claude-code" | "claude-desktop" | "codex" | "cursor";
+type Client = "claude-code" | "claude-desktop" | "codex" | "cursor" | "antigravity";
 
 const CLIENTS: { id: Client; label: string; hint: string }[] = [
   { id: "claude-code", label: "Claude Code", hint: "~/.claude.json — atau jalankan perintah `claude mcp add` di bawah." },
   { id: "claude-desktop", label: "Claude Desktop", hint: "Settings → Developer → Edit Config (claude_desktop_config.json)." },
+  { id: "antigravity", label: "Antigravity", hint: "~/.gemini/config/mcp_config.json — konfigurasi global MCP." },
   { id: "codex", label: "Codex", hint: "~/.codex/config.toml" },
   { id: "cursor", label: "Cursor / Copilot", hint: "~/.cursor/mcp.json atau .vscode/mcp.json di project." },
 ];
@@ -35,7 +36,7 @@ export function snippetFor(client: Client, host: string, level: SnippetLevel): s
       "command": "hanoman",
       "args": ${args},
       "env": {
-        "HANOMAN_HOST": "${host}",
+        "HANOMAN_HOST": ${JSON.stringify(host)},
         "HANOMAN_AGENT_TOKEN": "hnm_agt_…"
       }
     }
@@ -116,6 +117,18 @@ export function McpPanel(): React.ReactElement {
         </div>
 
         <div className="hn-mcp-muted hn-mcp-hint">{active.hint}</div>
+        {client === "antigravity" && (
+          <div data-testid="antigravity-mcp-guide" className="hn-mcp-muted">
+            Gabungkan hanya entri <code>mcpServers.hanoman</code> dari contoh ini; pertahankan
+            server lain dan field yang tidak dikenal di root. Bila JSON rusak atau entri hanoman
+            berbeda sudah ada, lakukan rekonsiliasi manual sebelum menyimpan. Gunakan izin berkas
+            <code>0600</code> setelah mengganti placeholder dengan token yang kamu pilih di kartu
+            akses agent; pilihan tingkat di sini tidak menambah capability token. Konfigurasi
+            workspace <code>.agents/mcp_config.json</code> tetap utuh. Buka sesi Antigravity baru,
+            periksa <code>/mcp</code>, lalu panggil <code>hanoman_about</code> untuk memverifikasi
+            koneksi.
+          </div>
+        )}
         <pre data-testid="mcp-snippet" className="hn-mcp-pre">{snippet}</pre>
         <div className="hn-mcp-copy">
           <Button size="sm" leftIcon="copy" onClick={copy}>{copied ? "Tersalin" : "Salin"}</Button>

@@ -562,3 +562,35 @@ observability gate and existing API client consumers. Real fake-executable timeo
 Shared typecheck exit 0; server reports only pending Task 13 Telegram runtime label, frontend
 only pending Task 12 RuntimeDefs/EngineValue/default fields; no Task 10 diagnostic or suppression.
 Logs are in ignored `.superpowers/sdd/2026-10-14-spec-1442-antigravity-cli-runtime/Task10-*.log`.
+
+
+## Panduan MCP global dan preservasi operator (Task 11)
+
+Dashboard `McpPanel` menyediakan klien Antigravity dengan path global
+`~/.gemini/config/mcp_config.json`, JSON `mcpServers.hanoman`, command `hanoman`, args
+`mcp` dan tingkat existing default/read-only/danger. Token tetap placeholder `hnm_agt_…`;
+alur token/capability existing tidak berubah. Host JSON di-escape agar snippet sah juga
+untuk karakter kutip. Petunjuk eksplisit meminta merge hanya entri Hanoman, preservasi
+sibling dan unknown root fields, rekonsiliasi manual JSON rusak/bentuk invalid/collision,
+izin 0600, dan workspace `.agents/mcp_config.json` tetap utuh. Aplikasi tidak menambah
+writer konfigurasi lokal ataupun endpoint pemasangan, sehingga keputusan MCP ADR-0202
+untuk task ini adalah panduan UI di atas tool stdio existing, tanpa API baru.
+
+Fixture prosedur operator memakai konfigurasi sementara dan token placeholder; ini bukti
+prosedur merge, bukan klaim writer produksi. Root/sibling, workspace bytes dan merge
+idempoten terjaga, mode 0600; malformed JSON, root/servers array, collision operator dan
+entri null ditolak tanpa mengubah byte asal. RED mounted 4 gagal/8 lulus karena klien dan
+panduan belum ada serta host berkutip bukan JSON sah; GREEN akhir 1 berkas/18 test lulus.
+Log terarah ada di ignored workspace `Task11-{red,green,green-final}.log`.
+`pnpm --filter ./src typecheck` masih exit 2 pada defaults/EngineValue/picker Task 12
+existing; tidak ada diagnostic pada McpPanel atau test Task 11, tanpa suppressions.
+`docs index --check` menjawab `index ok` dan `git diff --check` exit 0.
+
+Bukti native `/mcp`/tools-list serta `hanoman_about` masih pending keputusan sumber
+credential: env sesi tidak memasok token/host dan entri hanoman global Antigravity belum
+ada. Metadata-only menemukan konfigurasi Hanoman Claude existing, tetapi pemilihan
+credential operator tidak diambil oleh implementer. Semua konfigurasi global operator
+masih utuh; receipt fixture tidak menggantikan receipt koneksi native. Jalur rekomendasi
+adalah fixture auth terisolasi pada boot final Task 14 dan entri global sementara yang
+owned, dengan merge-preserve cleanup; alternatif sumber credential existing harus
+dipilih eksplisit oleh operator sebelum reuse.
