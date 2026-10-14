@@ -129,7 +129,8 @@ export function capabilityForRoute(method: string, path: string): Resolved {
     // opt-in, tak diwarisi `settings:*`. Capability itu SAJA tak pernah cukup untuk eksekusi — handler
     // di routes/scheduler.ts menuntut `sessions:spawn` juga untuk create/patch-eksekusi/run. Fungsi
     // ini sengaja tak melihat body (kemurnian (method, path)), jadi gerbang kedua itu hidup di handler.
-    if (seg[1] === "crons") return rw("scheduler");
+    // ADR-0222 · laporan run cron: baca-saja, `scheduler:read`. Tanpa baris ini ia jatuh ke `settings`.
+    if (seg[1] === "crons" || seg[1] === "reports") return rw("scheduler");
     return rw("settings");   // SPEC-294 · sisanya = setelan instance
   }
   // SPEC-409 · ADR-0091 · domain TERSENDIRI. `POST /lead/decisions` adalah endpoint TULIS: ia

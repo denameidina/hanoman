@@ -38,6 +38,7 @@ export * from "./mcp";
 export * from "./auto-merge";
 export * from "./handled-by";
 export * from "./cron-expr";
+export * from "./cron-report";
 export * from "./terminal-workspace";
 export * from "./terminal-io";
 export * from "./session-dialog";

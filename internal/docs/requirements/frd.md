@@ -242,6 +242,16 @@ tanpa penopang tidak ditulis.
 - WHEN metrik load tidak tersedia (termasuk Windows), THEN THE SYSTEM SHALL meluluskan
   check load dan menampilkan status unavailable/unsupported dengan nilai null.
 
+- WHEN sebuah sesi cron menyelesaikan giliran (hook `Stop`) dan punya run `launched`, THE SYSTEM SHALL
+  menyimpan pesan akhir agen sebagai satu `CronReport` markdown per run (id = id run), terikat ke
+  cron, project, tanggal, dan run; giliran terakhir menang
+  ([ADR-0222](../adr/0222-laporan-run-cron-cronreport-tersync.md)).
+- THE SYSTEM SHALL menyinkronkan `CronReport` dua arah lewat mekanisme sync yang ada tanpa duplikat
+  (id = id run) dan SHALL mempertahankan paling banyak 90 laporan terbaru per cron.
+- THE SYSTEM SHALL menyajikan laporan lewat `GET /api/scheduler/reports[/latest|/:id]`, tool MCP
+  `hanoman_scheduler_reports` / `hanoman_scheduler_report_get` (`scheduler:read`), dan panel Laporan
+  di halaman cron; cron tak dikenal SHALL tidak menghasilkan 404 untuk daftar laporan.
+
 ## VPS
 
 - THE SYSTEM SHALL menjalankan audit dan harden sebagai **skrip deterministik** lewat SSH+sudo, tanpa

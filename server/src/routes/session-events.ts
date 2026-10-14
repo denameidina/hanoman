@@ -5,6 +5,7 @@ import { getSessionAsync } from "../services/pty";
 import { intakeAsk } from "../services/lead/ask";
 import { startAgentInvocation, stopAgentInvocation } from "../services/agent-invocations";
 import { refreshPhaseInvocations } from "../services/phase-invocations";
+import { recordCronReport } from "../services/scheduler/cron-report";
 
 // SPEC-909 · ADR-0146 · pintu masuk event pertanyaan sesi.
 //
@@ -52,6 +53,14 @@ export default async function (app: FastifyInstance) {
 
     const body = recordOf(req.body);
     const lifecycle = body?.hook_event_name;
+    // ADR-0222 · pesan akhir sesi cron = laporan run-nya (giliran terakhir menang). Sebelum
+    // `parseHookEvent` dengan sengaja: yang dibaca di sini adalah isi pesan, bukan "apakah agen
+    // bertanya", dan `stop_hook_active` tak boleh membuangnya. Gagal menulis laporan tak boleh
+    // mengubah jawaban jalur event.
+    if (lifecycle === "Stop" && sessionId.startsWith("cron-")) {
+      await recordCronReport(sessionId, body?.last_assistant_message)
+        .catch((e) => console.error("laporan cron tak tersimpan:", e));
+    }
     if (body && (lifecycle === "SubagentStart" || lifecycle === "SubagentStop")) {
       const runtimeInvocationId = boundedString(
         body.agent_id ?? body.subagent_id ?? body.thread_id, 500,

@@ -21,13 +21,14 @@ import { QA_STORAGE_KEY, QA_SYNC_MAX_BYTES, settleNewQaAttachment } from "./qa-a
 // SPEC-945 · ADR-0150 · `member` & `task` ikut menyeberang: papan kerja tim adalah pengetahuan
 // bersama, bukan setelan mesin. `Member.id` deterministik (email ternormalisasi) justru supaya dua
 // mesin yang mencatat orang yang sama bertemu sebagai SATU baris di sini.
-export const SYNCED = ["project", "spec", "vps", "sessionResult", "ticket", "ticketAttachment", "customAgent", "githubIssue", "member", "task", "qaReport", "qaCase", "qaFinding", "qaAttachment"] as const;
+export const SYNCED = ["project", "spec", "vps", "sessionResult", "ticket", "ticketAttachment", "customAgent", "githubIssue", "member", "task", "qaReport", "qaCase", "qaFinding", "qaAttachment", "cronReport"] as const;
 export type Entity = (typeof SYNCED)[number];
 
 // ADR-0180 · entitas yang hanya dikirim ke client yang MENYEBUTNYA (`?entities=`). Client versi lama
 // melempar pada entitas tak dikenal dan kursornya berhenti selamanya (sync-client `validateIncomingRecord`)
 // — jadi entitas baru tak boleh pernah sampai ke sana. Hub menyaring; kursor tetap maju melewatinya.
-export const OPTIONAL_ENTITIES: readonly Entity[] = [];
+// ADR-0222 · `cronReport` opsional: client lama tak mengenalnya dan kursornya akan berhenti.
+export const OPTIONAL_ENTITIES: readonly Entity[] = ["cronReport"];
 export type OptionalEntity = (typeof OPTIONAL_ENTITIES)[number];
 export const isOptionalEntity = (e: string): e is OptionalEntity => (OPTIONAL_ENTITIES as readonly string[]).includes(e);
 export function acceptedOptional(raw: unknown): Set<string> {
@@ -56,6 +57,7 @@ const DELEGATE: Record<Entity, Delegate> = {
   qaCase: prisma.qaCase as unknown as Delegate,
   qaFinding: prisma.qaFinding as unknown as Delegate,
   qaAttachment: prisma.qaAttachment as unknown as Delegate,
+  cronReport: prisma.cronReport as unknown as Delegate,
 };
 
 // Whitelist field bisnis per entitas — SENGAJA mengecualikan never-sync (Project.repoDir,
@@ -127,6 +129,9 @@ const FIELDS: Record<Entity, string[]> = {
   qaCase: ["reportId", "code", "title", "steps", "expected", "actual", "status", "order", "createdAt", "updatedAt"],
   qaFinding: ["reportId", "caseId", "code", "title", "severity", "priority", "area", "steps", "expected", "actual", "status", "backlogId", "createdAt", "updatedAt"],
   qaAttachment: ["reportId", "projectId", "ownerType", "ownerId", "filename", "mimeType", "size", "sha256", "storageKey", "createdAt", "updatedAt"],
+  // ADR-0222 · SELURUH kolom bermakna ikut (`version` stempel mekanisme, tak masuk). `cronId` soft-link:
+  // SchedulerCron LOCAL-only, jadi tak ada peta FK ke sana.
+  cronReport: ["projectId", "cronId", "cronName", "runDate", "dueAt", "sessionId", "body", "bytes", "createdAt", "updatedAt"],
 };
 // Field yang JSONB-nya string ISO tapi kolomnya DateTime — dikonversi balik saat menulis.
 const DATE_FIELDS: Record<Entity, string[]> = {
@@ -140,6 +145,7 @@ const DATE_FIELDS: Record<Entity, string[]> = {
   task: ["startDate", "dueDate", "createdAt", "updatedAt"],
   qaReport: ["createdAt", "updatedAt"], qaCase: ["createdAt", "updatedAt"],
   qaFinding: ["createdAt", "updatedAt"], qaAttachment: ["createdAt", "updatedAt"],
+  cronReport: ["dueAt", "createdAt", "updatedAt"],
 };
 
 // SPEC-799 · ADR-0119 · relasi FK antar entitas SYNCED. Dipakai penerima untuk MEMBUANG record anak
@@ -176,6 +182,7 @@ export const PARENTS: Partial<Record<Entity, ParentRef[]>> = {
   qaCase: [{ field: "reportId", entity: "qaReport", onDelete: "cascade" }],
   qaFinding: [{ field: "reportId", entity: "qaReport", onDelete: "cascade" }],
   qaAttachment: [{ field: "reportId", entity: "qaReport", onDelete: "cascade" }],
+  cronReport: [{ field: "projectId", entity: "project", onDelete: "cascade" }],
 };
 
 // Ekspor test-only: kontrak "setiap kolom bermakna ikut menyeberang" hanya bisa diuji dari
@@ -184,7 +191,7 @@ export const __FIELDS = FIELDS;
 export const __DATE_FIELDS = DATE_FIELDS;
 
 const NUMBER_FIELDS = new Set([
-  "vps:port", "ticket:number", "ticketAttachment:size", "githubIssue:number", "qaAttachment:size",
+  "vps:port", "ticket:number", "ticketAttachment:size", "githubIssue:number", "qaAttachment:size", "cronReport:bytes",
 ]);
 const NULLABLE_NUMBER_FIELDS = new Set(["customAgent:maxTurns", "customAgent:timeoutSeconds"]);
 // SPEC-945 · ADR-0150 · TERPISAH dari NUMBER_FIELDS, yang menuntut `Number.isSafeInteger`.
@@ -472,6 +479,8 @@ export const BOOTSTRAP_ORDER: Entity[] = [
   // Workspace QA · induk SEBELUM anak (FK reportId, cascade) dan sesudah `project`. Urutan yang salah
   // bootstrap SUKSES tanpa error tapi anaknya dibuang sebagai yatim (kelas SPEC-885).
   "qaReport", "qaCase", "qaFinding", "qaAttachment",
+  // ADR-0222 · sesudah `project` (FK projectId, cascade).
+  "cronReport",
   "vps", "sessionResult",
 ];
 

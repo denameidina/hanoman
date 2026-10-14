@@ -6,6 +6,7 @@ import { getScheduler, setScheduler } from "../services/scheduler/config";
 import { buildQueuePage, markCanceled, markRequeued } from "../services/scheduler/queue";
 import { computeNextRun, listCronRunsPage, serverTimeZone } from "../services/scheduler/cron";
 import { buildSchedulerState } from "../services/scheduler/state";
+import { getCronReport, latestCronReport, listCronReports } from "../services/scheduler/cron-report";
 
 // SPEC-294 · ADR-0072 · config (knob) + state (antrean/sesi/cadence) scheduler. Di belakang gate cookie.
 // SPEC-522 · ADR-0106 · + pembatalan satu baris antrean. Sengaja di bawah prefix `/scheduler` supaya
@@ -121,6 +122,24 @@ export default async function (app: FastifyInstance) {
     dueAt: r.dueAt.toISOString(), startedAt: r.startedAt ? r.startedAt.toISOString() : null,
     status: r.status, sessionId: r.sessionId, note: r.note, manual: r.manual,
     createdAt: r.createdAt.toISOString(),
+  });
+
+  // ADR-0222 · laporan run cron (tersync). Baca-saja. Cron TIDAK divalidasi keberadaannya: cron
+  // milik mesin lain tak ada di DB ini sementara laporannya tetap tersync dan harus terbaca.
+  // `latest` didaftarkan SEBELUM `:id` (find-my-way memprioritaskan segmen statis, urutan ini
+  // sekadar menjaga keterbacaan).
+  app.get("/scheduler/reports", async (req) => {
+    const { projectId, cronId, page, limit } = req.query as Record<string, string | undefined>;
+    return listCronReports({ projectId, cronId, page, limit });
+  });
+  app.get("/scheduler/reports/latest", async (req, reply) => {
+    const { projectId, cronId } = req.query as Record<string, string | undefined>;
+    const r = await latestCronReport({ projectId, cronId });
+    return r ?? reply.code(404).send({ error: "belum ada laporan" });
+  });
+  app.get("/scheduler/reports/:id", async (req, reply) => {
+    const r = await getCronReport((req.params as { id: string }).id);
+    return r ?? reply.code(404).send({ error: "laporan tak ada" });
   });
 
   app.get("/scheduler/crons", async (req) => {

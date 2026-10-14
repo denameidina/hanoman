@@ -515,3 +515,30 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ADR-0222 · panel Laporan run cron */
+.hn-sched-reports {
+  margin-top: var(--space-5);
+}
+
+.hn-sched-reports > h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-subtle);
+}
+
+.hn-sched-report-body {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.hn-sched-report-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}

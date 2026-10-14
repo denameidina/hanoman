@@ -25,6 +25,7 @@ import { usePersistedState, isNum, isStr, nullableStr } from "../ui-state";
 import type { ProjectVM } from "./types";
 import { failureMessage } from "../lib/report-error";
 import { InlineError, clampNumber, fmtAt, browserTimeZone } from "./sched-lead-shared";
+import { CronReports } from "./CronReports";
 import "./styles/scheduler.css";
 
 const PAGE = 10;
@@ -324,6 +325,13 @@ export function SchedulerCrons({ projects, onProjectChanged, onToast, timeZone }
                 </table>
               </LocalOverflow>
             )}
+
+      {projectId && (
+        <section className="hn-sched-reports" aria-label="Laporan run cron">
+          <h3>Laporan run cron</h3>
+          <CronReports projectId={projectId} />
+        </section>
+      )}
 
       <Modal open={editing !== undefined} title={editing ? "Ubah cron" : "Cron baru"} eyebrow="scheduler"
         onClose={() => setEditing(undefined)} width={640}

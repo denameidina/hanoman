@@ -19,6 +19,7 @@ const listCronRuns = vi.fn(async (..._a: unknown[]) => ({
   }],
   total: 1, page: 1, pageSize: 10,
 }));
+const listCronReports = vi.fn(async (..._a: unknown[]) => ({ items: [], total: 0, page: 1, pageSize: 10 }));
 const createCron = vi.fn(async (..._a: unknown[]) => cron({ id: "c2" }));
 const runCronNow = vi.fn(async (..._a: unknown[]) => ({ id: "r2" }));
 const updateProject = vi.fn(async (..._a: unknown[]) => ({}));
@@ -28,6 +29,7 @@ vi.mock("../api/client", () => ({
   api: {
     listCrons: (...a: unknown[]) => listCrons(...a),
     listCronRuns: (...a: unknown[]) => listCronRuns(...a),
+    listCronReports: (...a: unknown[]) => listCronReports(...a),
     createCron: (...a: unknown[]) => createCron(...a),
     patchCron: vi.fn(async () => cron()),
     deleteCron: (...a: unknown[]) => deleteCron(...a),

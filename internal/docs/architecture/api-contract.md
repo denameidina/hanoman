@@ -2053,6 +2053,9 @@ POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # cance
 > | DELETE | `/api/scheduler/crons/:id` | **204**; riwayat run ikut terhapus (tak ada FK) |
 > | POST | `/api/scheduler/crons/:id/run` | uji coba → baris run `manual`; **409** saat scheduler mati/dijeda atau sudah ada run `queued` |
 > | GET | `/api/scheduler/crons/:id/runs?page=&limit=` | `Paginated<SchedulerCronRunView>`, urut `dueAt` turun |
+> | GET | `/api/scheduler/reports?projectId=&cronId=&page=&limit=` | `Paginated<CronReportView>` (ADR-0222), urut `dueAt` turun, **tanpa** `body`. Cron tak dikenal → **200** kosong (cron milik mesin lain tak ada di DB ini) |
+> | GET | `/api/scheduler/reports/latest?projectId=&cronId=` | `CronReportDetail` (dengan `body` markdown + `filename`); **404** bila belum ada |
+> | GET | `/api/scheduler/reports/:id` | `CronReportDetail`; **404** bila tak ada. Laporan ditulis hook `Stop` sesi `cron-*`, tersync (`cronReport`), retensi 90/cron |
 >
 > `expr` divalidasi lewat `parseCron` — parser yang SAMA yang menghitung jadwalnya, jadi expr yang
 > diterima pasti punya jatuh tempo. "Jalankan sekarang" **tidak** men-spawn sesi: ia membuat baris

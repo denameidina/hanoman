@@ -35,6 +35,7 @@ model Project {
   clientAccess ClientProjectAccess[] // SPEC-617 · ADR-0110 · akun klien yang boleh melihat project ini
   portalChats  PortalChatSession[]   // SPEC-854 · ADR-0129 · percakapan portal klien project ini
   tasks        Task[]                // SPEC-945 · ADR-0150 · kartu kerja manusia di project ini
+  cronReports  CronReport[]         // ADR-0222 · laporan run cron project ini
   qaReports    QaReport[]            // Workspace QA · laporan QA project ini
 }
 
@@ -1039,6 +1040,30 @@ model LogCursor {
   updatedAt DateTime @updatedAt
 
   @@id([deviceId, lane])
+}
+
+// ADR-0222 · laporan hasil SATU run cron: pesan akhir agen (hook `Stop`) sebagai markdown. TERSYNC
+// (entitas `cronReport`). `id` = `SchedulerCronRun.id` supaya tulis ulang idempoten dan dua mesin tak
+// bisa menerbitkan laporan ganda untuk run yang sama. `cronId` soft-link TANPA FK: SchedulerCron
+// LOCAL-only, jadi cron milik mesin lain tak ada di DB ini sementara laporannya tetap harus terbaca.
+// Nama berkas `.md` diturunkan (`cronReportFilename`), tak disimpan.
+model CronReport {
+  id        String   @id
+  projectId String
+  cronId    String
+  cronName  String
+  runDate   String // YYYY-MM-DD, zona lokal mesin penjalan, dari dueAt
+  dueAt     DateTime
+  sessionId String?
+  body      String
+  bytes     Int      @default(0)
+  version   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([cronId, dueAt])
+  @@index([projectId, dueAt])
 }
 
 // Workspace QA · bagian 1 · laporan QA per project (design 2026-10-01).

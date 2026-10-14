@@ -116,6 +116,42 @@ const CRONS: readonly McpToolDef[] = [
     shape: (raw) => raw,
   },
   {
+    name: "hanoman_scheduler_reports",
+    title: "Daftar laporan run cron",
+    description:
+      "Laporan hasil run cron (ADR-0222): pesan akhir agen yang disimpan sebagai dokumen markdown, satu per run, tersync antar mesin. Amplop berhalaman `{items,total,page,pageSize}`, terbaru dulu, TANPA isi (`id`, `cronId`, `cronName`, `runDate`, `dueAt`, `bytes`, `filename`). Isi dibaca lewat hanoman_scheduler_report_get. Saring menurut `cron` / `project`; cron dari mesin lain tetap terdaftar (cron tak harus ada di instance ini).",
+    inputSchema: obj({ properties: {
+      cron: str("Saring menurut id cron."), project: str("Saring menurut id project."), ...PAGE_PARAMS,
+    } }),
+    mode: "read", capability: "scheduler:read",
+    samplePath: "/scheduler/reports", sampleMethod: "GET",
+    build: (a) => ({
+      method: "GET", path: "/scheduler/reports",
+      query: query({ cronId: s(a.cron), projectId: s(a.project), page: n(a.page)?.toString(), limit: n(a.limit)?.toString() }),
+    }),
+    shape: (raw) => raw,
+  },
+  {
+    name: "hanoman_scheduler_report_get",
+    title: "Baca laporan run cron",
+    description:
+      "Baca SATU laporan run cron berikut isi markdown-nya (`body`) dan `filename` turunan. `report` = id laporan (sama dengan id run), atau `latest` (default) untuk laporan terbaru — saring dengan `cron` / `project`. 404 bila belum ada laporan. Contoh laporan terakhir sebuah cron: `{cron:\"<id cron>\"}`.",
+    inputSchema: obj({ properties: {
+      report: str("Id laporan, atau `latest` (default)."),
+      cron: str("Untuk `latest`: batasi ke id cron ini."),
+      project: str("Untuk `latest`: batasi ke id project ini."),
+    } }),
+    mode: "read", capability: "scheduler:read",
+    samplePath: "/scheduler/reports/latest", sampleMethod: "GET",
+    build: (a) => {
+      const id = s(a.report);
+      return id && id !== "latest"
+        ? { method: "GET", path: `/scheduler/reports/${enc(id)}` }
+        : { method: "GET", path: "/scheduler/reports/latest", query: query({ cronId: s(a.cron), projectId: s(a.project) }) };
+    },
+    shape: (raw) => raw,
+  },
+  {
     name: "hanoman_scheduler_cron_create",
     title: "Buat cronjob (BERBAHAYA)",
     description:

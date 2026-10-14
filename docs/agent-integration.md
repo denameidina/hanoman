@@ -114,7 +114,7 @@ membuat token; endpoint katalognya (`GET /api/agent-tokens/capabilities`) kini t
 | `docs` | `/api/prds*`, `/api/projects/:id/{docs,prds}*` | dokumen SoT project & PRD |
 | `ide` | `/api/projects/:id/{tree,file,file-diff,working-status,graph,commit,git,status,stashes,remotes,compare,archive,pr-url}*` | tree/file working tree, operasi git |
 | `vps` | `/api/vps*` | kelola VPS, audit, harden, konsol — **high-risk (remote exec)** |
-| `settings` | `/api/settings*`, `/api/config*`, `/api/scheduler*` kecuali `/api/scheduler/crons*` | setelan instance & config runtime |
+| `settings` | `/api/settings*`, `/api/config*`, `/api/scheduler*` kecuali `/api/scheduler/crons*` dan `/api/scheduler/reports*` | setelan instance & config runtime |
 | `support` | `/api/tickets*`, `/api/github-issues*`, `/api/projects/:id/github*` | tiket Help Center & issue GitHub (triase) |
 | `notifications` | `/api/notifications*` | notifikasi |
 | `lead` | `/api/lead*` | minta putusan ke hanoman-lead & baca jejaknya — **`lead:write` bisa menggerakkan sesi** (ADR-0091) |
@@ -131,7 +131,7 @@ membuat token; endpoint katalognya (`GET /api/agent-tokens/capabilities`) kini t
 | `team` | `/api/tasks*`, `/api/members*` | papan **Tim**: kartu kerja MANUSIA & direktori anggota (ADR-0157). `status` kartu milik manusia — ia **bukan** `stage` backlog. `POST /api/tasks/:id/escalate` melahirkan backlog item dan tetap `team:write` (cermin `POST /api/tickets/:id/accept`) |
 | `qa` | `/api/projects/:id/qa/**`, `/api/qa/**` | laporan QA, test case, temuan, lampiran, ekspor/impor. Method `DELETE` menuntut `qa:delete` (akses `danger`, ADR-0185), bukan `qa:write` |
 | `decisions` | `/api/terminal/sessions/:id/dialog*` (capability `sessions:decide`, akses `danger`) | **gerbang manusia-yang-memutuskan** (ADR-0190, ADR-0192): baca, jawab, dan rebut dialog `AskUserQuestion` sebuah sesi. **Tak diimplikasikan `sessions:write`.** Beri HANYA ke token yang tidak dipakai agen di dalam sesi hanoman — lihat §13 |
-| `scheduler` | `/api/scheduler/crons*` | cronjob per project — **cron = sesi agen berizin penuh yang ditunda** (ADR-0191). Membuat, mengubah prompt/agen/model/effort/jadwal, mengaktifkan, dan menjalankan cron menuntut **`scheduler:write` DAN `sessions:spawn`**; server menjawab 403 `need: sessions:spawn` bila yang kedua tak dicentang |
+| `scheduler` | `/api/scheduler/crons*`, `/api/scheduler/reports*` (baca-saja, ADR-0222) | cronjob per project — **cron = sesi agen berizin penuh yang ditunda** (ADR-0191). Membuat, mengubah prompt/agen/model/effort/jadwal, mengaktifkan, dan menjalankan cron menuntut **`scheduler:write` DAN `sessions:spawn`**; server menjawab 403 `need: sessions:spawn` bila yang kedua tak dicentang |
 | `tokens` | `/api/agent-tokens*` | cetak/ubah/cabut **agent token**. Dulu cookie-only (ADR-0065); ADR-0196 membukanya dengan **pagar tak-eskalasi-diri** (§5b). `tokens:write` **bukan** izin menaikkan hak sendiri |
 | `devices` | `/api/device-tokens*` | **device token** (identitas mesin untuk sync & relay) atas nama akun admin yang menerbitkan agent token ini (ADR-0197). Plaintext sekali-tampil |
 | `access` | `/api/auth/users*`, `POST /api/auth/change-password` | daftar akun (`access:read`); **`access:admin`** (danger) membuat akun admin, menghapus akun, dan menyetel ulang password akun lain — **setara akses penuh instance** |
@@ -625,6 +625,11 @@ bisa dilepas oleh klien yang sengaja memakai token yang sama lewat `curl`. Yang 
 praktik: **jangan pasang token ber-`sessions:decide` di konfigurasi yang dibaca sesi hanoman**
 (mis. `~/.claude.json` tingkat-user diwarisi setiap sesi). Pakai token terpisah, di klien MCP yang
 dijalankan manusia di luar sesi.
+
+**Laporan run cron** (ADR-0222): pesan akhir agen tiap run cron disimpan sebagai dokumen markdown, satu
+per run, tersync antar mesin (retensi 90/cron). Tool baca `hanoman_scheduler_reports` (daftar, tanpa
+isi; saring `cron`/`project`) dan `hanoman_scheduler_report_get` (`report` = id atau `latest`; isi di
+`body`), keduanya `scheduler:read`. Laporan terakhir sebuah cron: `hanoman_scheduler_report_get {cron:"<id>"}`.
 
 **Cronjob** (`/api/scheduler/crons*`, ADR-0191 membalik ADR-0112) kini punya tool
 `hanoman_scheduler_crons_list|cron_runs` (baca, `scheduler:read`) dan

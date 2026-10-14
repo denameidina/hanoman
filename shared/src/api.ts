@@ -217,6 +217,9 @@ export const paths = {
   schedulerCron: (id: string) => `${API}/scheduler/crons/${encodeURIComponent(id)}`,
   schedulerCronRunNow: (id: string) => `${API}/scheduler/crons/${encodeURIComponent(id)}/run`,
   schedulerCronRuns: (id: string) => `${API}/scheduler/crons/${encodeURIComponent(id)}/runs`,
+  // ADR-0222 · laporan run cron (baca-saja).
+  schedulerReports: `${API}/scheduler/reports`,
+  schedulerReport: (id: string) => `${API}/scheduler/reports/${encodeURIComponent(id)}`,
   // SPEC-409 · ADR-0091 · hanoman-lead. Semua HTTP (polling) — tak ada kanal WS baru (AC-26).
   leadConfig: `${API}/lead/config`,
   leadStatus: `${API}/lead/status`,

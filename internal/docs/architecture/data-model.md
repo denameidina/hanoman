@@ -708,6 +708,13 @@ jadwal adalah properti **mesin ini** — worktree, tmux, dan cap concurrency-nya
 - Baris dihapus bersama cron-nya (`DELETE /api/scheduler/crons/:id`) — tanpa FK, jadi penghapusannya
   eksplisit di route.
 
+## CronReport (ADR-0222)
+Laporan hasil satu run cron — **TERSYNC** (`SYNCED`, induk `project` cascade). `id` = `SchedulerCronRun.id`
+(idempoten, tanpa duplikat lintas mesin). Kolom: `projectId` (FK), `cronId` (soft-link; cron LOCAL-only),
+`cronName` (snapshot), `runDate` (`YYYY-MM-DD`), `dueAt`, `sessionId`, `body` (markdown ≤64 KiB),
+`bytes`, `version`, `createdAt`, `updatedAt`. Index `(cronId, dueAt)`, `(projectId)`. Retensi 90/cron.
+Nama berkas diturunkan: `<runDate>-<slug>-<id>.md`.
+
 ## SessionHistory (SPEC-362 · [ADR-0079](../adr/0079-history-sesi-terminal-store-lokal-plus-transkrip.md))
 Riwayat **setiap** sesi terminal — **LOCAL-ONLY, tak disync** (cermin `LocalBinding`/`SchedulerQueueItem`:
 sesi hidup di tmux mesin ini dan transkripnya berkas di disk mesin ini). tmux tetap sumber kebenaran

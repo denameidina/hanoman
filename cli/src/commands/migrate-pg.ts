@@ -63,6 +63,8 @@ export const PG_ORDER = [
   // QaAttachment sesudah QaReport (FK reportId, cascade). Keempatnya LOCAL-only dan TIDAK ada di
   // sumber Postgres lama — jalur 42P01 memperlakukannya sebagai nol baris (cermin SessionHistory).
   "QaReport", "QaCase", "QaFinding", "QaAttachment",
+  // ADR-0222 · CronReport sesudah Project (FK projectId, cascade); tak ada di sumber Postgres lama.
+  "CronReport",
 ] as const;
 
 const CHUNK = 200;

@@ -34,7 +34,7 @@ const ENTITY_LABEL: Record<string, string> = {
   project: "Project", spec: "Item backlog", vps: "VPS", sessionResult: "Hasil sesi",
   ticket: "Tiket", ticketAttachment: "Lampiran tiket", customAgent: "Agen kustom",
   githubIssue: "Issue GitHub", member: "Anggota tim", task: "Tugas", qaReport: "Laporan QA",
-  qaCase: "Kasus QA", qaFinding: "Temuan QA", qaAttachment: "Lampiran QA",
+  qaCase: "Kasus QA", qaFinding: "Temuan QA", qaAttachment: "Lampiran QA", cronReport: "Laporan cron",
 };
 const entityLabel = (e: string): string => ENTITY_LABEL[e] ?? "Data";
 

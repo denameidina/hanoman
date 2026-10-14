@@ -102,3 +102,22 @@ it("native phase overrides are preserved by the existing launch MCP tool", () =>
   expect(t.inputSchema.properties!.phaseOverrides).toBeDefined();
   expect(t.build({ spec: "SPEC-1442", flow: "feature", agent: "antigravity", phaseOverrides })!.body).toMatchObject({ phaseOverrides });
 });
+
+// ADR-0222 · laporan run cron: dua tool baca, `scheduler:read`.
+describe("laporan run cron (ADR-0222)", () => {
+  const tool = (n: string) => MCP_TOOLS.find((t) => t.name === n)!;
+  it("hanoman_scheduler_reports: daftar berfilter, read, scheduler:read", () => {
+    const t = tool("hanoman_scheduler_reports");
+    expect(t).toMatchObject({ mode: "read", capability: "scheduler:read" });
+    expect(t.build({ cron: "c1", project: "p1", page: 2, limit: 5 })).toEqual({
+      method: "GET", path: "/scheduler/reports", query: { cronId: "c1", projectId: "p1", page: "2", limit: "5" },
+    });
+  });
+  it("hanoman_scheduler_report_get: latest (default) atau id", () => {
+    const t = tool("hanoman_scheduler_report_get");
+    expect(t).toMatchObject({ mode: "read", capability: "scheduler:read" });
+    expect(t.build({ cron: "c1" })).toEqual({ method: "GET", path: "/scheduler/reports/latest", query: { cronId: "c1" } });
+    expect(t.build({ report: "latest" })?.path).toBe("/scheduler/reports/latest");
+    expect(t.build({ report: "ab/c" })).toEqual({ method: "GET", path: "/scheduler/reports/ab%2Fc" });
+  });
+});
