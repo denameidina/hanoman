@@ -201,7 +201,7 @@ export function AntigravityVersionNote({ info }: { info?: AntigravityVersionInfo
     return () => { active = false; };
   }, [info]);
   const value = info === undefined ? detected : info;
-  return <div data-testid="antigravity-version-note" className="hn-set-codex-note">
+  return <div role="status" data-testid="antigravity-version-note" className="hn-set-codex-note">
     Antigravity CLI · versi {value?.version ?? "tak terdeteksi"}. {value?.error}
     <p>Host/lab saja; sandbox belum didukung. Mode goal native belum didukung. Telemetri native tidak diketahui.</p>
     <a href="https://antigravity.google/docs/cli" target="_blank" rel="noreferrer">Panduan pemasangan dan login resmi</a>

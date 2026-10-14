@@ -357,11 +357,12 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   keystroke `/goal` best-effort ke pane untuk visibilitas TUI. Bisa di-override per sesi lewat
   `goal`/`goalCondition` di `POST /terminal/sessions`; sesi scheduler mengikuti default global ini.
   Ditambahkan sebagai `.default(GOAL_DEFAULTS)` → baris Setting lama tetap parse, **tanpa migration**.
-- `agent` (`claude|codex`, default `claude`) + `codex` (`{ model, effort }`, default
+- `agent` (`claude|codex|antigravity`, default `claude`) + `codex` (`{ model, effort }`, default
   `gpt-5.6-terra`/`medium`) — SPEC-338/[ADR-0074](../adr/0074-codex-sebagai-mesin-sesi.md): mesin sesi
   default untuk SEMUA sesi yang men-spawn agen. `model`/`effort` di akar **tetap milik claude**;
   `sessionAgentDefaults()` memilih blok mengikuti `agent`. Blok codex dinormalkan saat **dibaca**
   (model pensiun → `gpt-5.5`, lalu effort dikoersi ke yang didukung model itu — SPEC-339).
+- `antigravity` (`{ model, effort }`, default `gemini-3.8-flash-high`/`high`) — SPEC-1442/[ADR-0221](../adr/0221-antigravity-cli-runtime-interaktif-native.md). Child native hanya tier `inherit|flash|pro`, effort null; policy read-only/isolated-worktree Custom Agent unavailable beralasan. Tidak ada migration.
 - `verifyScope` (`changed|full`, default `changed`) — SPEC-376/[ADR-0080](../adr/0080-scope-verifikasi-per-sesi.md):
   scope verifikasi default sesi backlog, di-override per sesi saat Start.
 - `conflict` (SPEC-383/[ADR-0081](../adr/0081-default-sesi-konflik-opt-in.md), `zConflict`,
@@ -720,7 +721,7 @@ scaffold, breakdown, dan konsol VPS.
   `vps:<id>`/`vps-console:<id>`, konvensi `SessionResult`), `specId?`, `title?` (**snapshot** judul spec
   saat sesi lahir — riwayat tetap terbaca setelah spec-nya dihapus), `kind`
   (`spec|reverse|prd|scaffold|breakdown|vps|shell|worktree|terminal`), `flow?`, `agent`
-  (`claude|codex`), `model?`, `effort?`, `branch?`, `cwd`, `startedAt`, `endedAt?` (null = **berjalan**),
+  (`claude|codex|antigravity`), `model?`, `effort?`, `branch?`, `cwd`, `startedAt`, `endedAt?` (null = **berjalan**),
   `exitCode?`, `transcriptKey?` + `transcriptBytes?` (pointer berkas; **isi tak pernah di DB**),
   `createdAt`, `updatedAt`. Index `(projectId, startedAt)`, `(specId)`, `(sessionId)`.
 - **Baris lahir saat sesi LAHIR**, bukan saat ditutup — sesi berjalan pun sudah tercatat. Penulisnya
@@ -870,7 +871,7 @@ semua project); terisi = milik satu project, dan agen project **menimpa** agen g
 | `tools` | `Json?` | Array nama tool. `null` = pakai `DEFAULT_AGENT_TOOLS`. |
 | `model` | `String?` | `null` = warisi model sesi. |
 | `mentions` | `Json?` | Array nama agen yang boleh dipanggil. `null`/`[]` = daun. |
-| `runtime` | `String?` | **SPEC-484 · [ADR-0101](../adr/0101-form-custom-agent-katalog-runtime.md)** · penyaring mesin sesi. `null` = **ikut sesi induk** (dipakai sesi claude **dan** codex — perilaku ADR-0094 apa adanya, jadi baris lama tak perlu backfill); `"claude"`/`"codex"` = hanya dimaterialisasi di sesi mesin itu. Nilai asing dari sync dibaca sebagai `null`. Ikut `FIELDS.customAgent`. |
+| `runtime` | `String?` | **SPEC-484 · [ADR-0101](../adr/0101-form-custom-agent-katalog-runtime.md)** · penyaring mesin sesi. `null` = **ikut sesi induk** (dipakai sesi claude, codex **dan** antigravity yang kompatibel — perilaku ADR-0094 apa adanya, jadi baris lama tak perlu backfill); `"claude"`/`"codex"`/`"antigravity"` = hanya dimaterialisasi di sesi mesin itu. Nilai asing dari sync dibaca sebagai `null`. Ikut `FIELDS.customAgent`. |
 | `activation` | `String` | **SPEC-950 · [ADR-0159](../adr/0159-custom-agent-native-terukur-terisolasi.md)** · `always` atau `smart`; default legacy `always`. Seluruh enabled yang kompatibel masuk registry; smart mengarahkan delegasi berdasarkan pekerjaan/fase/diff terkini (amandemen 2026-09-05). |
 | `effort` | `String?` | Override reasoning effort child dari katalog `ultra|max|xhigh|high|medium|low|ultracode`; null = warisi/rekomendasi runtime. Kombinasi sah divalidasi terhadap runtime+model efektif; warisan ambigu memakai irisan aman. |
 | `workspacePolicy` | `String` | `inherit` · `read-only` · `isolated-worktree`; default legacy `inherit`. Isolasi child hanya tersedia untuk Claude. |

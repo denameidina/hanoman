@@ -127,3 +127,10 @@ provider Antigravity baru. Installer metode tetap unavailable; installer biner C
 bukan bukti upstream method/plugin installer tersedia. Telegram engine memakai runtime/default/
 katalog parent ketiga melalui kontrak Settings existing. Rincian dan receipt:
 [runtime Task 13](../architecture/antigravity-runtime.md#distribusi-doctor-dan-telegram-task-13).
+
+Execute audit clarification (2026-10-14): tmux shell command metadata must not contain Gemini
+credential values. Antigravity uses a private, self-consuming launch bootstrap with owned cleanup;
+Claude credentials are removed before Antigravity runtime and probe launches. Operator agent
+frontmatter inspection is bounded and rejects unsafe/incomplete inspection before writing a roster.
+Headless custom-agent evaluation remains explicitly unavailable for Antigravity; working sessions
+and children retain the interactive native contract. Settings version updates use a status live region.

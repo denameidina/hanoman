@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { fileURLToPath } from "node:url";
 import {
   appendFileSync, chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, statSync,
-  writeFileSync, existsSync,
+  writeFileSync, existsSync, rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1105,6 +1105,7 @@ const fs = require("node:fs");
 fs.writeFileSync(process.env.CAPTURE_RESULT, JSON.stringify({ args: process.argv.slice(2), executable: process.argv[1],
   keyPresent: Object.hasOwn(process.env, "GEMINI_API_KEY"),
   basePresent: Object.hasOwn(process.env, "GOOGLE_GEMINI_BASE_URL"),
+  claudePresent: Object.hasOwn(process.env, "CLAUDE_CODE_OAUTH_TOKEN") || Object.hasOwn(process.env, "ANTHROPIC_API_KEY"),
   keyCurrent: process.env.GEMINI_API_KEY === "current-fixture-key",
   baseCurrent: process.env.GOOGLE_GEMINI_BASE_URL === "https://current.invalid",
   projectPreserved: process.env.GOOGLE_CLOUD_PROJECT === "unrelated-project" }));
@@ -1115,7 +1116,7 @@ process.stdin.resume();
   const captured = async (path: string) => {
     await waitFor(() => existsSync(path));
     return JSON.parse(readFileSync(path, "utf8")) as { args: string[]; executable: string; keyPresent: boolean; basePresent: boolean;
-      keyCurrent: boolean; baseCurrent: boolean; projectPreserved: boolean };
+      claudePresent: boolean; keyCurrent: boolean; baseCurrent: boolean; projectPreserved: boolean };
   };
   it("path dengan spasi dan multiline shell-special prompt/model/effort adalah argv utuh", async () => {
     const bin = captureExecutable(repoDir);
@@ -1153,6 +1154,21 @@ process.stdin.resume();
       }
     } finally { await clearConfig("HANOMAN_ANTIGRAVITY_BIN"); }
   }, TMUX_SPAWN_TIMEOUT);
+  it("does not expose provider secrets in tmux argv and cleans a rejected spawn", () => {
+    const shim = join(repoDir, "tmux-shim"); mkdirSync(shim);
+    const captured = join(repoDir, "rejected-tmux.json");
+    const realTmux = execFileSync("/bin/sh", ["-c", "command -v tmux"], { encoding: "utf8" }).trim();
+    writeFileSync(join(shim, "tmux"), `#!${process.execPath}
+const fs=require("node:fs"),cp=require("node:child_process"); const args=process.argv.slice(2); if(args.includes("new-session")){fs.writeFileSync(${JSON.stringify(captured)},JSON.stringify(args));process.exit(70);} const r=cp.spawnSync(${JSON.stringify(realTmux)},args,{stdio:"inherit"});process.exit(r.status??1);
+`, { mode: 0o700 });
+    vi.stubEnv("PATH", `${shim}:${process.env.PATH}`);
+    expect(() => createSession("failed-agy", repoDir, { agent: "antigravity", env: { GEMINI_API_KEY: "rejected-fixture-key" } })).toThrow();
+    const args: string[] = JSON.parse(readFileSync(captured, "utf8"));
+    expect(args.some(a => a.includes("rejected-fixture-key"))).toBe(false);
+    const receipt = JSON.parse(args[args.indexOf("@hanoman_env_bootstrap") + 1]!);
+    expect(existsSync(receipt.directory)).toBe(false);
+    rmSync(shim, { recursive: true });
+  });
   it("per-pane env membersihkan daemon lama tanpa mengubah env sesi tetangga", async () => {
     const bin = captureExecutable(repoDir);
     const socket = process.env.HANOMAN_TMUX_SOCKET ?? "hanoman-test";
@@ -1171,12 +1187,16 @@ process.stdin.resume();
     vi.stubEnv("HANOMAN_CODEX_BIN", bin);
     for (const agent of ["claude", "codex", null, "antigravity"] as const) {
       const result = join(repoDir, `env-${agent}.json`);
-      const env = { CAPTURE_RESULT: result, GEMINI_API_KEY: "current-fixture-key", GOOGLE_GEMINI_BASE_URL: "https://current.invalid" };
-      createSession(`env-${agent}`, repoDir, agent === null ? { command: [bin], env } : { agent, env });
+      const env = { CAPTURE_RESULT: result, GEMINI_API_KEY: "current-fixture-key", GOOGLE_GEMINI_BASE_URL: "https://current.invalid", CLAUDE_CODE_OAUTH_TOKEN: "claude-fixture", ANTHROPIC_API_KEY: "anthropic-fixture" };
+      const session = createSession(`env-${agent}`, repoDir, agent === null ? { command: [bin], env } : { agent, env });
       const actual = await captured(result);
       expect(actual.keyPresent).toBe(agent === "antigravity");
       expect(actual.basePresent).toBe(agent === "antigravity");
       if (agent === "antigravity") {
+        expect(actual.claudePresent).toBe(false);
+        const metadata = tmux("display-message", "-p", "-t", `hanoman-${session.id}`, "#{pane_start_command}");
+        expect(metadata.includes("current-fixture-key")).toBe(false);
+        expect(metadata.includes("https://current.invalid")).toBe(false);
         expect(actual.keyCurrent).toBe(true);
         expect(actual.baseCurrent).toBe(true);
       }

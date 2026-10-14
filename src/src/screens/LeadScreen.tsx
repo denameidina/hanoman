@@ -12,6 +12,7 @@ import {
 import type { ConfirmOptions, FilterChip } from "../ds";
 import { api } from "../api/client";
 import { useLiveTopic } from "../api/live";
+import { AGENT_RUNTIME_LABELS } from "@hanoman/shared";
 import type { Lead, LeadStatusView, LeadDecisionView, LeadFlowView } from "@hanoman/shared";
 import type { ProjectVM } from "./types";
 import { usePersistedState, useResetOnChange, ResetViewButton, isStr, isNum, oneOf } from "../ui-state";
@@ -698,7 +699,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
               {/* SPEC-488 · mesin yang MENJALANKAN lead. `?.` disengaja: dashboard bisa lebih baru daripada server. */}
               <div data-testid="lead-engine-line" className="hn-lead-note">
                 Model lead: {state.config.engine?.enabled
-                  ? <>{state.config.engine.agent === "codex" ? "Codex CLI" : "Claude Code"} · <code>{state.config.engine.model}</code> · <code>{state.config.engine.effort}</code></>
+                  ? <>{AGENT_RUNTIME_LABELS[state.config.engine.agent]} · <code>{state.config.engine.model}</code> · <code>{state.config.engine.effort}</code></>
                   : <>ikut default global · atur di Settings → Model sesi</>}
               </div>
               <div className="hn-lead-footer">

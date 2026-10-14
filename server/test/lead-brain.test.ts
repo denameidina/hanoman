@@ -214,7 +214,7 @@ describe("Antigravity internal advisor", () => {
   it("isolates Antigravity credentials from other advisor runtimes", () => {
     const source = { GEMINI_API_KEY: "fixture", GOOGLE_GEMINI_BASE_URL: "https://fixture.invalid", PATH: "/bin" };
     for (const agent of ["claude", "codex"] as const) { expect(leadEnv(agent, source, 1000)).toEqual({ PATH: "/bin" }); }
-    expect(leadEnv("antigravity", source, 1000)).toEqual(source);
+    expect(leadEnv("antigravity", { ...source, CLAUDE_CODE_OAUTH_TOKEN: "claude-fixture", ANTHROPIC_API_KEY: "anthropic-fixture" }, 1000)).toEqual(source);
   });
 });
 

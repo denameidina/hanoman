@@ -67,6 +67,7 @@ describe("configured probe binary and env boundary", () => {
     try {
       await writeFile(file, `#!${process.execPath}
 const ag = process.argv[2] === "models";
+if (ag && (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY)) process.exit(5);
 if (ag && (process.env.GEMINI_API_KEY !== "secret" || process.env.GOOGLE_GEMINI_BASE_URL !== "https://private")) process.exit(2);
 if (!ag && (process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_BASE_URL)) process.exit(3);
 if (process.env.GOOGLE_PROJECT_ID !== "keep") process.exit(4);
@@ -74,6 +75,8 @@ console.log(ag ? "future-high\\tFuture" : JSON.stringify({models:[{slug:"gpt-fut
 `, { mode: 0o700 });
       vi.stubEnv("HANOMAN_ANTIGRAVITY_BIN", "/missing-env-agy");
       vi.stubEnv("GEMINI_API_KEY", "secret");
+      vi.stubEnv("CLAUDE_CODE_OAUTH_TOKEN", "claude-fixture");
+      vi.stubEnv("ANTHROPIC_API_KEY", "anthropic-fixture");
       vi.stubEnv("GOOGLE_GEMINI_BASE_URL", "https://private");
       vi.stubEnv("GOOGLE_PROJECT_ID", "keep");
       vi.stubEnv("HANOMAN_SESSION_SANDBOX", "off");

@@ -694,3 +694,22 @@ ignored `.superpowers/sdd/2026-10-14-spec-1442-antigravity-cli-runtime/Task13-*.
 server, live auth, auto-install atau mengubah data operator pada task ini; curl runtime sekali
 pada Task 14. Task 0/4/5/7/8/11 sebelumnya sudah membuktikan parent/skill/native child/follow-up/
 review/MCP; scoped Task 13 tidak mengklaim pengulangan live tersebut.
+
+Task 14 audit corrections: Antigravity parent/advisor/version/model/doctor receive a cloned env
+without `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`; Claude/Codex credential behavior remains
+unchanged. A stale tmux daemon is cleared per-pane in both directions. Antigravity launch uses an
+exclusive temporary 0700 directory and 0600 shell bootstrap, whose command/receipt contains no
+credential value. The shell unsets provider keys before its cleanup Node subprocess, then exports
+only current Gemini values and execs the interactive runtime. Its private file is consumed before
+exec; spawn rejection and restart/kill cleanup use persisted inode/device/hash ownership, preserving
+operator replacements. No global tmux environment or neighboring pane is mutated.
+
+Native operator registry inspection is limited to 256 markdown definitions/1024 directory entries
+and a 16 KiB verified O_NOFOLLOW file-descriptor prefix per definition. Large bodies are not read;
+incomplete oversized frontmatter, excessive entries, unsafe symlinks or replacement during inspection
+fail with a safe explicit reason before registry writes. Operator definitions remain untouched.
+
+The asynchronous version note has a stable `role=status`; mounted resolution/rejection tests verify
+announcement semantics, without claiming an actual screen-reader run. Lead runtime labels and Telegram
+help include Antigravity. `agent:eval` explicitly reports Antigravity unavailable because that evaluator
+is headless; this does not change the native interactive child/session contract.

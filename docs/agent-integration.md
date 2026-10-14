@@ -18,7 +18,7 @@ Naskah ini punya **satu sumber** dan tiga cara membacanya — isinya byte yang s
 ## 0. Apa itu hanoman, dan bagaimana ia bekerja
 
 hanoman adalah **orchestrator + dashboard** untuk pengembangan yang digerakkan dokumentasi. Ia tidak
-menulis kode sendiri; ia **menjalankan agen** (Claude Code atau Codex CLI) sebagai sesi interaktif,
+menulis kode sendiri; ia **menjalankan agen** (Claude Code, Codex CLI atau Antigravity CLI) sebagai sesi interaktif,
 lalu memantau semuanya dalam satu tempat.
 
 Model kerjanya tiga tingkat, dan penting kamu pegang sebelum memanggil endpoint apa pun:

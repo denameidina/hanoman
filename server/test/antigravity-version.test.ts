@@ -22,8 +22,8 @@ describe("Antigravity version observation", () => {
     }
   });
   it("probes only --version with the Antigravity environment", async () => {
-    const bin = executable('if (JSON.stringify(process.argv.slice(2)) !== \'["--version"]\' || process.env.GEMINI_API_KEY !== "version-test" || process.env.GOOGLE_GEMINI_BASE_URL !== "https://version.invalid") process.exit(2); console.log("1.3.4");');
-    const info = await probeAntigravityVersion(bin, { PATH: process.env.PATH, GEMINI_API_KEY: "version-test", GOOGLE_GEMINI_BASE_URL: "https://version.invalid" });
+    const bin = executable('if (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY) process.exit(3); if (JSON.stringify(process.argv.slice(2)) !== \'["--version"]\' || process.env.GEMINI_API_KEY !== "version-test" || process.env.GOOGLE_GEMINI_BASE_URL !== "https://version.invalid") process.exit(2); console.log("1.3.4");');
+    const info = await probeAntigravityVersion(bin, { PATH: process.env.PATH, CLAUDE_CODE_OAUTH_TOKEN: "claude-fixture", ANTHROPIC_API_KEY: "anthropic-fixture", GEMINI_API_KEY: "version-test", GOOGLE_GEMINI_BASE_URL: "https://version.invalid" });
     expect(info).toEqual({ version: "1.3.4", error: null });
   });
   it("missing binary and malformed or failing output become safe DTOs", async () => {

@@ -23,7 +23,7 @@ const COMMANDS = [
 // SPEC-492 · empat command runtime DICEGAT server sebelum menyentuh pane ini — kamu tak akan
 // pernah menerimanya. Ia disebut di sini semata supaya `/help` yang KAMU tulis tidak berbohong.
 const SERVER_COMMANDS = [
-  "/engine", "/runtime claude|codex", "/model <id>", "/effort <nilai>",
+  "/engine", "/runtime claude|codex|antigravity", "/model <id>", "/effort <nilai>",
 ];
 
 /**

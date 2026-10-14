@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, symlinkSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, truncateSync, writeFileSync, symlinkSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { renderAntigravityAgent, materializeAntigravityAgents, cleanupAntigravityAgents } from '../src/antigravity-agent-config';
@@ -131,4 +131,26 @@ const out = cp.spawnSync(${JSON.stringify(realGit)}, process.argv.slice(2), {std
   const own = materializeAntigravityAgents({ cwd, sessionId: "env-probe", defs: [def()] });
   expect(JSON.parse(readFileSync(result, "utf8"))).toEqual({ keyPresent: false, basePresent: false, projectKept: true });
   own.cleanup();
+});
+
+describe("bounded operator registry inspection", () => {
+  it("reads only frontmatter of a huge operator definition while preserving its body", () => {
+    const cwd = fixture(), dir = join(cwd, ".agents/agents"); mkdirSync(dir, { recursive: true });
+    const file = join(dir, "operator.md"); writeFileSync(file, "---\nname: probe\n---\n"); truncateSync(file, 128 * 1024 * 1024);
+    const m = materializeAntigravityAgents({ cwd, sessionId: "large", defs: [def()] });
+    expect(m.names).toEqual([]); expect(m.warnings[0]?.reason).toContain("collision");
+    expect(statSync(file).size).toBe(128 * 1024 * 1024); m.cleanup();
+  });
+  it("rejects excessive operator definitions before materializing a partial roster", () => {
+    const cwd = fixture(), dir = join(cwd, ".agents/agents"); mkdirSync(dir, { recursive: true });
+    for (let i = 0; i < 257; i++) writeFileSync(join(dir, `operator-${i}.md`), "---\nname: operator\n---\n");
+    expect(() => materializeAntigravityAgents({ cwd, sessionId: "many", defs: [def()] })).toThrow("native registry inspection limit");
+    expect(readdirSync(dir)).toHaveLength(257);
+  });
+  it("rejects frontmatter beyond the bounded prefix rather than overlooking a collision", () => {
+    const cwd = fixture(), dir = join(cwd, ".agents/agents"); mkdirSync(dir, { recursive: true });
+    const file = join(dir, "operator.md"), contents = "---\n" + "description: ".padEnd(20000, "x") + "\nname: probe\n---\n"; writeFileSync(file, contents);
+    expect(() => materializeAntigravityAgents({ cwd, sessionId: "long", defs: [def()] })).toThrow("native registry frontmatter inspection limit");
+    expect(readFileSync(file, "utf8")).toBe(contents);
+  });
 });

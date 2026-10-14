@@ -18,6 +18,7 @@ import {
   enrichPhases, readPhases, readPhasesAsync, sessionComplete, sessionCompleteAsync, trackDoneSeen, type Phase, type PhaseInvocation,
 } from "./session-phases";
 import { sessionIdForSpec } from "./session-id";
+import { createAntigravityEnvBootstrap, cleanupAntigravityEnvBootstrap } from "./antigravity-env-bootstrap";
 import { antigravityBin } from "./antigravity-runtime";
 import { cleanupInjectedSkills, injectGlobalSkills } from "./skill-inject";
 import { ensureAntigravityTrust } from "./antigravity-trust";
@@ -1127,20 +1128,12 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // Env tambahan dari pemanggil lewat jalur yang sama.
   const runtime = opts.command ? null : agent;
   for (const [k, v] of Object.entries(agentEnvironment(runtime, opts.env ?? {}))) {
-    if (v !== undefined) envPairs.push(`${k}=${sq(v)}`);
-  }
-  // Daemon tmux membekukan env saat lahir; nilai runtime harus dibaca lagi per-pane,
-  // dan env -u melepas credential lama tanpa mutasi daemon atau sesi tetangga.
-  if (runtime === "antigravity") {
-    const current = agentEnvironment(runtime, { ...process.env, ...opts.env });
-    for (const key of ANTIGRAVITY_ENV_KEYS) {
-      const value = current[key];
-      if (value !== undefined) envPairs.push(`${key}=${sq(value)}`);
-    }
+    if (v !== undefined && !(runtime === "antigravity" && ANTIGRAVITY_ENV_KEYS.some(key => key === k))) envPairs.push(`${k}=${sq(v)}`);
   }
   // Kredensial warisan yang dikosongkan operator: `claude` mewarisi env dari tmux server (lahir
   // dengan env server ini), jadi hanya `env -u` yang benar-benar melepasnya dari sesi baru.
-  const unsets = [...ANTIGRAVITY_ENV_KEYS,
+  const unsets = [...(runtime === "antigravity" ? [] : ANTIGRAVITY_ENV_KEYS),
+    ...(runtime === "antigravity" ? ["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"] : []),
     ...(!opts.command ? [...suppressedInheritKeys(), ...hanomanDbInheritUnsets()] : []),
   ].flatMap((key) => ["-u", key]);
   let cmd = unsets.length ? ["env", ...unsets, ...envPairs, argv].join(" ")
@@ -1152,13 +1145,17 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     });
     cmd = wrapped;
   }
+  const bootstrap = runtime === "antigravity"
+    ? createAntigravityEnvBootstrap(cmd, agentEnvironment(runtime, { ...process.env, ...opts.env })) : undefined;
+  if (bootstrap) cmd = bootstrap.command;
   // SPEC-184 · direktori marker keputusan; hook Notification menulis absolute path di dalamnya.
   if (opts.decisionFile) mkdirSync(dirname(opts.decisionFile), { recursive: true });
 
   // Opsi global mendahului `new-session` dalam satu invokasi: window lahir sudah membawa
   // `remain-on-exit`, jadi proses yang mati seketika pun meninggalkan pane mati yang masih
   // bisa dibaca. Menyetelnya setelah new-session akan balapan dengan proses yang cepat mati.
-  tmux(
+  try {
+    tmux(
     // tmux menyerahkan argumen perintah `new-session` ke `default-shell`, dan defaultnya adalah
     // shell login pemanggil di /etc/passwd. Saat hanoman jalan sebagai user service ber-shell
     // `/usr/sbin/nologin`, SETIAP pane lahir langsung mati ("Attempted login by UNKNOWN") dan tak
@@ -1180,7 +1177,12 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
     "new-session", "-d", "-s", name(id), "-c", cwd, cmd, ";",
     "set-option", "-t", name(id), "@hanoman_project", projectId, ";",
     "set-option", "-t", name(id), "@hanoman_cwd", cwd,
-  );
+    ...(bootstrap ? [";", "set-option", "-t", name(id), "@hanoman_env_bootstrap", JSON.stringify(bootstrap.receipt)] : []),
+    );
+  } catch (error) {
+    if (bootstrap) cleanupAntigravityEnvBootstrap(bootstrap.receipt);
+    throw error;
+  }
   if (opts.specId) tmux("set-option", "-t", name(id), "@hanoman_spec", opts.specId);
   if (opts.flow) tmux("set-option", "-t", name(id), "@hanoman_flow", opts.flow);
   // SPEC-230 · branch integrasi sesi (mis. PRD prd/<slug>) → dipakai review/integrate ber-skop sesi.
@@ -1772,7 +1774,10 @@ export function killSession(id: string): boolean {
   // SPEC-362 · capture SEBELUM kill: sesudah `kill-session` scrollback-nya tak ada lagi.
   const transcript = captureTranscript(id);
   drop(id);
+  const bootstrapReceipt = p.agent === "antigravity"
+    ? tmux("show-option", "-qv", "-t", name(id), "@hanoman_env_bootstrap").trim() : "";
   tmux("kill-session", "-t", name(id));
+  if (bootstrapReceipt) { try { cleanupAntigravityEnvBootstrap(JSON.parse(bootstrapReceipt)); } catch { /* Invalid operator metadata is preserved. */ } }
   // Direktori ini eksklusif milik id sesi yang sudah di-resolve, berisi beberapa config/hook kecil.
   // Hapus sinkron agar return `killSession` juga menjadi batas lifecycle kredensial/instruksinya.
   cleanupAntigravityAgents({ cwd: p.cwd, sessionId: id });

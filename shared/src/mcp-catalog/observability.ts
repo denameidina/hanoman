@@ -111,7 +111,7 @@ const OBSERVE: readonly McpToolDef[] = [
     name: "hanoman_methods_status",
     title: "Kesiapan metode workflow",
     description:
-      "Metode workflow mana yang benar-benar siap dipakai di MESIN ini, per agen (claude/codex): skill/paket apa yang sudah terpasang dan apa yang masih kurang. Diturunkan dari disk tiap dipanggil (tanpa cache), jadi hasilnya segar sesudah operator memasang skill. Baca-saja dan tak pernah memblokir kelahiran sesi — metode yang belum siap hanya ditandai; memasangnya tetap tindakan manusia di dashboard. Berisi path home/roots skill di mesin. Tak menuntut capability apa pun.",
+      "Metode workflow mana yang benar-benar siap dipakai di MESIN ini, per agen (claude/codex/antigravity; installer Antigravity unavailable sampai upstream terverifikasi): skill/paket apa yang sudah terpasang dan apa yang masih kurang. Diturunkan dari disk tiap dipanggil (tanpa cache), jadi hasilnya segar sesudah operator memasang skill. Baca-saja dan tak pernah memblokir kelahiran sesi — metode yang belum siap hanya ditandai; memasangnya tetap tindakan manusia di dashboard. Berisi path home/roots skill di mesin. Tak menuntut capability apa pun.",
     inputSchema: obj({ properties: {} }),
     mode: "read", capability: null, samplePath: "/methods/status", sampleMethod: "GET",
     build: () => ({ method: "GET", path: "/methods/status" }),

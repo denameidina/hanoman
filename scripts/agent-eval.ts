@@ -10,6 +10,7 @@ import {
 const usage = [
   "Usage: pnpm agent:eval --runtime claude|codex [--agent name] [--case id] [--output path]",
   "",
+  "Antigravity unavailable: evaluasi ini headless; sesi dan child Antigravity wajib interaktif native.",
   "Live dan opt-in: perintah ini menjalankan CLI model terhadap repo fixture sementara.",
 ].join("\n");
 
@@ -32,6 +33,7 @@ for (let index = 2; index < process.argv.length; index += 1) {
 }
 
 const runtime = values.get("--runtime");
+if (runtime === "antigravity") throw new Error(`Antigravity eval unavailable: evaluator headless tidak memenuhi kontrak sesi/child interaktif native.\n${usage}`);
 if (runtime !== "claude" && runtime !== "codex") throw new Error(`--runtime wajib claude|codex\n${usage}`);
 const runtimeBin = runtime === "codex"
   ? process.env.HANOMAN_CODEX_BIN ?? "codex"

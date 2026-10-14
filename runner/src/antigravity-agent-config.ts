@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
-  appendFileSync, closeSync, constants, fstatSync, ftruncateSync, lstatSync, openSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync, writeSync,
+  appendFileSync, closeSync, constants, fstatSync, ftruncateSync, lstatSync, openSync, opendirSync, readSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync, writeSync,
 } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { isAntigravityChildTier } from "@hanoman/shared";
@@ -143,6 +143,38 @@ export function cleanupAntigravityAgents(opts: { cwd: string; sessionId: string 
   } catch { /* Missing or operator-edited ownership must never delete their files. */ }
 }
 
+function operatorDefinitions(directory: string): string[] {
+  const dir = opendirSync(directory), files: string[] = [];
+  let inspected = 0;
+  try {
+    for (let entry = dir.readSync(); entry; entry = dir.readSync()) {
+      if (++inspected > 1024) throw new Error("native registry inspection limit");
+      if (entry.name.endsWith(".md")) files.push(entry.name);
+      if (files.length > 256) throw new Error("native registry inspection limit");
+    }
+  } finally { dir.closeSync(); }
+  return files;
+}
+
+function operatorFrontmatter(path: string): string {
+  let fd: number;
+  try { fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW); }
+  catch { throw new Error("unsafe native registry definition"); }
+  try {
+    const before = fstatSync(fd);
+    if (!before.isFile() || before.uid !== process.getuid?.()) throw new Error("unsafe native registry definition");
+    const prefix = Buffer.alloc(16 * 1024), count = readSync(fd, prefix, 0, prefix.length, 0);
+    const contents = prefix.subarray(0, count).toString("utf8");
+    if (/^---\r?\n/.test(contents) && !/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/.test(contents)) {
+      throw new Error("native registry frontmatter inspection limit");
+    }
+    const after = fstatSync(fd), current = lstatSync(path, { throwIfNoEntry: false });
+    if (!current?.isFile() || current.isSymbolicLink() || current.ino !== before.ino || current.dev !== before.dev
+      || after.size !== before.size || after.mtimeMs !== before.mtimeMs) throw new Error("native registry definition changed during inspection");
+    return contents;
+  } finally { closeSync(fd); }
+}
+
 export function materializeAntigravityAgents(opts: Options): AntigravityMaterialization {
   const p = paths(opts);
   for (const directory of [join(p.cwd, ".agents"), p.directory]) safeDirectory(directory);
@@ -151,10 +183,10 @@ export function materializeAntigravityAgents(opts: Options): AntigravityMaterial
   const write = opts.writeFile;
   const warnings: Warning[] = [], liveDefs: AgentDef[] = [];
   const names = new Set<string>();
-  for (const file of readdirSync(p.directory).filter(name => name.endsWith(".md"))) {
+  for (const file of operatorDefinitions(p.directory)) {
     const path = join(p.directory, file);
     if (!safeRegularFile(path)) throw new Error("unsafe native registry definition");
-    const contents = readFileSync(path, "utf8");
+    const contents = operatorFrontmatter(path);
     const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(contents)?.[1];
     const raw = frontmatter && /^name:\s*(.+)$/m.exec(frontmatter)?.[1]?.trim();
     if (raw) {

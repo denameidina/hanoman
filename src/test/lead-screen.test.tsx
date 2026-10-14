@@ -444,6 +444,13 @@ describe("SPEC-488 · baris mesin lead", () => {
     expect(line).toHaveTextContent("medium");
   });
 
+  it("displays Antigravity lead engine with its actual runtime label", async () => {
+    getLeadStatus.mockResolvedValue({ ...STATUS, config: { ...CONFIG, engine: { enabled: true, agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high" } } });
+    getLeadDecisions.mockResolvedValue(DECISIONS); renderScreen();
+    const line = await screen.findByTestId("lead-engine-line");
+    expect(line).toHaveTextContent("Antigravity CLI"); expect(line).not.toHaveTextContent("Claude Code");
+  });
+
   // Server lama tak mengirim blok `engine` sama sekali — barisnya harus tetap terbaca, bukan
   // meruntuhkan panel dengan `undefined.enabled` (ADR-0087).
   it("config tanpa blok engine → jatuh ke kalimat warisan", async () => {

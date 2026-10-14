@@ -218,6 +218,8 @@ describe("SPEC-1442 · real doctor child environment", () => {
       writeFileSync(bin, '#!/bin/sh\nprintf "1.3.4\\n"\n', { mode: 0o700 });
       expect(probeDoctorVersion(bin, ["--version"], env, "antigravity")).toBe("1.3.4");
       expect(probeDoctorVersion(bin, ["--version"], { ...env, HANOMAN_HARDENING: "1" }, "antigravity")).toBeNull();
+      writeFileSync(bin, '#!/bin/sh\nif [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}${ANTHROPIC_API_KEY:-}" ]; then exit 3; else echo "1.3.4"; fi\n', { mode: 0o700 });
+      expect(probeDoctorVersion(bin, ["--version"], { ...env, CLAUDE_CODE_OAUTH_TOKEN: "claude-fixture", ANTHROPIC_API_KEY: "anthropic-fixture" }, "antigravity")).toBe("1.3.4");
       expect(probeDoctorVersion(join(dir, "missing"), ["--version"], env, "antigravity")).toBeNull();
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });

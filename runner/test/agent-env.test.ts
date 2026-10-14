@@ -3,7 +3,7 @@ import { agentEnvironment } from "../src/agent-env";
 
 describe("agentEnvironment", () => {
   const source = { GEMINI_API_KEY: "fixture-key", GOOGLE_GEMINI_BASE_URL: "https://fixture.invalid",
-    GOOGLE_CLOUD_PROJECT: "project-kept", PATH: "/bin", EMPTY: "" };
+    GOOGLE_CLOUD_PROJECT: "project-kept", PATH: "/bin", EMPTY: "", CLAUDE_CODE_OAUTH_TOKEN: "claude-fixture", ANTHROPIC_API_KEY: "anthropic-fixture" };
   it.each(["claude", "codex", null] as const)("%s menghapus env Antigravity dan mempertahankan env unrelated", (agent) => {
     const result = agentEnvironment(agent, source);
     expect(Object.hasOwn(result, "GEMINI_API_KEY")).toBe(false);
@@ -18,6 +18,8 @@ describe("agentEnvironment", () => {
     const result = agentEnvironment("antigravity", source);
     expect(result.GEMINI_API_KEY === source.GEMINI_API_KEY).toBe(true);
     expect(result.GOOGLE_GEMINI_BASE_URL === source.GOOGLE_GEMINI_BASE_URL).toBe(true);
+    expect(Object.hasOwn(result, "CLAUDE_CODE_OAUTH_TOKEN")).toBe(false);
+    expect(Object.hasOwn(result, "ANTHROPIC_API_KEY")).toBe(false);
     expect(result).not.toBe(source);
     expect(agentEnvironment("antigravity", {}).GEMINI_API_KEY).toBeUndefined();
   });
