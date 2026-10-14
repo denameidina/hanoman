@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
-import { readFileSync, existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,11 +21,13 @@ const defs: AgentDef[] = [
 
 let cwd: string;
 const ids: string[] = [];
+const argvFixtures: string[] = [];
 const born = (id: string): string => { ids.push(id); return id; };
 
 beforeEach(() => { cwd = mkdtempSync(join(tmpdir(), "hnm-ca-")); });
 afterEach(() => {
   for (const id of ids.splice(0)) { try { killSession(id); } catch { /* sudah mati */ } }
+  for (const dir of argvFixtures.splice(0)) rmSync(dir, { recursive: true, force: true });
   registerCustomAgentSource(() => []);
   registerCodexNativeAgentSupport(() => ({ version: "0.151.0", ok: true }));
 });
@@ -353,11 +355,22 @@ describe("createSession · antigravity native registry", () => {
     if (previousBin === undefined) delete process.env.HANOMAN_ANTIGRAVITY_BIN;
     else process.env.HANOMAN_ANTIGRAVITY_BIN = previousBin;
   });
-  it("loads workspace native names, interactive argv, and cleans owned registry", () => {
+  it("loads workspace native names, interactive argv, and cleans owned registry", async () => {
+    const fixture = mkdtempSync(join(tmpdir(), "hnm-ag-argv-")); argvFixtures.push(fixture);
+    const result = join(fixture, "argv.json"), executable = join(fixture, "agy");
+    writeFileSync(executable, `#!${process.execPath}\nrequire("node:fs").writeFileSync(${JSON.stringify(result)}, JSON.stringify(process.argv.slice(2))); process.stdin.resume();\n`, { mode: 0o700 });
+    process.env.HANOMAN_ANTIGRAVITY_BIN = executable;
     registerCustomAgentSource(() => defs);
     const s = createSession("p1", cwd, { id: born("ca-ag-native"), agent: "antigravity", prompt: "halo", model: "gemini-3.8-flash-high", effort: "high" });
-    expect(paneCmd(s.id)).toContain("--prompt-interactive");
-    expect(paneCmd(s.id)).not.toContain("agents.enabled=true");
+    const deadline = Date.now() + 5000;
+    while (!existsSync(result) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
+    const args: string[] = JSON.parse(readFileSync(result, "utf8"));
+    expect(args).toContain("--prompt-interactive");
+    expect(args[args.indexOf("--prompt-interactive") + 1]).toBe(readFileSync(promptFilePath(s.id), "utf8").trimEnd());
+    expect(args[args.indexOf("--model") + 1]).toBe("gemini-3.8-flash-high");
+    expect(args[args.indexOf("--effort") + 1]).toBe("high");
+    expect(args).not.toContain("-p"); expect(args).not.toContain("agents.enabled=true");
+    expect(paneCmd(s.id)).toContain("exec /bin/sh");
     const prompt = readFileSync(promptFilePath(s.id), "utf8");
     expect(prompt).toContain("invoke_subagent");
     expect(prompt).toContain("send_message");

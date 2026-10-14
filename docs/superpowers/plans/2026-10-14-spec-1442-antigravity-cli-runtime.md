@@ -294,6 +294,19 @@ Kontrak metode dasar diterapkan di Task 1 agar union tidak menciptakan crash/per
 - [ ] **Step 5:** Jalankan `pnpm exec tsx cli/src/hanoman.ts docs index --check`, link existence untuk plan/spec/SoT/ADR/MCP, `git diff --check`, status/diff explicit touched paths. Tidak ada config/token/fixture temp di tracked tree. Update semua checkbox hanya sesudah buktinya dibaca; docs+code berada pada commit yang sama.
 - [ ] **Step 6:** Laporkan `Status`, path spec **dan** plan persis, tabel 18 AC→bukti dengan command/output/count dan live receipts, candidate SHA serta `Keputusan terbuka:-`. Jangan tulis phase-file/push; orchestrator meminta review, meneruskan rework ke Execute yang sama dan baru menulis `Execute done` setelah `Verdict:lulus`.
 
+**Receipt Task 14 (implementer, checkbox milik Execute parent):** Audit fixes committed
+`b39e2677977ab54dd18f077bccbde0c1be46cb81`, TMPDIR pane fix `d1eafbb0a52723f4ebb8b65f2f002a065f02e35e`,
+restart ownership `1ae1b61b680b93f1dc75e52130bf4d5307d5eebb`.
+Changed regression 759files/7819tests: 7808pass/11fail, **not green**; bounded rerun after2AGfixture
+corrections+authenvcleanup 84pass/8fail, exact8fails reproduced on actual committed-base snapshot
+52pass/8fail (60tests), own workspace packages resolved to snapshot. Relevant32/32 pass, audit
+100/100 and restart83/83; five package typechecks0, finalserver0. One HTTP boot/18curl checks pass,
+version1.3.5; native actualRead+MCP+same-ID Execute+independent reviewer/marker ordering pass,
+79s/175s samepane/PID; cleanup complete. Original native harness versionliteral1.3.4 explicitlyignored,
+API/installedbin observe1.3.5. Full18AC and exact baseline limitations are recorded in
+[final receipt SoT](../../../internal/docs/architecture/antigravity-runtime.md#receipt-final-execute-task-14-2026-10-14).
+No actual phase marker/push from child; no task14 checkbox changed before parent review.
+
 ## Pemetaan AC → task/evidence wajib
 
 | AC | Task | Bukti sebelum klaim selesai |

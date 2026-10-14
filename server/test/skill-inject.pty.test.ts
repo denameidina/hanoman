@@ -61,7 +61,7 @@ describe("createSession · skill global", () => {
   it("trust preparation fails before pane/config side effects, raw command bypasses trust", () => {
     const config = join(home, ".gemini/antigravity-cli/settings.json");
     mkdirSync(join(home, ".gemini/antigravity-cli"), { recursive: true }); writeFileSync(config, "corrupt");
-    expect(() => createSession("p1", cwd, { id: "si-agy-fail", agent: "antigravity" })).toThrow("antigravity-trust-preparation-failed");
+    expect(() => createSession("p1", cwd, { id: "si-agy-fail", agent: "antigravity" })).toThrow(expect.objectContaining({ statusCode: 500, code: "antigravity-config-failed", message: "Persiapan konfigurasi Antigravity CLI gagal; periksa konfigurasi lokal." }));
     expect(getSession("si-agy-fail")).toBeUndefined(); expect(existsSync(agentTempDir("si-agy-fail"))).toBe(false);
     const s = createSession("p1", cwd, { id: born("si-agy-shell"), agent: "antigravity", command: ["/bin/cat"] });
     expect(s.id).toBe("si-agy-shell"); expect(readFileSync(config, "utf8")).toBe("corrupt");

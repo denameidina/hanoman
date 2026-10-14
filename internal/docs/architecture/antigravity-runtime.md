@@ -727,3 +727,79 @@ Changing the restarted server TMPDIR no longer strands an unconsumed credential 
 fixture reproduced that case; GREEN bootstrap+PTY: 83/83 tests in 2 files, server typecheck exit 0.
 Namespace, directory/file ownership, permissions, inode/device and content hash checks remain;
 operator replacements are preserved. Bootstrap allocation follows decision-directory preparation.
+
+
+## Receipt final Execute Task 14 (2026-10-14)
+
+Final `env -u HANOMAN_CONTROL_ORIGINS -u SSH_ASKPASS -u SSH_ASKPASS_REQUIRE
+-u GIT_TERMINAL_PROMPT TEST_DATABASE_URL=file:<unique>/t.test.db
+pnpm vitest --run --changed c6800c59837a152e413d8b7834ced0b21adcb084
+--no-file-parallelism` began at candidate `b39e2677977ab54dd18f077bccbde0c1be46cb81`.
+The shared runtime/API/MCP imports selected 759 files/7819 tests (801.61 seconds): 750 files and
+7808 tests passed, 9 files/11 tests failed. This run is **not green**. Two Antigravity fixture
+expectations were updated to the deliberate contract: actual child argv rather than secret-free
+tmux command metadata, and safe RuntimeLaunchError instead of the raw trust helper error.
+The config-apply failure came from an inherited ANTHROPIC_API_KEY fixture; auth/provider keys were
+all removed in the bounded rerun. No product behavior was changed to hide these failures.
+
+Rerun only the nine failed files: 84 passed/8 failed (92 tests). The three relevant files all pass:
+custom-agents.pty 24, skill-inject.pty 4, config-apply 4. Remaining eight failures were reproduced
+on an actual committed-base source snapshot **inside the ignored current worktree**:
+6 files/60 tests, 52 passed/8 failed. Both `@hanoman/shared` and `@hanoman/runner` resolve to snapshot
+sources, third-party dependencies reused; no branch or new git worktree created. Snapshot setup
+runs with no test collection were discarded, not accepted as evidence. Same controlled auth/provider
+env and isolated DB/socket used for candidate/base. Baseline failures are scheduler defaults missing
+expected minMemAvailablePct (2); scheduler-state fixtures missing memory fields (2); removed changelog
+endpoint expectation (1); PRD audit inline-context expectation (1); attachment direct-inline-path
+expectation (1); operator project-session cap exemption expectation (1). None is introduced by this
+feature; no unrelated API/scheduler/Claude/Codex product behavior was changed to make them pass.
+
+After audit follow-ups, targeted bootstrap/PTY/mounted UI suite passed 100/100 in 5 files; restart
+bootstrap/PTY passed 83/83 in 2 files. All five touched package typechecks exit 0, server/frontend
+rechecked after follow-ups; final fixture server typecheck exit 0. Original logs are ignored
+`.superpowers/sdd/2026-10-14-spec-1442-antigravity-cli-runtime/Task14-*.log`.
+
+Actual HTTP receipt: **one** isolated loopback boot and **18** real curl requests. Version observed
+1.3.5 via cookie and zero-capability read token (200); unauthenticated 401; Custom Agent capability
+403; Settings/model catalog/Custom Agent contracts 200/201; invalid phase/method installer 400;
+goal, sandbox podman/required and hardening 409. Launch approval remains null and rejected launches
+create no pane. HOME and HANOMAN_HOME/DB are fixtures; native user skill create/fork succeed (201),
+project native source rejects (400). Token/cookie headers are temporary 0600 files, never argv/log;
+server, DB, headers and fixture removed. The TMPDIR follow-ups change internal credential transport,
+not these HTTP contracts; no repeat boot required.
+
+Integrated native current launcher receipt: Read injected task14-native-probe/SKILL.md and native
+hanoman_about succeed. Execute child `131503a1-9dc3-4a7a-9a05-7af20d4b3825` receives same-ID SendMessage
+and recalls its private nonce. Independent generated reviewer `bab8956d-7191-4240-b521-3ab767a714fc`
+returns actual `Verdict: lulus`. The owned synthetic marker stays empty before decisions, then receives
+Execute done only after review. Parent stays pane %0/PID 14821/agy across turns (79/175 seconds,
+each within 180 seconds), interactive --prompt-interactive argv, no working one-shot/bridge; registry
+metadata inherit/unknown effort and private bootstrap consumption verified. Git stays clean.
+MCP global siblings/config permissions, trust siblings, registry/exclude and temporary worktree restored;
+owned pane/PID removed, no remaining MCP process with fixture cwd. Existing Task 0/4/5/7/8/11 native
+receipts continue to cover other instruction/custom-child/MCP-panel paths.
+
+The copied native harness contained a stale literal version 1.3.4: that metadata is explicitly ignored,
+not a fresh version measurement. Real final version API and independently installed --version both
+observe 1.3.5. No runtime behavior claim depends on the stale literal.
+
+| AC | Actual evidence read |
+| --- | --- |
+| AC-01 | terminal.route 101 + session-launch 46 + lead-defaults 2 pass; native same pane/process/cwd |
+| AC-02 | PTY 78 + actual child argv fixture 24 pass; live interactive argv and same-ID follow-up |
+| AC-03 | PTY DB binary switch, models probe 8/cache 10, version 11 pass |
+| AC-04 | services/runtime-defaults 11 + settings-remote-keys 10 pass; legacy defaults preserved |
+| AC-05 | models parser 9/probe 8/cache 10; mounted catalog/pickers and Task12 browser receipt |
+| AC-06 | antigravity-trust 14 pass + no native trust dialog, realpath/sibling cleanup |
+| AC-07 | skill-inject 14 + skill-inject.pty 4 pass; actual native Read skill, Task4 AGENTS/GEMINI preservation |
+| AC-08 | MCP panel 18 pass; actual native about and Task11 genuine MCP panel/tool-list receipt |
+| AC-09 | provider env parent/lead/version/model/doctor tests + bootstrap5/PTY78; secret-free argv and stale env isolation |
+| AC-10 | native registry 23/custom API68/actual child argv24 pass; current native named Execute invoke |
+| AC-11 | native Execute same-ID relay and nonce recall; parent pane/PID unchanged; independent reviewer ID |
+| AC-12 | custom API68 + registry23 + mounted Custom Agent/phase reason tests and Task12 browser receipt |
+| AC-13 | phase agents47 + orchestration30 pass; native child/reviewer and synthetic marker ordering |
+| AC-14 | version11/route5/MCP coverage8 pass; real curl200/401/403 and semver1.3.5 |
+| AC-15 | route/final-launch/lead boundary tests pass; real curl409/no pane/approval unchanged; mounted reasons |
+| AC-16 | pty-parse12/history26/presence/completion tests pass; actual tmux/native phase marker, no claimed telemetry |
+| AC-17 | 7819-test changed scope read, 8 residual baseline failures reproduced; relevant32/32 and audit83/100 pass; five typechecks0 |
+| AC-18 | MCP decisions/catalog/coverage8; ADR0221/docs/plan links, index ok, diff check0, nonempty counts above |
