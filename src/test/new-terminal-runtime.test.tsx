@@ -147,3 +147,14 @@ describe("Sesi baru · galat tak ditelan (audit UI/UX)", () => {
     expect(screen.getByRole("button", { name: "Buka sesi" })).toBeInTheDocument();
   });
 });
+
+ it("SPEC-1442 selects interactive Antigravity with its own defaults", async () => {
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByText("Belum ada sesi terminal");
+    fireEvent.click(screen.getByRole("button", { name: "Sesi baru" }));
+    await screen.findByLabelText("Agen");
+    expect(screen.getByRole("option", { name: "Antigravity CLI" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Agen"), { target: { value: "antigravity" } });
+    expect(screen.getByLabelText("Model")).toHaveValue("gemini-3.8-flash-high");
+    expect(screen.getByLabelText("Effort")).toHaveValue("high");
+  });

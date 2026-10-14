@@ -20,7 +20,10 @@ describe("OrchestrationPanel · flow nonaktif", () => {
     render(<OrchestrationPanel orchestration={orch} onChange={vi.fn()} />);
     const selects = within(screen.getByTestId("orch-flow-feature")).getAllByRole("combobox");
     expect(selects.length).toBeGreaterThan(0);
-    for (const s of selects) expect(s).toBeEnabled();
+    for (const s of selects) {
+      if (s.getAttribute("aria-label")?.startsWith("Effort ") && s.getAttribute("aria-label")?.endsWith(" antigravity")) expect(s).toBeDisabled();
+      else expect(s).toBeEnabled();
+    }
   });
 
   it("tabel matriks dibungkus LocalOverflow, bukan div overflow-x biasa", () => {
@@ -47,4 +50,15 @@ describe("OrchestrationPanel · varian accordion", () => {
     expect(within(screen.getByTestId("orch-flow-feature")).queryByRole("button", { expanded: false })).not.toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Orkestrasi feature" })).toBeInTheDocument();
   });
+});
+
+it("SPEC-1442 native tier selection serializes effort null and explains reviewer limits", () => {
+  const change = vi.fn();
+  render(<OrchestrationPanel orchestration={ORCHESTRATION_DEFAULTS} onChange={change} />);
+  const model = screen.getByRole("combobox", { name: "Model feature Brainstorm antigravity" });
+  expect([...model.querySelectorAll("option")].map((o) => o.value)).toEqual(["inherit", "flash", "pro"]);
+  fireEvent.change(model, { target: { value: "pro" } });
+  expect(change.mock.calls[0]?.[0].feature.antigravity.Brainstorm).toEqual({ model: "pro", effort: null });
+  expect(screen.getByRole("combobox", { name: "Effort feature Brainstorm antigravity" })).toBeDisabled();
+  expect(screen.getAllByText(/Reviewer read-only instruksional/).length).toBeGreaterThan(0);
 });

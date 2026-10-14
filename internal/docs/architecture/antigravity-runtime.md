@@ -605,3 +605,21 @@ sukses about 39 detik; tightening panel pertama memakai perbandingan current-com
 launcher yang terlalu ketat dan gagal walau heading panel teramati, cleanup tetap sukses
 (`Task11-native-panel.log`). Final probe membandingkan pane ID/PID stabil serta memverifikasi
 descendant cleanup. Tidak ada keputusan credential terbuka atau klaim native pending tersisa.
+
+### Receipt Task 12 — dashboard
+
+Parent picker dan EngineFields kini menggunakan helper runtime bersama yang memisahkan katalog
+slug parent dari tier child. Settings menjaga tiga blok runtime; Start/New Terminal memuat
+Antigravity tanpa fallback Claude. Versi additive, unavailable method installer, batas host/lab/
+sandbox/goal serta telemetry unknown tampil dalam DS yang sudah ada. Goal aktif tidak dihapus
+ketika runtime diganti; Start menahan kombinasi Antigravity + goal dan operator mematikan goal
+secara eksplisit. Profil child read-only/isolated yang tidak kompatibel tetap terlihat dan tidak
+berubah policy diam-diam. Detail implementasi dan receipt mounted/browser berada di
+[kontrak frontend](../frontend/frontend-implementation.md#runtime-antigravity-cli-spec-1442--adr-0221).
+
+Test scoped Task 12 `156/156` + tambahan `77/77` lulus, `pnpm --filter ./src typecheck` lulus;
+Chrome 155.0.8059.79 fixture-only menjalankan Settings keyboard, Start/New Terminal 320px,
+Custom Agent availability/effort, Orchestration tiers/overflow, serta detail telemetry null.
+Browser plugin discovery kosong sehingga receipt memakai standalone Playwright + Chrome headless
+isolated profile. Semua API fixture diintercept; tidak ada Settings, token atau sesi operator yang
+berubah. Proses Vite hanya milik receipt ini ditutup melalui session/PID spesifik.

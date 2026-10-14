@@ -1,9 +1,9 @@
 import {
   MODELS, claudeEfforts, coerceClaudeEffort, CODEX_MODELS, codexEfforts, coerceCodexEffort,
-  modelSelectOptions, subagentClaudeModels, type Agent,
+  modelSelectOptions, subagentClaudeModels, ANTIGRAVITY_MODELS, ANTIGRAVITY_CHILD_TIERS, antigravityEfforts, AGENT_RUNTIMES, AGENT_RUNTIME_LABELS, type Agent,
 } from "@hanoman/shared";
 
-/** Default per agen sebagaimana dibaca dari `GET /settings` (blok claude & blok codex). */
+/** Default per agen sebagaimana dibaca dari `GET /settings` (blok setiap runtime). */
 export type RuntimeDefs = Record<Agent, { model: string; effort: string }>;
 
 /**
@@ -12,12 +12,12 @@ export type RuntimeDefs = Record<Agent, { model: string; effort: string }>;
  * pola yang sama dengan `codexClientTooOld` yang menyatukan Settings & picker Start (SPEC-339).
  */
 export function runtimeModels(agent: Agent): readonly { id: string; label: string; resolved?: string }[] {
-  return agent === "codex" ? CODEX_MODELS : MODELS;
+  return agent === "antigravity" ? ANTIGRAVITY_MODELS : agent === "codex" ? CODEX_MODELS : MODELS;
 }
 
 /** Katalog untuk model SUBAGENT per fase — tanpa alias `default` yang hanya sah untuk `--model`. */
 export function runtimeSubagentModels(agent: Agent): readonly { id: string; label: string }[] {
-  return agent === "codex" ? CODEX_MODELS : subagentClaudeModels();
+  return agent === "antigravity" ? ANTIGRAVITY_CHILD_TIERS.map((id) => ({ id, label: id })) : agent === "codex" ? CODEX_MODELS : subagentClaudeModels();
 }
 
 /**
@@ -31,7 +31,7 @@ export function runtimeModelOptions(agent: Agent, current: string): { value: str
 
 /** SPEC-339 · effort adalah properti MODEL untuk codex; untuk claude ia properti CLI. */
 export function runtimeEfforts(agent: Agent, model: string): readonly string[] {
-  return agent === "codex" ? codexEfforts(model) : claudeEfforts(model);
+  return agent === "antigravity" ? antigravityEfforts(model) : agent === "codex" ? codexEfforts(model) : claudeEfforts(model);
 }
 
 /**
@@ -43,6 +43,13 @@ export function runtimeFor(defs: RuntimeDefs, agent: Agent): { model: string; ef
   const d = defs[agent];
   return {
     model: d.model,
-    effort: agent === "codex" ? coerceCodexEffort(d.model, d.effort) : coerceClaudeEffort(d.model, d.effort),
+    effort: runtimeCoerceEffort(agent, d.model, d.effort),
   };
+}
+
+export const runtimeOptions = AGENT_RUNTIMES.map((value) => ({ value, label: AGENT_RUNTIME_LABELS[value] }));
+
+export function runtimeCoerceEffort(agent: Agent, model: string, effort: string): string {
+  if (agent === "antigravity") return antigravityEfforts(model)[0] ?? effort;
+  return agent === "codex" ? coerceCodexEffort(model, effort) : coerceClaudeEffort(model, effort);
 }

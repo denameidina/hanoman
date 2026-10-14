@@ -95,3 +95,12 @@ describe("SettingsScreen · kartu agen sesi (SPEC-338)", () => {
     expect(opts).toContain("gpt-7-belum-ada");
   });
 });
+
+it("SPEC-1442 exposes Antigravity defaults without changing other blocks", async () => {
+  openModel();
+  await screen.findByLabelText("Agen default");
+  expect(screen.getByRole("option", { name: "Antigravity CLI" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Model antigravity")).toHaveValue("gemini-3.8-flash-high");
+  fireEvent.change(screen.getByLabelText("Agen default"), { target: { value: "antigravity" } });
+  await waitFor(() => expect(api.putSettings).toHaveBeenCalledWith(expect.objectContaining({ agent: "antigravity", codex: { model: "gpt-5.6-sol", effort: "xhigh" } })));
+});

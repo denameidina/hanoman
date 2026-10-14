@@ -55,7 +55,7 @@ export function PhasePlanPreview({ flow, agent, model, effort, orchestration, co
   if (cfg?.enabled === false) {
     return <>{remoteNote}<div data-testid="phase-plan-preview" style={NOTE}>Orkestrasi mati untuk flow ini — sesi tunggal.</div></>;
   }
-  const nativeAgents = agent === "claude" || codexNativeAgentsSupported(codexVersion);
+  const nativeAgents = agent !== "codex" || codexNativeAgentsSupported(codexVersion);
   const resolveWith = (overrides: PhaseOverrides | undefined) => resolvePhasePlan({
     flow, runtime: agent, orchestration, orchestrator: { model, effort }, phaseOverrides: overrides, nativeAgents,
   });
@@ -84,6 +84,7 @@ export function PhasePlanPreview({ flow, agent, model, effort, orchestration, co
   return (
     <>
     {remoteNote}
+    {agent === "antigravity" && <div style={NOTE}>Child native memakai tier inherit/flash/pro. Effort child tidak diketahui. Invoke/recall asynchronous ditunggu melalui protokol; reviewer read-only instruksional tanpa enforcement native.</div>}
     <div data-testid="phase-plan-preview" style={{ marginBottom: 12 }}>
       <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Fase — dikerjakan subagent</div>
       <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, lineHeight: 1.6, fontFamily: "var(--font-mono)" }}>
@@ -116,6 +117,7 @@ export function PhasePlanPreview({ flow, agent, model, effort, orchestration, co
             const current = { ...(phaseOverrides?.[p.phase] ?? {}) };
             if (value) current[key] = value;
             else delete current[key];
+            if (agent === "antigravity") current.effort = null;
             const selectedModel = current.model ?? cell?.model ?? model;
             if (key === "model" && current.effort) {
               current.effort = agent === "codex"
@@ -129,18 +131,18 @@ export function PhasePlanPreview({ flow, agent, model, effort, orchestration, co
           };
           return (
             <li key={p.phase} style={{ overflowWrap: "anywhere", marginBottom: onPhaseOverridesChange ? 8 : 0 }}>
-              <div>{p.phase} · {modelLabel(p.model)} · {p.effort}{suffix}</div>
+              <div>{p.phase} · {modelLabel(p.model)} · {p.effort ?? "effort tidak diketahui"}{suffix}</div>
               {onPhaseOverridesChange && (
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, .65fr)", gap: 6, marginTop: 4 }}>
-                  <Select size="sm" aria-label={`Model subagent ${p.phase}`} value={override?.model ?? ""}
+                  <Select size="sm" aria-label={`Model subagent ${p.phase}`} value={override?.model ?? (agent === "antigravity" ? p.model : "")}
                     onChange={(e) => updateOverride("model", e.target.value)} style={controlStyle}
-                    options={[
+                    options={agent === "antigravity" ? runtimeSubagentModels(agent).map((m) => ({ value: m.id, label: m.label })) : [
                       { value: "", label: inheritLabel(modelSource, inheritedOf(p.phase, "model")) },
                       ...modelSelectOptions(runtimeSubagentModels(agent), override?.model ?? ""),
                     ]} />
                   <Select size="sm" aria-label={`Effort subagent ${p.phase}`} value={override?.effort ?? ""}
-                    onChange={(e) => updateOverride("effort", e.target.value)} style={controlStyle}
-                    options={[
+                    disabled={agent === "antigravity"} onChange={(e) => updateOverride("effort", e.target.value)} style={controlStyle}
+                    options={agent === "antigravity" ? [{ value: "", label: "Tidak diketahui · effort native" }] : [
                       { value: "", label: `Warisi ${effortSource} · ${inheritedOf(p.phase, "effort")}` },
                       ...effortOptions,
                     ]} />

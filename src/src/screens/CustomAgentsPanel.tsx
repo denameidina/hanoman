@@ -184,6 +184,7 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
   const profileInvalid = editing ? (
     !optionalIntValid(editing.draft.maxTurns, 1, 200)
     || !optionalIntValid(editing.draft.timeoutSeconds, 30, 3_600)
+    || (editing.draft.runtime === "antigravity" && editing.draft.workspacePolicy === "read-only")
     || (editing.draft.workspacePolicy === "isolated-worktree"
       && editing.draft.runtime !== "claude")
   ) : false;
@@ -196,7 +197,9 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
     effort: effortInvalid ? `Effort "${draftNow?.effort}" tak didukung oleh model ini.` : null,
     maxTurns: draftNow && !optionalIntValid(draftNow.maxTurns, 1, 200) ? "Isi bilangan bulat 1–200, atau kosongkan." : null,
     timeoutSeconds: draftNow && !optionalIntValid(draftNow.timeoutSeconds, 30, 3_600) ? "Isi bilangan bulat 30–3600, atau kosongkan." : null,
-    workspacePolicy: draftNow?.workspacePolicy === "isolated-worktree" && draftNow.runtime !== "claude"
+    workspacePolicy: draftNow?.runtime === "antigravity" && draftNow.workspacePolicy === "read-only"
+      ? "Read-only enforced belum tersedia untuk Antigravity; ubah kebijakan secara eksplisit."
+      : draftNow?.workspacePolicy === "isolated-worktree" && draftNow.runtime !== "claude"
       ? "Worktree terisolasi hanya tersedia untuk runtime Claude; pilih runtime Claude atau ganti kebijakan." : null,
   };
   const errorId = (field: keyof typeof errors) => `${fieldId}-${field}`;
@@ -365,7 +368,7 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
 
       {rows.length === 0 && !loadError && (
         <StateBlock kind="empty" compact title="Belum ada custom agent"
-          hint="Custom agent adalah persona yang bisa dipilih sesi claude & codex — misalnya peninjau keamanan atau penulis migration." />
+          hint="Custom agent adalah persona yang bisa dipilih sesi Claude, Codex & Antigravity — misalnya peninjau keamanan atau penulis migration." />
       )}
 
       {rows.map((a) => {
@@ -523,9 +526,9 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
               </Field>
               <div className="hn-grid-mobile hn-agent-grid2">
                 <Field label="Model" hint={hintWithError("Kosongkan untuk mewarisi model sesi.", errorId("model"), errors.model)}>
-                  <Select aria-label="Model" value={editing.draft.model} invalid={modelInvalid}
+                  <Select aria-label="Model" value={editing.draft.model || (runtime === "antigravity" ? "inherit" : "")} invalid={modelInvalid}
                     {...invalidAria(errorId("model"), errors.model)}
-                    options={[{ value: "", label: "Ikut sesi induk" }, ...modelOptions,
+                    options={[...(runtime === "antigravity" ? [] : [{ value: "", label: "Ikut sesi induk" }]), ...modelOptions,
                       ...(modelInvalid ? [{ value: editing.draft.model, label: `⚠ ${editing.draft.model} — tak ada di katalog` }] : [])]}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setModel(e.target.value)} />
                 </Field>
@@ -561,8 +564,8 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
                     ...(catalog?.runtimes ?? []).map((r) => ({ value: r.id, label: r.label }))]}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRuntime(e.target.value)} />
               </Field>
-              <Field label="Effort" hint={hintWithError("Kosongkan untuk mewarisi sesi.", errorId("effort"), errors.effort)}>
-                <Select aria-label="Effort" value={editing.draft.effort} invalid={effortInvalid}
+              <Field label="Effort" hint={hintWithError(runtime === "antigravity" ? "Effort child native tidak diketahui; konfigurasi effort independen belum tersedia." : "Kosongkan untuk mewarisi sesi.", errorId("effort"), errors.effort)}>
+                <Select aria-label="Effort" disabled={runtime === "antigravity"} value={editing.draft.effort} invalid={effortInvalid}
                   {...invalidAria(errorId("effort"), errors.effort)}
                   options={[{ value: "", label: "Ikut sesi induk" },
                     ...effortOptions.map((effort) => ({ value: effort, label: effort })),
@@ -574,12 +577,12 @@ export function CustomAgentsPanel({ projectId, runtime: sessionRuntime, onToast 
                   })} />
               </Field>
               <Field label="Kebijakan workspace"
-                hint={hintWithError("Read-only dipagari hook; isolated hanya tersedia untuk Claude.", errorId("workspacePolicy"), errors.workspacePolicy)}>
+                hint={hintWithError(runtime === "antigravity" ? "Read-only enforced dan worktree terisolasi belum tersedia untuk Antigravity. Profil lama yang tidak kompatibel tidak dipilih." : "Read-only dipagari hook; isolated hanya tersedia untuk Claude.", errorId("workspacePolicy"), errors.workspacePolicy)}>
                 <Select aria-label="Kebijakan workspace" value={editing.draft.workspacePolicy}
                   invalid={Boolean(errors.workspacePolicy)} {...invalidAria(errorId("workspacePolicy"), errors.workspacePolicy)}
                   options={[
                     { value: "inherit", label: "Ikut parent" },
-                    { value: "read-only", label: "Hanya baca" },
+                    { value: "read-only", label: "Hanya baca", disabled: runtime === "antigravity" },
                     { value: "isolated-worktree", label: "Worktree terisolasi", disabled: editing.draft.runtime !== "claude" },
                   ]}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEditing({

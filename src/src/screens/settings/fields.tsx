@@ -6,13 +6,13 @@ import React from "react";
 import { Card, Input, Select, Switch } from "../../ds";
 import type { ShowToast } from "../../ds";
 import {
-  CODEX_MODELS, codexClientTooOld, codexEfforts, codexModel, coerceCodexEffort, modelSelectOptions,
+  type Agent, type AntigravityVersionInfo, codexClientTooOld, codexModel,
 } from "@hanoman/shared";
-import { AGENT_LABEL, claudeEffortOptions, claudeEffortPatch, claudeOptions, type CodexVersionState } from "./model";
+import { claudeEffortPatch, type CodexVersionState } from "./model";
+import { runtimeCoerceEffort, runtimeOptions, runtimeModelOptions, runtimeEfforts, type RuntimeDefs } from "../session-runtime";
+import { api } from "../../api/client";
 import { Prose, SettingRow } from "./rows";
 import { useSettingField } from "./useSettingField";
-
-const codexOptions = (model: string) => modelSelectOptions(CODEX_MODELS, model);
 
 /** Catatan lunak bila CLI codex terpasang lebih lama dari model yang dipilih. Aturannya di shared. */
 export function CodexVersionNote({ model, codexVer }: { model: string; codexVer: CodexVersionState | null }) {
@@ -28,7 +28,7 @@ export function CodexVersionNote({ model, codexVer }: { model: string; codexVer:
 }
 
 /** Judul grup agen di kartu model default. Penanda "dipakai sesi baru" menjawab blok mana yang berlaku. */
-export function AgentGroupHeader({ id, label, active }: { id: "claude" | "codex"; label: string; active: boolean }) {
+export function AgentGroupHeader({ id, label, active }: { id: Agent; label: string; active: boolean }) {
   return (
     <div className="hn-set-agent-head">
       <div className="hn-set-agent-name">{label}</div>
@@ -42,7 +42,7 @@ export function AgentGroupHeader({ id, label, active }: { id: "claude" | "codex"
 
 export interface EngineValue {
   enabled: boolean;
-  agent: "claude" | "codex";
+  agent: Agent;
   model: string;
   effort: string;
 }
@@ -57,10 +57,7 @@ export interface EngineLabels {
   msg: { agent: string; model: string; effort: string };
 }
 
-export interface EngineDefaults {
-  claude: { model: string; effort: string };
-  codex: { model: string; effort: string };
-}
+export type EngineDefaults = RuntimeDefs;
 
 /** Runtime + model + effort untuk satu fungsi override. Setiap kontrol auto-save lewat `useSettingField`. */
 export function EngineFields({ engine, labels, defaults, codexVer, save }: {
@@ -70,15 +67,15 @@ export function EngineFields({ engine, labels, defaults, codexVer, save }: {
   codexVer: CodexVersionState | null;
   save: (patch: EnginePatch, msg: string) => Promise<boolean>;
 }) {
-  const agent = useSettingField<"claude" | "codex">({
+  const agent = useSettingField<Agent>({
     value: engine.agent, delayMs: 0,
     save: (a) => {
       // Cermin `pickAgent`: menukar runtime HARUS menukar model + effort ke default agen itu,
       // kalau tidak fungsi lahir dengan pasangan yang ditolak CLI (`codex -m claude-…`).
-      const d = a === "codex" ? defaults.codex : defaults.claude;
+      const d = defaults[a];
       return save({
         agent: a, model: d.model,
-        effort: a === "codex" ? coerceCodexEffort(d.model, d.effort) : d.effort,
+        effort: a === "claude" ? d.effort : runtimeCoerceEffort(a, d.model, d.effort),
       }, `${labels.msg.agent} → ${a}`);
     },
   });
@@ -86,7 +83,8 @@ export function EngineFields({ engine, labels, defaults, codexVer, save }: {
     value: engine.model, delayMs: 0,
     save: (m) => save({
       model: m,
-      ...(engine.agent === "codex" ? { effort: coerceCodexEffort(m, engine.effort) } : claudeEffortPatch(m, engine.effort)),
+      ...(engine.agent === "claude" ? claudeEffortPatch(m, engine.effort)
+        : { effort: runtimeCoerceEffort(engine.agent, m, engine.effort) }),
     }, `${labels.msg.model} → ${m}`),
   });
   const effort = useSettingField<string>({
@@ -98,20 +96,19 @@ export function EngineFields({ engine, labels, defaults, codexVer, save }: {
     <>
       <SettingRow title={labels.agentTitle} desc={labels.agentDesc} save={agent}>
         <Select size="sm" aria-label={labels.aria.agent} value={agent.value} className="hn-set-w-sm"
-          options={[{ value: "claude", label: AGENT_LABEL.claude }, { value: "codex", label: AGENT_LABEL.codex }]}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => agent.set(e.target.value as "claude" | "codex")} />
+          options={runtimeOptions}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => agent.set(e.target.value as Agent)} />
       </SettingRow>
       {isCodex && <CodexVersionNote model={model.value} codexVer={codexVer} />}
+      {agent.value === "antigravity" && <AntigravityVersionNote />}
       <SettingRow title="Model" save={model}>
         <Select size="sm" aria-label={labels.aria.model} value={model.value} className="hn-set-w-sm"
-          options={isCodex ? codexOptions(model.value) : claudeOptions(model.value)}
+          options={runtimeModelOptions(agent.value, model.value)}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => model.set(e.target.value)} />
       </SettingRow>
       <SettingRow title="Effort" desc={labels.effortDesc} last save={effort}>
         <Select size="sm" aria-label={labels.aria.effort} value={effort.value} className="hn-set-w-xs"
-          options={isCodex
-            ? codexEfforts(model.value).map((v) => ({ value: v, label: v }))
-            : claudeEffortOptions(model.value)}
+          options={runtimeEfforts(agent.value, model.value).map((value) => ({ value, label: value === "xhigh" ? "x-high" : value }))}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => effort.set(e.target.value)} />
       </SettingRow>
     </>
@@ -192,4 +189,21 @@ export function NumberSettingField({ label, value, min, max, placeholder, width,
       onBlur={commit}
       onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") commit(); }} />
   );
+}
+
+export function AntigravityVersionNote({ info }: { info?: AntigravityVersionInfo | null }) {
+  const [detected, setDetected] = React.useState<AntigravityVersionInfo | null>(null);
+  React.useEffect(() => {
+    if (info !== undefined) return;
+    let active = true;
+    api.getAntigravityVersion?.().then((value) => { if (active) setDetected(value); })
+      .catch(() => { if (active) setDetected({ version: null, error: "Versi Antigravity tidak dapat diperiksa." }); });
+    return () => { active = false; };
+  }, [info]);
+  const value = info === undefined ? detected : info;
+  return <div data-testid="antigravity-version-note" className="hn-set-codex-note">
+    Antigravity CLI · versi {value?.version ?? "tak terdeteksi"}. {value?.error}
+    <p>Host/lab saja; sandbox belum didukung. Mode goal native belum didukung. Telemetri native tidak diketahui.</p>
+    <a href="https://antigravity.google/docs/cli" target="_blank" rel="noreferrer">Panduan pemasangan dan login resmi</a>
+  </div>;
 }

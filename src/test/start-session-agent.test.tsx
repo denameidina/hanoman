@@ -127,3 +127,24 @@ describe("StartSessionModal · agen (SPEC-338)", () => {
     await waitFor(() => expect(screen.getByLabelText("Effort")).toHaveValue("xhigh"));
   });
 });
+
+it("SPEC-1442 launches Antigravity with its saved parent defaults", async () => {
+  vi.mocked(api.getSettings).mockResolvedValue(settings({ agent: "antigravity", antigravity: { model: "gemini-3.8-flash-high", effort: "high" } }) as ReturnType<typeof settings> as Awaited<ReturnType<typeof api.getSettings>>);
+  render(<StartSessionModal open spec={spec} onClose={() => {}} onStarted={() => {}} />);
+  await waitFor(() => expect(screen.getByLabelText("Agen")).toHaveValue("antigravity"));
+  expect(screen.getByLabelText("Model")).toHaveValue("gemini-3.8-flash-high");
+  fireEvent.click(screen.getByRole("button", { name: "Mulai" }));
+  await waitFor(() => expect(api.startSession).toHaveBeenCalledWith(expect.objectContaining({ agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high" })));
+});
+it("SPEC-1442 preserves checked goal and requires explicitly disabling it before Antigravity launch", async () => {
+  vi.mocked(api.startSession).mockClear();
+  vi.mocked(api.getSettings).mockResolvedValue(settings({ goal: { enabled: true, condition: "proof" } }) as Awaited<ReturnType<typeof api.getSettings>>);
+  render(<StartSessionModal open spec={spec} onClose={() => {}} onStarted={() => {}} />);
+  await waitFor(() => expect(screen.getByRole("switch", { name: "Mode goal" })).toHaveAttribute("aria-checked", "true"));
+  fireEvent.change(screen.getByLabelText("Agen"), { target: { value: "antigravity" } });
+  expect(screen.getByRole("switch", { name: "Mode goal" })).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByRole("button", { name: "Mulai" })).toBeDisabled();
+  expect(api.startSession).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("switch", { name: "Mode goal" }));
+  expect(screen.getByRole("button", { name: "Mulai" })).toBeEnabled();
+});

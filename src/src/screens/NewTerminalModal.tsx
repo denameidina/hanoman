@@ -1,10 +1,10 @@
 import React from "react";
-import { coerceClaudeEffort } from "@hanoman/shared";
 import { Modal, Button, Select, Field, Callout } from "../ds";
 import { api } from "../api/client";
 import { failureMessage } from "../lib/report-error";
-import { codexClientTooOld, codexModel, coerceCodexEffort, CODEX_DEFAULTS, type Agent } from "@hanoman/shared";
-import { runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./session-runtime";
+import { codexClientTooOld, codexModel, CODEX_DEFAULTS, BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS, type Agent } from "@hanoman/shared";
+import { AntigravityVersionNote } from "./settings/fields";
+import { runtimeCoerceEffort, runtimeOptions, runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./session-runtime";
 import "./styles/terminal.css";
 
 /**
@@ -28,6 +28,7 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
   const [defs, setDefs] = React.useState<RuntimeDefs>({
     claude: { model: "sonnet", effort: "medium" },
     codex: { ...CODEX_DEFAULTS },
+    antigravity: { ...BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS },
   });
   const [busy, setBusy] = React.useState(false);
   // Audit UI/UX Terminal · galat tak lagi ditelan: dua hal berbeda tampil terpisah. Gagal memuat
@@ -48,8 +49,9 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
       const d: RuntimeDefs = {
         claude: { model: s.model, effort: s.effort },
         codex: { ...CODEX_DEFAULTS, ...(s.codex ?? {}) },
+        antigravity: { ...BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS, ...(s.antigravity ?? {}) },
       };
-      const a: Agent = s.agent === "codex" ? "codex" : "claude";
+      const a: Agent = s.agent ?? "claude";
       const r = runtimeFor(d, a);
       setDefs(d); setAgent(a); setModel(r.model); setEffort(r.effort);
     }).catch((e: unknown) => {
@@ -69,7 +71,7 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
   // SPEC-339 · menukar model bisa membuat effort terpilih jadi tak sah (Luna tak punya `ultra`).
   const pickModel = (id: string) => {
     setModel(id);
-    setEffort((e) => agent === "codex" ? coerceCodexEffort(id, e) : coerceClaudeEffort(id, e));
+    setEffort((e) => runtimeCoerceEffort(agent, id, e));
   };
 
   async function create() {
@@ -110,7 +112,7 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
       )}
       <Field label="Agen" hint="Mesin yang menjalankan sesi ini. Perilaku sesi sama; hanya CLI-nya berbeda.">
         <Select aria-label="Agen" value={agent} className="hn-terminal-field-full"
-          options={[{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex CLI" }]}
+          options={runtimeOptions}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickAgent(e.target.value as Agent)} />
       </Field>
       <Field label="Model">
@@ -125,6 +127,7 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
       </Field>
       {/* SPEC-339 · catatan LUNAK: CLI terlalu tua untuk model terpilih. Tak memblokir "Buka sesi" —
           aturannya sama persis dengan kartu Settings & picker Start (satu `codexClientTooOld`). */}
+      {agent === "antigravity" && <AntigravityVersionNote />}
       {agent === "codex" && codexClientTooOld(model, codexVer) && (
         <div data-testid="codex-version-note" className="hn-terminal-codex-note">
           Codex CLI terpasang <b>{codexVer}</b>, sedangkan <b>{model}</b> butuh <b>{codexModel(model)?.minClient}</b>.

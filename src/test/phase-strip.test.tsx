@@ -166,3 +166,10 @@ describe("PhaseStrip · aksesibilitas chip & popover (audit R2)", () => {
     expect(screen.getByRole("dialog", { name: "Detail fase Plan" })).toBeInTheDocument();
   });
 });
+
+it("SPEC-1442 unknown native telemetry is displayed as unknown rather than zero", () => {
+  render(<PhaseStrip phases={[{ name: "Execute", state: "done", agent: agent({ model: undefined, effort: null, attempts: null, startedAt: undefined, durationMs: null, inputTokens: null, outputTokens: null, cachedTokens: null, evidence: "unknown" }) }]} />);
+  fireEvent.click(screen.getByRole("button", { name: /Fase Execute/ }));
+  expect(screen.getByRole("dialog")).toHaveTextContent("percobaan tidak diketahui");
+  expect(screen.getByRole("dialog")).toHaveTextContent("token in tidak diketahui · out tidak diketahui · cache tidak diketahui");
+});

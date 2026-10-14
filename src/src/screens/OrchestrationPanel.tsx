@@ -2,7 +2,7 @@ import React from "react";
 import { Card, LocalOverflow, Select, Switch } from "../ds";
 import {
   EXECUTE_MODE_FLOWS, FLOW_PHASES, ORCHESTRATION_DEFAULTS, ORCHESTRATION_FLOWS, coerceClaudeEffort, coerceCodexEffort,
-  type Agent, type FlowOrchestration, type Orchestration, type OrchestrationFlow, type PhaseCell,
+  ANTIGRAVITY_CHILD_TIERS, type Agent, type FlowOrchestration, type Orchestration, type OrchestrationFlow, type PhaseCell,
 } from "@hanoman/shared";
 import { runtimeEfforts, runtimeSubagentModels } from "./session-runtime";
 import { FLOW_LABEL, RUNTIME_LABEL } from "../lib/labels";
@@ -16,6 +16,7 @@ import "./styles/scheduler.css";
 export { FLOW_LABEL };
 const RUNTIMES: { id: Agent; label: string }[] = [
   { id: "claude", label: RUNTIME_LABEL.claude }, { id: "codex", label: RUNTIME_LABEL.codex },
+  { id: "antigravity", label: RUNTIME_LABEL.antigravity },
 ];
 // Amandemen ADR-0170 P2 · cara fase Execute/Goal (sesi Claude) mengerjakan plan.
 const EXECUTE_MODE_OPTIONS = [
@@ -28,10 +29,11 @@ function CellPicker({ flow, phase, runtime, cell, disabled, onPick }: {
   flow: OrchestrationFlow; phase: string; runtime: Agent; cell: PhaseCell; disabled: boolean;
   onPick: (next: PhaseCell, msg: string) => void;
 }) {
+  const nativeTier = runtime === "antigravity";
   const models = runtimeSubagentModels(runtime);
   const efforts = runtimeEfforts(runtime, cell.model ?? "");
   const coerce = runtime === "codex" ? coerceCodexEffort : coerceClaudeEffort;
-  const modelOptions = [
+  const modelOptions = nativeTier ? ANTIGRAVITY_CHILD_TIERS.map((value) => ({ value, label: value })) : [
     { value: "", label: "— warisi orchestrator" },
     // Nilai di luar katalog (PUT ber-AgentToken, model lama) tetap tampil supaya picker tak kosong.
     ...(cell.model && !models.some((m) => m.id === cell.model) ? [{ value: cell.model, label: cell.model }] : []),
@@ -44,18 +46,19 @@ function CellPicker({ flow, phase, runtime, cell, disabled, onPick }: {
   ];
   return (
     <div className="hn-sched-picks">
-      <Select size="sm" aria-label={`Model ${flow} ${phase} ${runtime}`} value={cell.model ?? ""}
+      <Select size="sm" aria-label={`Model ${flow} ${phase} ${runtime}`} value={cell.model ?? (nativeTier ? "inherit" : "")}
         className="hn-sched-pick-model" options={modelOptions} disabled={disabled}
         onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
           const model = e.target.value || null;
           // Cermin picker Start: menukar model menurunkan effort yang tak didukung model baru SEKARANG.
-          onPick({ model, effort: model && cell.effort ? coerce(model, cell.effort) : cell.effort },
+          onPick({ model, effort: nativeTier ? null : model && cell.effort ? coerce(model, cell.effort) : cell.effort },
             `${phase} (${runtime}) → ${model ?? "warisi"}`);
         }} />
       <Select size="sm" aria-label={`Effort ${flow} ${phase} ${runtime}`} value={cell.effort ?? ""}
-        className="hn-sched-pick-effort" options={effortOptions} disabled={disabled}
+        className="hn-sched-pick-effort" options={nativeTier ? [{ value: "", label: "Tidak tersedia · effort native tidak diketahui" }] : effortOptions} disabled={disabled || nativeTier}
         onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
           onPick({ ...cell, effort: e.target.value || null }, `${phase} (${runtime}) effort → ${e.target.value || "warisi"}`)} />
+      {nativeTier && <span>Effort child tidak diketahui; invoke/recall asynchronous ditunggu melalui protokol. Reviewer read-only instruksional, tanpa enforcement native.</span>}
     </div>
   );
 }
@@ -85,7 +88,7 @@ function FlowBody({ flow, f, putFlow }: { flow: OrchestrationFlow; f: FlowOrches
               putFlow(flow, { ...f, executeMode: mode },
                 `Mode Execute ${FLOW_LABEL[flow]} · ${mode === "subagent" ? "subagen per task" : "inline"}`);
             }} />
-          <span className="hn-sched-flow-mode-note">khusus sesi Claude · Codex selalu inline</span>
+          <span className="hn-sched-flow-mode-note">khusus sesi Claude · Codex dan Antigravity selalu inline</span>
         </div>
       )}
       {/* Kontrol flow yang dimatikan benar-benar `disabled` (tak bisa difokus atau diubah), bukan
@@ -155,7 +158,7 @@ export function OrchestrationPanel({ orchestration, onChange, variant = "cards" 
     <div className="hn-sched-group-hint">
       Sesi utama berperan sebagai <b>pengatur</b>; setiap fase dikerjakan subagen dengan model &amp; effort di
       bawah. <b>Warisi</b> memakai pengaturan sesi utama yang dipilih saat <b>Start</b>. Subagen selalu berjalan di
-      runtime yang sama dengan sesi utama: sesi Claude memakai kolom Claude Code, sesi Codex kolom Codex CLI.
+      runtime yang sama dengan sesi utama: sesi Claude memakai kolom Claude Code, sesi Codex kolom Codex CLI, sesi Antigravity kolom Antigravity CLI.
       Flow yang dimatikan berjalan sebagai satu sesi biasa seperti sebelumnya.
     </div>
   );

@@ -582,3 +582,18 @@ describe("audit UI/UX · hapus, galat muat, field lanjutan, validasi", () => {
     expect(screen.getByLabelText("Maksimum giliran").getAttribute("aria-invalid")).toBeNull();
   });
 });
+
+it("SPEC-1442 exposes native tiers, disabled independent effort and unavailable profile reason", async () => {
+  getCustomAgentCatalog.mockResolvedValue({ ...catalog, runtimes: [...catalog.runtimes, { id: "antigravity", label: "Antigravity CLI" }] });
+  listCustomAgents.mockResolvedValue([{ ...rows[0], runtime: "antigravity", available: false, availabilityReason: "Read-only enforced Antigravity belum tersedia." }]);
+  render(<CustomAgentsPanel projectId={null} />);
+  await screen.findByText("Read-only enforced Antigravity belum tersedia.");
+  fireEvent.click(screen.getByRole("button", { name: /agen baru/i }));
+  fireEvent.click(screen.getByRole("tab", { name: /Lanjutan/ }));
+  fireEvent.change(screen.getByLabelText("Runtime agent"), { target: { value: "antigravity" } });
+  expect(screen.getByLabelText("Effort")).toBeDisabled();
+  expect(screen.getByText(/Effort child native tidak diketahui/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: /Dasar/ }));
+  const values = [...screen.getByLabelText("Model").querySelectorAll("option")].map((o) => o.value);
+  expect(values).toEqual(["inherit", "flash", "pro"]);
+});

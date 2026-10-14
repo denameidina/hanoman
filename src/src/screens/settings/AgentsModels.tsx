@@ -1,3 +1,5 @@
+import { BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS } from "@hanoman/shared";
+import { runtimeFor } from "../session-runtime";
 // Audit UI/UX 2026-10 · Fase 3C · niat "Agen & model": daftar override per fungsi (Konflik, Lead, obrolan
 // portal) dan orkestrasi per fase. Default global TIDAK diedit di sini (ia di "Sesi harian"); setiap
 // override membaca default itu dan menjelaskan nilai yang diwarisinya saat sakelarnya mati.
@@ -29,10 +31,9 @@ export function AgentsModels({ s, store, onToast, codexVer, onNavigate }: {
   const defaults = {
     claude: { model: s.model, effort: s.effort },
     codex: { model: codex.model, effort: codex.effort },
+    antigravity: s.antigravity ?? BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS,
   };
-  const inherited = agent === "codex"
-    ? { agent: "codex" as const, model: codex.model, effort: codex.effort }
-    : { agent: "claude" as const, model: s.model, effort: s.effort };
+  const inherited = { agent, ...runtimeFor({ claude: { model: s.model, effort: s.effort }, codex, antigravity: s.antigravity ?? BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS }, agent) };
   const inheritedText = (prefix: string) => (
     <>{prefix} <b>{AGENT_LABEL[inherited.agent]}</b> · <code>{inherited.model}</code> · <code>{inherited.effort}</code>.</>
   );

@@ -3,7 +3,7 @@
    calls the client and updates state from the response. */
 import React from "react";
 import { useModelCatalog } from "./api/model-catalog";
-import { coerceClaudeEffort, zLaunchRejection, type LaunchRejection } from "@hanoman/shared";
+import { zLaunchRejection, type LaunchRejection } from "@hanoman/shared";
 import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
 import { parseRoute, routePath } from "./routes";
 import { STAGE_LABEL } from "./lib/labels";
@@ -21,7 +21,7 @@ import { usePetEnabled, petVisibleOn } from "./ui-state/pet-pref";
 import { api, ApiError, createApi, type TerminalSession, type SourceResetPending } from "./api/client";
 import { subscribe } from "./api/events";
 import type { ProjectView, Spec, SpecSlim, SpecListItem, AuthStatus, UserView, Notification, BreakdownItem, DeviceTokenView, HandledByEntry, SetupStatus, SessionAsk, PresenceView, PendingCounts, OverviewDTO } from "@hanoman/shared";
-import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, codexModel, codexClientTooOld, CODEX_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, LOCAL_DEVICE_ID, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus, type Orchestration, type OrchestrationFlow, type PhaseOverrides } from "@hanoman/shared";
+import { flowForSource, isGoalShapedFlow, payloadShapeFor, codexModel, codexClientTooOld, CODEX_DEFAULTS, BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS, METHODS, METHOD_IDS, resolveMethod, LOCAL_DEVICE_ID, type Agent, type VerifyScope, type AutoMerge, type MethodSkillStatus, type Orchestration, type OrchestrationFlow, type PhaseOverrides } from "@hanoman/shared";
 // SPEC-1216 · ADR-0165 §11 · target picker dialog Start — murni (Task 10), dipakai di sini apa
 // adanya. `createApi` diimpor dari "./api/client" (bukan "./api/instance"): instance.tsx hanya
 // mengekspor InstanceProvider/useInstance/useApi/useWsTarget, StartSessionModal ini dipanggil dari
@@ -29,7 +29,7 @@ import { flowForSource, isGoalShapedFlow, payloadShapeFor, coerceCodexEffort, co
 import { startTargets, type StartTarget, type TargetReason } from "./api/start-targets";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
-import { runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
+import { runtimeCoerceEffort, runtimeOptions, runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
 import { useLaunchAdmission } from "./screens/use-launch-admission";
 import { AttachmentPicker } from "./screens/SpecAttachments";
 import { PhasePlanPreview } from "./screens/PhasePlanPreview";
@@ -127,6 +127,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   const [defs, setDefs] = React.useState<RuntimeDefs>({
     claude: { model: "sonnet", effort: "medium" },
     codex: { ...CODEX_DEFAULTS },
+    antigravity: { ...BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS },
   });
   // Override per fase adalah keputusan sesi saat ini, bukan perubahan Settings global.
   const [phaseOverrides, setPhaseOverrides] = React.useState<PhaseOverrides>({});
@@ -176,8 +177,9 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       const d: RuntimeDefs = {
         claude: { model: s.model, effort: s.effort },
         codex: { ...CODEX_DEFAULTS, ...(s.codex ?? {}) },
+        antigravity: { ...BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS, ...(s.antigravity ?? {}) },
       };
-      const a: Agent = s.agent === "codex" ? "codex" : "claude";
+      const a: Agent = s.agent ?? "claude";
       setDefs(d); setAgent(a); setModel(d[a].model); setEffort(d[a].effort);
       // SPEC-407 · ADR-0089 · backlog goal membawa kondisinya sendiri (server menurunkannya dari
       // item), jadi (a) mode goal-nya tak boleh bisa dimatikan — itulah yang membedakan source ini
@@ -246,7 +248,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // Turunkan SEKARANG supaya perubahannya terlihat di picker, bukan diam-diam saat sesi lahir.
   const pickModel = (id: string) => {
     setModel(id);
-    setEffort((e) => agent === "codex" ? coerceCodexEffort(id, e) : coerceClaudeEffort(id, e));
+    setEffort((e) => runtimeCoerceEffort(agent, id, e));
   };
   // SPEC-339 · effort adalah properti MODEL untuk codex — daftarnya menyempit mengikuti pilihan.
   const efforts = runtimeEfforts(agent, model);
@@ -256,6 +258,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // SPEC-407 · ADR-0089 · SPEC-825 · ADR-0123 · sesi backlog goal & no_effort selalu lahir
   // bermode goal (server pun memaksanya — ini cerminan UI-nya, bukan gerbangnya).
   const goalLocked = isGoalShapedFlow(flow);
+  const unsupportedGoal = agent === "antigravity" && goalOn;
   // SPEC-447 · ADR-0093 · gerbang dependency ada di SERVER (409); ini cerminannya supaya operator
   // tahu apa yang ia paksa sebelum menekannya. Force admission baru ditawarkan setelah 409.
   const blockers = s.blockedBy ?? [];
@@ -264,6 +267,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   // karena superpowers bisa siap untuk claude dan kosong untuk codex di mesin yang sama.
   const methodStat = methodStatuses?.find((m) => m.method === method && m.agent === agent) ?? null;
   async function start(force = false, confirmRemote = false) {
+    if (unsupportedGoal) return;
     setBusy(true);
     setLaunchRejection(null); setRemoteError(null);
     try {
@@ -293,8 +297,8 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       footer={<>
         <Button variant="ghost" onClick={onClose}>Batal</Button>
         <Button leftIcon={isBlocked ? "lock" : "play"} variant={isBlocked ? "danger" : "primary"}
-          disabled={busy} onClick={() => void start()}>{isBlocked ? "Mulai tetap" : launchRejection ? "Coba lagi" : "Mulai"}</Button>
-        {launchRejection && !isBlocked && !isRemoteTarget && <Button leftIcon="lock" variant="danger" disabled={busy}
+          disabled={busy || unsupportedGoal} onClick={() => void start()}>{isBlocked ? "Mulai tetap" : launchRejection ? "Coba lagi" : "Mulai"}</Button>
+        {launchRejection && !isBlocked && !isRemoteTarget && <Button leftIcon="lock" variant="danger" disabled={busy || unsupportedGoal}
           onClick={() => void start(true)}>Mulai tetap</Button>}
       </>}>
       <div className="hn-sheet-lead">
@@ -337,14 +341,14 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       {remoteError?.error === "confirm-required" && (
         <div role="alert" className="hn-sheet-notice">
           <div>Device terakhir yang mengerjakan ini sudah offline.</div>
-          <Button variant="danger" disabled={busy} onClick={() => void start(false, true)}>Tetap mulai</Button>
+          <Button variant="danger" disabled={busy || unsupportedGoal} onClick={() => void start(false, true)}>Tetap mulai</Button>
         </div>
       )}
       {/* SPEC-338 · ADR-0074 · mesin sesi. Perilaku sesi identik (worktree, fase, stage, review);
           yang berbeda hanya CLI yang dijalankan — dan karenanya katalog model/effort-nya. */}
       <Field label="Agen" hint="Mesin yang menjalankan sesi ini. Perilaku sesi sama; hanya CLI-nya berbeda.">
         <Select aria-label="Agen" value={agent} className="hn-w-full"
-          options={[{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex CLI" }]}
+          options={runtimeOptions}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickAgent(e.target.value as Agent)} />
       </Field>
       <Field label="Model">
@@ -375,12 +379,13 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
         loading={!settingsLoaded || (agent === "codex" && !codexVerLoaded)} />
       {/* SPEC-332 · ADR-0073 · mode goal: sesi menolak berhenti sampai kondisinya terbukti di
           transkrip. Interupsi manusia (Esc) tetap bekerja; melepas gate = hentikan sesinya. */}
+      {agent === "antigravity" && <div role="note" className="hn-sheet-note">Antigravity tersedia pada host/lab; sandbox dan mode goal native belum didukung. Matikan mode goal secara eksplisit atau pilih runtime lain. Telemetri native tidak diketahui.</div>}
       <Field label="Mode goal"
         hint={goalLocked
           ? "Backlog goal selalu berjalan dalam mode goal — sesi menolak berhenti sampai goal item ini terbukti tercapai. Kosongkan kondisi untuk memakai goal item apa adanya."
           : "Sesi menolak berhenti sampai kondisinya terbukti. Kosongkan kondisi untuk memakai bawaan hanoman: semua fase tercatat, plan tak menyisakan task, push sukses."}>
         <div className={goalOn ? "hn-goal-row hn-goal-row--on" : "hn-goal-row"}>
-          <Switch aria-label="Mode goal" checked={goalOn} disabled={goalLocked}
+          <Switch aria-label="Mode goal" checked={goalOn} disabled={goalLocked || (agent === "antigravity" && !goalOn)}
             onChange={(v: boolean) => { if (!goalLocked) setGoalOn(v); }} />
           <span className="hn-sheet-meta">
             {goalLocked ? "aktif · terkunci" : goalOn ? "aktif" : "nonaktif"}
@@ -420,7 +425,8 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
             skill yang hilang tak mematikan sesi, ia menghapus gerbang yang disebut prompt. */}
         {methodStat && !methodStat.ready && (
           <div data-testid="method-status-note" className="hn-sheet-status">
-            <b>{methodStat.label}</b> belum siap untuk <b>{agent === "codex" ? "Codex CLI" : "Claude Code"}</b> di
+            {methodStat.availabilityReason && <div>{methodStat.availabilityReason}</div>}
+            <b>{methodStat.label}</b> belum siap untuk <b>{runtimeOptions.find((r) => r.value === agent)?.label}</b> di
             mesin ini
             {methodStat.missingPackages.length > 0 && <> · paket kurang: <code>{methodStat.missingPackages.join(" · ")}</code></>}
             {methodStat.missingSkills.length > 0 && <> · skill kurang: <code>{methodStat.missingSkills.join(" · ")}</code></>}.

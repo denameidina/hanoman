@@ -379,7 +379,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
         // di mana pun, jadi tak bisa diulang di sini.
         ? await api.startSession({
             spec: r.specId, flow: (r.flow ?? "feature") as Flow,
-            agent: r.agent === "codex" ? "codex" : "claude",
+            agent: r.agent === "antigravity" ? "antigravity" : r.agent === "codex" ? "codex" : "claude",
             ...(r.model ? { model: r.model } : {}),
             ...(r.effort ? { effort: r.effort } : {}),
             ...(force ? { force } : {}),
@@ -392,7 +392,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
             // `agent` kolomnya `String` (bukan enum) — nilai asing jatuh ke claude, cermin
             // pembacaan @hanoman_agent di pty.ts.
             ? await api.createTerminal(r.projectId, {
-                agent: r.agent === "codex" ? "codex" : "claude",
+                agent: r.agent === "antigravity" ? "antigravity" : r.agent === "codex" ? "codex" : "claude",
                 ...(r.model ? { model: r.model } : {}),
                 ...(r.effort ? { effort: r.effort } : {}),
               })
@@ -1313,10 +1313,11 @@ export function PhaseStrip({ phases, compact = false, now }: {
           <div><b>{openPhase.agent.name}</b></div>
           {/* Guard: `model` opsional — dibangun dari bagian yang ADA saja supaya tak menyisakan
               "· " di depan saat model kosong. */}
-          <div>{[modelLabel(openPhase.agent.model), openPhase.agent.effort, openPhase.agent.status ?? "belum mulai"]
+          <div>{[modelLabel(openPhase.agent.model) || (openPhase.agent.evidence === "unknown" ? "model tidak diketahui" : ""),
+            openPhase.agent.effort ?? (openPhase.agent.evidence === "unknown" ? "effort tidak diketahui" : ""), openPhase.agent.status ?? "belum mulai"]
             .filter(Boolean).join(" · ")}</div>
-          <div>durasi {durationOf(openPhase) || "—"} · percobaan {openPhase.agent.attempts}</div>
-          <div>token in {openPhase.agent.inputTokens ?? "—"} · out {openPhase.agent.outputTokens ?? "—"} · cache {openPhase.agent.cachedTokens ?? "—"}</div>
+          <div>durasi {durationOf(openPhase) || (openPhase.agent.evidence === "unknown" ? "tidak diketahui" : "—")} · percobaan {openPhase.agent.attempts ?? "tidak diketahui"}</div>
+          <div>token in {openPhase.agent.inputTokens ?? "tidak diketahui"} · out {openPhase.agent.outputTokens ?? "tidak diketahui"} · cache {openPhase.agent.cachedTokens ?? "tidak diketahui"}</div>
           {openPhase.agent.resultExcerpt && (
             <pre className="hn-terminal-phase-excerpt">{openPhase.agent.resultExcerpt}</pre>
           )}

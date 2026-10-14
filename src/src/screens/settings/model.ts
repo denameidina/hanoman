@@ -2,7 +2,7 @@
 // yang masing-masing dirender sebagai satu layar. Kunci bagian juga kunci persist (`settings/tab`,
 // ADR-0115) dan nilai deep link `#bagian=<kunci>`; kunci lama tetap dipetakan lewat `normalizeSection`.
 import {
-  BUILTIN_RUNTIME_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, DEFAULT_METHOD, GOAL_DEFAULTS,
+  BUILTIN_RUNTIME_DEFAULTS, BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS, CODEX_DEFAULTS, CONFLICT_DEFAULTS, DEFAULT_METHOD, GOAL_DEFAULTS,
   LEAD_DEFAULTS, LOG_RETENTION_DEFAULTS, LOG_SHIPPING_DEFAULTS, MODELS, ORCHESTRATION_DEFAULTS,
   PORTAL_CHAT_DEFAULTS, REMOTE_CONTROL_DEFAULTS, SCHEDULER_DEFAULTS, TELEGRAM_DEFAULTS,
   claudeEfforts, coerceClaudeEffort, modelSelectOptions,
@@ -123,6 +123,7 @@ export const S_DEFAULTS: Setting = {
   goal: GOAL_DEFAULTS,
   agent: "claude",
   codex: CODEX_DEFAULTS,
+  antigravity: BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS,
   verifyScope: "changed",
   method: DEFAULT_METHOD,
   conflict: CONFLICT_DEFAULTS,

@@ -1,3 +1,5 @@
+import { BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS } from "@hanoman/shared";
+import { runtimeFor } from "../session-runtime";
 // Audit UI/UX 2026-10 · Fase 3C · niat "Integrasi & akses". Telegram di sini adalah SATU tempat: kredensial
 // (form Simpan eksplisit), gateway, dan agen operator (override). Dua tempat Telegram di Fase 1 kini satu.
 import React from "react";
@@ -62,10 +64,9 @@ export function TelegramSection({ s, store, onToast, codexVer }: {
   const defaults = {
     claude: { model: s.model, effort: s.effort },
     codex: { model: codex.model, effort: codex.effort },
+    antigravity: s.antigravity ?? BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS,
   };
-  const inherited = agent === "codex"
-    ? { agent: "codex" as const, model: codex.model, effort: codex.effort }
-    : { agent: "claude" as const, model: s.model, effort: s.effort };
+  const inherited = { agent, ...runtimeFor({ claude: { model: s.model, effort: s.effort }, codex, antigravity: s.antigravity ?? BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS }, agent) };
 
   // `source === "env"` = nilai masih datang dari .env: jalur warisan yang sengaja hidup, tapi ditandai.
   const sourceBadge = (src: "db" | "env" | "default") =>

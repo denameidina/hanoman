@@ -147,3 +147,12 @@ describe("StartSessionModal · catatan kesiapan metode (SPEC-739)", () => {
     expect(screen.queryByTestId("method-status-note")).toBeNull();
   });
 });
+
+it("SPEC-1442 unavailable Antigravity installer explains reason and disables only install", async () => {
+  vi.mocked(api.createShell).mockClear();
+  vi.mocked(api.getMethodStatus).mockResolvedValue({ agents: [], methods: [{ method: "superpowers", label: "superpowers", agent: "antigravity", ready: false, available: false, availabilityReason: "Installer Antigravity belum terverifikasi.", install: [], missingPackages: [], missingSkills: [] }] });
+  openSesi();
+  await screen.findByText("Installer Antigravity belum terverifikasi.");
+  expect(screen.getByRole("button", { name: "Pasang" })).toBeDisabled();
+  expect(api.createShell).not.toHaveBeenCalled();
+});

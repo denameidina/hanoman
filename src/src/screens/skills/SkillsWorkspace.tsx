@@ -150,7 +150,7 @@ export function SkillsWorkspace({ projectId, projectName, onToast }:
                 onChange={(e) => setCreating({ ...creating, layer: e.target.value as NewSkill["layer"] })}
                 options={[
                   { value: "hanoman", label: "Global hanoman (disuntik ke semua sesi)" },
-                  { value: "user", label: "User (~/.claude, ~/.codex, ~/.agents)" },
+                  { value: "user", label: "User (~/.claude, ~/.codex, ~/.agents, ~/.gemini/antigravity-cli)" },
                   ...(projectId ? [{ value: "project", label: "Project ini" }] : []),
                 ]} />
             </Field>
@@ -160,8 +160,9 @@ export function SkillsWorkspace({ projectId, projectName, onToast }:
                   onChange={(e) => setCreating({ ...creating, source: e.target.value })}
                   options={[
                     { value: ".claude", label: ".claude (claude)" },
-                    { value: ".agents", label: ".agents (codex)" },
+                    { value: ".agents", label: creating.layer === "project" ? ".agents (Codex + Antigravity)" : ".agents (Codex)" },
                     { value: ".codex", label: ".codex (codex)" },
+                    ...(creating.layer === "user" ? [{ value: ".gemini/antigravity-cli", label: ".gemini/antigravity-cli (Antigravity CLI)" }] : []),
                   ]} />
               </Field>
             )}

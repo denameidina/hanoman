@@ -1,3 +1,5 @@
+import { BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS } from "@hanoman/shared";
+import { runtimeFor, runtimeModelOptions, runtimeEfforts, runtimeOptions, runtimeCoerceEffort } from "../session-runtime";
 // Audit UI/UX 2026-10 · Fase 3C · niat "Sesi harian": notifikasi, perilaku sesi, default agen & model,
 // mode goal, scope verifikasi, dan metode workflow. Ini kebiasaan harian, jadi default-nya ditaruh di
 // sini dan BUKAN di "Agen & model" (satu sumber untuk setiap angka; "Agen & model" membaca default ini).
@@ -17,7 +19,7 @@ import type { Setting } from "@hanoman/shared";
 import {
   AGENT_LABEL, S_SOUNDS, claudeEffortOptions, claudeEffortPatch, claudeOptions, type CodexVersionState,
 } from "./model";
-import { AgentGroupHeader, CodexVersionNote } from "./fields";
+import { AntigravityVersionNote, AgentGroupHeader, CodexVersionNote } from "./fields";
 import { Prose, SectionNote, SettingRow } from "./rows";
 import type { SettingsStore } from "./useSettingsStore";
 import { useSettingField } from "./useSettingField";
@@ -98,6 +100,14 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
     save: (e) => store.save({ codex: { ...codex, effort: e } }, "Effort codex → " + e),
   });
 
+  const antigravity = s.antigravity ?? BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS;
+  const agModel = useSettingField<string>({ value: antigravity.model, delayMs: 0,
+    save: (model) => store.save({ antigravity: { model, effort: runtimeCoerceEffort("antigravity", model, antigravity.effort) } }, "Model Antigravity → " + model),
+  });
+  const agEffort = useSettingField<string>({ value: antigravity.effort, delayMs: 0,
+    save: (effort) => store.save({ antigravity: { ...antigravity, effort } }, "Effort Antigravity → " + effort),
+  });
+
   // ── Mode goal & scope verifikasi & metode ─────────────────────────────────
   const goalEnabled = useSettingField<boolean>({
     value: s.goal.enabled, delayMs: 0,
@@ -129,9 +139,7 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
     }
   };
 
-  const inherited = agent === "codex"
-    ? { agent: "codex" as const, model: codex.model, effort: codex.effort }
-    : { agent: "claude" as const, model: s.model, effort: s.effort };
+  const inherited = { agent, ...runtimeFor({ claude: { model: s.model, effort: s.effort }, codex, antigravity: s.antigravity ?? BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS }, agent) };
 
   return (
     <>
@@ -204,13 +212,23 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
           Default untuk sesi baru; bisa di-override per sesi saat <b>Start</b>. Di terminal, <code>/model</code>{" "}
           mengubahnya kapan saja. Dengan orkestrasi aktif, model ini menjadi model <b>orchestrator</b>; model
           &amp; effort tiap fase diatur di bagian <b>Orkestrasi</b> pada Agen &amp; model. Yang benar-benar dipakai adalah blok milik
-          agen terpilih di bawah — yang satunya tersimpan, menunggu giliran.
+          agen terpilih di bawah — blok runtime lain tersimpan, menunggu giliran.
         </Prose>
         <SettingRow title="Agen default" desc="Sesi backlog masih bisa memilih agen lain saat Start." save={agentField}>
           <Select size="sm" aria-label="Agen default" value={agentField.value} className="hn-set-w-sm"
-            options={[{ value: "claude", label: AGENT_LABEL.claude }, { value: "codex", label: AGENT_LABEL.codex }]}
+            options={runtimeOptions}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => agentField.set(e.target.value as Setting["agent"])} />
         </SettingRow>
+        <div data-testid="agent-group-antigravity" className="hn-set-group">
+          <AgentGroupHeader id="antigravity" label={AGENT_LABEL.antigravity} active={agent === "antigravity"} />
+          <AntigravityVersionNote />
+          <SettingRow title="Model" desc="Model parent diteruskan ke agy --model." save={agModel}>
+            <Select size="sm" aria-label="Model antigravity" value={agModel.value} options={runtimeModelOptions("antigravity", agModel.value)} onChange={(e) => agModel.set(e.target.value)} />
+          </SettingRow>
+          <SettingRow title="Effort" last desc="Effort mengikuti kemampuan slug model parent." save={agEffort}>
+            <Select size="sm" aria-label="Effort antigravity" value={agEffort.value} options={runtimeEfforts("antigravity", agModel.value).map((value) => ({ value, label: value }))} onChange={(e) => agEffort.set(e.target.value)} />
+          </SettingRow>
+        </div>
         <div data-testid="agent-group-claude" className="hn-set-group">
           <div className="hn-set-catalog">
             Katalog model diperiksa otomatis setiap 5 menit.
@@ -254,6 +272,7 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
       </Card>
 
       <Card eyebrow="goal" title="Mode goal — sesi backlog" data-setting-card data-search="mode goal kondisi template gate stop">
+        {agent === "antigravity" && <Prose>Mode goal native Antigravity belum didukung. Nilai global tetap disimpan; matikan mode goal secara eksplisit atau pilih runtime lain sebelum memulai sesi.</Prose>}
         <Prose>
           Sesi backlog lahir dengan gate <code>Stop</code>: ia menolak berhenti sampai kondisinya terbukti
           di transkrip. Interupsi manusia (<code>Esc</code>) tetap bekerja; melepas gate sepenuhnya =
@@ -262,7 +281,7 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
         <SettingRow title="Aktif sebagai default"
           desc="Sesi backlog baru lahir dengan mode goal. Masih bisa dimatikan per sesi saat Start."
           save={goalEnabled}>
-          <Switch aria-label="Mode goal default" checked={goalEnabled.value}
+          <Switch aria-label="Mode goal default" disabled={agent === "antigravity" && !goalEnabled.value} checked={goalEnabled.value}
             onChange={(v: boolean) => goalEnabled.set(v)} />
         </SettingRow>
         <SettingRow title="Kondisi (template global)" last
@@ -323,6 +342,7 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
                     <Badge tone={m.ready ? "ok" : "warn"}>{m.ready ? "siap" : "belum siap"}</Badge>
                     <div className="hn-set-method-text">
                       <b>{AGENT_LABEL[m.agent]}</b>
+                      {m.availabilityReason && <div>{m.availabilityReason}</div>}
                       {!m.ready && (
                         <div className="hn-set-method-missing">
                           {m.missingPackages.length > 0 && (
@@ -333,7 +353,7 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
                       )}
                     </div>
                     {!m.ready && (
-                      <Button size="sm" variant="ghost" leftIcon="download" disabled={!installProject}
+                      <Button size="sm" variant="ghost" leftIcon="download" disabled={!installProject || m.available === false}
                         onClick={() => installMethod(m)}>Pasang</Button>
                     )}
                   </div>

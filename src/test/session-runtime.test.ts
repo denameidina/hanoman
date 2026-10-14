@@ -23,6 +23,7 @@ describe("session-runtime", () => {
 
   it("runtimeFor mengambil blok agen terpilih", () => {
     const defs = {
+      antigravity: { model: "gemini-3.8-flash-high", effort: "high" },
       claude: { model: "claude-opus-5", effort: "xhigh" },
       codex: { model: "gpt-5.6-terra", effort: "low" },
     };
@@ -32,6 +33,7 @@ describe("session-runtime", () => {
 
   it("runtimeFor mengoreksi effort codex yang tak didukung modelnya", () => {
     const defs = {
+      antigravity: { model: "gemini-3.8-flash-high", effort: "high" },
       claude: { model: "claude-opus-5", effort: "xhigh" },
       codex: { model: "gpt-5.6-luna", effort: "ultra" },
     };
@@ -58,4 +60,12 @@ describe("session-runtime", () => {
     expect(runtimeSubagentModels("claude").map((m) => m.id)).not.toContain("default");
     expect(runtimeSubagentModels("codex")).toEqual(runtimeModels("codex"));
   });
+});
+
+it("separates Antigravity parent slugs and native child tiers", () => {
+  expect(runtimeSubagentModels("antigravity").map((m) => m.id)).toEqual(["inherit", "flash", "pro"]);
+  expect(runtimeModels("antigravity").map((m) => m.id)).toContain("gemini-3.8-flash-high");
+  expect(runtimeModelOptions("antigravity", "future-model-low")[0]).toEqual({ value: "future-model-low", label: "future-model-low" });
+  expect(runtimeEfforts("antigravity", "future-model-low")).toEqual(["low"]);
+  expect(runtimeEfforts("antigravity", "unknown")).toEqual([]);
 });

@@ -3572,3 +3572,42 @@ dengan perbaikan aman yang dipertahankan: [ADR-0219](../adr/0219-dalang-sinemati
   "Aktifkan" di Scheduler, "Mulai" dan "Lanjutkan" di Backlog, "Jalankan" di detail item, dan checkbox dependensi
   tercentang. axe-core 4.13 (WCAG 2.2 A/AA + best-practice) pada enam rute utama: 0 pelanggaran di 1280 dan 390.
   Batas: Safari dan Firefox tak diuji; keterbacaan disabled (sekitar 2:1) tak diubah.
+
+## Runtime Antigravity CLI (SPEC-1442 / ADR-0221)
+
+Pemilih parent sesi Backlog/IDE, Terminal, serta override konflik, lead dan operator memakai
+katalog runtime bersama (`screens/session-runtime.ts`): Claude Code, Codex CLI dan Antigravity CLI.
+Blok `Setting.antigravity` menyimpan default parent `gemini-3.8-flash-high`/`high`; menukar runtime
+memakai blok runtime tersebut dan menjaga blok lainnya. Model tersimpan yang sudah tidak ada di
+katalog tetap tampil. Katalog bundled/last-good tetap tersedia saat probe offline; effort parent
+Antigravity mengikuti katalog atau suffix slug yang terverifikasi, tanpa mengarang semua level.
+
+Pemilih child pada Orkestrasi, pratinjau Start dan Custom Agent memakai tier `inherit`, `flash`,
+`pro`, bukan slug parent. Effort child independen dinonaktifkan dan override fase mengirim
+`effort:null`. Catatan menyebut invoke/recall asynchronous yang ditunggu melalui protokol dan
+reviewer fase read-only **instruksional**, tanpa mengklaim enforcement native/foreground.
+Custom Agent menampilkan `availabilityReason`/`selectionReason` dari API; kebijakan read-only
+strict dan isolated-worktree Antigravity belum tersedia, nilai lama tidak diubah menjadi inherit
+secara diam-diam. Form menahan profil tidak kompatibel sampai operator memperbaikinya.
+
+Catatan versi membaca `/api/antigravity/version`, menampilkan semver atau null beserta alasan
+aman, dan menyediakan tautan [pemasangan/login resmi](https://antigravity.google/docs/cli).
+Batas host/lab, sandbox, mode goal dan telemetri terlihat. Pemilihan Antigravity menjaga nilai
+global goal yang sudah aktif, tetapi Start diblokir sampai operator mematikan goal secara eksplisit
+atau memilih runtime lain; backlog goal yang terkunci tetap diblokir. Tidak ada goal yang dikirim
+lalu diabaikan. Detail fase menampilkan token/attempt/durasi/model/effort native yang belum diketahui
+sebagai **tidak diketahui**, bukan angka nol atau bukti missing.
+
+Installer metode Antigravity menampilkan alasan belum terverifikasi dan tombol **Pasang** disabled;
+kesiapan metode tetap fail-open bagi sesi tanpa goal yang tidak didukung. Skill existing tetap
+tersedia. Library Skills menawarkan sumber user `~/.gemini/antigravity-cli`; `.agents` project
+berlabel Codex + Antigravity, `.agents` user tetap Codex, global hanoman disuntik ke semua runtime.
+
+Verifikasi Task 12: test mounted terkait (15 berkas, 156 test) dan tambahan metode/telemetri/profil/
+Telegram (4 berkas, 77 test) lulus; typecheck hanya paket `src`. Browser Chromium 155.0.8059.79
+headless memakai fixture lokal dengan seluruh `/api/**` diintercept: Settings dipilih melalui
+Space → a → Enter → Tab; Start/New Terminal diverifikasi pada 320px, Custom Agent memperlihatkan
+alasan unavailable dan effort disabled, tabel Orkestrasi menampilkan tiga tier dengan local overflow,
+telemetri null tampil tidak diketahui. Tidak ada page error atau tulisan ke Settings/sesi operator.
+Receipt/harness/screenshot tersimpan di workspace ignored
+`.superpowers/sdd/2026-10-14-spec-1442-antigravity-cli-runtime/Task12-*`.

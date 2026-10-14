@@ -192,3 +192,14 @@ describe("StartSessionModal · override fase (audit R6)", () => {
     expect(screen.getByLabelText("Model subagent Plan")).toHaveValue("claude-retired-1");
   });
 });
+
+it("SPEC-1442 preview offers native tiers and nullable effort override", () => {
+  const change = vi.fn();
+  render(<PhasePlanPreview flow="feature" agent="antigravity" model="gemini-3.8-flash-high" effort="high" orchestration={ORCHESTRATION_DEFAULTS} codexVersion={null} loading={false} onPhaseOverridesChange={change} />);
+  const model = screen.getByRole("combobox", { name: "Model subagent Brainstorm" });
+  expect([...model.querySelectorAll("option")].map((o) => o.value)).toEqual(["inherit", "flash", "pro"]);
+  expect(screen.getByRole("combobox", { name: "Effort subagent Brainstorm" })).toBeDisabled();
+  fireEvent.change(model, { target: { value: "flash" } });
+  expect(change).toHaveBeenCalledWith({ Brainstorm: { model: "flash", effort: null } });
+  expect(screen.getByText(/reviewer read-only instruksional/)).toBeInTheDocument();
+});
