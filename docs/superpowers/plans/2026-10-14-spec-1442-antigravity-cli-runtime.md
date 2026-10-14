@@ -183,12 +183,14 @@ menunggu review parent sebelum ditandai selesai.
 
 **Interfaces:** `resolvePhasePlan(PhasePlanInput):PhasePlan|null` Antigravity uses tier/inherit and null effort; `buildPhaseAgents(plan,ctx):AgentDef[]`, `phaseDelegationClause`/orchestrator prompt render native `invoke_subagent` and verified follow-up tool from Task 0. `kind:phase` reviewer inherit/instructional-only; default inline execution remains existing.
 
-- [ ] **Step 1:** Tests default tier inherit/reviewer inherit, explicit flash/pro override, parent slug cannot become phase tier; null effort propagated through DTO/prompt/materializer. Existing Claude/Codex snapshots unchanged and no dependency on their foreground env/tool names for Antigravity.
+- [x] **Step 1:** Tests default tier inherit/reviewer inherit, explicit flash/pro override, parent slug cannot become phase tier; null effort propagated through DTO/prompt/materializer. Existing Claude/Codex snapshots unchanged and no dependency on their foreground env/tool names for Antigravity.
 
   Assertions: `expect(plan.phases[0]).toMatchObject({model:"inherit",effort:null})`; `expect(plan.reviewer).toMatchObject({model:"inherit",effort:null})`; `expect(prompt).toContain("invoke_subagent")`; reviewer instruksional tetap tidak mendapat policy read-only enforced.
-- [ ] **Step 2:** Assert relay reports all open questions, resumes same child ID, rework reviewer same ID, parent sole phase marker writer, Execute marker only after independent `Verdict:lulus`. Prompt explicitly describes async/protocol wait and native effort unknown, not runtime foreground or exact model guarantee.
-- [ ] **Step 3:** Run red paths; implement runtime-specific prompt/phase renderer with shared existing retry/review/marker contract. Materialization failure clears orchestrated metadata and warns visibly on existing single-session fallback; no false roster success.
-- [ ] **Step 4:** Run green and one bounded live phase child + same-ID follow-up/reviewer receipt in synthetic temp session. Parent protocol waits; no writes to this real orchestrator's phase-file. Commit updated agent workflow/ADR with code.
+- [x] **Step 2:** Assert relay reports all open questions, resumes same child ID, rework reviewer same ID, parent sole phase marker writer, Execute marker only after independent `Verdict:lulus`. Prompt explicitly describes async/protocol wait and native effort unknown, not runtime foreground or exact model guarantee.
+- [x] **Step 3:** Run red paths; implement runtime-specific prompt/phase renderer with shared existing retry/review/marker contract. Materialization failure clears orchestrated metadata and warns visibly on existing single-session fallback; no false roster success.
+- [x] **Step 4:** Run green and one bounded live phase child + same-ID follow-up/reviewer receipt in synthetic temp session. Parent protocol waits; no writes to this real orchestrator's phase-file. Commit updated agent workflow/ADR with code.
+
+**Receipt Task 7:** commits `43b9b706759edfc359d2f896130aacc2e9e11c64` + nullable override fix `bd1c789c90519f9b15cb18e8012f0a79a0ba32ee` reviewed. Original8files/279tests green + focused30tests green, shared/runner typecheck0, old prompt hashes unchanged. Native Execute d61f709e-2717-4278-a344-26facbe245d3 retained context after two-question relay to same ID; synthetic marker empty until independentReviewer66c05b90-01d2-4b3e-80d8-4d3999a0b1e4 Verdict:lulus; parent then wrote/tail/cat Execute done,47s+87s and fullcleanup. Task8 must validate effective runtime overrides before approveLaunch and map existing400; service validates before worktree/DB/reap. [Receipt SoT](../../../internal/docs/architecture/antigravity-runtime.md).
 
 ### Task 8: Semua launch, lead brain, boundary dan status
 
