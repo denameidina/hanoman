@@ -145,6 +145,20 @@ const MORE: readonly McpToolDef[] = [
     shape: (raw) => raw,
   },
   {
+    name: "hanoman_session_rename",
+    title: "Ganti nama sesi",
+    description:
+      "Memberi nama kustom pada sesi terminal (hidup atau yang panenya masih ada) supaya mudah dikenali di Terminal. Nama maksimal 80 karakter, satu baris. Nama kosong menghapus nama kustom dan UI kembali memakai label turunan (backlog/flow/project).",
+    inputSchema: obj({
+      properties: { session: str("Id sesi."), name: str("Nama baru. Kosong = hapus nama kustom.") },
+      required: ["session", "name"],
+    }),
+    mode: "write", capability: "sessions:write",
+    samplePath: "/terminal/sessions/s1", sampleMethod: "PATCH",
+    build: (a) => ({ method: "PATCH", path: `/terminal/sessions/${enc(String(a.session))}`, body: { name: String(a.name) } }),
+    shape: (raw) => raw,
+  },
+  {
     name: "hanoman_session_create",
     title: "Buka sesi agen baru (BERBAHAYA)",
     description:

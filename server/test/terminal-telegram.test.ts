@@ -70,4 +70,22 @@ describe("Telegram terminal controls (SPEC-476)", () => {
     expect(result.statusCode).toBe(202);
     await waitFor(() => capturePane(s.id).includes("HEX:1b"));
   });
+
+  it("PATCH rename: menyimpan nama kustom, menghapusnya bila kosong, 400 body cacat, 404 sesi tak ada", async () => {
+    const s = rawEchoSession("tg-rename");
+    await waitFor(() => capturePane(s.id).includes("READY"));
+    expect(capabilityForRoute("PATCH", `/api/terminal/sessions/${s.id}`)).toBe("sessions:write");
+
+    const ok = await app.inject({ method: "PATCH", url: `/api/terminal/sessions/${s.id}`, payload: { name: " Perbaiki login " } });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toEqual({ id: s.id, name: "Perbaiki login" });
+    const list = await app.inject({ method: "GET", url: "/api/terminal/sessions" });
+    expect((list.json() as Array<{ id: string; name?: string }>).find((x) => x.id === s.id)?.name).toBe("Perbaiki login");
+
+    const cleared = await app.inject({ method: "PATCH", url: `/api/terminal/sessions/${s.id}`, payload: { name: "" } });
+    expect(cleared.json()).toEqual({ id: s.id, name: null });
+
+    expect((await app.inject({ method: "PATCH", url: `/api/terminal/sessions/${s.id}`, payload: {} })).statusCode).toBe(400);
+    expect((await app.inject({ method: "PATCH", url: "/api/terminal/sessions/tak-ada", payload: { name: "x" } })).statusCode).toBe(404);
+  });
 });

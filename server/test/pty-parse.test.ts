@@ -24,10 +24,11 @@ const line = (over: Record<string, string> = {}) => {
 
 describe("parsePanes", () => {
   it("FMT dan destructuring sama panjang", () => {
-    expect(FIELDS).toHaveLength(23);
+    expect(FIELDS).toHaveLength(24);
     // SPEC-1218 · AC-C2 · pane_width/pane_height di UJUNG (pola SPEC-919): kolom lama tak bergeser.
-    expect(FIELDS[FIELDS.length - 2]).toBe("#{pane_width}");
-    expect(FIELDS[FIELDS.length - 1]).toBe("#{pane_height}");
+    expect(FIELDS[FIELDS.length - 3]).toBe("#{pane_width}");
+    expect(FIELDS[FIELDS.length - 2]).toBe("#{pane_height}");
+    expect(FIELDS[FIELDS.length - 1]).toBe("#{@hanoman_name}");
   });
 
   it("SPEC-1218 · AC-C2 · paneGeometry(id) murni dari listPanes — cols/rows dari pane_width/pane_height", () => {
@@ -105,5 +106,12 @@ describe("Antigravity restart metadata", () => {
   it("retains Antigravity runtime and explicit parent settings after tmux rediscovery", () => {
     const [p] = parsePanes(line({ "#{@hanoman_agent}": "antigravity", "#{@hanoman_model}": "gemini-3.8-flash-high", "#{@hanoman_effort}": "high", "#{@hanoman_event_hook}": "0" }));
     expect(p).toMatchObject({ agent: "antigravity", model: "gemini-3.8-flash-high", effort: "high", eventHook: false });
+  });
+});
+
+describe("parsePanes · nama kustom sesi", () => {
+  it("@hanoman_name terisi → name; kosong → undefined", () => {
+    expect(parsePanes(line({ "#{@hanoman_name}": "Perbaiki login" }))[0]!.name).toBe("Perbaiki login");
+    expect(parsePanes(line())[0]!.name).toBeUndefined();
   });
 });

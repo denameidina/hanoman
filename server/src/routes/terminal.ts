@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { existsSync } from "node:fs";
 import { prisma } from "../db";
 import {
-  zTerminalSession, zIntegrate, zTerminalSteerInput, zSessionDialogAnswer, METHODS, grantsCapability, type ReviewEmptyReason, type Stage,
+  zTerminalSession, zIntegrate, zTerminalSteerInput, zTerminalRenameInput, SESSION_NAME_MAX, zSessionDialogAnswer, METHODS, grantsCapability, type ReviewEmptyReason, type Stage,
 } from "@hanoman/shared";
 import { resolveHome, realGit, startProjectPrompt, startPrdPrompt, startScaffoldPrompt, startBreakdownPrompt, RESUMED_WORKTREE_NOTE, CODE_STYLE_CLAUSE, buildPhaseAgents, projectContext, scaffoldContext, prdContext, breakdownContext, PROJECT_METHOD, type Flow } from "@hanoman/runner";
 import { phaseFilePath, decisionFilePath, readPhases, stageForRun } from "../services/session-phases";
@@ -33,7 +33,7 @@ import { recordCompletion } from "../services/notifications";
 import { STAGES } from "../services/stage-machine";
 import {
   createSession, sessionIdForSpec, getSession, getSessionAsync, attachAsync, screenResyncFrame, listSessions, listSessionsAsync, killSession, sessionPhases,
-  detach, writeTo, resize, shellBin, sendToPane, interruptPane, clearMarker, type Client,
+  detach, writeTo, resize, shellBin, sendToPane, interruptPane, renameSession, clearMarker, type Client,
 } from "../services/pty";
 import { createBoundedSender } from "../services/bounded-sender";
 import { saveSessionUpload } from "../services/uploads";
@@ -450,6 +450,15 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     const ok = await sendToPane(steerId, parsed.data.text);
     if (!ok) return reply.code(404).send({ error: "live session not found" });
     return reply.code(202).send({ accepted: true });
+  });
+
+  // Rename sesi: nama kustom operator, disimpan di opsi tmux. String kosong menghapus nama kustom.
+  app.patch("/terminal/sessions/:id", async (req, reply) => {
+    const parsed = zTerminalRenameInput.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    const { id } = req.params as { id: string };
+    if (!renameSession(id, parsed.data.name)) return reply.code(404).send({ error: "session not found" });
+    return { id, name: parsed.data.name.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, SESSION_NAME_MAX) || null };
   });
 
   app.post("/terminal/sessions/:id/interrupt", async (req, reply) => {
