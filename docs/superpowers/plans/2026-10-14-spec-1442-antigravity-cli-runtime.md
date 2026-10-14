@@ -123,12 +123,14 @@ menunggu review parent sebelum ditandai selesai.
 
 **Interfaces:** `antigravityBin():string` memakai `effectiveStr("HANOMAN_ANTIGRAVITY_BIN")??"agy"`; `agentEnvironment(agent:Agent|null, env:NodeJS.ProcessEnv):NodeJS.ProcessEnv` clone env, `null` untuk raw/unrelated; `agentFlags(AgentFlagsOpts):string[]` cabang Antigravity; argv prompt tetap dirakit di `createSession` dari berkas 0600 existing.
 
-- [ ] **Step 1:** Tests bin DB→env→default, fake executable path dengan spasi, override sesudah cache/config refresh; assert Antigravity flags model/effort/bypass dan `--prompt-interactive` tepat sekali sebelum arg prompt. Prompt multiline/backticks/`$()`/quote dan model berkarakter shell diterima sebagai argv utuh, tanpa efek command injection. Assert `--settings`, `--agents`, `exec`, `--print`, `-p`, hook Codex/goal tidak muncul.
+- [x] **Step 1:** Tests bin DB→env→default, fake executable path dengan spasi, override sesudah cache/config refresh; assert Antigravity flags model/effort/bypass dan `--prompt-interactive` tepat sekali sebelum arg prompt. Prompt multiline/backticks/`$()`/quote dan model berkarakter shell diterima sebagai argv utuh, tanpa efek command injection. Assert `--settings`, `--agents`, `exec`, `--print`, `-p`, hook Codex/goal tidak muncul.
 
   Assertion argv: `expect(actualArgs).toContain("--prompt-interactive")`; `expect(actualArgs.at(-1)).toBe(originalPrompt)` pada fake bin yang menyimpan argv; `expect(actualArgs).not.toContain("-p")`; `expect(commandInjectionSentinelCreated).toBe(false)`.
-- [ ] **Step 2:** Tambah env fixtures sentinel pada parent/lead/probe; Claude/Codex/raw/unrelated tidak menerima dua key, Antigravity menerima supplied values. Uji tmux daemon lama membawa sentinel dan overwrite/unset environment per pane secara scoped; log receipt hanya key names/boolean, tidak nilai.
-- [ ] **Step 3:** Run test paths untuk red; implement resolver tunggal dan cabang argv/env eksplisit. Registry bin bukan credential/inherit-all; setiap probe/lead caller memakai resolver dan builder yang sama. Pertahankan quoting/file substitution existing; daemon env cleanup tidak merusak sesi tetangga.
-- [ ] **Step 4:** Run green regression argv/env/config/tmux paths; SoT registry/env/binary diperbarui dalam commit explicit paths.
+- [x] **Step 2:** Tambah env fixtures sentinel pada parent/lead/probe; Claude/Codex/raw/unrelated tidak menerima dua key, Antigravity menerima supplied values. Uji tmux daemon lama membawa sentinel dan overwrite/unset environment per pane secara scoped; log receipt hanya key names/boolean, tidak nilai.
+- [x] **Step 3:** Run test paths untuk red; implement resolver tunggal dan cabang argv/env eksplisit. Registry bin bukan credential/inherit-all; setiap probe/lead caller memakai resolver dan builder yang sama. Pertahankan quoting/file substitution existing; daemon env cleanup tidak merusak sesi tetangga.
+- [x] **Step 4:** Run green regression argv/env/config/tmux paths; SoT registry/env/binary diperbarui dalam commit explicit paths.
+
+**Receipt Task 3:** commit `ebbcc3ed8d979566698bfd17d2d310b1a3ffd5d4` reviewed; original logs 5 files/111 tests lulus, runner/shared typecheck exit 0. Actual tmux argv path-spasi/multiline/shell-special intact, DB bin refresh, daemon/neighbor unchanged and credential env booleans verified. Five server downstream adapter/phase/skill/status/Telegram seams remain for their owners. [Receipt SoT](../../../internal/docs/architecture/antigravity-runtime.md).
 
 ### Task 4: Trust cwd dan injeksi skill tanpa merusak repo
 
