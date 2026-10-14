@@ -349,3 +349,16 @@ Receipt tersanitasi tersimpan selama Execute di workspace ignored plan
 restart cleanup, dua worktree, prompt native, tier/effort metadata dan regressi Claude/Codex.
 Tidak ada endpoint atau skema baru pada Task 5; availability/API dan orkestrasi fase mengikuti
 task berikutnya, tanpa mengklaim enforcement readonly atau model exact dari receipt ini.
+
+Review Task 5 mereproduksi celah pada rewrite body roster: callback write agen kedua dapat
+mengedit atau mengganti file agen pertama dengan symlink sebelum rewrite akhir. Ketiga test
+regresi memerah (operator edit, symlink ke sentinel luar registry, false-live phase roster).
+Rewrite kini membuka file dengan `O_NOFOLLOW`, memeriksa inode/device/owner/permissions dan
+hash melalui descriptor, lalu menulis secara positional pada descriptor yang telah diverifikasi.
+Identity pathname diperiksa lagi sesudah write. Perubahan ownership mempertahankan file/operator
+sentinel dan menghasilkan `native registry ownership changed during roster preparation`;
+agent itu dikeluarkan dari roster live dan mentions survivor dihitung ulang. Bila agen fase
+terkena, seluruh roster fase dibatalkan sambil mempertahankan perubahan operator.
+Verification rework scoped: **19 test registry + 44 test prompt = 63/63 lulus**, typecheck runner
+exit 0; `Task5-rework-red-ownership.log` dan `Task5-rework-green-ownership.log` di workspace
+ignored plan. Argv/loader tidak berubah; receipt native di atas tidak dijalankan ulang.

@@ -85,3 +85,8 @@ persisten, file 0600/folder baru 0700, exclude per-owned-file dan cleanup sesuda
 operator serta worktree tetangga. Collision nama pada cwd yang sama menolak materialisasi,
 bukan menimpa definisi. Metadata child mempertahankan tier/inherit dan tidak mengaku effort
 parent sebagai effort child. Rincian serta hasil live ada di [runtime](../architecture/antigravity-runtime.md#registry-sesi-dan-receipt-helper-produk-task-5--2026-10-14).
+
+Review ownership Task 5 mewajibkan rewrite roster melalui descriptor `O_NOFOLLOW` dengan
+verifikasi inode/device/hash, bukan write pathname yang dapat mengikuti replacement operator.
+Ownership berubah berarti unavailable beralasan atau pembatalan seluruh roster fase; sentinel
+luar registry dan edit operator dipertahankan. Bukti RED→GREEN tercatat di receipt runtime.

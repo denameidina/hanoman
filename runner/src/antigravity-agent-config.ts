@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
-  appendFileSync, closeSync, fstatSync, lstatSync, openSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync,
+  appendFileSync, closeSync, constants, fstatSync, ftruncateSync, lstatSync, openSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync, writeSync,
 } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { isAntigravityChildTier } from "@hanoman/shared";
@@ -87,6 +87,32 @@ function writeManifest(p: ReturnType<typeof paths>, manifest: Manifest): void {
     writeFileSync(temporary, JSON.stringify(manifest), { mode: 0o600, flag: "wx" });
     renameSync(temporary, p.manifest);
   } finally { try { unlinkSync(temporary); } catch { /* rename already consumed it */ } }
+}
+
+const OWNERSHIP_CHANGED = "native registry ownership changed during roster preparation";
+
+function rewriteOwnedFile(p: ReturnType<typeof paths>, own: OwnedFile, content: string): void {
+  const path = join(p.directory, own.name);
+  let fd: number;
+  try { fd = openSync(path, constants.O_RDWR | constants.O_NOFOLLOW); }
+  catch { throw new Error(OWNERSHIP_CHANGED); }
+  try {
+    const st = fstatSync(fd);
+    if (!st.isFile() || st.uid !== process.getuid?.() || st.ino !== own.ino || st.dev !== own.dev
+      || (st.mode & 0o777) !== 0o600 || digest(readFileSync(fd, "utf8")) !== own.hash) throw new Error(OWNERSHIP_CHANGED);
+    // Positional writes use this verified inode even if the path is replaced afterwards.
+    const bytes = Buffer.from(content);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const written = writeSync(fd, bytes, offset, bytes.length - offset, offset);
+      if (!written) throw new Error("native registry preparation failed");
+      offset += written;
+    }
+    ftruncateSync(fd, bytes.length);
+    const current = lstatSync(path, { throwIfNoEntry: false });
+    if (!current?.isFile() || current.isSymbolicLink() || current.ino !== own.ino || current.dev !== own.dev) throw new Error(OWNERSHIP_CHANGED);
+    own.hash = digest(content);
+  } finally { closeSync(fd); }
 }
 
 /** Persisted ownership lets killSession clean a roster after an API restart. */
@@ -179,15 +205,27 @@ export function materializeAntigravityAgents(opts: Options): AntigravityMaterial
   const failedPhase = warnings.some(w => opts.defs.some(d => d.name === w.agentName && d.kind === "phase"));
   const cleanup = () => cleanupAntigravityAgents(opts);
   if (failedPhase) { cleanup(); return { names: [], warnings, liveDefs: [], cleanup }; }
-  // Mentions must only describe agents that survived individual preparation failures.
-  try {
-    for (const def of liveDefs) {
+  // A later definition write can reveal operator replacement of an earlier owned file.
+  // Retry the survivors so their mentions cannot retain any newly unavailable agent.
+  let changed: boolean;
+  do {
+    changed = false;
+    for (const def of [...liveDefs]) {
       const owned = manifest.files.find(f => f.name === `${p.prefix}${def.name}.md`)!;
-      const content = renderAntigravityAgent(def, liveDefs);
-      writeFileSync(join(p.directory, owned.name), content);
-      owned.hash = digest(content);
-      writeManifest(p, manifest);
+      try {
+        rewriteOwnedFile(p, owned, renderAntigravityAgent(def, liveDefs));
+        writeManifest(p, manifest);
+      } catch (error) {
+        warnings.push({ agentName: def.name, reason: error instanceof Error && error.message === OWNERSHIP_CHANGED
+          ? OWNERSHIP_CHANGED : "native registry preparation failed" });
+        liveDefs.splice(liveDefs.indexOf(def), 1);
+        if (def.kind === "phase") {
+          cleanup();
+          return { names: [], warnings, liveDefs: [], cleanup };
+        }
+        changed = true;
+      }
     }
-  } catch (error) { cleanup(); throw error; }
+  } while (changed && liveDefs.length);
   return { names: liveDefs.map(d => d.name), liveDefs, warnings, cleanup };
 }

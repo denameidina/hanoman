@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, symlinkSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { renderAntigravityAgent, materializeAntigravityAgents, cleanupAntigravityAgents } from '../src/antigravity-agent-config';
@@ -64,6 +64,39 @@ describe('session registry ownership',()=>{
     const cwd=fixture();const a=def({mentions:['bad']}),b=def({name:'bad',workspacePolicy:'read-only'});
     const m=materializeAntigravityAgents({cwd,sessionId:'s',defs:[a,b]});
     expect(readFileSync(join(cwd,'.agents/agents',markdown(cwd)[0]!), 'utf8')).not.toContain('@bad');m.cleanup();
+  });
+  it.each(['edit', 'symlink'] as const)('preserves an operator %s between initial write and live roster rewrite', (replacement) => {
+    const cwd = fixture(), outside = join(fixture(), 'operator-sentinel');
+    writeFileSync(outside, 'outside operator sentinel');
+    let first = '';
+    const m = materializeAntigravityAgents({ cwd, sessionId: 's', defs: [def(), def({ name: 'second', mentions: ['probe'] })],
+      writeFile: (path, content) => {
+        writeFileSync(path, content);
+        if (!first) first = path;
+        else if (replacement === 'symlink') { unlinkSync(first); symlinkSync(outside, first); }
+        else writeFileSync(first, 'operator edited content');
+      },
+    });
+    expect(readFileSync(outside, 'utf8')).toBe('outside operator sentinel');
+    expect(readFileSync(first, 'utf8')).toBe(replacement === 'symlink' ? 'outside operator sentinel' : 'operator edited content');
+    expect(m.names).toEqual(['second']);
+    expect(m.warnings).toContainEqual({ agentName: 'probe', reason: 'native registry ownership changed during roster preparation' });
+    const second = markdown(cwd).find(n => n.endsWith('-second.md'))!;
+    expect(readFileSync(join(cwd, '.agents/agents', second), 'utf8')).not.toContain('@probe');
+    m.cleanup();
+    expect(readFileSync(first, 'utf8')).toBe(replacement === 'symlink' ? 'outside operator sentinel' : 'operator edited content');
+    expect(readFileSync(outside, 'utf8')).toBe('outside operator sentinel');
+  });
+  it('rolls back a phase roster if ownership changes before final rendering', () => {
+    const cwd = fixture(); let first = '';
+    const m = materializeAntigravityAgents({ cwd, sessionId: 's', defs: [def({ kind: 'phase' }), def({ name: 'second', kind: 'phase' })],
+      writeFile: (path, content) => { writeFileSync(path, content); if (!first) first = path; else writeFileSync(first, 'operator phase edit'); },
+    });
+    expect(m.names).toEqual([]); expect(m.liveDefs).toEqual([]);
+    expect(m.warnings).toContainEqual({ agentName: 'probe', reason: 'native registry ownership changed during roster preparation' });
+    expect(readFileSync(first, 'utf8')).toBe('operator phase edit');
+    expect(markdown(cwd)).toEqual([first.split('/').at(-1)]);
+    m.cleanup(); expect(readFileSync(first, 'utf8')).toBe('operator phase edit');
   });
   it('preserves another session in the same cwd by rejecting its exact native names',()=>{
     const cwd=fixture(),a=materializeAntigravityAgents({cwd,sessionId:'a',defs:[def()]});
