@@ -708,6 +708,16 @@ export type CodexLimitsDTO = {
   plan: string | null;       // `plan_type` codex (mis. "pro"); null bila tak dilaporkan
 };
 
+// ADR-0224 · limit Antigravity CLI (`agy`). Window dipakai ulang; sumbernya panggilan LIVE ke Cloud
+// Code API Google (`retrieveUserQuotaSummary`) dengan token agy yang sedang hidup — tak pernah
+// di-refresh hanoman. Satu window per (grup model × jendela): "Gemini · Mingguan",
+// "Claude/GPT · Sesi 5 jam". `stale` = token agy kedaluwarsa (agy tak berjalan) atau fetch gagal.
+export type AntigravityLimitsDTO = {
+  status: LimitsStatus;
+  windows: LimitWindow[];
+  fetchedAt: string | null;  // ISO waktu fetch sukses terakhir; null bila belum pernah
+};
+
 // SPEC-398 · ADR-0087 · versi hanoman = semver paket npm (dulu SHA git, SPEC-214).
 // SPEC-405 · ADR-0088 · panel tak lagi murni read-only: bila proses server ini anak dari
 // `hanoman start`, ia boleh MEMINTA dipasang ulang. `command` tetap ada — ia satu-satunya
@@ -849,6 +859,7 @@ export type EventMsg =
   | { t: "notifications"; items: Notification[]; unread: number; total: number; page: number; pageSize: number }
   | { t: "limits"; limits: LimitsDTO }
   | { t: "codexLimits"; limits: CodexLimitsDTO }   // SPEC-338 · ADR-0074 · grup terpisah dari `limits`
+  | { t: "antigravityLimits"; limits: AntigravityLimitsDTO }   // ADR-0224 · grup terpisah dari `limits`
   | { t: "vps"; vps: VpsView[] }
   | { t: "cleanups"; cleanups: WorktreeCleanupView[] }   // SPEC-742 · ADR-0116
   | { t: "update"; update: UpdateStatus }

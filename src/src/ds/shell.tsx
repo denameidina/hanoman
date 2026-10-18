@@ -6,7 +6,7 @@ import { Icon } from "./icon";
 import { Input } from "./components/forms";
 import { Mark } from "./marks";
 import { NotificationBell } from "../notifications/NotificationBell";
-import { LimitBadge, CodexLimitBadge } from "../screens/LimitIndicator";
+import { LimitBadge, CodexLimitBadge, AntigravityLimitBadge } from "../screens/LimitIndicator";
 import { UpdateBadge, ReloadBadge } from "../screens/UpdateIndicator";
 import { AccountMenu } from "../auth/AccountMenu";
 import { useResponsiveTier } from "./responsive";
@@ -377,7 +377,7 @@ export function Shell({ active, title, breadcrumb, actions, showSearch = false, 
             <div className="hn-topbar-extra"><UpdateBadge /></div>
             <ReloadBadge />
             <NotificationBell />
-            <div className="hn-topbar-extra"><LimitBadge /><CodexLimitBadge /></div>
+            <div className="hn-topbar-extra"><LimitBadge /><CodexLimitBadge /><AntigravityLimitBadge /></div>
             <AccountMenu />
           </div>
         </header>

@@ -4,6 +4,7 @@ import type { LimitsDTO } from "@hanoman/shared";
 // shell.tsx meng-import <LimitBadge> dari sini — lewat barrel itu jadi siklus impor.
 import { useLimits, worstWindow, severityToken } from "../api/limits";
 import { useCodexLimits } from "../api/codex-limits";
+import { useAntigravityLimits } from "../api/antigravity-limits";
 import { usePopoverFocus } from "../ds/popover";
 import { relativeTime } from "../lib/time-format";
 import { LIMIT_SEVERITY_LABEL } from "../lib/labels";
@@ -91,8 +92,9 @@ export function LimitWindows({ dto, emptyHint }: { dto: LimitsDTO; emptyHint?: s
 // SPEC-338 · Satu pil + popover untuk SEMUA limit (Claude & Codex). Dua agen tetap dua pil terpisah:
 // angkanya datang dari sumber yang berbeda (Claude: panggilan live; Codex: snapshot sesi terakhir),
 // jadi satu angka "terburuk" lintas keduanya akan mencampur data hidup dengan data historis.
-function LimitPill({ title, dto, square = false, emptyHint, eyebrow, footnote }: {
-  title: string; dto: LimitsDTO; square?: boolean; emptyHint?: string; eyebrow?: string; footnote?: React.ReactNode;
+function LimitPill({ title, dto, mark = "dot", emptyHint, eyebrow, footnote }: {
+  title: string; dto: LimitsDTO; mark?: "dot" | "square" | "diamond"; emptyHint?: string; eyebrow?: string;
+  footnote?: React.ReactNode;
 }) {
   const worst = worstWindow(dto.windows);
   const [open, setOpen] = React.useState(false);
@@ -125,8 +127,9 @@ function LimitPill({ title, dto, square = false, emptyHint, eyebrow, footnote }:
         className={coarse ? "hn-lim-pill hn-lim-pill-touch" : "hn-lim-pill"}
         style={cssVars({ "--lim-bg": tok.bg, "--lim-fg": tok.fg })}
       >
-        {/* Bentuk membedakan agen sekilas: titik untuk Claude, kotak untuk Codex. */}
-        <span aria-hidden="true" className={square ? "hn-lim-dot hn-lim-dot-square" : "hn-lim-dot"} />
+        {/* Bentuk membedakan agen sekilas: titik untuk Claude, kotak untuk Codex, belah ketupat untuk
+            Antigravity. */}
+        <span aria-hidden="true" className={mark === "dot" ? "hn-lim-dot" : `hn-lim-dot hn-lim-dot-${mark}`} />
         {visible}
       </button>
       {open && (
@@ -154,9 +157,21 @@ export function CodexLimitBadge() {
   const dto = useCodexLimits();
   if (dto.status === "unavailable" || !worstWindow(dto.windows)) return null;
   return (
-    <LimitPill title="Limit Codex" dto={dto} square
+    <LimitPill title="Limit Codex" dto={dto} mark="square"
       emptyHint="Limit Codex belum terbaca. Jalankan satu sesi Codex dulu."
       eyebrow={`Limit Codex${dto.plan ? ` · paket ${dto.plan}` : ""}`}
       footnote="Dibaca dari sesi Codex terakhir. Nilainya berubah saat sesi Codex berjalan, tidak realtime." />
+  );
+}
+
+// ADR-0224 · pil limit Antigravity — TERPISAH dari Claude & Codex (lihat LimitPill). Disembunyikan
+// saat `unavailable`, sama seperti Codex: operator yang tak memakai agy tak perlu pil "—" permanen.
+export function AntigravityLimitBadge() {
+  const dto = useAntigravityLimits();
+  if (dto.status === "unavailable" || !worstWindow(dto.windows)) return null;
+  return (
+    <LimitPill title="Limit Antigravity" dto={dto} mark="diamond"
+      emptyHint="Limit Antigravity belum terbaca. Login ke agy di host ini dulu."
+      footnote="Dibaca dari API kuota Google memakai login agy di host ini. Bila agy tak berjalan, token login kedaluwarsa dan angka yang tampil adalah data terakhir." />
   );
 }

@@ -39,6 +39,8 @@ process.env.HANOMAN_TMUX_SOCKET ??= "hanoman-test";
 // SPEC-215 · deteksi update kini dibaca via resolver config (default registry "1"). Test tak boleh
 // menyentuh jaringan → paksa OFF di sini (dulu tergantung server.ts yang tak dimuat test).
 process.env.HANOMAN_UPDATE_FETCH = "0";
+// ADR-0224 · limit Antigravity tak boleh membaca Keychain asli & memanggil Google dari test.
+process.env.HANOMAN_ANTIGRAVITY_LIMITS_FETCH = "0";
 // SPEC-903 (QA) · `=`, bukan `??=`: vitest sendiri sudah `NODE_ENV ??= "test"`, jadi nilai yang
 // DIWARISI dari shell menang — dan shell sesi hanoman mengekspor `NODE_ENV=development`. Suite ini
 // tak bisa jalan di bawah nilai lain: `revalidateWsPrincipal` menerima principal `test` HANYA saat

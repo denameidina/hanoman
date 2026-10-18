@@ -98,7 +98,7 @@ describe("katalog papan Tim", () => {
 
 describe("katalog GLOBAL_READ", () => {
   it("keempat tool ada, semuanya baca, dan tak satu pun menuntut capability", () => {
-    const names = ["hanoman_limits", "hanoman_limits_codex", "hanoman_update_status", "hanoman_fs_browse"];
+    const names = ["hanoman_limits", "hanoman_limits_codex", "hanoman_limits_antigravity", "hanoman_update_status", "hanoman_fs_browse"];
     for (const n of names) {
       const t = byName(n);
       expect(t.mode, n).toBe("read");

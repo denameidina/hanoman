@@ -120,7 +120,7 @@ describe("papan Tim lewat agent token", () => {
 describe("route GLOBAL_READ terjangkau tanpa capability", () => {
   it("token TANPA satu pun capability tetap membaca limits, update, dan fs/browse", async () => {
     const { headers } = await tokenWith([]);
-    for (const url of ["/api/limits", "/api/limits/codex", "/api/update", "/api/fs/browse"])
+    for (const url of ["/api/limits", "/api/limits/codex", "/api/limits/antigravity", "/api/update", "/api/fs/browse"])
       expect((await app.inject({ method: "GET", url, headers })).statusCode, url).toBe(200);
   });
 

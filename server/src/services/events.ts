@@ -4,6 +4,7 @@ import { liveOverlayTick, listSpecsSlim, specsDigest } from "./live-specs";
 import { notificationsFeed } from "./notifications";
 import { getLimits } from "./limits";
 import { getCodexLimits } from "./codex-limits";
+import { getAntigravityLimits } from "./antigravity-limits";
 import { modelCatalogService } from "./model-catalog";
 import { getUpdateStatus } from "./update";
 import { isDeciding } from "./lead/deciding";
@@ -101,6 +102,9 @@ const GROUPS: Group[] = [
   // ekor + cache 30s, jadi biayanya jauh di bawah panggilan jaringan claude. Frame lahir hanya saat
   // isinya berubah (dedup signature), dan snapshot codex baru bergerak saat ada sesi codex jalan.
   { everyTicks: 30, last: "", build: async () => ({ t: "codexLimits", limits: await getCodexLimits() }) },
+  // ADR-0224 · limit Antigravity — grup TERPISAH. Panggilan jaringan ber-cache 60 dtk di service, dan
+  // nol panggilan saat token agy kedaluwarsa; dedup signature membuat frame lahir saat isinya berubah.
+  { everyTicks: 30, last: "", build: async () => ({ t: "antigravityLimits", limits: await getAntigravityLimits() }) },
   // SPEC-214 · deteksi update jarang berubah; recompute tiap 300 dtk, dedup signature → siar hanya
   // saat status berubah. getUpdateStatus cache 15s + fetch ter-gate (server.ts) → attach tak menahan.
   { everyTicks: 300, last: "", build: async () => ({ t: "update", update: await getUpdateStatus() }) },

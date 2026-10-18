@@ -5,7 +5,7 @@ import { EMPTY_PENDING } from "@hanoman/shared";
 
 // Widget topbar yang self-fetch / butuh provider → di-noop (pola sama dengan nav-pending-badge.test).
 vi.mock("../src/notifications/NotificationBell", () => ({ NotificationBell: () => null }));
-vi.mock("../src/screens/LimitIndicator", () => ({ LimitBadge: () => null, CodexLimitBadge: () => null }));
+vi.mock("../src/screens/LimitIndicator", () => ({ LimitBadge: () => null, CodexLimitBadge: () => null, AntigravityLimitBadge: () => null }));
 vi.mock("../src/screens/UpdateIndicator", () => ({ UpdateBadge: () => null, ReloadBadge: () => null }));
 vi.mock("../src/auth/AccountMenu", () => ({ AccountMenu: () => null }));
 

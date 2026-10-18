@@ -12,7 +12,7 @@ import {
   Badge, Button, Field, Input, Select, StateBlock, Switch, Pager, serverPage, LiveConnectionBadge, useConfirm,
   Tabs, TabPanel, RowList, DenseRow, ProgressBar, StatusPill, SkeletonList,
 } from "../ds";
-import { LimitBadge, CodexLimitBadge } from "./LimitIndicator";
+import { LimitBadge, CodexLimitBadge, AntigravityLimitBadge } from "./LimitIndicator";
 import { api } from "../api/client";
 import { useLiveTopic } from "../api/live";
 import type {
@@ -258,6 +258,7 @@ function StatusStrip({ cfg, cap, liveCount, onWrite, onAsk, busy }:
       <div className="hn-sched-limits">
         <LimitBadge />
         <CodexLimitBadge />
+        <AntigravityLimitBadge />
       </div>
       <LiveConnectionBadge />
       <div className="hn-sched-strip-actions">
