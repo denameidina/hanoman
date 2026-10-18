@@ -89,9 +89,9 @@ Enter to select · ↑/↓ to navigate · Esc to cancel
 `;
 
 /** Satu layar dialog berantai; JUDUL-nya yang membedakan satu tangkapan dari tangkapan berikutnya. */
-const dialogPane = (title: string): string => [
+const dialogPane = (title: string, opsi: [string, string] = ["Merah", "Biru"]): string => [
   "←  ☐ Warna  ☐ Ukuran  ✔ Submit  →", "", title, "",
-  "❯ 1. Merah", "  2. Biru", "  3. Type something.", "  4. Chat about this", "",
+  `❯ 1. ${opsi[0]}`, `  2. ${opsi[1]}`, "  3. Type something.", "  4. Chat about this", "",
   "Enter to select · Tab/Arrow keys to navigate · Esc to cancel",
 ].join("\n");
 
@@ -108,6 +108,12 @@ const paneMaju = (): (() => string) => {
   let n = 0;
   return () => dialogPane(`Pertanyaan ke-${n++}?`);
 };
+
+/** Judul & opsi tiap langkah `rantai()` sebagaimana digambar TUI. */
+const LAYAR_RANTAI: [string, [string, string]][] = [
+  ["Pilih warna tema?", ["Merah", "Biru"]],
+  ["Pilih ukuran font?", ["Kecil", "Besar"]],
+];
 
 /** Layar rekap SPEC-474: bentuk yang dituntut `submitPaneDialog` (`kind === "review"`). */
 const REVIEW_PANE = [
@@ -143,7 +149,9 @@ function panggung(o: Panggung = {}): { pane: () => string; jawab: () => void; mu
       // `PreToolUse` menembak SEBELUM tool-nya jalan, jadi ada jendela nyata di mana dialognya
       // belum ada di layar sama sekali — dan `waitDialog` menolak mengetik apa pun di sana.
       if (o.tergambar && !o.tergambar()) return "✻ Cooked for 40m 4s\n> ";
-      if (n < total) return total > 1 ? dialogPane(`Pertanyaan ke-${n}?`) : ASKQ_PANE;
+      // ADR-0223 · layar TUI menampilkan pertanyaan PAYLOAD (`rantai()`), dan sejak lead
+      // mencocokkan layar dengan payload, panggung yang menampilkan judul lain adalah dialog lain.
+      if (n < total) return total > 1 ? dialogPane(...LAYAR_RANTAI[n]!) : ASKQ_PANE;
       if (akhir === "rekap") return REVIEW_PANE;
       if (akhir === "tertutup") return SELESAI_PANE;
       return dialogPane("Layar yang tak kunjung menutup?");

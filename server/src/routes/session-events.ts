@@ -112,7 +112,12 @@ export default async function (app: FastifyInstance) {
       decisionFile: s.decisionFile, event,
     });
     if (r.status === "duplicate") return reply.code(202).send({ duplicate: true });
-    if (r.status === "rate-limited") return reply.code(429).send({ error: "terlalu banyak event" });
+    if (r.status === "rate-limited") {
+      // ADR-0223 · pertanyaan yang ditolak ember laju tak sampai ke lead dan menunggu manusia —
+      // tanpa baris ini kehilangannya senyap (hook membuang jawaban 429).
+      console.log(`lead ask ${sessionId}: tanya ${event.askId} ditolak batas laju — menunggu manusia`);
+      return reply.code(429).send({ error: "terlalu banyak event" });
+    }
     if (r.status === "rejected") return reply.code(202).send({ rejected: true, reason: r.reason });
     return reply.code(202).send({ accepted: true });
   });

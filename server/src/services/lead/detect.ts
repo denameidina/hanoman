@@ -1,7 +1,7 @@
 import type { LeadDecision } from "@prisma/client";
 import { leadReplyText, type Lead, type LeadDelivery, type SessionAsk } from "@hanoman/shared";
 import { capturePane, clearMarker, getSession, sendToPane, submitPaneDialog } from "../pty";
-import { dialogKey, readDialogScreen } from "../tui-dialog";
+import { dialogKey, readDialogScreen, type DialogScreen } from "../tui-dialog";
 import { recordLeadDecision } from "../notifications";
 import { beginAnswer, endAnswer } from "../session-dialog";
 import { getLead, leadActive, leadProjects } from "./config";
@@ -24,16 +24,32 @@ import { recordDecision } from "./trail";
 // diketik ke pane, dan setiap pagar yang menahannya, tak berubah sedikit pun.
 
 /**
- * AC-11 / OQ-10 · berapa jawaban otomatis BERTURUT-TURUT sudah diberikan untuk satu sesi.
+ * AC-11 / OQ-10 · berapa kali PERTANYAAN YANG SAMA sudah dijawab otomatis berturut-turut di satu
+ * sesi (ADR-0223).
+ *
+ * Dulu penghitungnya total jawaban per sesi, dan itu memutus sesi yang sehat: sesi orchestrator
+ * bertanya puluhan keputusan BERBEDA sepanjang fasenya (spec-1468: pagar 20× tercapai di tengah
+ * brainstorm), sementara default 3 berarti lead berhenti sesudah panggilan ketiga. Yang ingin
+ * dicegah AC-11 adalah LOOP — lead menjawab, agen menanyakan hal yang sama lagi — dan loop terlihat
+ * dari tanda tangan pertanyaan yang berulang, bukan dari jumlahnya. Pertanyaan berbeda memutus deret.
  *
  * Sengaja TIDAK di-reset saat marker kosong: marker memang kosong sesaat setelah lead mengetik
  * (hook `UserPromptSubmit` menjalankan `: > <marker>`), jadi reset di sana akan membuat pagarnya
  * tak pernah tercapai — persis loop tak berujung yang ingin dicegah AC-11. Yang mereset hanyalah
- * sesi yang benar-benar berakhir (`pruneAsks`, lead/ask.ts) dan campur tangan manusia
- * (`resetSession`, dipanggil route saat operator menimpa keputusan).
+ * pertanyaan berbeda yang terjawab, sesi yang benar-benar berakhir (`pruneAsks`, lead/ask.ts), dan
+ * campur tangan manusia (`resetSession`, dipanggil route saat operator menimpa keputusan).
  */
-const answers = new Map<string, number>();
+const answers = new Map<string, { sig: string; n: number }>();
 const capped = new Set<string>();
+
+/**
+ * ADR-0223 · tanda tangan satu tanya: teks pertanyaannya (claude) atau pesan gilirannya (codex),
+ * dinormalisasi. Bukan `askId` — itu unik per panggilan justru saat agen MENGULANG pertanyaan.
+ */
+export function askSignature(a: Pick<SessionAsk, "questions" | "message">): string {
+  const raw = a.questions.length ? a.questions.map((q) => q.question).join("\n") : a.message;
+  return raw.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 2000);
+}
 
 /**
  * SPEC-472 (QA) · berapa keputusan BERTURUT-TURUT gagal disusun untuk satu sesi.
@@ -99,10 +115,11 @@ const CHAIN_POLL_MS = 300;
 const CHAIN_POLL_TRIES = 20;
 
 /**
- * SPEC-909 · ADR-0146 · berapa lama menunggu dialognya TERGAMBAR sesudah lead selesai memutuskan.
+ * SPEC-909 · ADR-0146 · ADR-0223 · berapa lama menunggu dialog PERTANYAAN INI tergambar.
  *
  * `PreToolUse` menembak SEBELUM tool-nya jalan, jadi pada saat event tiba dialognya belum ada di
- * layar. Menunggunya praktis gratis: `decide()` sudah memakan detik sampai menit lebih dulu.
+ * layar. Sejak ADR-0223 penantiannya terjadi SEBELUM `decide()`: membuktikan layar dan payload
+ * sepakat lebih murah daripada membakar satu giliran agen untuk dialog yang ternyata lain.
  * Habis tanpa dialog = BATAL, bukan jatuh ke jalur prosa — `sendToPane` akan mengetik prosa +
  * `Enter` ke kolom chat yang sudah normal, dan itu persis pesan liar yang diukur SPEC-487.
  */
@@ -117,7 +134,8 @@ export function __resetDetect(): void {
   answers.clear(); capped.clear(); failures.clear(); failCapped.clear(); failedAt.clear();
   chainFlows.clear();
 }
-export function answerCount(sessionId: string): number { return answers.get(sessionId) ?? 0; }
+/** Deret jawaban beruntun untuk pertanyaan TERAKHIR yang dijawab di sesi ini (ADR-0223). */
+export function answerCount(sessionId: string): number { return answers.get(sessionId)?.n ?? 0; }
 export function failureCount(sessionId: string): number { return failures.get(sessionId) ?? 0; }
 
 export type DetectDeps = {
@@ -209,6 +227,12 @@ export type AdmitResult = { ok: true } | { ok: false; reason: string };
 export type AskCtx = { projectId: string; specId?: string; decisionFile?: string };
 export type AnswerAskResult = {
   answered: boolean; reason: string; at: number; flowId: string | null; step: number | null;
+  /**
+   * ADR-0223 · dialog yang tampil di pane adalah pertanyaan LAIN, bukan pertanyaan tanya ini —
+   * tak ada yang diputuskan maupun diketik. Pekerja `lead/ask.ts` memakainya untuk mendahulukan
+   * tanya lain di antrean sesi itu yang mungkin justru sedang tampil.
+   */
+  mismatch?: boolean;
 };
 
 /**
@@ -218,7 +242,7 @@ export type AnswerAskResult = {
  * menggigit" harus menggigit dengan bunyi yang sama, dan operator membaca jejak itu sebagai bukti.
  */
 export async function admitAsk(
-  s: { id: string; specId?: string; projectId: string },
+  s: { id: string; specId?: string; projectId: string; sig?: string },
   deps: DetectDeps = prodDetectDeps,
 ): Promise<AdmitResult> {
   const cfg = await deps.cfg();
@@ -228,15 +252,19 @@ export async function admitAsk(
   if (!leadActive(cfg, s.projectId)) return no("lead dijeda untuk project ini");   // AC-15
   if (deps.exited(s.id)) return no("pane mati");                        // AC-10
 
-  if ((answers.get(s.id) ?? 0) >= cfg.maxAutoAnswers) {                 // AC-11
+  // ADR-0223 · pagar hanya menggigit pertanyaan yang SAMA dengan deret terakhir. Pemanggil tanpa
+  // `sig` (tak tahu pertanyaannya) dinilai terhadap deret apa pun — fail-closed seperti dulu.
+  const run = answers.get(s.id);
+  const looping = !!run && (s.sig === undefined || s.sig === run.sig);
+  if (run && looping && run.n >= cfg.maxAutoAnswers) {                 // AC-11
     if (!capped.has(s.id)) {
       capped.add(s.id);
       const row = await recordDecision({
         projectId: s.projectId, specId: s.specId, sessionId: s.id,
         gate: "detected", kind: "quality",
-        question: `Sesi ${s.id} sudah dijawab otomatis ${cfg.maxAutoAnswers}× berturut-turut.`,
-        answer: "Berhenti menjawab sesi ini; serahkan ke operator.",
-        reason: "Batas jawaban otomatis per sesi tercapai — pengulangan menandakan lead tak benar-benar membuka jalan buntunya (AC-11).",
+        question: `Sesi ${s.id} sudah dijawab otomatis ${cfg.maxAutoAnswers}× berturut-turut untuk pertanyaan yang sama.`,
+        answer: "Berhenti menjawab pertanyaan ini; serahkan ke operator.",
+        reason: "Pertanyaan yang sama terus kembali sesudah dijawab — pengulangan menandakan lead tak benar-benar membuka jalan buntunya (AC-11, ADR-0223).",
         refs: [], confidence: "tinggi", action: "none", weighty: true,
       });
       await deps.notify(row.id, `Lead berhenti menjawab sesi ${s.id} (batas ${cfg.maxAutoAnswers}× tercapai)`,
@@ -288,7 +316,10 @@ export async function answerAsk(
   const out = { at: chain.at, flowId: chain.flowId, step: chain.step };
   if (chain.acted && chain.done) {
     if (s.decisionFile) deps.clearMarker(s.decisionFile);
-    answers.set(ask.sessionId, (answers.get(ask.sessionId) ?? 0) + 1);
+    const sig = askSignature(ask);
+    const prev = answers.get(ask.sessionId);
+    if (prev?.sig === sig) prev.n++;
+    else { answers.set(ask.sessionId, { sig, n: 1 }); capped.delete(ask.sessionId); }
     failures.delete(ask.sessionId);
     return { answered: true, reason: "", ...out };
   }
@@ -296,7 +327,7 @@ export async function answerAsk(
     failures.set(ask.sessionId, (failures.get(ask.sessionId) ?? 0) + 1);
     failedAt.set(ask.sessionId, deps.now());
   }
-  return { answered: false, reason: chain.reason, ...out };
+  return { answered: false, reason: chain.reason, ...out, ...(chain.mismatch ? { mismatch: true } : {}) };
 }
 
 type ChainResult = {
@@ -306,6 +337,8 @@ type ChainResult = {
   done: boolean;
   /** Kegagalan yang layak dihitung (bukan sekadar lead dijeda/penuh di tengah panggilan). */
   failed: boolean;
+  /** ADR-0223 · pane menampilkan dialog pertanyaan lain sebelum satu langkah pun dikerjakan. */
+  mismatch?: boolean;
   reason: string;
   /** Langkah terakhir yang dikerjakan (0-based) — dipancarkan ke pet sebagai "ke-berapa dari". */
   at: number;
@@ -340,6 +373,7 @@ async function runChain(ask: SessionAsk, s: AskCtx, deps: DetectDeps): Promise<C
   };
   const stop = (reason: string, failed = false): ChainResult =>
     ({ acted, done: false, failed, reason, at, flowId, step });
+  const asked = ask.source === "ask-tool";
 
   // codex: satu langkah prosa ke kolom chat. Gerbangnya PESAN GILIRAN, bukan layar — teks penuh,
   // tak dipotong lebar pane, dan nol invokasi tmux. Ambangnya sama persis (AC-9 utuh).
@@ -389,6 +423,20 @@ async function runChain(ask: SessionAsk, s: AskCtx, deps: DetectDeps): Promise<C
       chain: true,
     };
 
+    // ADR-0223 · dialog yang tampil harus pertanyaan INI sebelum agen lead dibakar. `PreToolUse`
+    // menembak sebelum dialognya tergambar, dan beberapa panggilan `AskUserQuestion` yang
+    // berdekatan bisa tiba dalam urutan yang tak sama dengan urutan dialognya di layar — spec-1457:
+    // jawaban "temperature" diketik ke dialog "port edge" karena payload & layar tak pernah dicocokkan.
+    if (asked && q) {
+      const seen = await waitDialogFor(sid, q, ask.questions, deps);
+      if (seen === "none") return stop("dialog tak muncul di pane — tak ada yang diketik", true);
+      if (seen === "other") {
+        return i === 0
+          ? { ...stop("dialog di pane adalah pertanyaan lain — tak ada yang diketik"), mismatch: true }
+          : stop("dialog di pane bukan pertanyaan berikutnya rantai ini — tak ada yang diketik");
+      }
+    }
+
     let row: LeadDecision | null;
     try {
       row = await deps.decide({ ...req, flowId }, deps.decideDeps);
@@ -411,11 +459,15 @@ async function runChain(ask: SessionAsk, s: AskCtx, deps: DetectDeps): Promise<C
     if (!row) return stop("lead tak menghasilkan keputusan yang berlaku");
     if (row.status !== "berlaku") return stop("lead tak menghasilkan keputusan yang berlaku", true);
 
-    // Dialognya baru tergambar SESUDAH tool-nya jalan; untuk codex tak ada dialog sama sekali.
+    // Dialognya sudah dibuktikan tergambar sebelum `decide()`; yang dinilai ulang di sini hanya
+    // apakah ia MASIH pertanyaan yang sama — operator bisa menjawabnya selagi lead memutuskan.
+    // Untuk codex tak ada dialog sama sekali.
     let before = "";
-    if (ask.source === "ask-tool") {
-      const text = await waitDialog(sid, deps);
-      if (text === null) return stop("dialog tak muncul di pane — tak ada yang diketik", true);
+    if (asked && q) {
+      const text = deps.pane(sid);
+      const screen = readDialogScreen(text);
+      if (!screen || !dialogFits(screen, q, ask.questions))
+        return stop("layar dialog berubah selagi lead memutuskan — tak ada yang diketik");
       before = dialogKey(text);
     }
     if (isTakenOver(sid)) return stop("diambil alih operator");
@@ -475,19 +527,54 @@ async function afterLastAnswer(id: string, deps: DetectDeps): Promise<"review" |
 }
 
 /**
- * SPEC-909 · tangkapan pertama yang berupa dialog, atau `null` bila ia tak pernah muncul.
+ * SPEC-909 · ADR-0223 · tunggu sampai pane menampilkan dialog PERTANYAAN INI.
  *
- * Bukan `waitScreenChange`: yang itu menunggu layar BERGANTI, yang ini menunggu layar MENJADI
- * dialog. Keduanya dibutuhkan di tempat yang berbeda, dan menggabungkannya akan membuat salah
- * satunya kehilangan artinya.
+ * `"other"` = selama jendela tunggu yang tampil hanya dialog pertanyaan lain (dialog panggilan
+ * sebelumnya yang belum dijawab, atau panggilan lain yang tiba lebih dulu). `"none"` = tak pernah
+ * ada dialog sama sekali. Bukan `waitScreenChange`: yang itu menunggu layar BERGANTI, yang ini
+ * menunggu layar MENJADI pertanyaan tertentu.
  */
-async function waitDialog(id: string, deps: DetectDeps): Promise<string | null> {
+async function waitDialogFor(
+  id: string, q: SessionAsk["questions"][number], all: SessionAsk["questions"], deps: DetectDeps,
+): Promise<"fit" | "other" | "none"> {
+  let sawDialog = false;
   for (let i = 0; i < DIALOG_WAIT_TRIES; i++) {
-    const text = deps.pane(id);
-    if (readDialogScreen(text)) return text;
+    const screen = readDialogScreen(deps.pane(id));
+    if (screen?.kind === "question") {
+      if (dialogFits(screen, q, all)) return "fit";
+      sawDialog = true;
+    }
     await deps.sleep(CHAIN_POLL_MS);
   }
-  return null;
+  return sawDialog ? "other" : "none";
+}
+
+/** Huruf & angka saja: markdown, tanda baca, elipsis pemotongan, dan spasi lipatan tak berarti. */
+const bare = (s: string): string => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
+/**
+ * ADR-0223 · apakah layar dialog ini pertanyaan `q` (dari payload `all`)?
+ *
+ * Fail-OPEN pada ketiadaan bukti, fail-CLOSED pada bukti yang bertentangan: parser layar membaca
+ * TUI yang bisa berubah bentuk, jadi layar yang tak memberi judul maupun opsi dinilai cocok —
+ * perilaku persis sebelum ADR ini. Yang ditolak hanya layar yang jelas pertanyaan lain:
+ * - jumlah tab strip ≠ jumlah pertanyaan payload;
+ * - judul (baris pertama pertanyaan, TUI melipatnya sendiri) bukan awalan teks pertanyaan;
+ * - tak satu pun opsi layar merupakan awalan label opsi payload.
+ */
+export function dialogFits(
+  screen: DialogScreen, q: SessionAsk["questions"][number], all: SessionAsk["questions"],
+): boolean {
+  if (screen.kind !== "question") return false;
+  if (screen.tabs.length && screen.tabs.length !== all.length) return false;
+  const title = bare(screen.title);
+  const text = bare(q.question);
+  if (title.length >= 6 && text && !text.startsWith(title) && !title.startsWith(text)) return false;
+  const labels = q.options.map((o) => bare(o.label)).filter(Boolean);
+  const shown = screen.options.map(bare).filter(Boolean);
+  if (labels.length && shown.length
+    && !shown.some((s) => labels.some((l) => l.startsWith(s) || s.startsWith(l)))) return false;
+  return true;
 }
 
 async function waitScreenChange(id: string, before: string, deps: DetectDeps): Promise<boolean> {
