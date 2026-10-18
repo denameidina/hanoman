@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { SessionAsk } from "@hanoman/shared";
 import {
-  admitAsk, answerAsk, __resetDetect, answerCount, failureCount, type DetectDeps,
+  admitAsk, answerAsk, askSignature, dialogFits, __resetDetect, answerCount, failureCount, type DetectDeps,
 } from "../src/services/lead/detect";
 import { __resetLeadGate } from "../src/services/lead/gate";
+import { readDialogScreen } from "../src/services/tui-dialog";
 import { __resetDeciding } from "../src/services/lead/deciding";
 
 const LEAD = {
@@ -38,20 +39,24 @@ const SELESAI = "⏺ User answered Claude's questions:\n\n❯\n  ⏵⏵ bypass p
  * Panggung yang tak pernah berakhir menyembunyikan dua hal sekaligus: dialog satu pertanyaan yang
  * menutup sendiri (dan karena itu tak boleh di-Submit) dan rantai yang berujung layar rekap.
  */
-const dialogBerjudul = (title: string): string => [
+const dialogBerjudul = (title: string, opsi = ["SQLite", "Postgres"]): string => [
   "←  ☐ Basis  ☐ Auth  ☐ Deploy  ✔ Submit  →", "", title, "",
-  "❯ 1. SQLite", "  2. Postgres", "  3. Type something.", "  4. Chat about this", "",
+  ...opsi.map((o, i) => `${i ? " " : "❯"} ${i + 1}. ${o}`),
+  `  ${opsi.length + 1}. Type something.`, `  ${opsi.length + 2}. Chat about this`, "",
   "Enter to select · Tab/Arrow keys to navigate · Esc to cancel",
 ].join("\n");
 
-function panggung(total = 1, akhir: "rekap" | "tertutup" = total > 1 ? "rekap" : "tertutup") {
+function panggung(
+  total = 1, akhir: "rekap" | "tertutup" = total > 1 ? "rekap" : "tertutup",
+  layar: (n: number) => [string, string[]?] = (n) => [`Pertanyaan ke-${n}?`],
+) {
   let n = 0;
   return {
     jawab: () => { n++; },
     // JUDUL yang berganti, bukan suffix: `dialogKey` sengaja kebal terhadap kursor, spinner, dan
     // tab tercentang (ADR-0142 keputusan 2), jadi hanya judul yang benar-benar memajukan rantai.
     pane: () => (n < total
-      ? (total > 1 ? dialogBerjudul(`Pertanyaan ke-${n}?`) : DIALOG)
+      ? (total > 1 ? dialogBerjudul(...layar(n)) : DIALOG)
       : akhir === "rekap" ? REVIEW : SELESAI),
   };
 }
@@ -154,7 +159,10 @@ describe("answerAsk — rantai disuapi payload", () => {
   it("satu panggilan 3 pertanyaan = 3 decide dalam SATU alur, lalu Submit & marker dikosongkan", async () => {
     // Layar sungguhan MAJU antar-tab (judulnya berganti, jadi `dialogKey` ikut berganti — suffix
     // kosmetik tak pernah cukup, ADR-0142 keputusan 2) lalu BERAKHIR di layar rekap.
-    const p = panggung(3);
+    // ADR-0223 · judul layar = teks pertanyaan payload, persis yang digambar TUI.
+    const p = panggung(3, "rekap", (n) => [
+      ["Basis?", "Auth?", "Deploy?"][n]!, [["SQLite"], ["Cookie"], ["VPS"]][n],
+    ]);
     const d = deps({ pane: p.pane, send: vi.fn(async () => { p.jawab(); return true; }) });
     const three = ask({
       total: 3,
@@ -229,5 +237,131 @@ describe("answerAsk — rantai disuapi payload", () => {
       .toBe("Pakai SQLite atau Postgres?");
     expect(d.send).toHaveBeenCalled();
     expect(r.answered).toBe(true);
+  });
+});
+
+// ADR-0223 · payload dan layar wajib sepakat sebelum lead memutuskan maupun mengetik.
+describe("dialogFits — layar vs payload", () => {
+  const q = (question: string, labels: string[] = ["Ya", "Tidak"]) =>
+    ({ header: "H", question, multiSelect: false, options: labels.map((label) => ({ label })) });
+  const layar = (title: string, opsi: string[], strip = "☐ Port e…  ✔ Submit") => readDialogScreen([
+    `←  ${strip}  →`, "", title, "",
+    ...opsi.map((o, i) => `${i ? " " : "❯"} ${i + 1}. ${o}`), `  ${opsi.length + 1}. Type something.`, "",
+    "Enter to select · Tab/Arrow keys to navigate · Esc to cancel",
+  ].join("\n"))!;
+
+  it("judul = baris pertama pertanyaan yang dilipat TUI → cocok", () => {
+    const s = layar("Apakah port edge (Cloudflare D1, apps/edge/api", ["Ya (Recommended)", "Tidak"]);
+    expect(dialogFits(s, q("Apakah port edge (Cloudflare D1, apps/edge/api oneinbox) ikut dalam SPEC-1457?",
+      ["Ya (Recommended)", "Tidak"]), [q("x")])).toBe(true);
+  });
+
+  it("replay spec-1457: layar 'port edge', payload 'temperature' → TIDAK cocok walau opsinya mirip", () => {
+    const s = layar("Apakah port edge (Cloudflare D1, apps/edge/api", ["Ya (Recommended)", "Tidak"]);
+    expect(dialogFits(s, q("Apakah state filter temperature ikut mekanisme persistensi dan reset yang dipakai filter Branch?",
+      ["Ya (Recommended)", "Tidak"]), [q("x")])).toBe(false);
+  });
+
+  it("jumlah tab ≠ jumlah pertanyaan payload → dialog lain", () => {
+    const s = layar("Basis?", ["SQLite"], "☐ A  ☐ B  ☐ C  ☐ D  ✔ Submit");
+    expect(dialogFits(s, q("Basis?", ["SQLite"]), [q("Basis?", ["SQLite"])])).toBe(false);
+  });
+
+  it("tak satu pun opsi sepakat → dialog lain", () => {
+    expect(dialogFits(layar("Basis?", ["SQLite", "Postgres"]), q("Basis?", ["Cookie", "JWT"]), [q("x")])).toBe(false);
+  });
+
+  it("tangkapan pane claude ASLI (judul berbingkai `│`, dilipat TUI) dikenali dengan benar", () => {
+    const pane = [
+      "─".repeat(60),
+      "←  ☒ WABA ADMIN  ☒ ai-runtime  ☒ Egress guard  ☐ Sisa  ✔ Submit  →",
+      "",
+      "│ Port SMTP yang diizinkan 25, 465, 587, 2525, dan hapus POST /api/v1/auth/register polos (backend+edge; rd-07 kriteria 110 jadi 'ditutup')? Serta akun terlanjur tereskalasi/baris audit lama",
+      "│ dicatat sebagai tugas manusia saja?",
+      "",
+      "❯ 1. Setuju semua (Recommended)",
+      "     Port 25/465/587/2525; hapus /register polos; remediasi data dicatat sebagai tugas manusia.",
+      "  2. Ada koreksi",
+      "     Jelaskan lewat Other.",
+      "  3. Type something.",
+      "─".repeat(60),
+      "  4. Chat about this",
+      "",
+      "Enter to select · Tab/Arrow keys to navigate · Esc to cancel",
+    ].join("\n");
+    const s = readDialogScreen(pane)!;
+    const asli = q("Port SMTP yang diizinkan 25, 465, 587, 2525, dan hapus POST /api/v1/auth/register polos (backend+edge; rd-07 kriteria 110 jadi 'ditutup')? Serta akun terlanjur tereskalasi/baris audit lama dicatat sebagai tugas manusia saja?",
+      ["Setuju semua (Recommended)", "Ada koreksi"]);
+    const empat = [q("a"), q("b"), q("c"), asli];
+    expect(dialogFits(s, asli, empat)).toBe(true);
+    expect(dialogFits(s, q("Apakah egress guard memakai allowlist domain?", ["Setuju semua (Recommended)", "Ada koreksi"]), empat)).toBe(false);
+  });
+
+  it("layar tanpa judul & opsi yang terbaca → fail-open seperti sebelum ADR-0223", () => {
+    const s = { kind: "question", rows: [], freeIndex: null, notes: false, options: [], tabs: [], title: "",
+      multi: false, submit: { present: false, focused: false } } as never;
+    expect(dialogFits(s, q("Apa saja?"), [q("Apa saja?")])).toBe(true);
+  });
+});
+
+describe("answerAsk — layar milik pertanyaan lain (ADR-0223)", () => {
+  const LAIN = dialogBerjudul("Apakah port edge ikut?", ["Ya (Recommended)", "Tidak"]);
+
+  it("tak memutuskan & tak mengetik; melapor mismatch tanpa dihitung kegagalan", async () => {
+    const d = deps({ pane: () => LAIN });
+    const r = await answerAsk(ask(), CTX, d);
+    expect(d.decide).not.toHaveBeenCalled();
+    expect(d.send).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ answered: false, mismatch: true });
+    expect(failureCount("s1")).toBe(0);
+  });
+
+  it("dialog yang BERGANTI selagi lead memutuskan tak diketiki jawaban basi", async () => {
+    let decided = false;
+    const d = deps({
+      pane: () => (decided ? LAIN : DIALOG),
+      decide: vi.fn(async () => { decided = true; return { id: "d1", status: "berlaku", answer: "SQLite", flowId: "f1", step: 1 }; }) as never,
+    });
+    const r = await answerAsk(ask(), CTX, d);
+    expect(d.decide).toHaveBeenCalledTimes(1);
+    expect(d.send).not.toHaveBeenCalled();
+    expect(r.answered).toBe(false);
+    expect(failureCount("s1")).toBe(0);
+  });
+});
+
+describe("AC-11 per pertanyaan (ADR-0223)", () => {
+  const tanya = (question: string, id: string) => ask({ askId: id, questions: [
+    { header: "Basis", question, multiSelect: false, options: [{ label: "SQLite" }, { label: "Postgres" }] }] });
+  const layarnya = (question: string) => {
+    let answered = false;
+    return {
+      pane: () => (answered ? SELESAI : DIALOG.replace("Basis data mana?", question)),
+      send: vi.fn(async () => { answered = true; return true; }),
+    };
+  };
+
+  it("sesi panjang dengan pertanyaan BERBEDA tak pernah kena pagar", async () => {
+    const d = deps();
+    for (let i = 0; i < 10; i++) {
+      const question = `Basis data ke-${i} mana?`;
+      Object.assign(d, layarnya(question));
+      expect(await admitAsk({ ...S, sig: askSignature(tanya(question, `t${i}`)) }, d)).toEqual({ ok: true });
+      expect((await answerAsk(tanya(question, `t${i}`), CTX, d)).answered).toBe(true);
+    }
+    expect(d.notify).not.toHaveBeenCalled();
+  });
+
+  it("pertanyaan yang SAMA terus kembali → pagar menggigit sesudah maxAutoAnswers", async () => {
+    const d = deps();
+    const question = "Basis data mana?";
+    for (let i = 0; i < 3; i++) {
+      Object.assign(d, layarnya(question));
+      await answerAsk(tanya(question, `t${i}`), CTX, d);
+    }
+    expect(await admitAsk({ ...S, sig: askSignature(tanya(question, "t9")) }, d))
+      .toEqual({ ok: false, reason: "batas jawaban otomatis tercapai" });
+    // Pertanyaan lain tetap boleh — deretnya milik pertanyaan itu saja.
+    expect(await admitAsk({ ...S, sig: "pertanyaan lain?" }, d)).toEqual({ ok: true });
   });
 });

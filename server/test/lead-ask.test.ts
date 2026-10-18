@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { HookEvent } from "@hanoman/shared";
 import {
-  intakeAsk, liveAsks, pruneAsks, takeOverAsk, __resetAsks, type AskDeps,
+  intakeAsk, liveAsks, pruneAsks, takeOverAsk, __resetAsks, ASK_MISMATCH_MAX, type AskDeps,
 } from "../src/services/lead/ask";
 import { isTakenOver, __resetDeciding } from "../src/services/lead/deciding";
 import { beginAnswer, endAnswer } from "../src/services/session-dialog";
@@ -190,5 +190,82 @@ describe("takeOverAsk", () => {
     await intakeAsk(IN({ event: { ...EV, askId: "b" } }), d);
     expect(isTakenOver("s1")).toBe(true);
     expect(liveAsks().find((x) => x.sessionId === "s1")!.state).toBe("taken-over");
+  });
+});
+
+// ADR-0223 · setiap panggilan di rantai `AskUserQuestion` harus sampai ke lead, urut kedatangan.
+describe("antrean tanya per sesi (ADR-0223)", () => {
+  const ev = (askId: string, question = `${askId}?`): HookEvent => ({
+    ...EV, askId, questions: [{ header: askId, question, multiSelect: false, options: [{ label: "Ya" }] }],
+  });
+  const order = (d: AskDeps): string[] => vi.mocked(d.answer).mock.calls.map((c) => c[0].askId);
+
+  it("event yang tiba SEBELUM pekerjanya mulai tidak menimpa tanya pertama", async () => {
+    // Regresi: `running` baru menyala sesudah `await maxConcurrent()`, dan event kedua di celah itu
+    // dulu menimpa entri yang belum mulai, lalu KEDUA entri berjalan paralel di satu pane.
+    let running = 0, maxRunning = 0;
+    const d = deps({
+      maxConcurrent: () => new Promise((r) => setTimeout(() => r(2), 20)),
+      answer: vi.fn(async () => {
+        running++; maxRunning = Math.max(maxRunning, running);
+        await new Promise((r) => setTimeout(r, 15));
+        running--;
+        return ANSWERED;
+      }),
+    });
+    await intakeAsk(IN({ event: ev("a") }), d);
+    await intakeAsk(IN({ event: ev("b") }), d);
+    await vi.waitFor(() => expect(d.answer).toHaveBeenCalledTimes(2), { timeout: 2000 });
+    expect(order(d)).toEqual(["a", "b"]);
+    expect(maxRunning).toBe(1);
+  });
+
+  it("tiga panggilan bertumpuk dijawab SEMUA, urut kedatangan — bukan cuma yang terbaru", async () => {
+    const d = deps({
+      answer: vi.fn(async () => { await new Promise((r) => setTimeout(r, 15)); return ANSWERED; }),
+    });
+    for (const id of ["a", "b", "c"]) await intakeAsk(IN({ event: ev(id) }), d);
+    await vi.waitFor(() => expect(d.answer).toHaveBeenCalledTimes(3), { timeout: 2000 });
+    expect(order(d)).toEqual(["a", "b", "c"]);
+  });
+
+  it("dialog di layar milik tanya lain → tanya berikutnya didahulukan, yang ini diulang sesudahnya", async () => {
+    let first = true;
+    const d = deps({
+      answer: vi.fn(async (a) => {
+        await new Promise((r) => setTimeout(r, 10));
+        if (a.askId === "a" && first) { first = false; return { ...ANSWERED, answered: false, reason: "lain", mismatch: true }; }
+        return ANSWERED;
+      }),
+    });
+    await intakeAsk(IN({ event: ev("a") }), d);
+    await intakeAsk(IN({ event: ev("b") }), d);
+    await vi.waitFor(() => expect(d.answer).toHaveBeenCalledTimes(3), { timeout: 2000 });
+    expect(order(d)).toEqual(["a", "b", "a"]);
+  });
+
+  it("mismatch tanpa tanya lain di antrean tidak diulang tanpa ujung", async () => {
+    const d = deps({ answer: vi.fn(async () => ({ ...ANSWERED, answered: false, reason: "lain", mismatch: true })) });
+    await intakeAsk(IN({ event: ev("a") }), d);
+    await vi.waitFor(() => expect(d.answer).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(d.answer).toHaveBeenCalledTimes(1);
+    expect(liveAsks().find((x) => x.sessionId === "s1")!.state).toBe("failed");
+  });
+
+  it("rotasi mismatch berbatas ASK_MISMATCH_MAX", async () => {
+    const d = deps({ answer: vi.fn(async () => ({ ...ANSWERED, answered: false, reason: "lain", mismatch: true })) });
+    await intakeAsk(IN({ event: ev("a") }), d);
+    await intakeAsk(IN({ event: ev("b") }), d);
+    await vi.waitFor(() => expect(d.answer).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50));
+    // a, b, a, b, a — tiap tanya dicoba paling banyak 1 + ASK_MISMATCH_MAX kali, lalu dilepas.
+    expect(vi.mocked(d.answer).mock.calls.length).toBeLessThanOrEqual(2 * (1 + ASK_MISMATCH_MAX));
+  });
+
+  it("pagar menerima tanda tangan pertanyaan untuk AC-11 per pertanyaan", async () => {
+    const d = deps();
+    await intakeAsk(IN({ event: ev("a", "Basis data mana?") }), d);
+    expect(vi.mocked(d.admit).mock.calls[0]![0].sig).toBe("basis data mana?");
   });
 });

@@ -2168,8 +2168,12 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 > payload tool `AskUserQuestion` (codex: `last_assistant_message` dari hook `Stop`). Yang tak
 > berubah: jawabannya tetap **diketik ke pane** (`pty.sendToPane`, dipotong `goalChunks` — burst
 > ≥1024 char jadi `[Pasted Content]` secara senyap, ADR-0085); pane MATI tak pernah dijawab; giliran
-> **codex** yang sebenarnya selesai wajar (ADR-0074) juga tidak; batasnya tetap `maxAutoAnswers`
-> berturut-turut per sesi → sesudah itu lead berhenti & menotifikasi.
+> **codex** yang sebenarnya selesai wajar (ADR-0074) juga tidak; batasnya `maxAutoAnswers` jawaban
+> berturut-turut untuk **pertanyaan yang sama** → sesudah itu lead menyerahkan pertanyaan itu ke
+> operator & menotifikasi (ADR-0223; pertanyaan berbeda tak dihitung). Tanya yang tiba selagi sesi
+> dikerjakan **mengantre urut kedatangan** (maks 8/sesi), dan lead hanya memutuskan/mengetik bila
+> dialog di pane memang pertanyaan payload itu — dialog milik tanya lain membuat tanya berikutnya di
+> antrean didahulukan (ADR-0223). Event yang ditolak batas laju (429) kini tercatat di log server.
 >
 > **Pintu #3 — denyut proaktif** (`setInterval` in-process, cermin engine scheduler — tanpa queue/
 > worker/cron, ADR-0024 utuh): menata urutan backlog siap-kerja (**diserahkan ke antrean & governor

@@ -683,8 +683,8 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
                     value={settings.draft.timeoutSec} disabled={!cfg}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => settings.setDraft({ ...settings.draft, timeoutSec: e.target.value })} />
                 </Field>
-                <Field label="Jawaban otomatis per sesi (maks)" hint="1–20. Setelah batas, sesi diserahkan ke kamu.">
-                  <Input type="number" min={1} max={20} aria-label="maksimum jawaban otomatis per sesi" placeholder="mis. 3"
+                <Field label="Jawaban berulang per pertanyaan (maks)" hint="1–20. Bila pertanyaan yang sama terus kembali sesudah dijawab sebanyak ini, pertanyaan itu diserahkan ke kamu. Pertanyaan berbeda tak dihitung.">
+                  <Input type="number" min={1} max={20} aria-label="maksimum jawaban berulang per pertanyaan" placeholder="mis. 3"
                     value={settings.draft.maxAutoAnswers} disabled={!cfg}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => settings.setDraft({ ...settings.draft, maxAutoAnswers: e.target.value })} />
                 </Field>

@@ -1,6 +1,8 @@
 import type { Agent, HookEvent, SessionAsk } from "@hanoman/shared";
 import { getLead } from "./config";
-import { admitAsk, answerAsk, resetSession, type AdmitResult, type AskCtx } from "./detect";
+import {
+  admitAsk, answerAsk, askSignature, resetSession, type AdmitResult, type AnswerAskResult, type AskCtx,
+} from "./detect";
 import {
   markDeciding, clearDeciding, markQueued, clearQueued,
   markTakenOver, isTakenOver, clearTakeover,
@@ -21,12 +23,35 @@ export const ASK_BUCKET = { capacity: 5, refillMs: 10_000 };
 export const GLOBAL_BUCKET = { capacity: 20, refillMs: 500 };
 /** Berapa `askId` terakhir diingat untuk idempotensi. */
 const SEEN_MAX = 512;
+/**
+ * ADR-0223 · batas antrean tanya per sesi. Ember laju per sesi (5) sudah membatasi aliran masuk;
+ * angka ini pagar memori bila sesi tak pernah menampilkan dialognya.
+ */
+export const ASK_QUEUE_MAX = 8;
+/**
+ * ADR-0223 · berapa kali satu tanya boleh didahului tanya lain karena dialog di layar bukan miliknya.
+ * Dua cukup untuk dua panggilan yang tiba tertukar; lebih dari itu dialognya memang tak tampil.
+ */
+export const ASK_MISMATCH_MAX = 2;
+
+type Item = { ask: SessionAsk; ctx: AskCtx; skips: number };
 
 type Entry = {
   ask: SessionAsk;
   ctx: AskCtx;
-  /** Event yang tiba selagi sesi ini dikerjakan — yang TERBARU menang. */
-  pending: { ask: SessionAsk; ctx: AskCtx } | null;
+  skips: number;
+  /**
+   * ADR-0223 · tanya yang tiba selagi sesi ini dikerjakan, URUT KEDATANGAN. Dulu satu slot "yang
+   * terbaru menang", yang membuang panggilan di tengah rantai: Claude memecah >4 keputusan ke
+   * beberapa `AskUserQuestion` berturut-turut (ADR-0167), dan setiap panggilan harus dijawab.
+   */
+  queue: Item[];
+  /**
+   * ADR-0223 · sesi ini sudah DIJADWALKAN (mengantre slot kolam atau sedang dikerjakan). Diset
+   * sinkron di intake — `running` baru menyala sesudah `await` di `run()`, dan event yang tiba di
+   * celah itu dulu MENIMPA entri yang belum mulai.
+   */
+  busy: boolean;
   running: boolean;
 };
 
@@ -52,10 +77,8 @@ export type IntakeResult =
   | { status: "rate-limited" } | { status: "rejected"; reason: string };
 
 export type AskDeps = {
-  admit: (s: { id: string; specId?: string; projectId: string }) => Promise<AdmitResult>;
-  answer: (ask: SessionAsk, ctx: AskCtx) => Promise<{
-    answered: boolean; reason: string; at: number; flowId: string | null; step: number | null;
-  }>;
+  admit: (s: { id: string; specId?: string; projectId: string; sig?: string }) => Promise<AdmitResult>;
+  answer: (ask: SessionAsk, ctx: AskCtx) => Promise<AnswerAskResult>;
   reset: (sessionId: string) => void;
   live: () => string[] | Promise<string[]>;
   maxConcurrent: () => Promise<number>;
@@ -146,6 +169,7 @@ export async function intakeAsk(
 
   const verdict = await deps.admit({
     id: input.sessionId, specId: input.specId, projectId: input.projectId,
+    sig: askSignature(input.event),
   });
   if (!verdict.ok) return { status: "rejected", reason: verdict.reason };
 
@@ -157,18 +181,26 @@ export async function intakeAsk(
   };
   const ask = toAsk({ sessionId: input.sessionId, agent: input.agent, event: input.event, now });
   const cur = entries.get(input.sessionId);
-  // Satu sesi = satu pekerjaan. Event yang tiba selagi sesi ini dikerjakan menimpa "yang tertunda"
-  // dan dijalankan sesudahnya — itulah yang membuat "event kembar tak melahirkan dua keputusan
-  // paralel" benar secara KONSTRUKSI, bukan lewat penjagaan yang harus diingat.
-  if (cur?.running) { cur.pending = { ask, ctx }; return { status: "accepted" }; }
+  // Satu sesi = satu pekerjaan. Event yang tiba selagi sesi ini dijadwalkan/dikerjakan MENGANTRE
+  // dan dijalankan sesudahnya, urut kedatangan (ADR-0223) — itulah yang membuat "event kembar tak
+  // melahirkan dua keputusan paralel" benar secara KONSTRUKSI, tanpa membuang panggilan di tengah
+  // rantai. Antrean yang meluap membuang yang TERTUA: dialognya sudah lama tak terjawab di layar.
+  if (cur?.busy) {
+    cur.queue.push({ ask, ctx, skips: 0 });
+    if (cur.queue.length > ASK_QUEUE_MAX) {
+      const dropped = cur.queue.shift()!;
+      console.log(`lead ask ${input.sessionId}: antrean penuh — tanya ${dropped.ask.askId} dibuang`);
+    }
+    return { status: "accepted" };
+  }
 
-  // Takeover dilepas HANYA di sini — sesudah gerbang `running` di atas, bukan sebelumnya.
+  // Takeover dilepas HANYA di sini — sesudah gerbang `busy` di atas, bukan sebelumnya.
   // Operator merebut satu EPISODE, dan episode berikutnya memang miliknya lead lagi; tapi kalau
   // pelepasannya berjalan tanpa syarat, event kedua yang tiba selagi lead masih di tengah rantai
   // (mis. menunggu di `waitScreenChange`, sampai 6 dtk) akan MENCABUT takeover yang baru saja
   // dimenangkan operator — dan pemicunya milik sesi, bukan operator.
   clearTakeover(input.sessionId);
-  entries.set(input.sessionId, { ask, ctx, pending: null, running: false });
+  entries.set(input.sessionId, { ask, ctx, skips: 0, queue: [], busy: true, running: false });
 
   void prune(deps);
   void run(input.sessionId, deps);
@@ -218,7 +250,7 @@ async function run(sessionId: string, deps: AskDeps): Promise<void> {
       // AC-3 · latensi jalur event, satu baris per keputusan. Ini satu-satunya angka yang
       // membedakan "event sudah jalan" dari "event terpasang tapi diam", dan ia gratis.
       console.log(`lead ask ${sessionId}: ${deps.now() - Date.parse(e.ask.askedAt)} ms sampai mulai menyusun`);
-      const r = await deps.answer(e.ask, e.ctx).catch((err) => {
+      const r: AnswerAskResult = await deps.answer(e.ask, e.ctx).catch((err) => {
         console.error("lead ask:", err);
         return { answered: false, reason: "kesalahan tak terduga", at: 0, flowId: null, step: null };
       });
@@ -228,13 +260,17 @@ async function run(sessionId: string, deps: AskDeps): Promise<void> {
         ...e.ask, at: r.at, flowId: r.flowId, step: r.step,
         state: r.answered ? "answered" : "failed",
       };
-      if (!e.pending) break;
-      const next = e.pending; e.pending = null;
-      e.ask = next.ask; e.ctx = next.ctx;
+      // ADR-0223 · dialog di layar milik tanya lain: dahulukan tanya berikutnya di antrean (yang
+      // mungkin justru sedang tampil) dan kembalikan yang ini ke ekor — sampai `ASK_MISMATCH_MAX`.
+      if (r.mismatch && e.queue.length && e.skips < ASK_MISMATCH_MAX)
+        e.queue.push({ ask: { ...e.ask, state: "queued" }, ctx: e.ctx, skips: e.skips + 1 });
+      const next = e.queue.shift();
+      if (!next) break;
+      e.ask = next.ask; e.ctx = next.ctx; e.skips = next.skips;
     }
   } finally {
     clearQueued(sessionId); clearDeciding(sessionId);
-    e.running = false;
+    e.running = false; e.busy = false;
     inFlight--;
     const nextId = waiting.shift();
     if (nextId) void run(nextId, deps);

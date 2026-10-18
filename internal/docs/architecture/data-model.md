@@ -382,7 +382,8 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   **306 dtk** pada claude-opus-5 · xhigh, sehingga 7/7 baris jejak operator berstatus `gagal`;
   angka ini juga disebut ke agennya lewat paragraf anggaran waktu di `leadPrompt`, dan **harus
   berasal dari cfg yang sama** yang dipakai `brain.think()` — anggaran yang berbohong menggeser
-  pembacaan lead ke arah yang salah), `maxAutoAnswers` (jawaban otomatis berturut-turut per sesi sebelum lead berhenti,
+  pembacaan lead ke arah yang salah), `maxAutoAnswers` (berapa kali PERTANYAAN YANG SAMA boleh dijawab otomatis berturut-turut di satu
+  sesi sebelum lead menyerahkannya ke operator — pertanyaan berbeda memutus deretnya, ADR-0223;
   default 3), `requireGreenBeforeIntegrate` (syarat objektif sebelum integrasi ke `main`, default
   **menyala**), dan blok `engine` `{enabled,agent,model,effort}` = agen yang menjalankan lead —
   **opt-in seperti `conflict`**: selama `engine.enabled` mati, `leadAgentDefaults()` mendelegasikan
