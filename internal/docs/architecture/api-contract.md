@@ -778,6 +778,18 @@ GET      /limits/codex                  # CodexLimitsDTO { status, windows[], fe
 #   `isActive` hanya true untuk window yang disebut `rate_limit_reached_type` (codex tak punya is_active).
 #   status: ok = snapshot ≤12 jam; stale = lebih tua (tetap ditampilkan, ditandai); unavailable = belum
 #   pernah ada sesi codex yang melaporkan kuota → badge disembunyikan di UI.
+GET      /limits/antigravity            # AntigravityLimitsDTO { status, windows[], fetchedAt }  (ADR-0224)
+#   Limit langganan ANTIGRAVITY CLI (`agy`). agy tak menulis kuota ke disk, jadi server membaca token
+#   OAuth agy dari Keychain macOS (go-keyring: service `gemini`, akun `antigravity`) dan memanggil
+#   POST https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary — endpoint yang sama
+#   dengan yang dipanggil agy, internal & tak terdokumentasi; UA wajib memuat `antigravity` (tanpanya
+#   403 "no valid license") → `antigravity (hanoman)`. Token TAK PERNAH di-refresh; token yang
+#   kedaluwarsa (agy tak berjalan) = nol panggilan jaringan. Cache 60s, timeout 5s.
+#   `windows[]` = satu per (grup model × bucket): label "Gemini · Mingguan", "Claude/GPT · Sesi 5 jam";
+#   usedPct = round((1 − remainingFraction) × 100); `isActive` true hanya untuk bucket yang habis.
+#   status: ok = fetch sukses; stale = token kedaluwarsa/fetch gagal sesudah pernah sukses (data
+#   terakhir); unavailable = belum pernah terbaca, bukan macOS, atau knob
+#   `HANOMAN_ANTIGRAVITY_LIMITS_FETCH=0` → badge disembunyikan. Siar: grup `antigravityLimits` (30 dtk).
 #   `fetchedAt` = waktu SNAPSHOT (bukan waktu baca) — beda semantik dari /limits milik claude.
 GET      /notifications  ?page&limit    # { items:Notification[], unread:int, total:int, page:int, pageSize:int }
 #                                         SPEC-180 · SPEC-523/ADR-0107. TANPA `limit` → 50 teratas persis
@@ -887,7 +899,7 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > `telegram` (ADR-0096), `team` (papan Tim: `/tasks*` + `/members*`, ADR-0157). Peta route→capability di `server/src/services/agent-capabilities.ts`:
 > GET/HEAD → `:read`, selainnya → `:write`; sub-path `/projects/:id/{docs,prds}` → `docs`,
 > `/projects/:id/{tree,file,git,status,graph,commit,compare,remotes,…}` → `ide`; WS terminal → `sessions:write`.
-> **Read-only global** (`/limits`,`/limits/codex`,`/update`,`/events/ws`,`/fs/browse`,`/health`) → token
+> **Read-only global** (`/limits`,`/limits/codex`,`/limits/antigravity`,`/update`,`/events/ws`,`/fs/browse`,`/health`) → token
 > ber-capability apa pun — bahkan token TANPA satu pun capability — **hanya untuk method baca**
 > (SPEC-405 · ADR-0088). Keempat yang bukan WS/health punya tool MCP ber-`capability: null` (ADR-0157). **Tak-boleh-didelegasikan** (agent → 403):
 > `/auth`, `/agent-tokens`, `/device-tokens`, `/sync`, tulis `/portal` (ADR-0195; baca = `portal:read`),

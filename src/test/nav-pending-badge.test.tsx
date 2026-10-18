@@ -7,7 +7,7 @@ import { EMPTY_PENDING, type PendingCounts } from "@hanoman/shared";
 // Widget topbar yang self-fetch / butuh provider → di-noop agar Shell bisa dirender terisolasi
 // (pola yang sama dengan `changelog-nav.test.tsx`).
 vi.mock("../src/notifications/NotificationBell", () => ({ NotificationBell: () => null }));
-vi.mock("../src/screens/LimitIndicator", () => ({ LimitBadge: () => null, CodexLimitBadge: () => null }));
+vi.mock("../src/screens/LimitIndicator", () => ({ LimitBadge: () => null, CodexLimitBadge: () => null, AntigravityLimitBadge: () => null }));
 vi.mock("../src/screens/UpdateIndicator", () => ({ UpdateBadge: () => null, ReloadBadge: () => null }));
 vi.mock("../src/auth/AccountMenu", () => ({ AccountMenu: () => null }));
 

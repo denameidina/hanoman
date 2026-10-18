@@ -35,6 +35,16 @@ export const SYSTEM_TOOLS: readonly McpToolDef[] = [
     shape: (raw) => raw,
   },
   {
+    name: "hanoman_limits_antigravity",
+    title: "Sisa kuota Antigravity",
+    description:
+      "Sisa kuota Antigravity CLI (agy) per grup model (Gemini; Claude/GPT) untuk jendela mingguan dan 5 jam, berikut kapan resetnya. Dibaca live dari Cloud Code API Google memakai token agy yang sedang hidup dan di-cache 60 detik; token yang kedaluwarsa (agy tak berjalan) memberi `stale` atau `unavailable`, bukan angka karangan. Endpoint terpisah dari hanoman_limits karena sumbernya beda. Tak menuntut capability apa pun.",
+    inputSchema: obj({ properties: {} }),
+    mode: "read", capability: null, samplePath: "/limits/antigravity", sampleMethod: "GET",
+    build: () => ({ method: "GET", path: "/limits/antigravity" }),
+    shape: (raw) => raw,
+  },
+  {
     name: "hanoman_overview_get",
     title: "Ringkasan kinerja hari ini (Overview)",
     description:

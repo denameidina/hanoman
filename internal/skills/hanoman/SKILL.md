@@ -514,7 +514,7 @@ Pakai skill lebih sempit saat task cocok:
   `Spec.stage` diturunkan dari fase sesi. `POST /tasks/:id/escalate` melahirkan `Spec` tapi tetap
   `team:write` (preseden `/tickets/:id/accept`); yang menahan peluncuran tetap `launchPrincipal` —
   tanpa `sessions:write`, Spec-nya lahir TANPA `launchApprovedAt`. **ADR-0193/0194/0195 (integrasi) membalik tiga keputusan cookie-only lama** lewat capability BARU opt-in: `telegram:admin` (danger; kredensial Telegram — token gateway efektif tak boleh melebihi capability pemanggil, 403), `webhooks:read|write` (webhook keluar; agen tak boleh `allowPrivate`), `clients:read|write` (akun klien portal), dan `portal:read` (**baca** portal atas nama akun klien eksplisit `?asClient=`; tulis atas nama klien tetap cookie-only). Capability **34 → 40**, 18 domain. (b) Empat route **`GLOBAL_READ`**
-  (`/limits`, `/limits/codex`, `/update`, `/fs/browse`) yang sudah terjangkau SETIAP token sah tanpa
+  (`/limits`, `/limits/codex`, `/limits/antigravity`, `/update`, `/fs/browse`) yang sudah terjangkau SETIAP token sah tanpa
   satu pun capability — gerbang cakupan me-`continue` padanya sehingga mereka terlihat "tercakup"
   sementara nol tool menyentuhnya. **Jebakan yang lahir bersamanya:** `capability: null` kini punya
   DUA arti (tak memanggil `/api`, ATAU route `GLOBAL_READ`), jadi assert baru menuntut setiap tool

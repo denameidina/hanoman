@@ -31,6 +31,7 @@
 /* Titik untuk Claude, kotak untuk Codex. Warnanya `currentColor` = teks pil. */
 .hn-lim-dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
 .hn-lim-dot-square { border-radius: 2px; }
+.hn-lim-dot-diamond { border-radius: 1px; transform: rotate(45deg) scale(0.85); }
 
 /* Popover di bawah pil; kelas `hn-viewport-popover` (app.css) hanya menambah box-sizing dan max-width. */
 .hn-lim-popover {

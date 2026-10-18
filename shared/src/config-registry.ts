@@ -62,6 +62,9 @@ export const CONFIG_REGISTRY: ConfigEntry[] = [
   // runtime
   { key: "HANOMAN_EVENTS_TICK_MS", group: "runtime", label: "Interval events (ms)", kind: "int", apply: "live", category: "knob", example: "1000", default: "1000", min: 100 },
   { key: "HANOMAN_UPDATE_FETCH", group: "runtime", label: "Deteksi update saat boot", kind: "bool", apply: "live", category: "knob", default: "1" },
+  // ADR-0224 · limit Antigravity membaca token agy di Keychain dan memanggil Cloud Code API Google.
+  { key: "HANOMAN_ANTIGRAVITY_LIMITS_FETCH", group: "runtime", label: "Baca limit Antigravity", kind: "bool", apply: "live", category: "knob", default: "1",
+    help: "Membaca token agy di Keychain macOS lalu memanggil API kuota Google (endpoint internal, tak terdokumentasi). Matikan bila tak ingin hanoman menyentuh kredensial agy." },
   // SPEC-398 · ADR-0087 · deteksi update kini membandingkan semver dengan registry npm, bukan
   // menghitung commit di repo git (HANOMAN_REPO_ROOT dicabut bersama jalur git itu).
   { key: "HANOMAN_NPM_REGISTRY", group: "runtime", label: "Registry npm", kind: "string", apply: "live", category: "knob", example: "https://registry.npmjs.org",
