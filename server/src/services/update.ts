@@ -3,6 +3,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compareSemver, UPDATE_RESTART_EXIT, type UpdateStatus, type UpdateRegistryStatus } from "@hanoman/shared";
 import { effectiveStr, effectiveBool, effectiveInt } from "../config";
+import { exitGuarded } from "./exit-guard";
 
 // SPEC-398 · ADR-0087 · hanoman didistribusikan sebagai paket npm global, jadi "ada update?" adalah
 // perbandingan SEMVER dengan registry — bukan lagi `git fetch` + hitung commit (SPEC-214), yang tak
@@ -88,7 +89,7 @@ export function __setExiter(fn: ((code: number) => void) | null): void { exiter 
  */
 export function requestRestartForUpdate(): void {
   const delay = effectiveInt("HANOMAN_UPDATE_RESTART_DELAY_MS") ?? 250;
-  setTimeout(() => (exiter ?? ((c: number) => process.exit(c)))(UPDATE_RESTART_EXIT), delay);
+  setTimeout(() => (exiter ?? exitGuarded)(UPDATE_RESTART_EXIT), delay);
 }
 
 // Jaringan HANYA di sini, dan hanya bila opt-in (knob HANOMAN_UPDATE_FETCH; test memaksa "0").

@@ -6,6 +6,7 @@
 // hijau). Modul kecil ini bisa di-mock; menambahkan cabang `NODE_ENV === "test"` di route tidak
 // akan pernah bisa diuji dan menyembunyikan efek nyatanya.
 import { CONFIG_RESTART_EXIT, MANUAL_RESTART_EXIT } from "@hanoman/shared";
+import { exitGuarded } from "./exit-guard";
 
 /**
  * Ditunda sesaat supaya response sempat mengalir keluar sebelum proses berakhir — pemanggil
@@ -13,7 +14,7 @@ import { CONFIG_RESTART_EXIT, MANUAL_RESTART_EXIT } from "@hanoman/shared";
  * Yang menghidupkan server lagi adalah supervisor `hanoman start` (ADR-0088), bukan server ini.
  */
 export function requestConfigRestart(delayMs = 50): void {
-  setTimeout(() => process.exit(CONFIG_RESTART_EXIT), delayMs);
+  setTimeout(() => exitGuarded(CONFIG_RESTART_EXIT), delayMs);
 }
 
 /** Bagian `ServerResponse` yang dibutuhkan `afterReplyFlushed` — `reply.raw` memenuhinya. */
@@ -52,5 +53,5 @@ export function afterReplyFlushed(raw: FlushSignal, fn: () => void, maxWaitMs = 
 
 /** Tombol "Mulai ulang" di dashboard. Sama seperti di atas, tapi tanpa jatah di supervisor. */
 export function requestManualRestart(delayMs = 250): void {
-  setTimeout(() => process.exit(MANUAL_RESTART_EXIT), delayMs);
+  setTimeout(() => exitGuarded(MANUAL_RESTART_EXIT), delayMs);
 }
