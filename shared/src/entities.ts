@@ -487,6 +487,7 @@ export const zSetting = z.object({
   notifySound: z.enum(NOTIFY_SOUNDS).default("short"),                     // SPEC-180
   notifyDecision: z.boolean().default(true),                              // SPEC-184
   notifyDecisionSound: z.enum(NOTIFY_SOUNDS).default("alert"),            // SPEC-184
+  notifyDecisionTelegram: z.boolean().default(true),                      // ADR-0226 · dorong "menunggu keputusan" ke Telegram
   agentAccessEnabled: z.boolean().default(false),                        // SPEC-257 · master switch akses AI agent
   scheduler: zScheduler.default(SCHEDULER_DEFAULTS),                      // SPEC-294 · ADR-0072 · knob scheduler (default mati)
   goal: zGoal.default(GOAL_DEFAULTS),                                     // SPEC-332 · ADR-0073 · mode goal (default mati)
