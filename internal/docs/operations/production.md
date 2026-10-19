@@ -131,6 +131,26 @@ keluar dengan kode sentinel `75`, dan yang me-`npm i -g` lalu men-spawn ulang ad
 ADR-0016); yang putus hanya jembatan attach + WebSocket yang menyambung ulang sendiri. `hanoman update
 --check` hanya melaporkan, exit 0.
 
+**Supervisor buatan sendiri** (unit launchd/systemd yang memutar `node dist/server.js` dengan
+`HANOMAN_SUPERVISOR=1`) wajib meniru dua hal dari `hanoman start` ([ADR-0227](../adr/0227-watchdog-exit-macet.md)):
+`process.exit` bisa macet di join threadpool libuv, jadi server menitipkan watchdog yang meng-SIGKILL
+dirinya 5 dtk kemudian — dan kode 75/76/77-nya hanya tersisa di `$HANOMAN_HOME/exit-intent`. Jalankan
+node di latar supaya PID-nya diketahui, teruskan sinyal, dan pakai kode dari berkas itu bila PID cocok:
+
+```sh
+INTENT="$HANOMAN_HOME/exit-intent"
+HANOMAN_SUPERVISOR=1 node "$SERVER" & child=$!
+trap 'kill -TERM "$child" 2>/dev/null' TERM INT HUP   # tanpa ini node jadi yatim pemegang port
+wait "$child"; code=$?
+while kill -0 "$child" 2>/dev/null; do wait "$child"; code=$?; done
+trap - TERM INT HUP
+if [ "$code" -eq 137 ] && [ -f "$INTENT" ]; then
+  read -r ipid icode < "$INTENT" || true
+  [ "${ipid:-}" = "$child" ] && [ -n "${icode:-}" ] && code=$icode
+fi
+rm -f "$INTENT"
+```
+
 ## SPEC-384 · membersihkan byte source-map (sekali, SEBELUM migrate)
 
 `SourceMapArtifact` menyimpan byte `.map` di `HANOMAN_UPLOAD_DIR` dengan nama opaque `<uuid>.map` —

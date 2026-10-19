@@ -4,14 +4,16 @@
 // sinyal, exit code, dan flag node-nya bersih; sesi tmux tetap selamat dari restart (ADR-0016).
 import { spawn, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, chmodSync } from "node:fs";
+import { existsSync, mkdirSync, chmodSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   resolveHome, resolveDbUrl, dbFilePath, prismaCliPath, dbUrlNotice, repairSpawnHelper,
   readConfigEnv,
 } from "@hanoman/runner";
-import { CONFIG_RESTART_EXIT, MANUAL_RESTART_EXIT, UPDATE_RESTART_EXIT } from "@hanoman/shared";
+import {
+  CONFIG_RESTART_EXIT, EXIT_INTENT_FILE, MANUAL_RESTART_EXIT, UPDATE_RESTART_EXIT, parseExitIntent,
+} from "@hanoman/shared";
 import type { Ctx } from "../router";
 import { resolveLayout } from "../layout";
 import { INSTALL_ARGS } from "./update";
@@ -224,17 +226,43 @@ export function spawnEnv(
   return { ...fileEnv, ...processEnv, ...server };
 }
 
+export type ChildExit = { code: number | null; signal: NodeJS.Signals | null; pid: number | undefined };
+
+/**
+ * ADR-0227 · murni. Server yang macet DI DALAM `process.exit` dibunuh SIGKILL oleh watchdog-nya
+ * sendiri, dan SIGKILL menghapus kode sentinel-nya — yang tersisa hanya berkas maksud keluar. Kode
+ * dari berkas itu hanya dipercaya bila anaknya memang mati oleh SIGKILL DAN PID-nya cocok; berkas
+ * basi dari putaran sebelumnya diabaikan. Selain itu perilakunya sama dengan sebelumnya (`code ?? 0`).
+ */
+export function resolveChildExit(exit: ChildExit, intentText: string | null): { code: number; forced: boolean } {
+  const intent = parseExitIntent(intentText);
+  if (exit.signal === "SIGKILL" && intent && exit.pid !== undefined && intent.pid === exit.pid) {
+    return { code: intent.code, forced: true };
+  }
+  return { code: exit.code ?? 0, forced: false };
+}
+
+/** Membaca lalu menghapus berkas maksud keluar; tak ada / tak terbaca = `null`. */
+function takeExitIntent(home: string): string | null {
+  const path = join(home, EXIT_INTENT_FILE);
+  try {
+    const text = readFileSync(path, "utf8");
+    rmSync(path, { force: true });
+    return text;
+  } catch { return null; }
+}
+
 function runServer(
   serverJs: string, env: Record<string, string>, fileEnv: Record<string, string>,
-): Promise<number> {
+): Promise<ChildExit> {
   const child = spawn(process.execPath, [serverJs], {
     stdio: "inherit", env: spawnEnv(fileEnv, process.env, env),
   });
   const handlers = (["SIGINT", "SIGTERM"] as const).map((sig) => [sig, () => child.kill(sig)] as const);
   for (const [sig, h] of handlers) process.on(sig, h);
-  return new Promise<number>((res) => child.on("exit", (code) => {
+  return new Promise<ChildExit>((res) => child.on("exit", (code, signal) => {
     for (const [sig, h] of handlers) process.off(sig, h);
-    res(code ?? 0);
+    res({ code, signal, pid: child.pid });
   }));
 }
 
@@ -288,7 +316,9 @@ export default async function start(argv: string[], ctx: Ctx): Promise<number> {
   let configRestartsUsed = 0;
   for (;;) {
     // SPEC-884 · dibaca ULANG tiap putaran: wizard menulis berkas ini TEPAT sebelum minta restart.
-    const code = await runServer(layout.server, env, readConfigEnv(home));
+    const exit = await runServer(layout.server, env, readConfigEnv(home));
+    const { code, forced } = resolveChildExit(exit, takeExitIntent(home));
+    if (forced) ctx.stderr(`hanoman: server macet saat keluar — dihentikan watchdog; dilanjutkan sebagai exit ${code} (ADR-0227)\n`);
     const step = planSupervisorStep(code, restartsUsed, configRestartsUsed);
     if (step.action === "exit") {
       if (code === UPDATE_RESTART_EXIT) {

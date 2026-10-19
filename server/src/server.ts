@@ -34,6 +34,7 @@ import { startSessionEventRelay } from "./services/session-event-relay";
 import { installRelayClient } from "./services/relay/client";
 import { injectableFrom } from "./services/relay/dispatcher";
 import { installSafeGlobalFetch } from "./services/safe-outbound-request";
+import { exitGuarded } from "./services/exit-guard";
 
 // Insiden 2026-09-25: `fetch()` global resolve hostname lewat `dns.lookup()` (threadpool) secara
 // default. Satu lookup yang macet (jaringan sibuk/DNS lambat) meninggalkan thread OS yang TAK BISA
@@ -74,7 +75,7 @@ process.on("uncaughtException", (err) => console.error("uncaughtException:", err
 // services/graceful-shutdown.ts).
 const shutdown = createShutdown({
   close: async () => { await app.close(); await prisma.$disconnect(); },
-  exit: (code) => process.exit(code),
+  exit: (code) => exitGuarded(code),
 });
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
@@ -198,4 +199,4 @@ bootstrapReady.then(async () => {
   startRetentionSweep();
   // ADR-0220 · perekam menit menunggu & sampel limit untuk Overview (in-process, timer .unref).
   startOverviewRecorder();
-}).catch((err) => { console.error("listen gagal:", err); process.exit(1); });
+}).catch((err) => { console.error("listen gagal:", err); exitGuarded(1); });

@@ -1,8 +1,36 @@
 import { describe, expect, it } from "vitest";
 import {
-  MAX_CONFIG_RESTARTS, MAX_UPDATE_RESTARTS, planSupervisorStep, spawnEnv,
+  MAX_CONFIG_RESTARTS, MAX_UPDATE_RESTARTS, planSupervisorStep, resolveChildExit, spawnEnv,
 } from "../src/commands/start";
-import { CONFIG_RESTART_EXIT, MANUAL_RESTART_EXIT, UPDATE_RESTART_EXIT } from "@hanoman/shared";
+import {
+  CONFIG_RESTART_EXIT, MANUAL_RESTART_EXIT, UPDATE_RESTART_EXIT, formatExitIntent,
+} from "@hanoman/shared";
+
+// ADR-0227 · server yang macet di process.exit dibunuh SIGKILL oleh watchdog-nya sendiri; kode
+// sentinel-nya (75/76/77) hanya tersisa di berkas maksud keluar.
+describe("resolveChildExit (ADR-0227)", () => {
+  const killed = (pid: number) => ({ code: null, signal: "SIGKILL" as const, pid });
+
+  it("SIGKILL + maksud ber-PID sama = kode dari maksud, ditandai paksa", () => {
+    expect(resolveChildExit(killed(10), formatExitIntent(10, UPDATE_RESTART_EXIT)))
+      .toEqual({ code: UPDATE_RESTART_EXIT, forced: true });
+  });
+
+  it("maksud basi dari PID lain diabaikan", () => {
+    expect(resolveChildExit(killed(10), formatExitIntent(9, MANUAL_RESTART_EXIT)))
+      .toEqual({ code: 0, forced: false });
+  });
+
+  it("exit normal: kode aslinya yang dipakai walau berkas maksud ada", () => {
+    expect(resolveChildExit({ code: CONFIG_RESTART_EXIT, signal: null, pid: 10 }, formatExitIntent(10, 0)))
+      .toEqual({ code: CONFIG_RESTART_EXIT, forced: false });
+  });
+
+  it("SIGKILL tanpa maksud / maksud rusak: perilaku lama (0)", () => {
+    expect(resolveChildExit(killed(10), null)).toEqual({ code: 0, forced: false });
+    expect(resolveChildExit(killed(10), "sampah")).toEqual({ code: 0, forced: false });
+  });
+});
 
 describe("supervisor (SPEC-884)", () => {
   it("exit 76 = jalankan ulang TANPA memasang apa pun", () => {

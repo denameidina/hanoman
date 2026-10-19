@@ -748,6 +748,22 @@ export const CONFIG_RESTART_EXIT = 76;
 // tanpa npm dan tanpa jatah — dipicu manusia, jadi loop tak berujung bukan mode kegagalan.
 export const MANUAL_RESTART_EXIT = 77;
 
+// ADR-0227 · `process.exit()` bisa macet DI DALAM dirinya sendiri (join threadpool libuv), dan yang
+// bisa menghentikannya hanya SIGKILL dari luar — yang menghapus kode exit di atas. Sebelum keluar,
+// server menulis maksudnya di `$HANOMAN_HOME/exit-intent`; supervisor yang melihat anaknya mati oleh
+// SIGKILL memakai kode dari sini bila PID-nya cocok. Satu baris `<pid> <code>` supaya terbaca juga
+// dari supervisor `sh` (`read pid code < exit-intent`).
+export const EXIT_INTENT_FILE = "exit-intent";
+
+export function formatExitIntent(pid: number, code: number): string {
+  return `${pid} ${code}\n`;
+}
+
+export function parseExitIntent(text: string | null | undefined): { pid: number; code: number } | null {
+  const m = /^(\d+) (\d+)\s*$/.exec(text ?? "");
+  return m ? { pid: Number(m[1]), code: Number(m[2]) } : null;
+}
+
 // Dua langkah sengaja: tanpa `confirm` endpoint hanya melapor (dry-run), dengan `confirm` ia
 // benar-benar keluar. Nilai non-boolean DITOLAK — "ya"/1 tak boleh terbaca sebagai persetujuan.
 export const zUpdateApplyBody = z.object({ confirm: z.boolean().optional() });
