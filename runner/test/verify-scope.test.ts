@@ -48,6 +48,16 @@ describe("verifyScopeClause", () => {
     expect(c.toUpperCase()).toContain("JANGAN");
   });
 
+  // ADR-0225 · 92 Execute terukur: median 26 perintah test, berkas test yang sama dijalankan 6,5×
+  // (p90 15×), 730 typecheck — ~21 menit per Execute hanya untuk verifikasi berulang.
+  it("changed mengatur ritme: per task hanya test task itu, yang hijau tak diulang, set penuh sekali di akhir", () => {
+    const c = verifyScopeClause("changed");
+    expect(c).toContain("Ritme");
+    expect(c).toContain("JANGAN menjalankan ulang berkas test yang sudah hijau");
+    expect(c).toContain("SEKALI di akhir");
+    expect(c).toMatch(/Typecheck paket tersentuh[\s\S]*bukan tiap task/);
+  });
+
   it("changed menyebutkan alasannya (prompt sesi lain ada di argv) dan gantinya (PID/port)", () => {
     const c = verifyScopeClause("changed").toLowerCase();
     expect(c).toContain("argv");

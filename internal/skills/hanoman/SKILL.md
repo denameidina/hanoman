@@ -1247,6 +1247,13 @@ Pakai skill lebih sempit saat task cocok:
   terbukti **non-deterministik** (gagal 2× di run campur-project, lulus sendirian, lulus bersama
   tetangga server, lulus saat set yang sama diulang) — jalankan ulang terisolasi DAN ulangi
   set yang sama sebelum menyalahkan perubahanmu.
+- **Durasi sesi backlog** (**ADR-0225**, audit 2026-10-19 atas 86 sesi): `PLAN_SHAPE` membuat plan
+  berisi rencana, bukan kode (dulu median 130 KB, 22 m per Plan) dan menyatakan diri mengalahkan skill
+  plan; Brainstorm/Audit menarik semua keputusan sampai Execute ke satu putaran tanya dan keputusan
+  yang dijawab final (0167 tetap: ambiguitas baru tetap ditanyakan); klausa `changed` kini punya
+  ritme (berkas hijau tak diulang, set penuh sekali di akhir); `FOREGROUND_RULE` melarang polling
+  `sleep N`. Mengubah teks ini = perbarui golden `runner/test/__golden__` dan hash definisi di
+  `phase-agents.test.ts` dengan sengaja.
 - **Klausa gaya kode di setiap prompt agen** (SPEC-543/**ADR-0108**, memperluas POLA ADR-0080;
   ADR-0037 & ADR-0098 utuh): satu konstanta **`CODE_STYLE_CLAUSE`** (`runner/src/code-style.ts`,
   tetangga `verify-scope.ts`) — rapi & mengikuti idiom sekitarnya · jangan komentar yang **mengulang**
