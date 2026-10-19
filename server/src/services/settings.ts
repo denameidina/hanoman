@@ -17,6 +17,7 @@ export const DEFAULT_SETTING: Setting = {
   autoDefault: true, autoScaffold: true, notifyFail: true,
   notifyDone: true, notifySound: "short",
   notifyDecision: true, notifyDecisionSound: "alert",
+  notifyDecisionTelegram: true,    // ADR-0226 · tak berefek tanpa bot token + allowlist
   agentAccessEnabled: false,   // SPEC-257 · akses AI agent off sampai dibuka manusia
   scheduler: SCHEDULER_DEFAULTS,   // SPEC-294 · ADR-0072 · semua knob scheduler default mati
   goal: GOAL_DEFAULTS,             // SPEC-332 · ADR-0073 · mode goal default mati

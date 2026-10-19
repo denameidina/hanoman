@@ -24,7 +24,7 @@ import { Prose, SectionNote, SettingRow } from "./rows";
 import type { SettingsStore } from "./useSettingsStore";
 import { useSettingField } from "./useSettingField";
 
-type SwitchKey = "notifyDone" | "notifyDecision" | "notifyFail" | "autoDefault" | "autoScaffold";
+type SwitchKey = "notifyDone" | "notifyDecision" | "notifyDecisionTelegram" | "notifyFail" | "autoDefault" | "autoScaffold";
 
 /** Nilai RadioGroup "Tampilkan Hanoman (pet)" → preferensi per-browser (null = default per tier). */
 const PET_PREF_OF: Record<string, PetEnabled> = { default: null, tampil: true, sembunyi: false };
@@ -66,6 +66,7 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
     save: (v) => store.save({ notifySound: v as NotifySound }, "Sound → " + v),
   });
   const notifyDecision = useSwitchSetting(store, "notifyDecision", s.notifyDecision, "Notifikasi keputusan");
+  const notifyDecisionTelegram = useSwitchSetting(store, "notifyDecisionTelegram", s.notifyDecisionTelegram, "Keputusan ke Telegram");
   const notifyDecisionSound = useSettingField<string>({
     value: s.notifyDecisionSound, delayMs: 0,
     save: (v) => store.save({ notifyDecisionSound: v as NotifySound }, "Sound keputusan → " + v),
@@ -143,7 +144,7 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
 
   return (
     <>
-      <Card eyebrow="sesi" title="Sesi & notifikasi" data-setting-card data-search="sesi notifikasi suara">
+      <Card eyebrow="sesi" title="Sesi & notifikasi" data-setting-card data-search="sesi notifikasi suara telegram keputusan">
         <SettingRow title="Notifikasi backlog selesai"
           desc="Toast + sound saat sebuah backlog mencapai stage done. Daftar lonceng tetap terisi meski dimatikan."
           save={notifyDone}>
@@ -163,6 +164,12 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
           save={notifyDecision}>
           <Switch aria-label="Notifikasi keputusan" checked={notifyDecision.value}
             onChange={(v: boolean) => notifyDecision.set(v)} />
+        </SettingRow>
+        <SettingRow title="Kirim keputusan ke Telegram"
+          desc="Pesan ke user id di allowlist Telegram saat sesi menunggu keputusanmu, supaya tak menunggu sampai dashboard dibuka. Perlu bot token + allowlist; gateway percakapan tak perlu berjalan."
+          save={notifyDecisionTelegram}>
+          <Switch aria-label="Kirim keputusan ke Telegram" checked={notifyDecisionTelegram.value}
+            onChange={(v: boolean) => notifyDecisionTelegram.set(v)} />
         </SettingRow>
         <SettingRow title="Sound keputusan" desc="Nada saat sebuah sesi menunggu keputusan." save={notifyDecisionSound}>
           <div className="hn-set-inline">

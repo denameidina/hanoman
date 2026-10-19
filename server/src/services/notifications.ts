@@ -1,6 +1,7 @@
 import { prisma } from "../db";
 import { markerFilledAsync } from "./pty";
 import { liveDecisionsAsync } from "./live-phases";
+import { pushDecisionToTelegram } from "./telegram/notify";
 import type { DriftItem } from "../vps/drift";
 
 // SPEC-221 · notifikasi drift kepatuhan VPS (AC-19). Satu notif AGREGAT per audit (bukan per item —
@@ -202,6 +203,9 @@ export async function scanDecisions(read: () => DecisionSession[] | Promise<Deci
     await prisma.notification.create({
       data: { type: "decision", specId: s.specId ?? null, sessionId: s.id, projectId: s.projectId || null, title },
     });
+    // ADR-0226 · tanpa await: feed ini terbit tiap 3 detik dan jaringan Telegram tak boleh
+    // memperlambatnya. Dedup ikut `awaiting` di atas — baris decision baru = satu push.
+    void pushDecisionToTelegram({ title, specId: s.specId ?? null, sessionId: s.id });
   }
 }
 

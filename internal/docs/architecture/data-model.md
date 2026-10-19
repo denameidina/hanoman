@@ -276,6 +276,9 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   `model`/`effort` di `POST /terminal/sessions`); kosong → default global ini. Manusia tetap bisa
   `/model` di dalam terminal. `maxConcurrent` dan `askTimeoutMin` **hilang** bersama runner headless
   (ADR-0024) — tak ada `dailyBudget`.
+- `notifyDecisionTelegram` (bool, default `true`, [ADR-0226](../adr/0226-notifikasi-keputusan-ke-telegram.md)):
+  dorong notifikasi `decision` baru ke Telegram. Tak berefek tanpa bot token + allowlist. Kunci JSON
+  di blob `Setting`, bukan kolom — nol migration.
 - `phaseModels` **dicabut** (SPEC-252, [ADR-0061](../adr/0061-model-effort-per-sesi-picker-start.md),
   mengamandemen [ADR-0058](../adr/0058-model-effort-per-fase.md)): matrix model/effort **per fase** tak
   andal — ia bergantung agen mengetik `/model`+`/effort` di batas fase, padahal agen menembus batas fase

@@ -117,7 +117,7 @@ export const S_DEFAULTS: Setting = {
   model: "sonnet", effort: "medium",
   autoDefault: true, autoScaffold: true, notifyFail: true,
   notifyDone: true, notifySound: "short",
-  notifyDecision: true, notifyDecisionSound: "alert",
+  notifyDecision: true, notifyDecisionSound: "alert", notifyDecisionTelegram: true,
   agentAccessEnabled: false,
   scheduler: SCHEDULER_DEFAULTS,
   goal: GOAL_DEFAULTS,

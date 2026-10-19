@@ -688,6 +688,9 @@ POST /projects/:id/worktrees/delete  { names:string[], deleteBranch?, orphanOnly
 ```
 GET/PUT  /settings                      # Setting blob (zSetting): model, effort, autoDefault, autoScaffold,
 #                                         notifyFail, notifyDone (bool), notifySound — SPEC-180. Tanpa dailyBudget/maxConcurrent.
+#                                         notifyDecisionTelegram (bool, default true) — ADR-0226: sesi menunggu keputusan juga
+#                                           dikirim ke tiap user id allowlist Telegram (bot token + allowlist saja; gateway
+#                                           percakapan tak perlu jalan). Tanpa route baru; tool MCP settings_get/set sudah cukup.
 #                                         model/effort = DEFAULT GLOBAL sesi baru (Claude Sonnet 5/medium;
 #                                           Codex GPT-5.6 Terra/medium) (SPEC-252/ADR-0061); per sesi di-override saat Start.
 #                                         phaseModels DICABUT (SPEC-252/ADR-0061) — baris lama yang masih memuatnya tetap parse (diabaikan).
