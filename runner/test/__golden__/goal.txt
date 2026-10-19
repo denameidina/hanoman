@@ -27,6 +27,11 @@ Berkas yang berubah di worktree ini:
   test-nya memang berjalan, jangan menerima "no test files" sebagai bukti.
 - Typecheck: hanya paket yang tersentuh (mis. `pnpm --filter ./server typecheck`).
   JANGAN `pnpm -r typecheck` — itu menyalakan satu proses tsc per paket sekaligus.
+- Ritme: per task jalankan berkas test yang task itu sentuh saja.
+  JANGAN menjalankan ulang berkas test yang sudah hijau selama kode yang diujinya
+  tak berubah sejak itu. Typecheck paket tersentuh sesudah task yang mengubah
+  tipe/kontrak ekspor, bukan tiap task. Gabungan semua test tersentuh + typecheck
+  dijalankan SEKALI di akhir, sebelum melapor.
 - Lint: hanya berkas yang berubah, bukan seluruh repo.
 - Build penuh: hanya bila yang kamu ubah memang soal build/bundling.
 - Boot server + curl / smoke end-to-end: hanya bila task ini menyentuh endpoint atau perilaku

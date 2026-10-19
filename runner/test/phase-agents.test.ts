@@ -92,6 +92,46 @@ describe("buildPhaseAgents (ADR-0164)", () => {
     }
   });
 
+  // ADR-0225 · 70 fase Plan terukur: median 143 rb token output & 130 KB plan karena kode lengkap
+  // ikut tertulis — lalu Execute mengetiknya lagi. Plan tetap rencana, untuk metode apa pun.
+  it("Plan menulis rencana, bukan kode — dan aturannya mengalahkan skill plan, di semua metode", () => {
+    for (const method of ["superpowers", "matt", "agent-skills"]) {
+      const plan = at(agentsFor("feature", { method: resolveMethod(method) }), "Plan").instructions;
+      expect(plan).toContain("Bentuk plan: rencana, bukan kode");
+      expect(plan).toContain("JANGAN menulis isi implementasi maupun isi test lengkap");
+      expect(plan).toMatch(/mengalahkan anjuran .*kode lengkap/);
+    }
+    expect(at(agentsFor("feature"), "Execute").instructions).not.toContain("Bentuk plan: rencana");
+  });
+
+  // ADR-0225 · 89 sesi: median 2 putaran tanya tersebar sesudah Brainstorm, Spec, Plan, dan Execute —
+  // tiap putaran menghentikan sesi sampai dijawab. Fase pertama mengumpulkan semuanya di depan.
+  it("fase pertama yang bertanya mengumpulkan SEMUA keputusan sampai Execute dalam satu putaran", () => {
+    const brainstorm = at(agentsFor("feature"), "Brainstorm").instructions;
+    expect(brainstorm).toContain("SEMUA keputusan yang akan dibutuhkan sampai Execute");
+    expect(brainstorm).toContain("satu putaran");
+    const audit = at(agentsFor("qa"), "Audit").instructions;
+    expect(audit).toContain("SEMUA keputusan yang akan dibutuhkan Spec, Plan, dan Execute");
+    expect(at(agentsFor("audit"), "Audit").instructions).not.toContain("dibutuhkan Spec, Plan, dan Execute");
+  });
+
+  it("keputusan yang sudah dijawab final: fase berikutnya & reviewer tak menanyakannya ulang", () => {
+    for (const d of agentsFor("feature")) {
+      expect(d.instructions).toContain("Keputusan yang sudah dijawab");
+      expect(d.instructions).toContain("JANGAN menanyakannya ulang");
+      // ADR-0167 tetap: ambiguitas baru tetap ditanyakan, tanpa batas.
+      expect(d.instructions).toContain("tanpa batas jumlah");
+    }
+  });
+
+  // ADR-0225 · 257 perintah `sleep` di 92 Execute = 14,4 jam menunggu proses latar yang dipolling.
+  it("perintah verifikasi di foreground; polling jeda tidur dilarang — agen fase maupun reviewer", () => {
+    for (const d of agentsFor("feature")) {
+      expect(d.instructions).toContain("di FOREGROUND dengan batas waktu");
+      expect(d.instructions).toContain("`sleep N`");
+    }
+  });
+
   it("skill metode hanya di fase pemiliknya; exitSkills di fase terakhir flow penulis-kode", () => {
     const defs = agentsFor("feature");
     expect(at(defs, "Brainstorm").instructions).toContain("superpowers:brainstorming");
@@ -493,8 +533,10 @@ describe("Antigravity phase protocol (SPEC-1442)", () => {
     expect(reviewer.instructions).toContain("JANGAN mengubah, membuat, atau menghapus");
   });
   it.each([
-    ["claude", "26812ce4a0bd69e52ab388cfd259a44831b09a7f9b0969e0e2044880442fb0f4", "39e7293d499e7e567e67a6fd81324a874455c4d02e52372304b28d8183b5ad2c"],
-    ["codex", "a77bc5f636771d2637d85d7f53bfd0c129fc53fcf2853a577beaf98bf8b7741a", "ff71fee62e39e8a30ef611e933f43a0f16d4bb13a3735ee449940f5c87376862"],
+    // Hash defs diperbarui sengaja oleh ADR-0225 (bentuk plan, keputusan di depan, aturan foreground);
+    // hash parent tak berubah — klausa orchestrator tak disentuh.
+    ["claude", "26812ce4a0bd69e52ab388cfd259a44831b09a7f9b0969e0e2044880442fb0f4", "aef0fe90e7b00045ff5f35a04ad22cf85985ca7c5b90913818a86e5b184ff4ac"],
+    ["codex", "a77bc5f636771d2637d85d7f53bfd0c129fc53fcf2853a577beaf98bf8b7741a", "b60111bd6f3052aecc90cebd8c2b9f80c08be6b9d9e2c637ade494a8837e5c6d"],
   ] as const)("%s existing parent/phase prompts stay byte-identical", (runtime, parentHash, defsHash) => {
     const plan = planFor("feature", runtime);
     const defs = withPhaseDelegation(buildPhaseAgents(plan, { flow: "feature", method: resolveMethod("superpowers"), verifyScope: "changed", context: "KONTEKS-UJI" }), [], runtime);

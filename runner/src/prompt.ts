@@ -67,6 +67,19 @@ const AUTONOMY_CLAUSE_FULL =
 export const autonomyClause = (mode?: Autonomy): string =>
   mode === "full-control" ? AUTONOMY_CLAUSE_FULL : AUTONOMY_CLAUSE;
 
+// ADR-0225 · 70 fase Plan terukur: median 143 rb token output, plan median 130 KB (maks 378 KB) —
+// kode lengkap ikut tertulis karena skill plan memintanya, lalu Execute mengetiknya lagi. Satu kalimat
+// untuk dua mode: agen fase Plan dan `phaseInstruction` sesi tunggal.
+export const PLAN_SHAPE =
+  "Bentuk plan: rencana, bukan kode. Tiap task `- [ ]` adalah satu irisan perilaku yang bisa "
+  + "diverifikasi: berkas yang disentuh, perilaku yang dibangun, AC yang dipenuhinya, dan test yang "
+  + "membuktikannya (nama test + kasus intinya dalam satu kalimat). JANGAN menulis isi implementasi "
+  + "maupun isi test lengkap — Execute yang menulisnya; kode di plan ditulis dua kali. Potongan kode "
+  + "hanya untuk kontrak yang tak boleh ditafsirkan (signature/tipe ekspor, skema, bentuk payload API), "
+  + "masing-masing pendek. Jangan memecah tulis-test, jalankan, implementasi, dan commit menjadi kotak "
+  + "terpisah. Sasaran ±300 baris; lebih panjang biasanya tanda kode ikut tertulis. Aturan ini "
+  + "mengalahkan anjuran \"kode lengkap di setiap langkah\" dan \"langkah 2–5 menit\" milik skill plan mana pun.";
+
 // Agen yang melapor, server yang menonton: di PTY tak ada batas giliran yang terbaca mesin.
 // Append, bukan tulis-timpa — keadaan penuh selalu ada di berkasnya, jadi tak ada transisi
 // yang bisa terlewat kalau server sedang tidak menonton. Berkasnya di luar worktree, jadi
@@ -83,7 +96,8 @@ const phaseInstruction = (phases: readonly string[], method: MethodDef) => {
   return base
     + `\nExecute BELUM selesai selama plan (\`${method.planDir}/**\`) masih punya task `
     + `\`- [ ]\`: kerjakan SEMUA PR/task sampai tiap kotak jadi \`- [x]\` sebelum menulis `
-    + `\`Execute done\`. hanoman menahan backlog di \`executing\`, bukan \`done\`, selama masih ada \`- [ ]\`.`;
+    + `\`Execute done\`. hanoman menahan backlog di \`executing\`, bukan \`done\`, selama masih ada \`- [ ]\`.`
+    + `\n${PLAN_SHAPE}`;
 };
 
 // SPEC-734 · ADR-0113 · peta fase → skill datang dari registry metode (`METHODS` di

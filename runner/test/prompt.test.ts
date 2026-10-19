@@ -176,6 +176,14 @@ describe("startPrompt", () => {
     }
   });
 
+  // ADR-0225 · mode sesi tunggal memakai bentuk plan yang SAMA dengan agen fase Plan.
+  it("feature/qa: plan berbentuk rencana, bukan kode; flow tanpa Plan tak membawanya", () => {
+    for (const flow of ["feature", "qa"] as const) {
+      expect(startPrompt(flow, spec, "b")).toContain("Bentuk plan: rencana, bukan kode");
+    }
+    expect(startPrompt("audit", spec, "b")).not.toContain("Bentuk plan");
+  });
+
   // SPEC-187 · ADR-0035: lanjut antar-fase tanpa berhenti; berhenti hanya untuk yang ambigu — dan sejak
   // ADR-0167 pemutusnya lead (bila aktif) atau manusia, bukan selalu manusia.
   it("feature/qa: menyuruh terus lanjut antar-fase, berhenti hanya untuk keputusan ambigu", () => {

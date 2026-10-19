@@ -5,7 +5,7 @@ import {
 import type { AgentDef } from "./custom-agents";
 import type { Flow, VerifyScope } from "./types";
 import {
-  DECIDER, ESCALATION_CONTRACT, REVERSE_PHASE_GUIDE, SCAFFOLD_PHASE_GUIDE, WORK_PHASES, breakdownPhaseLines,
+  DECIDER, ESCALATION_CONTRACT, PLAN_SHAPE, REVERSE_PHASE_GUIDE, SCAFFOLD_PHASE_GUIDE, WORK_PHASES, breakdownPhaseLines,
   codeStyleClause, guideLine, methodClause, phaseSkillsFor, prdPhaseLines, scopeClause,
 } from "./prompt";
 import { REVERSE_STANDARD } from "./reverse-standard";
@@ -49,7 +49,22 @@ const PHASE_AGENT_AUTONOMY =
   + "panduan fase menyuruhmu bertanya ke manusia, lalu tulis `Status: menunggu-keputusan` dan berhenti. "
   + "Jawabannya datang sebagai pesan susulan ke agen yang sama — lanjutkan dari sana; bila jawaban itu "
   + "memunculkan ambiguitas baru, laporkan lagi dengan cara yang sama. Yang menjawab ditentukan hanoman "
-  + `— ${DECIDER}.`;
+  + `— ${DECIDER}. `
+  // ADR-0225 · tiap putaran tanya menghentikan sesi sampai dijawab (89 sesi: p90 36 menit per putaran);
+  // keputusan yang sudah dijawab tak boleh memicu putaran kedua. Ambiguitas BARU tetap ditanyakan (0167).
+  + "Keputusan yang sudah dijawab (baris `Keputusan manusia sejauh ini:` serah-terima, bagian keputusan "
+  + "dokumen spec atau dokumen audit) sudah final — JANGAN menanyakannya ulang; kumpulkan ambiguitas baru "
+  + "fasemu dan laporkan sekaligus.";
+
+// ADR-0225 · 92 Execute terukur: 257 perintah berjeda tidur (`sleep 290; tail …`) = 14,4 jam menunggu
+// proses yang dilepas ke latar. Larangan mengakhiri giliran (T1) mendorong polling; yang dibutuhkan
+// justru menjalankannya di foreground.
+const FOREGROUND_RULE =
+  "- Jalankan test/typecheck/build di FOREGROUND dengan batas waktu dan baca hasilnya di giliran yang "
+    + "sama. JANGAN melepasnya ke latar lalu menunggu dengan jeda tidur berdurasi tetap (`sleep N` "
+    + "berulang) — itu menit yang terbuang tanpa hasil; set yang terlalu lama untuk satu perintah dipecah. "
+    + "Proses yang memang harus hidup di latar (server untuk smoke) ditunggu dengan pemeriksaan kesiapan "
+    + "berbatas waktu yang berhenti sendiri begitu siap.";
 
 const PHASE_AGENT_RULES = [
   "Batas peran fase:",
@@ -57,6 +72,7 @@ const PHASE_AGENT_RULES = [
   "- JANGAN `git push` — push milik orchestrator. Commit artefak fasemu sendiri sebelum melapor.",
   `- JANGAN memanggil agen berawalan \`${PHASE_AGENT_PREFIX}\`. Custom agent lain boleh dipanggil bila relevan.`,
   "- Kerjakan HANYA fase ini; fase lain dikerjakan agen fasenya sendiri.",
+  FOREGROUND_RULE,
   // T1 · ADR-0164 amandemen 2026-09-23 · 22 laporan tanpa `Status:` di audit: agen fase mengakhiri
   // gilirannya sambil menunggu proses latarnya sendiri, dan teks "menunggu" itu dibaca orchestrator
   // sebagai laporan final. Giliranmu yang berakhir = laporanmu, jadi menunggu harus terjadi DI DALAM giliran.
@@ -98,6 +114,15 @@ function resumeNoteFor(r: NonNullable<PhaseAgentContext["resume"]>): string {
   ].filter(Boolean).join(" ");
 }
 
+// ADR-0225 · 89 sesi: putaran tanya tersebar sesudah Brainstorm (76), Spec (68), Plan (32), dan
+// Execute (17); tiap putaran menghentikan sesi sampai dijawab. Fase pertama yang bertanya menarik
+// keputusan fase-fase berikutnya ke depan, supaya cukup satu kali operator dipanggil.
+const FRONT_LOADED_DECISIONS = (until: string): string =>
+  `Kumpulkan di fase ini SEMUA keputusan yang akan dibutuhkan ${until} — bukan hanya yang muncul `
+  + "sekarang: data model & migrasi/backfill, kontrak API, scope & yang di luar scope, perilaku terlihat "
+  + "pengguna, sumber data, kasus tepi — dan ajukan sekaligus sebagai `Keputusan terbuka:` dalam satu "
+  + "putaran; satu putaran di depan jauh lebih murah daripada beberapa putaran yang tersebar.";
+
 /** Defensif seperti `readSpecMethod`: payload datang dari kolom Json. */
 export function fromAuditOf(payload: unknown): string | undefined {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return undefined;
@@ -112,6 +137,7 @@ function backlogGuide(flow: Flow, phase: string, ctx: PhaseAgentContext): string
       return "- Brainstorm: gali konteks, alternatif, dan keputusan untuk backlog ini dari Source of Truth "
         + `dan kode. Tulis hasilnya sebagai bagian \`## Konteks & keputusan\` di dokumen spec baru di `
         + `\`${m.specDir}/\` (nama berkas \`<YYYY-MM-DD>-<spec-id>-<slug>-design.md\`) dan laporkan path-nya.`
+        + ` ${FRONT_LOADED_DECISIONS("sampai Execute")} Tulis jawabannya ke \`## Konteks & keputusan\`.`
         + (ctx.fromAudit
           ? ` Backlog ini LANJUTAN audit ${ctx.fromAudit}: baca \`internal/docs/research/audit-`
             + `${ctx.fromAudit.toLowerCase()}-*.md\` lebih dulu dan pakai temuannya sebagai bahan — jangan `
@@ -143,7 +169,7 @@ function backlogGuide(flow: Flow, phase: string, ctx: PhaseAgentContext): string
         + `serah-terima) ke SATU berkas \`${m.planDir}/<YYYY-MM-DD>-<spec-id>-<slug>.md\` (spec-id backlog `
         + "ini huruf kecil, mis. `2026-09-25-spec-123-ekspor-csv.md` — nama tanpa spec-id membuat hanoman tak "
         + "menemukan plan-nya). Laporkan path PERSIS berkas itu di `Artefak:`; orchestrator meneruskannya "
-        + "ke Execute.";
+        + `ke Execute. ${PLAN_SHAPE}`;
     case "Execute":
       return "- Execute: kerjakan plan backlog ini — path persisnya di baris `Artefak fase sebelumnya:` "
         + `serah-terima (bila tak ada: berkas di \`${m.planDir}/\` yang namanya memuat spec-id backlog ini). `
@@ -163,7 +189,8 @@ function backlogGuide(flow: Flow, phase: string, ctx: PhaseAgentContext): string
           + "bukan default: bila temuan berconfidence tinggi dan perbaikannya bisa dikerjakan langsung (diff "
           + "kecil, akar masalah jelas), tulis `Rekomendasi fase: jalur-cepat` beserta alasannya — "
           + "orchestrator akan melewati Spec & Plan dan dokumen audit menjadi doc-of-record perbaikan itu. "
-          + "Bila temuan luas, berisiko, atau ambigu, tulis `Rekomendasi fase: penuh`.";
+          + "Bila temuan luas, berisiko, atau ambigu, tulis `Rekomendasi fase: penuh`. "
+        + FRONT_LOADED_DECISIONS("Spec, Plan, dan Execute") + " Catat jawabannya di dokumen audit.";
     case "Laporan":
       return "- Laporan: tulis DOKUMEN AUDIT ke Source of Truth `internal/docs/research/audit-<spec-id>-<slug>.md` "
         + "(ikuti konvensi audit yang ada), tautkan di `internal/docs/README.md`, memuat: keluhan/pertanyaan, "
@@ -302,6 +329,7 @@ const REVIEWER_RULES = [
   "- JANGAN menulis `$HANOMAN_PHASE_FILE` dan JANGAN memperbaiki temuanmu sendiri — perbaikan milik agen "
     + "Execute, marker milik orchestrator.",
   `- JANGAN memanggil agen berawalan \`${PHASE_AGENT_PREFIX}\`.`,
+  FOREGROUND_RULE,
   "- JANGAN mengakhiri giliran atau melapor selama masih menunggu proses/tugas latar milikmu sendiri "
     + "(test yang kamu jalankan di latar): tunggu sampai selesai dan baca hasilnya, lalu tulis laporan "
     + "lengkap berawalan `Status:`.",

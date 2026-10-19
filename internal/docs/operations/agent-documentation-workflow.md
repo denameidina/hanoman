@@ -17,6 +17,10 @@ Kontrak operasional untuk hanoman + Claude Code.
   verification-before-completion. Objective/Spec adalah keluaran brainstorming. Di mode orchestrator
   claude, Execute memakai subagent-driven-development sebagai ganti executing-plans (ADR-0170,
   `orchestratedPhaseSkills`); codex & sesi tunggal tetap executing-plans.
+- Durasi sesi (ADR-0225): plan berisi rencana, bukan kode — aturan bentuk plan hanoman mengalahkan
+  anjuran "kode lengkap" skill plan mana pun; Brainstorm (feature) / Audit (qa) mengumpulkan semua
+  keputusan sampai Execute dalam satu putaran; berkas test yang sudah hijau tak diulang dan set
+  lengkapnya dijalankan sekali di akhir; test/build di foreground, tanpa polling `sleep N`.
 - **From-scratch:** pilih folder → hanoman `git init` repo → sesi **scaffold** interaktif: brainstorm
   (satu pertanyaan/giliran) → kunci objective → menyusun seluruh doc index dari ide, pakai STANDAR DOCS
   yang sama dengan reverse (SPEC-222, ADR-0052). Tombol "Scaffold docs" di layar project + `autoScaffold`
