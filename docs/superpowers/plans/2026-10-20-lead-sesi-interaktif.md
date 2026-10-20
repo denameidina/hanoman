@@ -447,7 +447,7 @@ git commit -m "feat(db): inbox & approval sesi lead + ADR-0228"
   - `launchBudget(projectId: string, deps?: BudgetDeps): Promise<Budget>`
   - `type BudgetDeps = { cfg; status: () => Promise<{ slotsFree: number; hostOk: boolean }>; quota: () => Promise<{ status: "ok"|"error"; maxUsedPct: number }>; leadItems: (projectId: string) => Promise<{ status: string; launchedAt: Date | null }[]>; now: () => number }`
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -513,9 +513,9 @@ describe("project-config", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan → FAIL** (modul tak ada).
+- [x] **Step 2: Jalankan → FAIL** (modul tak ada).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `server/src/services/lead/project-config.ts`:
 
@@ -627,8 +627,8 @@ export async function launchBudget(projectId: string, deps: BudgetDeps = prodBud
 
 Catatan untuk implementer: `hostLoad` — cari pembaca beban host yang dipakai `session-launch-gate.ts`/`createLaunchGate` (`session-admission.ts:58`) dan impor fungsi yang sama; jangan menulis pembaca kedua. Nama `getCodexLimits`/`getAntigravityLimits` mengembalikan DTO dengan `status`+`windows` (`shared/src/dto.ts:685-697`); bila tipe DTO codex/antigravity berbeda, petakan ke `{status, windows}` di `prodQuota` saja. Cek nilai `Agent` untuk antigravity di `shared/src/enums.ts` dan pakai literal yang benar.
 
-- [ ] **Step 4: Test → PASS.**
-- [ ] **Step 5: Commit** `feat(lead): jatah peluncuran — slot, host, kuota, ramp, pemutus beruntun`
+- [x] **Step 4: Test → PASS.**
+- [x] **Step 5: Commit** `feat(lead): jatah peluncuran — slot, host, kuota, ramp, pemutus beruntun`
 
 ### Task 4: `verify.ts` + pengetatan `integrate-main`
 
