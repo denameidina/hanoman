@@ -1,6 +1,6 @@
 # Lead sebagai sesi interaktif + gerbang server — desain
 
-Tanggal: 2026-10-20 · Status: disetujui (brainstorming) · Berikutnya: implementation plan (SPEC 1 dulu)
+Tanggal: 2026-10-20 · Status: disetujui (brainstorming) · Berikutnya: implementation plan (satu SPEC, fase berurutan)
 
 ## Tujuan
 
@@ -26,7 +26,7 @@ dan **hidup sebagai sesi yang bisa dilihat serta di-steer manusia**.
 | Granularitas | **Satu sesi per proyek**: `lead-<proyek>`, cwd = repo proyek. |
 | Wewenang | **Mode per tindakan per proyek**: `auto` / `ask` / `off`. Default: answer=auto, start-session=auto, integrate=ask, stop/resume=auto. |
 | Ambil backlog | **Server menentukan jatah, lead memilih isinya** — wajib alasan + bukti per backlog. |
-| Jalur lama | **Semua pemicu menjadi event di inbox DB** sesi lead; brain sekali-panggil dicabut (lewat flag transisi). Lead mati/pause → pertanyaan jatuh ke manusia (ADR-0167). |
+| Jalur lama | **Semua pemicu menjadi event di inbox DB** sesi lead; brain sekali-panggil dicabut di SPEC yang sama. Lead mati/pause → pertanyaan jatuh ke manusia (ADR-0167). |
 | Pengantaran | **Pendekatan A**: server menyuntik event ke pane saat lead diam; lead bertindak lewat `hanoman_lead_act` yang digerbangi; sesi dirotasi. |
 | Keputusan bersamaan | Batch + prioritas kelas + investigasi paralel via subagent + tenggat per event → manusia. Lead-pembantu kedua = YAGNI (dicatat sebagai jalan keluar). |
 
@@ -73,7 +73,7 @@ dan **hidup sebagai sesi yang bisa dilihat serta di-steer manusia**.
 
 ### Dicabut / dipakai ulang
 
-- Dicabut (setelah transisi): `brain.ts`, pemanggilan LLM di `decide.ts`, state in-memory
+- Dicabut: `brain.ts`, pemanggilan LLM di `decide.ts`, state in-memory
   `deciding`, `lastReadySig`.
 - Dipakai ulang: `LeadDecision`/`LeadFlow` (ditulis oleh `hanoman_lead_act`), `applyAction` dan
   eksekutornya, gerbang host ADR-0161/0170, `limits.ts`/`codex-limits.ts`/`antigravity-limits.ts`,
@@ -171,7 +171,7 @@ menjawab event mana pun sendiri (event tertutup untuk lead).
 - **`LeadDecision`** + kolom `eventId?`.
 - **Setting `lead`** diperluas per proyek: `authority{}`, `quotaStopPct`, `rampStep`, `rampProbeMin`,
   `failStreak`, `answerSlaSec`, `deliverTimeoutSec`, `rotateAfterEvents`, `approvalTtlMin`,
-  engine/model sesi lead, `mode: "brain" | "session"` (transisi). Dicabut: `maxConcurrent`,
+  engine/model sesi lead. Dicabut: `maxConcurrent`,
   `queueWaitSec`, `timeoutSec` (milik brain).
 
 ### Realtime
@@ -207,8 +207,9 @@ Grup snapshot `lead` di `/api/events/ws`: inbox, approval, status sesi lead. Tan
 
 1. Migration Prisma (`LeadEvent`, `LeadApproval`, `LeadDecision.eventId`) + **ADR baru** yang
    menggantikan bagian "brain sekali-panggil" ADR-0091/0146/0223 dan mengamandemen ADR-0167.
-2. Flag transisi `lead.mode`; default `session` untuk proyek baru, proyek opt-in lama dialihkan via
-   UI. Flag + `brain.ts` dihapus di SPEC 4.
+2. Tanpa flag transisi: brain dicabut dalam SPEC yang sama. Proyek yang sudah opt-in langsung
+   memakai sesi lead setelah rilis; knob lama yang dicabut diabaikan saat Setting `lead` dibaca
+   (tak perlu migrasi data Setting).
 3. Docs dalam commit yang sama: `internal/docs/architecture/{stack,data-model,api-contract}.md`,
    `internal/docs/requirements/frd.md`, `internal/docs/frontend/glossary.md`,
    `internal/skills/hanoman/SKILL.md`, `CLAUDE.md` (kalimat grup snapshot), tautan di
@@ -229,16 +230,25 @@ Grup snapshot `lead` di `/api/events/ws`: inbox, approval, status sesi lead. Tan
 - **Nyata lokal**: boot server, curl `/lead/act`, `/lead/inbox`, `/lead/approvals/:id`,
   `/lead/session/*`; buka satu sesi lead sungguhan di proyek uji dan amati event tersuntik ke pane.
 
-## Pemecahan implementasi (4 SPEC berurutan, masing-masing bisa rilis)
+## Implementasi: satu SPEC, fase berurutan
 
-1. **Gerbang & jatah** — `budget.ts`, ramp, pemutus beruntun, pengetatan `integrate`, sesi
-   selesai/gagal selalu jadi keputusan. Langsung dipakai brain lama → masalah "7 sesi gagal" tertutup
-   lebih dulu.
-2. **Inbox, wewenang, approval** — `LeadEvent`, `LeadApproval`, mode per tindakan, Telegram,
-   LeadScreen.
-3. **Sesi lead** — `lead-session.ts`, `courier.ts`, rotasi, `hanoman_lead_act`, attach/steer,
-   flag `mode`.
-4. **Pembersihan** — cabut brain, sesi satu-satunya jalur, rapikan knob.
+Satu SPEC, satu plan, satu branch, dirilis sekali. Fase hanya urutan kerja di dalam plan; tiap fase
+ditutup dengan test yang tersentuh hijau sebelum fase berikutnya dimulai.
+
+1. **Data & ADR** — migration `LeadEvent`/`LeadApproval`/`LeadDecision.eventId`, perluasan Setting
+   `lead`, ADR baru.
+2. **Gerbang & jatah** — `budget.ts`, `gate.ts`, `authority.ts`, pengetatan `integrate`
+   (test dijalankan ulang server, `baseBranch`), daftar sensitif.
+3. **Inbox & approval** — `inbox.ts` (prioritas, batch, tenggat → manusia), `LeadApproval` +
+   Telegram Setujui/Tolak, sesi selesai/gagal selalu jadi event.
+4. **Sesi lead** — `lead-session.ts` (buka/rotasi/backoff), `courier.ts` (suntik saat diam,
+   `takenOver`), prompt sistem lead, `hanoman_lead_act`.
+5. **API, MCP, realtime, UI** — route baru + tool MCP (ADR-0202), grup snapshot `lead`, LeadScreen
+   (sesi, inbox, antrean izin, mode wewenang).
+6. **Pencabutan brain** — hapus `brain.ts`, LLM di `decide.ts`, state in-memory, knob lama; ubah
+   `hanoman_lead_ask` menulis event `human`.
+7. **Docs & verifikasi nyata** — docs SoT tersentuh, boot server + curl endpoint baru, satu sesi
+   lead sungguhan di proyek uji, skenario regresi 7 backlog.
 
 ## Di luar scope
 
