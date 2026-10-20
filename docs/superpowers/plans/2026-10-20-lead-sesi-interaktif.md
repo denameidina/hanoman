@@ -644,7 +644,7 @@ Catatan untuk implementer: `hostLoad` — cari pembaca beban host yang dipakai `
   - `integrateMain` mengembalikan `ApplyResult` dengan `detail` diawali kode penolakan (`plan-open:`, `worktree-dirty:`, `verify-failed:`, `conflict:`, `integrate-busy:`) supaya Task 11 bisa memetakan ke event `integrate-failed`.
   - `export const integrateLocks: Set<string>` (mutex per proyek, in-process)
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
 
 `server/test/lead-verify.test.ts`:
 
@@ -699,9 +699,9 @@ describe("integrate-main diperketat (ADR-0228)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan → FAIL.**
+- [x] **Step 2: Jalankan → FAIL.**
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `server/src/services/lead/verify.ts`:
 
@@ -787,8 +787,8 @@ async function integrateMain(row: LeadDecision, deps: ApplyDeps): Promise<ApplyR
 
 Sebelum mengganti, baca `apply.ts:130-174` yang asli dan pertahankan perilaku yang tak disebut di atas (mis. format catatan bukti `Bukti integrasi:` pada `detail`, pengecekan pane masih ada). `worktreeDir` sudah diimpor dari `../spec-review`. Bila `verifyCommand` kosong, integrasi tetap jalan di sini — kewajiban izin untuk kasus itu ditegakkan `guard.ts` (Task 5), bukan eksekutor.
 
-- [ ] **Step 4: Test → PASS** (`server/test/lead-verify.test.ts server/test/lead-apply.test.ts`).
-- [ ] **Step 5: Commit** `feat(lead): integrasi lead diperketat — test dijalankan server, worktree bersih, branch target, mutex`
+- [x] **Step 4: Test → PASS** (`server/test/lead-verify.test.ts server/test/lead-apply.test.ts`).
+- [x] **Step 5: Commit** `feat(lead): integrasi lead diperketat — test dijalankan server, worktree bersih, branch target, mutex`
 
 ### Task 5: `guard.ts`
 

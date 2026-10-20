@@ -9,7 +9,11 @@ import { startSpecSession } from "../session-launch";
 import { integrate } from "../integrate";
 import { recordLeadDecision } from "../notifications";
 import { getLead } from "./config";
+import { leadProjectConfig } from "./project-config";
+import { runVerify } from "./verify";
 import { withActor } from "../webhooks/actor";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 // SPEC-409 · ADR-0091 · H · PERMUKAAN TINDAKAN LEAD. Satu-satunya tempat sebuah keputusan lead
 // berubah jadi perbuatan.
@@ -29,7 +33,15 @@ export type ApplyDeps = {
   planDone: (cwd: string, specId: string) => boolean;
   integrate: typeof integrate;
   notify: (id: string, title: string, projectId: string, specId: string | null, sessionId: string | null) => Promise<void>;
+  /** ADR-0228 · bukti hijau dijalankan server di worktree sesi. */
+  verify: typeof runVerify;
+  /** ADR-0228 · worktree punya perubahan yang belum di-commit? */
+  dirty: (cwd: string) => Promise<boolean>;
+  /** ADR-0228 · branch target & perintah verifikasi per proyek. */
+  targetOf: (projectId: string) => Promise<{ branch: string; verifyCommand: string }>;
 };
+
+const execFileAsync = promisify(execFile);
 
 export const prodApplyDeps: ApplyDeps = {
   killSession: (id) => { try { return killSession(id); } catch { return false; } },
@@ -39,6 +51,16 @@ export const prodApplyDeps: ApplyDeps = {
   planDone: planComplete,
   integrate,
   notify: recordLeadDecision,
+  verify: runVerify,
+  // Bacaan gagal = KOTOR: syarat objektif yang tak bisa dibuktikan tak boleh dianggap terpenuhi.
+  dirty: async (cwd) => {
+    try { return (await execFileAsync("git", ["status", "--porcelain"], { cwd })).stdout.trim().length > 0; }
+    catch { return true; }
+  },
+  targetOf: async (projectId) => {
+    const p = leadProjectConfig(await getLead(), projectId);
+    return { branch: p.targetBranch, verifyCommand: p.verifyCommand };
+  },
 };
 
 // SPEC-481 · ADR-0100 · tindakan lead adalah satu-satunya penulis latar yang punya identitas
@@ -118,59 +140,80 @@ async function relaunch(row: LeadDecision, deps: ApplyDeps): Promise<ApplyResult
 
 /**
  * AC-19 · bukti yang menjadi dasar keputusan integrasi DICATAT pada jejaknya.
- * OQ-3 · `requireGreenBeforeIntegrate` (default menyala) menuntut syarat OBJEKTIF sebelum lead
- * boleh menekan tombol ini: plan tak menyisakan `- [ ]` (ADR-0029) dan panenya tak berakhir dengan
- * kode keluar ≠ 0 (SPEC-402). Bukan penilaian prosa lead — ia diperiksa server dari berkas & tmux.
+ * ADR-0228 · syarat OBJEKTIF diperiksa server dari berkas, git, dan perintah verifikasi — bukan
+ * penilaian prosa lead — dan TAK BISA dilonggarkan untuk jalur lead: `requireGreenBeforeIntegrate`
+ * tak lagi dibaca di sini (merge tanpa bukti hijau berarti "minta izin", ditegakkan `guard.ts`).
+ * Urutan murah → mahal: plan tanpa `- [ ]` (ADR-0029), worktree bersih, satu integrasi per proyek,
+ * `verifyCommand` hijau, lalu merge ke `targetBranch` proyek (bukan `main` terpatok).
+ *
+ * `detail` hasil gagal DIAWALI kode (`plan-open:`, `worktree-dirty:`, `integrate-busy:`,
+ * `verify-failed:`, `conflict:`) — `post.ts` memetakannya menjadi event `integrate-failed`.
  *
  * SPEC-451 · integrasi yang BERSIH juga MELEPAS panenya. Tanpa itu jawaban `integrate-main` cuma
  * menyelesaikan separuh keluhan: hasilnya masuk main, tapi pane sesi yang sudah selesai tetap
  * terhitung `liveCount()` governor (scheduler/engine.ts) — dan pane sesi sukses tak pernah mati
  * sendiri (SPEC-433), jadi slot itu tertahan selamanya dan antrean tak pernah dapat ruang.
  */
+export const integrateLocks = new Set<string>();
+
 async function integrateMain(row: LeadDecision, deps: ApplyDeps): Promise<ApplyResult> {
-  if (!row.specId) return { ok: false, detail: "keputusan ini tak menunjuk backlog" };
-  const cfg = await getLead();
+  if (!row.specId) return { ok: false, detail: "no-session: keputusan ini tak menunjuk backlog" };
   const repoDir = await deps.repoDir(row.projectId);
-  if (!repoDir) return { ok: false, detail: `project ${row.projectId} belum di-bind ke checkout lokal` };
+  if (!repoDir) return { ok: false, detail: `no-session: project ${row.projectId} belum di-bind ke checkout lokal` };
   const spec = await prisma.spec.findUnique({ where: { id: row.specId } });
-  if (!spec) return { ok: false, detail: `backlog ${row.specId} tak ada` };
+  if (!spec) return { ok: false, detail: `no-session: backlog ${row.specId} tak ada` };
 
-  // SPEC-451 · `done` dihitung TANPA memandang knob: `requireGreenBeforeIntegrate` menjawab
-  // "boleh diintegrasikan?", sementara gerbang pelepasan pane menjawab pertanyaan yang berbeda —
-  // "boleh panenya dilepas?". Operator yang mematikan knob itu mengizinkan integrasi lebih awal,
-  // bukan mengizinkan membunuh pane yang plan-nya masih menyisakan pekerjaan.
   const sid = sessionIdForSpec(spec.id);
-  const done = deps.planDone(worktreeDir(repoDir, spec.id), spec.id);
+  const cwd = worktreeDir(repoDir, spec.id);
   const evidence: string[] = [];
-  if (cfg.requireGreenBeforeIntegrate) {
-    evidence.push(done ? "plan tak menyisakan `- [ ]`" : "plan MASIH menyisakan `- [ ]`");
-    const pane = deps.sessionExists(sid);
-    evidence.push(pane ? `pane ${sid} masih ada` : `pane ${sid} sudah tak ada`);
-    if (!done) {
-      await recordEvidence(row, evidence, "integrasi DIBATALKAN — syarat objektif tak terpenuhi");
-      await deps.notify(row.id, `Lead membatalkan integrasi ${spec.id}: plan belum tuntas`,
-        row.projectId, row.specId, row.sessionId);
-      return { ok: false, detail: "syarat integrasi tak terpenuhi: plan masih menyisakan `- [ ]`" };
-    }
-  } else {
-    evidence.push("syarat objektif dimatikan operator (lead.requireGreenBeforeIntegrate = false)");
-  }
-
-  const res = await deps.integrate(repoDir, spec.id, "merge", "local:main");
-  evidence.push(`integrate → ${res.status}`);
-  // Pane dilepas hanya pada integrasi BERSIH: hasil `conflict` meninggalkan worktree yang justru
-  // harus diselesaikan, dan panenya masih dibutuhkan. `killSession` LANGSUNG, bukan
-  // `DELETE /terminal/sessions/:id` — worktree sesi tetap utuh (AC-32a), jadi rentang review
-  // ADR-0030 selamat dan "Lanjutkan" (ADR-0084) tetap bermakna.
-  if (res.status === "clean" && done && deps.sessionExists(sid)) {
-    evidence.push(deps.killSession(sid) ? `pane ${sid} dilepas (worktree utuh)` : `pane ${sid} gagal dilepas`);
-  }
-  await recordEvidence(row, evidence, res.status === "clean" ? "integrasi bersih" : `integrasi tak bersih: ${res.status}`);
-  if (res.status !== "clean") {
-    await deps.notify(row.id, `Integrasi ${spec.id} oleh lead tak bersih (${res.status}) — butuh operator`,
+  const refuse = async (code: string, why: string): Promise<ApplyResult> => {
+    await recordEvidence(row, evidence, `integrasi DIBATALKAN — ${why}`);
+    await deps.notify(row.id, `Lead membatalkan integrasi ${spec.id}: ${why.split("\n")[0]}`,
       row.projectId, row.specId, row.sessionId);
+    return { ok: false, detail: `${code}: ${why}; ${evidence.join("; ")}` };
+  };
+
+  const done = deps.planDone(cwd, spec.id);
+  evidence.push(done ? "plan tak menyisakan `- [ ]`" : "plan MASIH menyisakan `- [ ]`");
+  evidence.push(deps.sessionExists(sid) ? `pane ${sid} masih ada` : `pane ${sid} sudah tak ada`);
+  if (!done) return refuse("plan-open", "plan belum tuntas");
+  if (await deps.dirty(cwd)) {
+    evidence.push("worktree kotor");
+    return refuse("worktree-dirty", "worktree punya perubahan yang belum di-commit");
   }
-  return { ok: res.status === "clean", detail: evidence.join("; ") };
+  evidence.push("worktree bersih");
+  if (integrateLocks.has(row.projectId)) return refuse("integrate-busy", "integrasi lain sedang berjalan di proyek ini");
+
+  integrateLocks.add(row.projectId);
+  try {
+    const target = await deps.targetOf(row.projectId);
+    if (target.verifyCommand.trim()) {
+      const v = await deps.verify(cwd, target.verifyCommand, 15 * 60_000);
+      evidence.push(`\`${target.verifyCommand}\` → ${v.ok ? "hijau" : `merah (keluar ${v.code})`}`);
+      if (!v.ok) return refuse("verify-failed", `verifikasi merah\n${v.tail.slice(-1500)}`);
+    } else {
+      evidence.push("tanpa perintah verifikasi (disetujui manusia)");
+    }
+
+    const res = await deps.integrate(repoDir, spec.id, "merge", `local:${target.branch}`);
+    evidence.push(`integrate → ${target.branch}: ${res.status}`);
+    // Pane dilepas hanya pada integrasi BERSIH: hasil `conflict` meninggalkan worktree yang justru
+    // harus diselesaikan, dan panenya masih dibutuhkan. `killSession` LANGSUNG, bukan
+    // `DELETE /terminal/sessions/:id` — worktree sesi tetap utuh (AC-32a), jadi rentang review
+    // ADR-0030 selamat dan "Lanjutkan" (ADR-0084) tetap bermakna.
+    if (res.status === "clean" && deps.sessionExists(sid)) {
+      evidence.push(deps.killSession(sid) ? `pane ${sid} dilepas (worktree utuh)` : `pane ${sid} gagal dilepas`);
+    }
+    await recordEvidence(row, evidence, res.status === "clean" ? "integrasi bersih" : `integrasi tak bersih: ${res.status}`);
+    if (res.status !== "clean") {
+      await deps.notify(row.id, `Integrasi ${spec.id} oleh lead tak bersih (${res.status}) — butuh operator`,
+        row.projectId, row.specId, row.sessionId);
+      return { ok: false, detail: `conflict: integrasi ke ${target.branch} tak bersih (${res.status}); ${evidence.join("; ")}` };
+    }
+    return { ok: true, detail: evidence.join("; ") };
+  } finally {
+    integrateLocks.delete(row.projectId);
+  }
 }
 
 /** Bukti ditempel ke baris jejak yang bersangkutan — bukan ke baris baru (AC-19: "pada jejak keputusan yang bersangkutan"). */
