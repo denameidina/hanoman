@@ -30,6 +30,37 @@ dan **hidup sebagai sesi yang bisa dilihat serta di-steer manusia**.
 | Pengantaran | **Pendekatan A**: server menyuntik event ke pane saat lead diam; lead bertindak lewat `hanoman_lead_act` yang digerbangi; sesi dirotasi. |
 | Keputusan bersamaan | Batch + prioritas kelas + investigasi paralel via subagent + tenggat per event → manusia. Lead-pembantu kedua = YAGNI (dicatat sebagai jalan keluar). |
 
+## Koreksi pasca-penelusuran kode (2026-10-20, sebelum plan)
+
+Penelusuran sambungan untuk plan menemukan lima hal yang mengubah detail (bukan arah) desain:
+
+1. **Seam otak = `DecideDeps.think`.** `decide()` (`server/src/services/lead/decide.ts`) sudah
+   choke point tunggal ketiga pintu (kontrak, deteksi, denyut). Sesi lead MENGGANTIKAN `think`
+   (`thinkViaSession`): prompt yang sama (`leadPrompt`) ditulis ke `LeadEvent`, lead menjawab dengan
+   bentuk `zLeadVerdict`, dan seluruh mesin rantai dialog / jejak / notifikasi / `applyAction` tetap
+   dipakai apa adanya. `runGated` + `LeadBusyError` + knob `maxConcurrent`/`queueWaitSec` dicabut.
+2. **Lead bertindak lewat HTTP ber-token sesi, bukan MCP operator.** Sesi tak otomatis punya MCP
+   hanoman. Setiap pane sudah membawa `HANOMAN_SESSION_ID` + `HANOMAN_EVENT_TOKEN` (HMAC per sesi,
+   ADR-0146). Lead memakai `/api/lead-pane/brief` (situasi: jatah, sesi hidup, limit, backlog siap,
+   inbox) dan `/api/lead-pane/act`, diautentikasi HMAC persis seperti `/api/session-events` —
+   bypass di `app.ts`, peta capability `COOKIE_ONLY` (peniruan identitas sesi bukan capability).
+   Tool MCP `hanoman_lead_act` dari §3 **tidak dibuat**; tool MCP untuk manusia/agen tetap
+   (inbox, approvals, decide, session start/stop/rotate).
+3. **Nama berkas gerbang = `guard.ts`.** `lead/gate.ts` sudah ada (gerbang konkurensi brain) dan
+   dihapus bersama brain.
+4. **Tak ada `baseBranch`/perintah test di `Project`.** Ditambahkan sebagai setelan lead **per
+   proyek** di `Setting.lead.projects[<id>]`: `targetBranch` (default `main`) dan `verifyCommand`
+   (default kosong). `verifyCommand` kosong → `integrate` SELALU `butuh-izin` dengan laporan gerbang
+   "tak ada perintah verifikasi" (tak pernah auto tanpa bukti test).
+5. **Realtime memakai topik `lead` yang sudah ada** (`events-topics.ts`), bukan grup baru:
+   `LeadStatusView` diperluas dengan `inbox`, `approvals`, `sessions`. Telegram belum punya tombol
+   keputusan (hanya `tgcf:` konfirmasi destruktif di `gateway.ts`) → ditambah callback
+   `tgla:<approvalId>:approve|deny`.
+
+Jenis sesi baru `lead` (`SESSION_KINDS`, `sessionKind()`), `launchClass: "terminal"` supaya tak
+memakan slot backlog; worktree baca `<repo>/.worktrees/lead-<proyek>` di HEAD target (CLAUDE.md:
+tak ada run di working tree utama), di-refresh tiap rotasi.
+
 ## 1. Arsitektur
 
 ```
