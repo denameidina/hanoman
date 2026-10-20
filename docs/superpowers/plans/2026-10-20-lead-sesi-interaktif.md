@@ -805,7 +805,7 @@ Sebelum mengganti, baca `apply.ts:130-174` yang asli dan pertahankan perilaku ya
   - `type GuardDeps = { cfg: () => Promise<Lead>; budget: (projectId: string) => Promise<Budget>; spec: (id: string) => Promise<GuardSpec | null>; blockers: (spec: GuardSpec) => Promise<string[]>; sessionLive: (id: string) => boolean; sessionWaiting: (id: string) => boolean; approved: (spec: GuardSpec) => boolean }`
   - `type GuardSpec = { id: string; projectId: string; stage: string; baseSha: string | null; objective: string; launchApprovedAt: Date | null; dependsOn: unknown; branchFrom: string | null }`
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
 
 ```ts
 import { describe, it, expect } from "vitest";
@@ -876,9 +876,9 @@ describe("checkAct", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan → FAIL.**
+- [x] **Step 2: Jalankan → FAIL.**
 
-- [ ] **Step 3: Implementasi** `server/src/services/lead/guard.ts`:
+- [x] **Step 3: Implementasi** `server/src/services/lead/guard.ts`:
 
 ```ts
 import { isSensitiveText, leadActionAllowed, type Lead, type LeadAction, type LeadEventKind, type LeadRefusalCode } from "@hanoman/shared";
@@ -993,8 +993,8 @@ import { sessionIdForSpec } from "../session-id";
 
 Rapikan: pindahkan `import { sessionIdForSpec }` ke blok impor atas dan hapus helper `sessionIdOf` bila tak perlu. `blockersForSpec` mengembalikan `SpecBlocker[]` — cek field id-nya (`spec-deps.ts:13`) dan sesuaikan `.map`. `liveAsks()` mengembalikan `SessionAsk[]` dengan `sessionId` (`ask.ts:114`).
 
-- [ ] **Step 4: Test → PASS.**
-- [ ] **Step 5: Commit** `feat(lead): guard tindakan — allowlist, aturan objektif, sensitif, wewenang per proyek`
+- [x] **Step 4: Test → PASS.**
+- [x] **Step 5: Commit** `feat(lead): guard tindakan — allowlist, aturan objektif, sensitif, wewenang per proyek`
 
 ---
 
