@@ -867,6 +867,30 @@ sampai submit akhir. **LOCAL-ONLY, tak disync** (tanpa `version`, alasan yang sa
 - Langkah `gagal` tetap duduk di alurnya dan tetap menaikkan `steps`, tapi **tak** memindahkan status:
   alur yang semua langkahnya gagal memang masih "menunggu jawaban".
 
+## LeadEvent ([ADR-0228](../adr/0228-lead-sesi-interaktif-gerbang-server.md))
+**Inbox sesi lead** — satu baris = satu hal yang harus diputuskan pane `lead-<proyek>`. LOCAL-ONLY,
+tanpa FK (alasan yang sama dengan `LeadDecision`).
+- `id`, `projectId`, `kind` (`ask | session-ended | pulse | human | rejected | integrate-failed`),
+  `priority` (kecil didahulukan: tanya pekerja 0 → sesi selesai/gagal 1 → manusia/penolakan 2 →
+  denyut 3), `status` (`open | delivered | done | late | human`), `question` (yang dibaca manusia),
+  `payload` (Json: `prompt`, `gate`, `leadKind`, `options`, `select`, `mode` `wait|post`,
+  `request?`, `flowId?`, `step?`), `sessionId?`, `specId?`, `deadlineAt?` (hanya `ask`:
+  `answerSlaSec`), `deliveredAt?`, `attempts` (dinaikkan sapuan saat pane tak menjawab dalam
+  `deliverTimeoutSec`), `closedAt?`, `decisionId?`, `createdAt`, `updatedAt`.
+  Index `(projectId, status, priority, createdAt)`.
+- Penutupan **atomik** (`updateMany where status in open|delivered`): jawaban ganda dan jawaban
+  lead untuk event yang sudah diambil manusia kalah di sini.
+- Penunggu (`awaitEvent`) hanya in-process; baris di DB selamat dari restart.
+
+## LeadApproval ([ADR-0228](../adr/0228-lead-sesi-interaktif-gerbang-server.md))
+Tindakan lead yang menunggu izin manusia. `id`, `eventId`, `projectId`, `action`, `target?`,
+`reason`, `evidence` (Json string[]), `gateReport` (Json string[] — laporan gerbang server),
+`verdict` (Json — `zLeadVerdict` yang DITAHAN, dilepas apa adanya saat disetujui), `status`
+(`pending | approved | rejected | expired`), `decidedBy?`, `decidedAt?`, `note?`, `createdAt`.
+Index `(projectId, status)`, `(eventId)`. Kedaluwarsa (`Setting.lead.approvalTtlMin`) = ditolak.
+
+`LeadDecision.eventId?` menautkan baris jejak ke event yang dijawabnya.
+
 ## CustomAgent (SPEC-450 · [ADR-0094](../adr/0094-custom-agent-katalog-materialisasi-native.md))
 
 Katalog persona agen yang dipakai **setiap sesi baru**. `projectId` **null = GLOBAL** (berlaku di

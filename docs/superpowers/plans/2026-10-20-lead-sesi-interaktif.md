@@ -90,7 +90,7 @@ mkdir -p /private/tmp/hanoman-lead-test && /usr/bin/env -u HANOMAN_CONTROL_ORIGI
   - `zLead` menambah: `answerSlaSec`, `deliverTimeoutSec`, `rotateAfterEvents`, `approvalTtlMin`, `projects: Record<string, LeadProjectInput>`, default proyek: `projectDefaults: zLeadProject`
   - `SessionKind` += `"lead"`; capability `"lead:approve"`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 `shared/src/lead-session.test.ts`:
 
@@ -145,12 +145,12 @@ describe("kontrak sesi lead", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: `pnpm vitest --run shared/src/lead-session.test.ts`
 Expected: FAIL (`LEAD_AUTHORITY_DEFAULTS` tak diekspor).
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 Tambahkan di akhir `shared/src/lead.ts`:
 
@@ -266,12 +266,12 @@ Di `shared/src/entities.ts`, impor `zLeadProject` dari `./lead` (cek tak ada imp
 
 Ikuti pola `sessions:decide` (`agent.ts:145`) untuk entri `access: "danger"`. Perbarui `shared/src/lead.test.ts:134-139` bila ia mengunci daftar capability lead.
 
-- [ ] **Step 4: Jalankan test**
+- [x] **Step 4: Jalankan test**
 
 Run: `pnpm vitest --run shared/src/lead-session.test.ts shared/src/lead.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add shared/src
@@ -290,7 +290,7 @@ git commit -m "feat(shared): kontrak sesi lead — wewenang per tindakan, act, v
 **Interfaces:**
 - Produces: `prisma.leadEvent`, `prisma.leadApproval`, kolom `LeadDecision.eventId`.
 
-- [ ] **Step 1: Test skema yang gagal**
+- [x] **Step 1: Test skema yang gagal**
 
 ```ts
 import { describe, it, expect, afterAll } from "vitest";
@@ -318,9 +318,9 @@ describe("skema inbox lead (ADR-0228)", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan → FAIL** (`prisma.leadEvent` undefined). Pakai perintah test Global Constraints dengan `<paths>` = `server/test/lead-inbox-schema.test.ts`.
+- [x] **Step 2: Jalankan → FAIL** (`prisma.leadEvent` undefined). Pakai perintah test Global Constraints dengan `<paths>` = `server/test/lead-inbox-schema.test.ts`.
 
-- [ ] **Step 3: Skema + migration**
+- [x] **Step 3: Skema + migration**
 
 Tambah ke `schema.prisma` (LOCAL-ONLY seperti `LeadDecision`, tanpa FK ke Project):
 
@@ -417,9 +417,9 @@ ALTER TABLE "LeadDecision" ADD COLUMN "eventId" TEXT;
 
 Bandingkan tipe `Json` dengan migration lama (`grep -n JSONB server/prisma/migrations/*/migration.sql | head`); bila repo memakai `TEXT` untuk Json di SQLite, ikuti itu. Jalankan `pnpm --filter server exec prisma migrate diff --from-migrations server/prisma/migrations --to-schema-datamodel server/prisma/schema.prisma --shadow-database-url file:/private/tmp/hanoman-lead-test/shadow.db --script` → harus kosong setelah migration ditambahkan. Lalu `pnpm --filter server exec prisma generate`.
 
-- [ ] **Step 4: ADR-0228** — tulis `internal/docs/adr/0228-lead-sesi-interaktif-gerbang-server.md` dengan format ADR repo (Status Accepted, Tanggal 2026-10-20, Terkait: menggantikan bagian brain ADR-0091/0146/0223, mengamandemen ADR-0167, ADR-0161/0170 dipakai, ADR-0024 dipatuhi). Isi: Konteks (tabel bukti dari spec), Keputusan (10 poin: sesi per proyek, think-seam, lead-pane HMAC, inbox DB, batch+prioritas+tenggat, guard+budget, wewenang+approval, verifyCommand/targetBranch, kind `lead` launchClass terminal, pencabutan brain), Konsekuensi. Tambah baris tautan di `internal/docs/README.md` bagian ADR, dan bagian model `LeadEvent`/`LeadApproval` di `internal/docs/architecture/data-model.md`.
+- [x] **Step 4: ADR-0228** — tulis `internal/docs/adr/0228-lead-sesi-interaktif-gerbang-server.md` dengan format ADR repo (Status Accepted, Tanggal 2026-10-20, Terkait: menggantikan bagian brain ADR-0091/0146/0223, mengamandemen ADR-0167, ADR-0161/0170 dipakai, ADR-0024 dipatuhi). Isi: Konteks (tabel bukti dari spec), Keputusan (10 poin: sesi per proyek, think-seam, lead-pane HMAC, inbox DB, batch+prioritas+tenggat, guard+budget, wewenang+approval, verifyCommand/targetBranch, kind `lead` launchClass terminal, pencabutan brain), Konsekuensi. Tambah baris tautan di `internal/docs/README.md` bagian ADR, dan bagian model `LeadEvent`/`LeadApproval` di `internal/docs/architecture/data-model.md`.
 
-- [ ] **Step 5: Test → PASS**, lalu commit:
+- [x] **Step 5: Test → PASS**, lalu commit:
 
 ```bash
 git add server/prisma internal/docs server/test/lead-inbox-schema.test.ts
