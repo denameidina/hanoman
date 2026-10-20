@@ -43,6 +43,8 @@ export type TrailInput = {
   status?: LeadStatus;
   weighty?: boolean;
   actor?: "lead" | "operator";
+  /** ADR-0228 · event inbox sesi lead yang dijawab baris ini. */
+  eventId?: string | null;
 };
 
 export async function recordDecision(i: TrailInput): Promise<LeadDecision> {
@@ -64,6 +66,7 @@ export async function recordDecision(i: TrailInput): Promise<LeadDecision> {
       select: i.select ?? undefined,
       flowId: i.flowId ?? null, step: i.step ?? null,
       status: i.status ?? "berlaku", weighty: i.weighty ?? false, actor: i.actor ?? "lead",
+      eventId: i.eventId ?? null,
     },
   });
 }

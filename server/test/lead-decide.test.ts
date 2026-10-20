@@ -3,8 +3,8 @@ import { prisma } from "../src/db";
 import { LEAD_DEFAULTS, type Lead } from "@hanoman/shared";
 import { setLead } from "../src/services/lead/config";
 import { decide, takeDelivery, type DecideDeps } from "../src/services/lead/decide";
-import { LeadBusyError, leadGateStats, __resetLeadGate } from "../src/services/lead/gate";
-import { decidingIds, queuedIds, __resetDeciding } from "../src/services/lead/deciding";
+import { LeadLateError } from "../src/services/lead/session-think";
+import { decidingIds, __resetDeciding } from "../src/services/lead/deciding";
 import { LeadFlowClosedError } from "../src/services/lead/flow";
 
 // SPEC-409 · ADR-0091 · satu otak, tiga pintu. Semua deps disuntik: nol tmux, nol git, nol agen.
@@ -19,7 +19,7 @@ const clean = async () => {
 };
 beforeEach(async () => {
   await clean();
-  __resetLeadGate(); __resetDeciding();
+  __resetDeciding();
   await prisma.project.create({ data: { id: "demo", name: "Demo", desc: "", kind: "web", leadOptIn: true } });
 });
 afterAll(clean);
@@ -30,7 +30,6 @@ type Notif = { id: string; title: string };
 function deps(raw: string | Error, notes: Notif[] = []): DecideDeps {
   return {
     think: async () => { if (raw instanceof Error) throw raw; return raw; },
-    defaults: async () => ({ agent: "claude", model: "claude-opus-5", effort: "xhigh" }),
     repoDir: async () => null,
     liveSessions: () => [],
     notify: async (id, title) => { notes.push({ id, title }); },
@@ -183,42 +182,33 @@ describe("decide · gagal (AC-4)", () => {
 // diberi tahu satu angka lalu dibunuh di angka lain akan menganggarkan pembacaannya ke arah yang
 // salah — persis kegagalan 7/7 yang tercatat di jejak operator.
 describe("decide · anggaran waktu sampai ke agen (audit SPEC-432)", () => {
-  it("tells the agent the same budget it will actually be killed at", async () => {
-    await setLead(cfg({ timeoutSec: 300 }));
+  // ADR-0228 · tenggat pertanyaan kini SLA proyek (`answerSlaSec`), bukan `timeoutSec` proses.
+  it("tells the agent the same budget the inbox will close the question at", async () => {
+    await setLead(cfg({ projects: { demo: { answerSlaSec: 240 } } }));
     let seen = { prompt: "", timeoutMs: 0 };
     const out = block({ decision: "a", reason: "b" });
     await decide({ ...ask }, {
       ...deps(out),
       think: async (prompt, o) => { seen = { prompt, timeoutMs: o.timeoutMs }; return out; },
     });
-    expect(seen.timeoutMs).toBe(300_000);
-    expect(seen.prompt).toContain("300 detik");
+    expect(seen.timeoutMs).toBe(240_000);
+    expect(seen.prompt).toContain("240 detik");
+  });
+  it("gives pulse decisions twice the delivery timeout", async () => {
+    await setLead(cfg({ deliverTimeoutSec: 600 }));
+    let ms = 0;
+    const out = block({ decision: "a", reason: "b" });
+    await decide({ ...ask, gate: "pulse", kind: "quality" }, { ...deps(out), think: async (_p, o) => { ms = o.timeoutMs; return out; } });
+    expect(ms).toBe(1_200_000);
   });
 });
 
-// SPEC-479 (QA) · `decide()` adalah choke point tunggal ketiga pintu (ADR-0091 G6), jadi gerbang
-// konkurensinya duduk di sini — bukan disalin ke tiap pintu (kelas bug SPEC-431/448/475).
-describe("decide · gerbang konkurensi (SPEC-479)", () => {
-  beforeEach(() => setLead(cfg({ maxConcurrent: 2 })));
+// ADR-0228 · otak = sesi. Tak ada lagi gerbang konkurensi; yang diuji: penandaan sesi yang sedang
+// ditunggu, tautan baris → event, dan tenggat yang lewat jatuh ke manusia sebagai baris `gagal`.
+describe("decide · otak sesi lead (ADR-0228)", () => {
+  beforeEach(() => setLead(cfg()));
 
-  it("tak pernah memanggil agen lebih dari maxConcurrent sekaligus", async () => {
-    let inFlight = 0, max = 0;
-    const slow: DecideDeps = {
-      ...deps(block({ decision: "a", reason: "b" })),
-      think: async () => {
-        inFlight++; max = Math.max(max, inFlight);
-        await new Promise((r) => setTimeout(r, 30));
-        inFlight--;
-        return block({ decision: "a", reason: "b" });
-      },
-    };
-    await Promise.all(Array.from({ length: 8 }, (_, i) =>
-      decide({ ...ask, sessionId: `s${i}` }, slow)));
-    expect(max).toBe(2);
-  });
-
-  it("melempar LeadBusyError — BUKAN baris `gagal` — saat antreannya kehabisan waktu", async () => {
-    await setLead(cfg({ maxConcurrent: 1, queueWaitSec: 0 }));
+  it("menandai sesi `sedang diputuskan` selama pane lead belum menjawab", async () => {
     let release!: () => void;
     const held = new Promise<void>((r) => { release = r; });
     const holder: DecideDeps = {
@@ -227,47 +217,27 @@ describe("decide · gerbang konkurensi (SPEC-479)", () => {
     };
     const first = decide({ ...ask, sessionId: "s1" }, holder);
     await new Promise((r) => setTimeout(r, 5));
-
-    await expect(decide({ ...ask, sessionId: "s2" }, holder)).rejects.toBeInstanceOf(LeadBusyError);
-    // Inti temuan C: penolakan karena penuh BUKAN percobaan yang gagal, jadi ia tak boleh
-    // meninggalkan jejak `gagal` yang nanti dihitung pagar SPEC-472 sebagai sebab permanen.
-    expect(await prisma.leadDecision.count({ where: { status: "gagal" } })).toBe(0);
-
+    expect(decidingIds()).toEqual(["s1"]);
     release();
     await first;
-  });
-
-  it("menandai sesi ANTRE selagi menunggu slot, dan `sedang diputuskan` hanya saat agennya jalan", async () => {
-    await setLead(cfg({ maxConcurrent: 1, queueWaitSec: 30 }));
-    let release!: () => void;
-    const held = new Promise<void>((r) => { release = r; });
-    const holder: DecideDeps = {
-      ...deps(block({ decision: "a", reason: "b" })),
-      think: async () => { await held; return block({ decision: "a", reason: "b" }); },
-    };
-    const first = decide({ ...ask, sessionId: "s1" }, holder);
-    await new Promise((r) => setTimeout(r, 5));
-    expect(decidingIds()).toEqual(["s1"]);
-
-    const second = decide({ ...ask, sessionId: "s2" }, holder).catch(() => null);
-    await new Promise((r) => setTimeout(r, 5));
-    // s2 belum memanggil agen apa pun — ia mengantre. Operator harus bisa membedakan keduanya:
-    // "menunggu manusia" dan "menunggu giliran" terlihat sama di pane, tapi hanya satu yang bug.
-    expect(decidingIds()).toEqual(["s1"]);
-    expect(queuedIds()).toEqual(["s2"]);
-
-    release();
-    await Promise.all([first, second]);
     expect(decidingIds()).toEqual([]);
-    expect(queuedIds()).toEqual([]);
   });
 
-  it("melepas slotnya saat agen melempar — kegagalan tak boleh mengecilkan kapasitas", async () => {
-    await setLead(cfg({ maxConcurrent: 1, queueWaitSec: 0 }));
-    const boom = deps(new Error("agen mati"));
-    const row = await decide({ ...ask, sessionId: "s1" }, boom);
-    expect(row?.status).toBe("gagal");          // ini kegagalan lead yang sebenarnya (AC-4)
-    expect(leadGateStats()).toEqual({ inFlight: 0, queued: 0 });
+  it("menautkan baris jejak ke event inbox yang dijawabnya", async () => {
+    const out = block({ decision: "a", reason: "b" });
+    const row = await decide({ ...ask }, { ...deps(out), think: async (_p, o) => { o.onEvent?.("evt-1"); return out; } });
+    expect(row?.eventId).toBe("evt-1");
+  });
+
+  it("tenggat sesi lead lewat → baris gagal yang menyebut manusia", async () => {
+    const row = await decide({ ...ask, sessionId: "s1" }, {
+      ...deps(""),
+      think: async (_p, o) => { o.onEvent?.("evt-2"); throw new LeadLateError("sesi lead tak menjawab dalam 300 dtk — diserahkan ke manusia"); },
+    });
+    expect(row?.status).toBe("gagal");
+    expect(row?.reason).toContain("manusia");
+    expect(row?.eventId).toBe("evt-2");
+    expect(decidingIds()).toEqual([]);
   });
 });
 

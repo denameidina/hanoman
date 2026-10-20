@@ -1215,7 +1215,7 @@ export function toEventView(e: LeadEvent): LeadEventView {
   - `eventKindFor(gate: LeadGate, kind: LeadKind): LeadEventKind` — `detected`/`contract` → `ask`, `pulse`+`quality` → `session-ended`, `pulse`+`order` → `pulse`, lainnya → `human`
   - Waktu: `ask` → `answerSlaSec` proyek; lainnya → `deliverTimeoutSec` × 2.
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
 
 `server/test/lead-session-think.test.ts`:
 
@@ -1262,9 +1262,9 @@ it("tenggat sesi lead lewat → baris gagal, alasan menyebut manusia", async () 
 });
 ```
 
-- [ ] **Step 2: Jalankan → FAIL.**
+- [x] **Step 2: Jalankan → FAIL.**
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `server/src/services/lead/session-think.ts`:
 
@@ -1349,8 +1349,8 @@ Di `decide.ts`:
 4. Hapus impor `runGated`, `LeadBusyError`, `markQueued`, `clearQueued` dari `decide.ts`. Semua pemakai `LeadBusyError` lain (`pulse.ts` `decideOrSkip`, `routes/lead.ts:131-147`, `detect.ts`, `ask.ts`) diperbarui di Task 15; untuk sekarang biarkan kelasnya tetap diekspor dari `gate.ts` agar kompilasi lulus.
 5. Saat `decide()` menulis baris jejak, isi `eventId`: `thinkViaSession` tak mengembalikan id event — tambahkan ke `ThinkCtx` sebuah callback `onEvent?: (id: string) => void` yang `thinkViaSession` panggil setelah `openEvent`, dan `decide()` menyimpan id itu lalu menyertakannya ke `recordDecision` (tambah field `eventId?: string | null` di `TrailInput`, `trail.ts:15`). Setelah baris tercatat, panggil `prisma.leadEvent.update({ where: { id }, data: { decisionId: row.id } })`.
 
-- [ ] **Step 4: Test → PASS** (`server/test/lead-session-think.test.ts server/test/lead-decide.test.ts server/test/lead-detect.test.ts server/test/lead-ask.test.ts server/test/lead-pulse.test.ts`). Perbaiki test lain yang menyuntik `think` dengan tanda tangan lama.
-- [ ] **Step 5: Commit** `feat(lead): otak lead = sesi — decide() menulis event inbox dan menunggu jawaban pane`
+- [x] **Step 4: Test → PASS** (`server/test/lead-session-think.test.ts server/test/lead-decide.test.ts server/test/lead-detect.test.ts server/test/lead-ask.test.ts server/test/lead-pulse.test.ts`). Perbaiki test lain yang menyuntik `think` dengan tanda tangan lama.
+- [x] **Step 5: Commit** `feat(lead): otak lead = sesi — decide() menulis event inbox dan menunggu jawaban pane`
 
 ### Task 7b: Event tanpa penunggu — `postDecision` + `executeEventVerdict`
 

@@ -14,10 +14,14 @@ import { runGated, __resetLeadGate } from "../src/services/lead/gate";
 
 // SPEC-409 · ADR-0091 · permukaan HTTP hanoman-lead.
 
-// SPEC-480 · agen lead disuntik di titik spawn-nya (`brain.think`) — satu-satunya jalan menguji
-// jalur 201 tanpa men-spawn `claude -p` sungguhan. `leadOutput` diganti per test.
-const { leadOutput } = vi.hoisted(() => ({ leadOutput: { raw: "" } }));
-vi.mock("../src/services/lead/brain", () => ({ think: async () => leadOutput.raw }));
+// SPEC-480 · otak lead disuntik di titiknya — ADR-0228: `thinkViaSession` (pane sesi lead) —
+// satu-satunya jalan menguji jalur 201 tanpa pane tmux sungguhan. `leadOutput` diganti per test;
+// Error = pane tak menjawab dalam tenggat.
+const { leadOutput } = vi.hoisted(() => ({ leadOutput: { raw: "" as string | Error } }));
+vi.mock("../src/services/lead/session-think", async (orig) => ({
+  ...(await orig<typeof import("../src/services/lead/session-think")>()),
+  thinkViaSession: async () => { if (leadOutput.raw instanceof Error) throw leadOutput.raw; return leadOutput.raw; },
+}));
 
 const app = buildApp();
 const clean = async () => {
@@ -139,29 +143,16 @@ describe("POST /api/lead/decisions (pintu #1)", () => {
     expect(r.json().need).toBe("lead:write");
   });
 
-  // SPEC-479 (QA) · pintu ini tak punya pengereman apa pun sebelumnya: terukur 12 permintaan
-  // bersamaan → 12 proses `claude -p --effort xhigh` sekaligus. Sekarang ia mengantre, dan antrean
-  // yang penuh menjawab EKSPLISIT alih-alih menggantung.
-  it("503 + Retry-After saat gerbang penuh — bukan 409 (lead mati) dan bukan 504 (sudah mencoba)", async () => {
+  // ADR-0228 · 503 "gerbang penuh" dicabut bersama brain: pertanyaan kini mengantre di inbox
+  // sesi lead, dan tenggat yang lewat menjawab 504 (baris `gagal`, jatuh ke manusia).
+  it("504 saat sesi lead tak menjawab dalam tenggat", async () => {
     const cookie = await login();
-    await setLead({ ...LEAD_DEFAULTS, enabled: true, maxConcurrent: 1, queueWaitSec: 0 });
-
-    let release!: () => void;
-    const held = new Promise<void>((r) => { release = r; });
-    const occupied = runGated({ capacity: 1, waitMs: 5_000 }, async () => { await held; });
-    await new Promise((r) => setTimeout(r, 5));
-
+    await setLead({ ...LEAD_DEFAULTS, enabled: true });
+    leadOutput.raw = new Error("sesi lead tak menjawab dalam 300 dtk — diserahkan ke manusia");
     const r = await app.inject({ method: "POST", url: "/api/lead/decisions", headers: { cookie },
       payload: { projectId: "demo", question: "pakai kolom baru?" } });
-    expect(r.statusCode).toBe(503);
-    expect(Number(r.headers["retry-after"])).toBeGreaterThan(0);
-    // Peminta harus TAHU bahwa ini layak diulang — itu bedanya dengan 409/504.
-    expect(r.json().retryable).toBe(true);
-    // Dan tak ada baris `gagal` yang menyesatkan jejak operator (temuan C).
-    expect(await prisma.leadDecision.count()).toBe(0);
-
-    release();
-    await occupied;
+    expect(r.statusCode).toBe(504);
+    expect(r.json().error).toContain("manusia");
   });
 });
 
