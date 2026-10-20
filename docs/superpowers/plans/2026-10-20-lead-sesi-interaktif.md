@@ -1732,7 +1732,7 @@ Catatan implementer:
   - `deliverAll(projects: string[]): Promise<void>`
   - Aturan: kirim hanya bila pane hidup ∧ idle ∧ tak ada input manusia < 120 dtk ∧ batch tak kosong. Setelah kirim: idle=false. Bila `noteDelivered` ≥ `rotateAfterEvents` dan batch berikutnya kosong → `rotateLeadSession`.
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
 
 ```ts
 import { describe, it, expect, beforeEach } from "vitest";
@@ -1792,9 +1792,9 @@ describe("courier", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan → FAIL.**
+- [x] **Step 2: Jalankan → FAIL.**
 
-- [ ] **Step 3: Implementasi** `server/src/services/lead/courier.ts`:
+- [x] **Step 3: Implementasi** `server/src/services/lead/courier.ts`:
 
 ```ts
 import type { LeadEvent } from "@prisma/client";
@@ -1942,8 +1942,8 @@ Di `session-events.ts`, tepat sebelum blok cron (`:56`):
     }
 ```
 
-- [ ] **Step 4: Test → PASS** (`server/test/lead-courier.test.ts`, `server/test/lead-detect-event.test.ts`).
-- [ ] **Step 5: Commit** `feat(lead): kurir — batch event disuntik ke pane lead saat diam, hormati ketikan manusia`
+- [x] **Step 4: Test → PASS** (`server/test/lead-courier.test.ts`, `server/test/lead-detect-event.test.ts`).
+- [x] **Step 5: Commit** `feat(lead): kurir — batch event disuntik ke pane lead saat diam, hormati ketikan manusia`
 
 ### Task 10: Route `lead-pane` (brief + act) dan `act.ts`
 
