@@ -1379,7 +1379,7 @@ Di `decide.ts`:
 
 `PreparedDecision` dibangun ulang dari `payload.request` saat eksekusi: panggil `prepareDecision(req)` dengan `flowId: payload.flowId` agar langkah rantainya sama — ATAU (lebih sederhana dan disarankan) simpan `flowId`/`step`/`options`/`bounds` di payload dan susun `PreparedDecision` langsung tanpa membuka alur kedua. Pakai cara kedua; `prompt` tak perlu disusun ulang.
 
-- [ ] **Step 1: Test gagal** `server/test/lead-post.test.ts`:
+- [x] **Step 1: Test gagal** `server/test/lead-post.test.ts`:
 
 ```ts
 import { describe, it, expect, beforeEach } from "vitest";
@@ -1423,10 +1423,10 @@ describe("event tanpa penunggu", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan → FAIL.**
-- [ ] **Step 3: Implementasi.** Pecah `decide()` tepat di batas `think` tanpa mengubah urutan langkahnya (komentar AC-2: jejak ditulis sebelum jawaban sampai ke peminta — tetap benar karena `finalizeDecision` menulis jejak sebelum `executeEventVerdict` menjalankan tindakan). `executeEventVerdict` menutup event lewat `resolveEvent` HANYA bila event masih terbuka (dipanggil dari `act`: Task 10 sudah menutupnya → jangan menutup dua kali; terima `alreadyClosed` sebagai opsi).
-- [ ] **Step 4: Test → PASS** (`server/test/lead-post.test.ts server/test/lead-decide.test.ts`).
-- [ ] **Step 5: Commit** `feat(lead): event denyut tanpa penunggu — dieksekusi saat act/izin, tick tak pernah menunggu pane`
+- [x] **Step 2: Jalankan → FAIL.**
+- [x] **Step 3: Implementasi.** Pecah `decide()` tepat di batas `think` tanpa mengubah urutan langkahnya (komentar AC-2: jejak ditulis sebelum jawaban sampai ke peminta — tetap benar karena `finalizeDecision` menulis jejak sebelum `executeEventVerdict` menjalankan tindakan). `executeEventVerdict` menutup event lewat `resolveEvent` HANYA bila event masih terbuka (dipanggil dari `act`: Task 10 sudah menutupnya → jangan menutup dua kali; terima `alreadyClosed` sebagai opsi).
+- [x] **Step 4: Test → PASS** (`server/test/lead-post.test.ts server/test/lead-decide.test.ts`).
+- [x] **Step 5: Commit** `feat(lead): event denyut tanpa penunggu — dieksekusi saat act/izin, tick tak pernah menunggu pane`
 
 ### Task 8: `lead-session.ts` + `lead-prompt.ts` + kind `lead` di pty
 
