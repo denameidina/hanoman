@@ -2757,9 +2757,9 @@ Expected: semua PASS. Lalu `pnpm --filter server exec tsc --noEmit` dan `pnpm --
 - Modify: `internal/docs/architecture/stack.md`, `internal/docs/architecture/api-contract.md` (route `/lead-pane/*`, `/lead/approvals*`, `/lead/inbox*`, `/lead/sessions/*`, perubahan 503→hilang di `POST /lead/decisions`), `internal/docs/architecture/data-model.md` (sudah di Task 2 — periksa lengkap), `internal/docs/requirements/frd.md` (bagian lead), `internal/docs/frontend/frontend-implementation.md`, `internal/docs/frontend/glossary.md` (Sesi lead, Inbox lead, Izin lead, Jatah peluncuran, Wewenang), `internal/skills/hanoman/SKILL.md` (lead = sesi; tool MCP baru), `CLAUDE.md` (kalimat Konteks: lead berjalan sebagai sesi `lead-<proyek>`), `internal/docs/README.md` (tautan)
 - Modify: ADR-0091, 0146, 0167, 0223 — tambah baris "Diamandemen/digantikan sebagian oleh [0228]" di header masing-masing.
 
-- [ ] **Step 1:** Perbarui tiap berkas di atas; setiap klaim harus cocok dengan kode yang sudah ditulis (nama route, field, default).
-- [ ] **Step 2:** `grep -rn "claude -p\|brain\|maxConcurrent" internal/docs/architecture internal/docs/requirements internal/skills/hanoman | grep -i lead` → tak ada klaim usang tentang lead.
-- [ ] **Step 3: Commit** `docs: lead sebagai sesi interaktif + gerbang server (ADR-0228)`
+- [x] **Step 1:** Perbarui tiap berkas di atas; setiap klaim harus cocok dengan kode yang sudah ditulis (nama route, field, default).
+- [x] **Step 2:** `grep -rn "claude -p\|brain\|maxConcurrent" internal/docs/architecture internal/docs/requirements internal/skills/hanoman | grep -i lead` → tak ada klaim usang tentang lead.
+- [x] **Step 3: Commit** `docs: lead sebagai sesi interaktif + gerbang server (ADR-0228)`
 
 ### Task 17: Verifikasi nyata di lokal
 

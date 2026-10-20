@@ -136,7 +136,12 @@ Per layar:
 - **Lead** — input angka memakai draft, tanpa PUT per ketukan dan tanpa `disabled={busy}`. Komit saat blur
   atau Enter (`screens/LeadScreen.tsx:85,103-109,140-161`). Batal keputusan dan batal atau kirim rangkaian
   berkonfirmasi (`:475-492`). Helper `screens/sched-lead-shared.tsx` dipakai Scheduler, Cron, dan Lead
-  (`test/sched-lead-shared.test.tsx`).
+  (`test/sched-lead-shared.test.tsx`). ADR-0228 · panel sesi lead hidup di `screens/lead/`
+  (`LeadApprovalsPanel`, `LeadInboxPanel`, `LeadSessionsPanel`, `LeadAuthorityPanel`; test
+  `screens/lead/LeadPanels.test.tsx`): props-only, data dari frame topik `lead` (`inbox`, `approvals`,
+  `sessions` — `?? []` untuk server lama), aksinya lewat `api.decideLeadApproval`/`takeLeadEvent`/
+  `leadSession`. Hentikan & Rotasi sesi lead berkonfirmasi; Mulai tidak. Panel Wewenang memakai draft
+  lokal + "Simpan wewenang", tombol pengurung "Urungkan" (bukan "Batal" — nama itu milik pengaturan lead).
 - **QA** — hapus test case, lampiran, dan "Kirim semua ke backlog" berkonfirmasi (`screens/qa/QaCasesPanel.tsx:28`,
   `QaAttachments.tsx:41`, `QaFindingsPanel.tsx:79,100`; `screens/qa/QaWorkspace.test.tsx`, `screens/qa/QaAttachments.test.tsx`).
   "Kembali" dengan isian belum tersimpan bertanya dulu, dan badge "Belum disimpan" tampil

@@ -38,6 +38,15 @@ jatuh tempo. Terukur: `AskUserQuestion` → lead mulai menyusun turun dari lanta
 tick) ke **32–164 ms**, dan `capture-pane` saat tak ada yang bertanya jadi **nol**. Tak ada kanal
 WebSocket baru: keadaan tanya untuk pet menumpang frame `leadAsks` di `/api/events/ws` (ADR-0039).
 
+Sejak [ADR-0228](../adr/0228-lead-sesi-interaktif-gerbang-server.md) **otak lead adalah sesi**: satu
+pane tmux `lead-<proyek>` (kind `lead`, `launchClass: "terminal"` — tak memakan slot cap) per proyek
+opt-in, di worktree baca `<repo>/.worktrees/lead-<proyek>`. `claude -p`/`codex exec` per keputusan
+dicabut. Keputusan antre di tabel `LeadEvent` (inbox), dan kurir mengantar batch ke pane saat ia diam.
+Pane memeriksa & bertindak lewat `/api/lead-pane/{brief,act}` ber-token HMAC sesi, dibatasi gerbang
+server (`guard.ts`, `budget.ts`). Tindakan yang perlu izin manusia menjadi `LeadApproval`. Rumah
+tangga sesi lead (sapu tenggat & izin, lahirkan/rotasi pane, antar batch) menumpang tick 60 dtk yang
+sama — tetap tanpa timer baru.
+
 **Kendali jarak jauh & log terpusat — turunan A + B + C + D mendarat (SPEC-1215/SPEC-1216/SPEC-1218/SPEC-1217 ·
 [ADR-0165](../adr/0165-kendali-jarak-jauh-hub-lewat-socket-relay.md) ·
 [ADR-0166](../adr/0166-log-terpusat-ingest-satu-arah.md)).**
@@ -80,14 +89,15 @@ Server (Fastify, bind 127.0.0.1:8787)
    ├─ VPS monitor (setInterval: health 5 mnt · audit 24 jam)
    ├─ Scheduler engine (setInterval tick: source enable+cadence → antrean durable → rekonsil akhir sesi + scanDecisions → drain di bawah cap · SPEC-294/ADR-0072; checker konkret: backlog SPEC-295, errors SPEC-296 — grup produksi berulang → escalate → antrean, satu grup = satu backlog, triase SPEC-297 — tiket bug/fitur eligible → accept → antrean, satu tiket = satu backlog; SPEC-298 — klausa autonomy per mode saat launch [full-control tembus sampai done tanpa checkpoint namun keputusan ambigu tetap ditanyakan — ADR-0167 / butuh-keputusan berhenti→notif decision, slot tetap] + akhir sesi: done→ringkasan `SessionResult`+notif done tanpa auto-merge, gagal/limit→notif fail tanpa retry)
    ├─ Lead engine (pintu deteksi keputusan = EVENT, bukan timer: hook sesi → POST /api/session-events
-   │                → lead/ask.ts → putuskan → ketik jawabannya · SPEC-909/ADR-0146;
-   │                setInterval 60 dtk hanya RUMAH TANGGA: rantai kedaluwarsa, pangkas penghitung, sesi tanpa jalur event;
-   │                denyut proaktif tiap Setting.lead.everyMin: urutan kerja → antrean scheduler yang SUDAH ADA,
-   │                tabrakan area kerja dari diff worktree, tindak lanjut sesi exitCode≠0 / plan bersisa `- [ ]` · SPEC-409/ADR-0091;
+   │                → lead/ask.ts → decide() → LeadEvent → pane lead-<proyek> menjawab → ketik jawabannya · SPEC-909/ADR-0146/ADR-0228;
+   │                setInterval 60 dtk hanya RUMAH TANGGA: rantai kedaluwarsa, pangkas penghitung, sesi tanpa jalur event,
+   │                + ADR-0228: sapu tenggat inbox & izin, lahirkan/rotasi pane lead, antar batch tertunda;
+   │                denyut proaktif tiap Setting.lead.everyMin: pilih ≤ jatah backlog → antrean scheduler yang SUDAH ADA,
+   │                tabrakan area kerja dari diff worktree, tindak lanjut sesi selesai/gagal (integrasi ber-verifikasi) · SPEC-409/ADR-0091/ADR-0228;
    │                default MATI, opt-in per project lewat Project.leadOptIn)
    ├─ Docs SoT scan (live dari Project.repoDir tiap request — ADR-0011/0018)
    ├─ @fastify/static → web/  (aset dashboard di dalam paket npm; HANOMAN_WEB_DIR)
-   └─ SQLite (Prisma): Project · Spec · Setting · Notification · User · Session · Vps (+ LeadDecision, LOCAL-only · SPEC-409)
+   └─ SQLite (Prisma): Project · Spec · Setting · Notification · User · Session · Vps (+ LeadDecision, LOCAL-only · SPEC-409; + LeadEvent, LeadApproval, LOCAL-only · ADR-0228)
 ```
 
 **Nol proses eksternal, dan itu termasuk DB-nya.** Sejak SPEC-398/ADR-0086 provider Prisma adalah

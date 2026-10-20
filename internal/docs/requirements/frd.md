@@ -228,6 +228,25 @@ tanpa penopang tidak ditulis.
 - THE SYSTEM SHALL memasukkan ke antrean **hanya** backlog yang `baseSha` **dan** `stage`-nya
   menyatakan belum dikerjakan (`baseSha = null` ∧ `stage ≠ "done"`) — berlaku untuk checker `backlog`
   maupun denyut hanoman-lead (SPEC-431).
+- **hanoman-lead sebagai sesi** ([ADR-0228](../adr/0228-lead-sesi-interaktif-gerbang-server.md)):
+  - THE SYSTEM SHALL menjalankan lead sebagai satu pane `lead-<proyek>` per project opt-in yang bisa
+    di-attach & diketik manusia, tanpa memakan slot cap agen.
+  - WHEN lead hendak meluncurkan backlog, THE SYSTEM SHALL membatasinya pada jatah = min(slot
+    scheduler, gerbang host, kuota engine < `quotaStopPct`, ramp `rampStep` per `rampProbeMin`),
+    menganggap data kuota yang tak terbaca sebagai jatah 0, dan menolak spec yang selesai, belum
+    disetujui diluncurkan, terblokir dependensi, sudah bersesi, atau tanpa alasan/bukti yang merujuk id-nya.
+  - IF `failStreak` sesi lead gagal beruntun di satu project, THEN THE SYSTEM SHALL menjeda project itu
+    dan memberi tahu operator.
+  - WHEN sesi pekerja selesai atau gagal, THE SYSTEM SHALL meminta keputusan lead (integrasi,
+    lanjutkan, ulangi, hentikan, biarkan) tanpa menahan tick lead.
+  - THE SYSTEM SHALL mengintegrasikan hanya bila plan tuntas, worktree bersih, `verifyCommand` hijau
+    dijalankan server, dan tanpa konflik terhadap `targetBranch`; integrasi tanpa `verifyCommand`
+    SHALL selalu menunggu izin manusia.
+  - WHEN tindakan lead ber-mode `ask` atau jawabannya menyentuh daftar sensitif, THE SYSTEM SHALL
+    menahannya sebagai izin (UI + Telegram) dan tak pernah menjalankannya tanpa persetujuan; izin yang
+    kedaluwarsa SHALL berlaku sebagai penolakan.
+  - IF pertanyaan sesi pekerja tak dijawab lead dalam `answerSlaSec`, THEN THE SYSTEM SHALL
+    menyerahkannya ke manusia (ADR-0167).
 - IF sebuah item antrean menunjuk `Spec` ber-`stage = "done"` saat governor hendak meluncurkannya,
   THEN THE SYSTEM SHALL menutup item itu (`status:"done"` + alasan) **tanpa** meluncurkan sesi dan
   tanpa memakai slot concurrency.

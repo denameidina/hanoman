@@ -2111,13 +2111,38 @@ POST /api/scheduler/queue/:id/requeue            -> SchedulerQueueItem   # cance
 # topik langganan `lead` di kanal `/events/ws` yang sudah ada (ADR-0039 diamandemen pada bentuk
 # frame, bukan pada jumlah kanal). HTTP di bawah tetap jalur muat awal + fallback. Default MATI.
 # Capability agent-token: domain `lead`, dipetakan MENURUT METHOD (baca → lead:read, tulis → lead:write).
-GET  /api/lead/config      -> Lead (zLead: enabled, paused, pausedProjects[], everyMin, timeoutSec,
-#                                    maxAutoAnswers, maxConcurrent, queueWaitSec,
-#                                    requireGreenBeforeIntegrate, engine{enabled,agent,model,effort})
+GET  /api/lead/config      -> Lead (zLead: enabled, paused, pausedProjects[], everyMin, maxAutoAnswers,
+#                                    flowTtlMin, requireGreenBeforeIntegrate (tak lagi melonggarkan jalur lead),
+#                                    deliverTimeoutSec, approvalTtlMin, rotateAfterEvents,
+#                                    projects{<id>: {authority{<aksi>: auto|ask|off}, targetBranch, verifyCommand,
+#                                                    quotaStopPct, rampStep, rampProbeMin, failStreak, answerSlaSec}},
+#                                    engine{enabled,agent,model,effort})
+#                          # ADR-0228 · timeoutSec/maxConcurrent/queueWaitSec DICABUT (baris lama tetap ter-parse)
 PUT  /api/lead/config      { Lead } -> Lead          # ganti blok penuh (pola PUT /scheduler/config). Pause = { paused:true }. 400 invalid.
 GET  /api/lead/status      -> { config, projects:[{projectId,name,optIn,paused,decisions24h,openSessions}],
 #                               queue: SchedulerQueueItem[], deciding:[sessionId], queued:[sessionId],
-#                               waiting:[sessionId], lastPulseAt, gate:{inFlight,queued,capacity} }
+#                               waiting:[sessionId], lastPulseAt, gate:{inFlight,queued,capacity=ASK_POOL},
+#                               inbox: LeadEventView[], approvals: LeadApprovalView[],
+#                               sessions: LeadSessionView[] }   # ADR-0228 · tiga terakhir default [] untuk klien lama
+# ADR-0228 · SESI LEAD — inbox, izin, pane per proyek
+GET  /api/lead/inbox?projectId&status&page&limit -> Paginated<LeadEventView>
+#    LeadEventView: { id, projectId, kind: ask|session-ended|pulse|human|rejected|integrate-failed,
+#                     status: open|delivered|done|late|human, priority, question, specId, sessionId,
+#                     deadlineAt, deliveredAt, createdAt, decisionId }
+POST /api/lead/inbox/:id/take        -> { ok:true }   # manusia mengambil event; 409 bila sudah tertutup
+GET  /api/lead/approvals?projectId&status&page&limit -> Paginated<LeadApprovalView>
+#    LeadApprovalView: { id, eventId, projectId, action, target, reason, evidence[], gateReport[],
+#                        status: pending|approved|rejected|expired, decidedBy, decidedAt, note, createdAt }
+POST /api/lead/approvals/:id/decide { approve: boolean, note? } -> LeadApprovalView
+#                          # capability `lead:approve` (danger, TAK diimplikasikan lead:write) · 400 bentuk · 409 sudah diputuskan
+POST /api/lead/sessions/:projectId/start  -> { id, started }   # 409 lead tak aktif/belum bind/backoff · 500 gagal lahir
+POST /api/lead/sessions/:projectId/stop   -> { stopped }
+POST /api/lead/sessions/:projectId/rotate -> { id, started }
+# Permukaan PANE LEAD — token HMAC per sesi (x-hanoman-session + Bearer HANOMAN_EVENT_TOKEN), COOKIE_ONLY
+GET  /api/lead-pane/brief  -> { text, data:{ budget{n,reasons[],tripped}, live[], ready[], inbox[], approvals[] } }
+POST /api/lead-pane/act    { eventId, verdict: zLeadVerdict, evidence?[] }
+#                          -> { outcome: lolos|butuh-izin|ditolak, code?, detail, approvalId? }
+#                             401 token · 403 bukan pane lead · 404 pane mati · 400 bentuk
 GET  /api/lead/decisions?projectId&specId&sessionId&flowId&status&page&limit (juga take&skip)
 #                        -> Paginated<LeadDecisionView>   # { items, total, page, pageSize }
 #    SPEC-523 · ADR-0107 · `page`/`limit` ADITIF; `take`/`skip` lama tetap diterima. Bila keduanya
@@ -2133,9 +2158,9 @@ POST /api/lead/decisions   { projectId, specId?, sessionId?, question, options?[
 #                                   choice: { index (1-basis), option } | null, choices[{index,option}],
 #                                   missing: string[], flowId, flowStatus }   # PINTU #1
 #                             409 lead tak aktif / project tak opt-in · 409 flowId sudah tertutup (SPEC-485)
-#                             404 project · 504 lead gagal memutuskan (AC-4)
+#                             404 project · 504 sesi lead tak menjawab dalam `answerSlaSec` / gagal (AC-4, ADR-0228)
 #                             400 bentuk `select` mustahil dipenuhi daftar opsi yang dikirim (SPEC-485)
-#                             503 { error, retryable:true, queued } + Retry-After  gerbang penuh (SPEC-479)
+#                             (503 "gerbang penuh" SPEC-479 DICABUT — ADR-0228)
 POST /api/lead/decisions/:id/override { answer, reason?, choices?[] } -> { old, next, delivered }
 POST /api/lead/decisions/:id/cancel                       -> LeadDecisionView
 # SPEC-485 · ADR-0102 · RANTAI keputusan
@@ -2148,6 +2173,16 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 > **Tiga pintu, satu otak** (`services/lead/decide.ts`) — urutan wajibnya bukti → putusan → saring
 > rujukan → gerbang tindakan → **TULIS JEJAK** → notifikasi. Jejak ditulis SEBELUM jawaban dikirim ke
 > peminta (AC-2), dan itulah alasan tak ada jalur kedua.
+>
+> **ADR-0228 · otak = sesi lead.** `DecideDeps.think` = `thinkViaSession`: prompt `leadPrompt` menjadi
+> `LeadEvent` di inbox, kurir (`lead/courier.ts`) menulis batch ke `$HANOMAN_HOME/lead-batches/<proyek>/`
+> dan mengetik satu baris penunjuk ke pane `lead-<proyek>` saat diam (hook Stop) dan manusia tak
+> mengetik 120 dtk; pane memeriksa lewat `/lead-pane/brief` lalu menjawab lewat `/lead-pane/act`.
+> Pintu #1/#2 MENUNGGU jawaban (tenggat `answerSlaSec`); pintu #3 membuka event **tanpa penunggu**
+> (`lead/post.ts`) yang dieksekusi saat `act` lolos atau izinnya disetujui. Setiap `act` lewat
+> `lead/guard.ts` (allowlist → aturan objektif → wewenang per proyek; teks sensitif → izin) dan
+> `lead/budget.ts` (jatah = min(slot, host, kuota < `quotaStopPct`, ramp); pemutus beruntun menjeda
+> proyek). Tindakan `butuh-izin` menjadi `LeadApproval` (UI + Telegram `tgla:<id>:approve|deny`).
 >
 > **Pintu #1 — kontrak eksplisit** (`POST /api/lead/decisions`), dipakai sesi internal **dan** agen
 > eksternal ber-`AgentToken`. Ia **endpoint TULIS**: capability `lead:read` tak pernah cukup (403
@@ -2191,16 +2226,22 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 > antrean didahulukan (ADR-0223). Event yang ditolak batas laju (429) kini tercatat di log server.
 >
 > **Pintu #3 — denyut proaktif** (`setInterval` in-process, cermin engine scheduler — tanpa queue/
-> worker/cron, ADR-0024 utuh): menata urutan backlog siap-kerja (**diserahkan ke antrean & governor
-> yang sudah ada**, bukan antrean kedua), mendeteksi dua sesi yang menyentuh area kerja sama (diff
-> worktree lewat `specReview`), dan menindaklanjuti sesi yang berakhir dengan kode keluar ≠ 0 atau
-> plan bersisa `- [ ]`.
+> worker/cron, ADR-0024 utuh): **memilih paling banyak N backlog** siap-kerja (N = jatah server,
+> ADR-0228; hanya pilihan lead yang lolos guard yang diantrekan ke antrean & governor yang sudah
+> ada), mendeteksi dua sesi yang menyentuh area kerja sama (diff worktree lewat `specReview`),
+> menindaklanjuti sesi yang berakhir dengan kode keluar ≠ 0 atau plan bersisa `- [ ]`, dan
+> memutuskan nasib sesi yang SELESAI (integrasi ke `targetBranch` dengan `verifyCommand` yang
+> dijalankan server, lanjutkan, hentikan, biarkan). Integrasi yang gagal → event `integrate-failed`.
 >
 > **Permukaan tindakan lead adalah allowlist tertutup** (`shared/src/lead.ts`, konstanta modul —
 > bukan konfigurasi): deploy, perintah/konsol VPS, data produksi, dan penghapusan apa pun TERKUNCI
 > dan ditegakkan **di server** (`services/lead/apply.ts`), bukan lewat hook penolak perintah pada
 > sesi pekerja — ADR-0037 tetap utuh. Menghentikan sesi memakai `killSession()` langsung sehingga
 > **worktree-nya dibiarkan utuh** (berbeda dari `DELETE /api/terminal/sessions/:id`).
+>
+> **[DICABUT · ADR-0228]** paragraf di bawah ini sejarah: `lead/gate.ts`, `maxConcurrent`,
+> `queueWaitSec`, dan 503 sudah tak ada. Yang tersisa kolam pekerja tanya `ASK_POOL` (8) di
+> `lead/ask.ts` beserta ember token per sesi & global; antreannya kini inbox sesi lead (DB).
 >
 > **Gerbang konkurensi** (SPEC-479 · QA, `services/lead/gate.ts`): ketiga pintu berbagi SATU gerbang
 > penerimaan **FIFO** berkapasitas `maxConcurrent` (default 2), dipasang di choke point yang sudah
@@ -2212,7 +2253,7 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 > serial yang digantikannya. Slot yang tak didapat dalam `queueWaitSec` (default 120) → penolakan
 > **eksplisit yang bisa diulang**: `503 { retryable:true }` + `Retry-After` di pintu kontrak, lewati-
 > dan-coba-lagi di pintu deteksi & denyut. **SPEC-909:** loop `for`+`await` pintu deteksi sudah tak
-> ada — batasnya kini kolam pekerja di `lead/ask.ts` dengan angka yang SAMA (`maxConcurrent`), plus
+> ada — batasnya kini kolam pekerja di `lead/ask.ts` dengan angka yang SAMA (`maxConcurrent`; ADR-0228: `ASK_POOL`), plus
 > ember token per sesi (5 @ 1/10 dtk) & global (20 @ 2/dtk) di depan gerbang itu. Penuh **bukan** kegagalan lead — ia tak menulis baris
 > jejak dan tak menambah penghitung `maxAutoAnswers`, sebab pagar itu (SPEC-472) dibuat untuk sebab
 > yang tak hilang dengan mengulang sementara penuh hilang begitu slot bebas.
@@ -2222,6 +2263,11 @@ POST /api/lead/flows/:id/cancel -> LeadFlowView   # idem; closeReason = "operato
 > `GET /api/lead/decisions` (5 dtk, pola SchedulerScreen): jejak (pertanyaan → jawaban → alasan →
 > rujukan), sesi menunggu vs **sedang diputuskan** vs **antre** (SPEC-479 — ketiganya terlihat sama
 > di pane, hanya yang pertama butuh manusia), Pause global & per project, Timpa & Batalkan.
+> ADR-0228 menambah: **Menunggu izinmu** (Setujui/Tolak + catatan), **Inbox sesi lead** (Ambil alih),
+> **Sesi lead** per project (Buka terminal/Mulai/Rotasi/Hentikan), dan **Wewenang & jatah** per
+> project. MCP: `hanoman_lead_inbox[_take]`, `hanoman_lead_approvals_list`,
+> `hanoman_lead_approval_decide` (danger, `lead:approve`), `hanoman_lead_session_{start,stop,rotate}`
+> (danger); `/lead-pane/*` sengaja tak dibungkus (UNWRAPPED beralasan).
 
 ## Custom agent (SPEC-450 · ADR-0094)
 ```

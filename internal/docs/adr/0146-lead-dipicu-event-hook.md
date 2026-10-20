@@ -1,6 +1,8 @@
 # ADR-0146 — Pintu deteksi hanoman-lead dipicu event hook, bukan denyut
 
-Tanggal: 2026-08-23 · Status: diterima · SPEC-909
+Tanggal: 2026-08-23 · Status: diterima · SPEC-909 · **otak sekali-panggil & gerbang konkurensi digantikan
+[ADR-0228](0228-lead-sesi-interaktif-gerbang-server.md)** (jalur event hook di sini tetap berlaku; kolam
+pekerja kini `ASK_POOL`, bukan `lead.maxConcurrent`)
 Sumber: spec [`docs/superpowers/specs/2026-08-23-spec-909-lead-dipicu-event-askuserquestion-design.md`](../../../docs/superpowers/specs/2026-08-23-spec-909-lead-dipicu-event-askuserquestion-design.md),
 audit [`docs/superpowers/audits/2026-08-23-spec-909-latensi-event-vs-denyut.md`](../../../docs/superpowers/audits/2026-08-23-spec-909-latensi-event-vs-denyut.md)
 

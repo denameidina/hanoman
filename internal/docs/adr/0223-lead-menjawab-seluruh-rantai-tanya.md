@@ -1,6 +1,7 @@
 # ADR-0223 — Lead menjawab seluruh rantai tanya: antrean FIFO, layar harus sepakat dengan payload, AC-11 per pertanyaan
 
-Tanggal: 2026-10-18 · Status: diterima · tanpa nomor SPEC (dikerjakan langsung atas permintaan operator)
+Tanggal: 2026-10-18 · Status: diterima · tanpa nomor SPEC (dikerjakan langsung atas permintaan operator) ·
+yang memutuskan tiap langkah rantai kini sesi lead ([ADR-0228](0228-lead-sesi-interaktif-gerbang-server.md)); antrean FIFO per sesi & kecocokan layar di sini tetap berlaku
 
 **Mengamandemen** [ADR-0146](0146-lead-dipicu-event-hook.md) §5 ("satu sesi = satu pekerjaan; event
 yang tiba selagi sesi dikerjakan menimpa yang tertunda — terbaru menang") dan §6 (dialog ditunggu

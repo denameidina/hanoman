@@ -13,6 +13,11 @@ Dokumen ini adalah kontrak untuk teks yang tampil ke operator. Kode penegaknya: 
 | Layar takeover orkestrasi | **Dalang Hanoman** (judul); **Buka panggung** (aksi palet) | Dalang sinematik, panggung orkestrasi | Layar gelap penuh tanpa Shell (ADR-0208, dipulihkan sinematik ADR-0219). Satu-satunya layar gelap penuh. |
 | Kartu project di Dalang | **Wayang** | Puppet, Avatar | Hidup = sesi berjalan (benang emas). Redup = tanpa sesi, tertulis "tersandar di debog". |
 | Sesi yang menunggu keputusanmu | **Menunggu jawabanmu** (aksi **Jawab**) | Blocked, Perlu input | Tampil di atas layar Dalang dan di Overview. |
+| Pane agen hanoman-lead per project | **Sesi lead** (aksi **Buka terminal**, **Mulai**, **Rotasi**, **Hentikan**) | Lead brain, otak lead | ADR-0228. Satu per project yang diurus lead; jenis sesi berlabel "Lead". |
+| Tindakan lead yang ditahan gerbang | **Menunggu izinmu** (aksi **Setujui**, **Tolak**) | Approval, Pending | ADR-0228. Kedaluwarsa = ditolak, tindakannya tak pernah jalan. |
+| Antrean keputusan sesi lead | **Inbox sesi lead** (aksi **Ambil alih**) | Queue lead, Event | ADR-0228. Status: menunggu diantar, di pane lead, lewat tenggat · menunggu kamu, diambil manusia. |
+| Mode wewenang lead per tindakan | **jalan sendiri** / **minta izin** / **tidak boleh** | auto/ask/off di copy | ADR-0228. Nilai `auto`/`ask`/`off` hanya di kode. |
+| Batas peluncuran backlog oleh lead | **Jatah peluncuran** | Budget, quota lead | ADR-0228. Dihitung server: slot, beban host, kuota, ramp. |
 | Satu entri backlog | **Item** | SpecSlim, Spec | `Spec` tetap dipakai untuk `SPEC-nnn` dan untuk tahap spesifikasi. Nama tipe `SpecSlim` di kode bukan teks tampil. |
 | Dokumen project | **Dokumen** | SoT, Docs · SoT | `SoT` (source of truth) tetap istilah internal di docs/ADR, bukan copy layar. |
 | Hapus permanen | **Hapus** | Buang (untuk data) | Selalu lewat `useConfirm` dengan nama objek dan dampaknya. |
