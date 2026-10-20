@@ -2731,21 +2731,21 @@ export function LeadApprovalsPanel({ approvals, busy, onDecide }: LeadApprovalsP
 - Modify: `shared/src/entities.ts` (`zLead`: hapus `maxConcurrent`, `queueWaitSec`, `timeoutSec` — `zod` default mengabaikan kunci lama pada baris Setting yang ada; pastikan skema tidak `.strict()`), `server/src/services/lead/ask.ts:79-104` (`AskDeps.maxConcurrent`), `server/src/services/lead/pulse.ts` (`decideOrSkip` tanpa `LeadBusyError`), `server/src/services/lead/detect.ts` (pemakai `LeadBusyError`), `server/src/routes/lead.ts`, `server/src/services/lead/prompt.ts:44-54` (paragraf anggaran waktu — kini dari `thinkTimeoutMs`), `server/test/lead-routes.test.ts` (hapus `vi.mock("../src/services/lead/brain")` dan suntik `think` lewat mock `session-think`), `server/test/antigravity-lead-defaults.test.ts` (periksa: bila menguji argv brain, hapus; bila menguji `leadAgentDefaults`, pertahankan)
 - Test: seluruh `server/test/lead-*.test.ts`, `shared/src/lead*.test.ts`
 
-- [ ] **Step 1:** `grep -rn "brain\|runGated\|LeadBusyError\|queueWaitSec\|maxConcurrent\|timeoutSec\|__resetLeadGate\|markQueued\|clearQueued" server/src/services/lead server/src/routes/lead.ts server/test/lead-* shared/src src/src/screens/LeadScreen.tsx` — catat setiap pemakai.
-- [ ] **Step 2:** Hapus/ubah tiap pemakai:
+- [x] **Step 1:** `grep -rn "brain\|runGated\|LeadBusyError\|queueWaitSec\|maxConcurrent\|timeoutSec\|__resetLeadGate\|markQueued\|clearQueued" server/src/services/lead server/src/routes/lead.ts server/test/lead-* shared/src src/src/screens/LeadScreen.tsx` — catat setiap pemakai.
+- [x] **Step 2:** Hapus/ubah tiap pemakai:
   - `decideOrSkip` → panggil `deps.decide` langsung (tak ada lagi backpressure untuk ditangkap); hapus komentar SPEC-479 yang tak berlaku, sisakan satu baris rujukan ADR-0228.
   - `ask.ts` worker: hapus `maxConcurrent` dari deps dan pembatas paralel antar-sesi yang memakainya — antrean per sesi tetap (ADR-0223); paralelisme kini milik inbox.
   - `deciding.ts`: hapus `markQueued`/`clearQueued`/`isQueued` bila tak ada pemakai lagi; `views.ts` `queued` di `LeadStatusView` → diganti `inbox` (hapus field `queued`, `deciding` tetap).
   - `routes/lead.ts:131-147`: hapus cabang 503.
   - Test: setiap `vi.mock(".../brain")` diganti `vi.mock("../src/services/lead/session-think", async (orig) => ({ ...(await orig()), thinkViaSession: async () => leadOutput.raw }))`.
-- [ ] **Step 3:** Jalankan seluruh test lead + shared:
+- [x] **Step 3:** Jalankan seluruh test lead + shared:
 
 ```bash
 mkdir -p /private/tmp/hanoman-lead-test && /usr/bin/env -u HANOMAN_CONTROL_ORIGINS -u HANOMAN_SUPERVISOR -u HANOMAN_WEB_DIR -u HANOMAN_SESSION_ID -u HANOMAN_EVENT_URL -u HANOMAN_EVENT_TOKEN -u HANOMAN_EVENT_DIR -u HANOMAN_EVENT_HOST TEST_DATABASE_URL=file:/private/tmp/hanoman-lead-test/t.test.db pnpm vitest --run server/test/lead- shared/src/lead server/test/agent-capabilities.test.ts server/test/session-events --no-file-parallelism
 ```
 
 Expected: semua PASS. Lalu `pnpm --filter server exec tsc --noEmit` dan `pnpm --filter shared exec tsc --noEmit` dan `pnpm --filter src exec tsc --noEmit` (nama filter: cek `pnpm-workspace.yaml`) — 0 error.
-- [ ] **Step 4: Commit** `refactor(lead): cabut brain sekali-panggil, gerbang konkurensi, dan knob lamanya`
+- [x] **Step 4: Commit** `refactor(lead): cabut brain sekali-panggil, gerbang konkurensi, dan knob lamanya`
 
 ---
 

@@ -378,26 +378,12 @@ export const zLead = z.object({
   paused: z.boolean().default(false),             // rem darurat global (AC-27)
   pausedProjects: z.array(z.string()).default([]),// rem per project (AC-15/US-4)
   everyMin: z.number().int().min(1).max(1440).default(5),   // denyut proaktif (OQ-2)
-  // SPEC-432 · batas waktu satu putusan (AC-4/35). Default 120 dtk MELAWAN prompt lead sendiri
-  // ("kumpulkan bukti dulu: SoT, ADR, plan, kode, riwayat git") dan kalah: satu keputusan `order`
-  // nyata terukur 306 dtk pada claude-opus-5 · xhigh, jadi 7/7 baris jejak operator berstatus
-  // `gagal`. 600 dtk memberi kelonggaran di atas ongkos terukur itu; yang memangkas ongkosnya
-  // sendiri adalah paragraf anggaran waktu di `leadPrompt` (306 dtk → 101 dtk).
-  timeoutSec: z.number().int().min(10).max(900).default(600),
+  // ADR-0228 · `timeoutSec` (batas satu proses brain), `maxConcurrent` & `queueWaitSec` (gerbang
+  // konkurensi brain, SPEC-479) DICABUT bersama brain sekali-panggil. Tenggatnya kini milik inbox:
+  // `projects[<id>].answerSlaSec` untuk pertanyaan, `deliverTimeoutSec` untuk pengantaran. Baris
+  // Setting lama yang masih membawa kunci itu tetap ter-parse — zod membuang kunci tak dikenal.
   // AC-11 / OQ-10 · berapa jawaban otomatis berturut-turut untuk SATU sesi sebelum lead berhenti.
   maxAutoAnswers: z.number().int().min(1).max(20).default(3),
-  // SPEC-479 (QA) · berapa putusan boleh DISUSUN SEKALIGUS, untuk KETIGA pintu bersama. Sebelum
-  // knob ini jawabannya tak pernah dinyatakan, jadi ia jatuh ke bentuk kode tiap pintu: 1 di pintu
-  // deteksi (`for`+`await`, terukur `maxInFlight = 1` dengan tangga tunggu linier) dan tak hingga
-  // di pintu kontrak (Fastify konkuren, terukur 12 permintaan → 12 proses agen). Default 2 diambil
-  // dari mesin tempat keluhan lahir — 8 GB / 8 core yang sudah menanggung sesi pekerja di tmux,
-  // sementara satu `claude -p --effort xhigh` adalah runtime Node penuh, bukan panggilan HTTP tipis.
-  maxConcurrent: z.number().int().min(1).max(16).default(2),
-  // Deadline penerimaan: menunggu slot lebih lama dari ini → penolakan EKSPLISIT yang bisa dicoba
-  // ulang (503 + Retry-After di pintu kontrak), bukan gantung. Wajib ada karena Fastify menyetel
-  // `requestTimeout: 0` (terukur dari `buildApp()`) — tak ada pihak lain yang akan memutus peminta.
-  // 0 = tanpa antrean sama sekali: penuh berarti langsung ditolak.
-  queueWaitSec: z.number().int().min(0).max(900).default(120),
   // SPEC-485 · ADR-0102 · umur maksimum satu RANTAI keputusan yang dibiarkan terbuka. Peminta bisa
   // mati di tengah rantai (sesi ditutup, agen crash); tanpa batas ini alurnya `sebagian` selamanya
   // dan tak ada yang tahu apakah ia masih ditunggu. Penyapunya menumpang tick lead yang sudah ada —

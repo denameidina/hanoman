@@ -7,7 +7,6 @@ import {
   type AskCtx, type DetectDeps,
 } from "../src/services/lead/detect";
 import { recordDecision } from "../src/services/lead/trail";
-import { LeadBusyError } from "../src/services/lead/gate";
 
 // SPEC-409 · ADR-0091 · pintu #2 (deteksi otomatis). Semua deps disuntik: nol tmux, nol agen.
 //
@@ -344,38 +343,8 @@ describe("admitAsk · batas kegagalan beruntun (SPEC-472)", () => {
     expect(calls).toBe(2);
   });
 
-  // SPEC-479 (QA) · satu-satunya kasus describe "banyak sesi menunggu bersamaan" yang TIDAK ikut
-  // pindah ke `lead-ask.test.ts`: yang diukurnya penghitung `failures` milik `runChain`, bukan
-  // batas konkurensinya. Inti temuan C: `failures`/`failCapped` SPEC-472 dibuat untuk sebab yang
-  // tak hilang dengan mengulang. Penuh adalah kebalikannya — ia hilang begitu slot bebas.
-  it("gerbang penuh BUKAN kegagalan lead: tak menambah penghitung, sesinya tetap layak dicoba lagi", async () => {
-    let penuh = true;
-    let percobaan = 0;
-    const h = harness({
-      decide: (async (req: { question: string; projectId: string; specId?: string | null; sessionId?: string | null }) => {
-        percobaan++;
-        if (penuh) throw new LeadBusyError(120_000, 4);
-        return recordDecision({
-          projectId: req.projectId, specId: req.specId, sessionId: req.sessionId,
-          gate: "detected", kind: "answer", question: req.question,
-          answer: "opsi 1", reason: "r", refs: [], confidence: "tinggi", action: "none",
-        });
-      }) as unknown as DetectDeps["decide"],
-    });
-
-    for (let i = 0; i < 5; i++) {
-      const r = await layani(h);
-      expect(r.answered).toBe(false);
-      expect(r.reason).toContain("penuh");
-    }
-    expect(failureCount("s1")).toBe(0);
-    expect(await prisma.leadDecision.count()).toBe(0);   // tak ada jejak `gagal` yang menyesatkan
-
-    // Beban hilang → sesi yang sama langsung terlayani lagi, tanpa campur tangan operator.
-    penuh = false;
-    expect((await layani(h)).answered).toBe(true);
-    expect(percobaan).toBe(6);
-  });
+  // ADR-0228 · test "gerbang penuh BUKAN kegagalan lead" dicabut bersama `LeadBusyError`: tak ada
+  // lagi gerbang konkurensi brain — pertanyaan mengantre di inbox sesi lead.
 });
 
 describe("admitAsk · batas jawaban otomatis (AC-11 / OQ-10)", () => {

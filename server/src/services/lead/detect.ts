@@ -9,7 +9,6 @@ import { isTakenOver } from "./deciding";
 import { closeFlow, LeadFlowClosedError } from "./flow";
 import { readCodexTurn } from "./pane";
 import { decide, prodDecideDeps, takeDelivery, type DecideDeps } from "./decide";
-import { LeadBusyError } from "./gate";
 import { recordDecision } from "./trail";
 
 // SPEC-409 · ADR-0091 · SPEC-909 · ADR-0146 · PINTU KEPUTUSAN #2 — deteksi otomatis.
@@ -441,17 +440,11 @@ async function runChain(ask: SessionAsk, s: AskCtx, deps: DetectDeps): Promise<C
     try {
       row = await deps.decide({ ...req, flowId }, deps.decideDeps);
     } catch (e) {
-      // SPEC-479 · gerbang penuh BUKAN kegagalan lead: ia hilang begitu slot bebas, sementara
-      // `failures` dibuat untuk sebab yang TAK hilang dengan mengulang.
-      if (e instanceof LeadBusyError) return stop(`lead penuh — ${e.message}`);
       // Alur yang kedaluwarsa di tengah rantai (`flowTtlMin`) tak boleh menjatuhkan rantainya.
+      // ADR-0228 · tak ada lagi "gerbang penuh" (`LeadBusyError`): pertanyaan mengantre di inbox.
       if (!(e instanceof LeadFlowClosedError)) throw e;
       chainFlows.delete(sid); flowId = null;
-      try { row = await deps.decide({ ...req, flowId: null }, deps.decideDeps); }
-      catch (e2) {
-        if (e2 instanceof LeadBusyError) return stop(`lead penuh — ${e2.message}`);
-        throw e2;
-      }
+      row = await deps.decide({ ...req, flowId: null }, deps.decideDeps);
     }
     if (row?.flowId) { flowId = row.flowId; chainFlows.set(sid, row.flowId); }
     if (row?.step != null) step = row.step;

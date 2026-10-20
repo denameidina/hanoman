@@ -10,7 +10,8 @@ import { LEAD_DEFAULTS } from "@hanoman/shared";
 import { capabilityForRoute, checkAgentCapability } from "../src/services/agent-capabilities";
 import { setLead } from "../src/services/lead/config";
 import { recordDecision } from "../src/services/lead/trail";
-import { runGated, __resetLeadGate } from "../src/services/lead/gate";
+import { markDeciding, clearDeciding } from "../src/services/lead/deciding";
+import { ASK_POOL } from "../src/services/lead/ask";
 import { openEvent } from "../src/services/lead/inbox";
 import { createApproval } from "../src/services/lead/approvals";
 
@@ -39,7 +40,6 @@ const clean = async () => {
 };
 beforeEach(async () => {
   await clean();
-  __resetLeadGate();
   await prisma.project.create({ data: { id: "demo", name: "Demo", desc: "", kind: "web", leadOptIn: true } });
 });
 afterAll(clean);
@@ -158,24 +158,17 @@ describe("POST /api/lead/decisions (pintu #1)", () => {
   });
 });
 
-describe("GET /api/lead/status · gerbang konkurensi (SPEC-479)", () => {
-  it("melaporkan berapa yang sedang disusun dan berapa yang mengantre", async () => {
+describe("GET /api/lead/status · antrean pertanyaan (SPEC-479, ADR-0228)", () => {
+  it("melaporkan sesi yang menunggu pane lead dan kapasitas kolam tanya", async () => {
     const cookie = await login();
-    await setLead({ ...LEAD_DEFAULTS, enabled: true, maxConcurrent: 1 });
-
-    let release!: () => void;
-    const held = new Promise<void>((r) => { release = r; });
-    const occupied = runGated({ capacity: 1, waitMs: 5_000 }, async () => { await held; });
-    await new Promise((r) => setTimeout(r, 5));
-
-    const r = await app.inject({ method: "GET", url: "/api/lead/status", headers: { cookie } });
-    expect(r.statusCode).toBe(200);
-    // Batas yang tak terlihat operator akan terbaca lagi sebagai "lead diam" — persis salah baca
-    // yang melahirkan tiket ini.
-    expect(r.json().gate).toEqual({ inFlight: 1, queued: 0, capacity: 1 });
-
-    release();
-    await occupied;
+    await setLead({ ...LEAD_DEFAULTS, enabled: true });
+    markDeciding("s1");
+    try {
+      const r = await app.inject({ method: "GET", url: "/api/lead/status", headers: { cookie } });
+      expect(r.statusCode).toBe(200);
+      expect(r.json().gate).toEqual({ inFlight: 1, queued: 0, capacity: ASK_POOL });
+      expect(r.json()).toMatchObject({ inbox: [], approvals: [] });
+    } finally { clearDeciding("s1"); }
   });
 });
 

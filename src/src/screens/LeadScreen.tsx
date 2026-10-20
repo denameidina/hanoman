@@ -52,12 +52,13 @@ const FLOW_TONE: Record<string, Tone> = {
 const FLOW_OPEN = new Set(["menunggu", "sebagian"]);
 
 // Pengaturan lead sebagai draft string: input angka boleh kosong saat diketik.
-type SettingsDraft = { everyMin: string; timeoutSec: string; maxAutoAnswers: string; requireGreen: boolean };
+// ADR-0228 · `timeoutSec` (proses brain) dan `requireGreenBeforeIntegrate` (tak lagi melonggarkan
+// jalur lead) tak ditampilkan lagi; tenggat & syarat integrasi kini per project di panel Wewenang.
+type SettingsDraft = { everyMin: string; maxAutoAnswers: string };
 const toDraft = (c: Lead): SettingsDraft => ({
-  everyMin: String(c.everyMin), timeoutSec: String(c.timeoutSec),
-  maxAutoAnswers: String(c.maxAutoAnswers), requireGreen: c.requireGreenBeforeIntegrate,
+  everyMin: String(c.everyMin), maxAutoAnswers: String(c.maxAutoAnswers),
 });
-const EMPTY_DRAFT: SettingsDraft = { everyMin: "5", timeoutSec: "600", maxAutoAnswers: "3", requireGreen: true };
+const EMPTY_DRAFT: SettingsDraft = { everyMin: "5", maxAutoAnswers: "3" };
 
 /* Pager sumber tunggal (keputusan atau rangkaian) — rentang & total eksak. */
 function LeadPager({ total, page, onPage, unit }:
@@ -415,9 +416,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
     const next: Lead = {
       ...cfg,
       everyMin: clampNumber(settings.draft.everyMin, 1, 1440, cfg.everyMin),
-      timeoutSec: clampNumber(settings.draft.timeoutSec, 10, 900, cfg.timeoutSec),
       maxAutoAnswers: clampNumber(settings.draft.maxAutoAnswers, 1, 20, cfg.maxAutoAnswers),
-      requireGreenBeforeIntegrate: settings.draft.requireGreen,
     };
     // Kolom yang dikosongkan kembali ke nilai tersimpan: tak ada yang berubah, jadi tak ada tulisan.
     if (JSON.stringify(toDraft(next)) === JSON.stringify(toDraft(cfg))) { settings.setDraft(toDraft(cfg)); return; }
@@ -759,22 +758,10 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
                     value={settings.draft.everyMin} disabled={!cfg}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => settings.setDraft({ ...settings.draft, everyMin: e.target.value })} />
                 </Field>
-                <Field label="Batas waktu keputusan (detik)" hint="10–900. Lewat dari ini, keputusan gagal.">
-                  <Input type="number" min={10} max={900} aria-label="batas waktu keputusan (detik)" placeholder="mis. 600"
-                    value={settings.draft.timeoutSec} disabled={!cfg}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => settings.setDraft({ ...settings.draft, timeoutSec: e.target.value })} />
-                </Field>
                 <Field label="Jawaban berulang per pertanyaan (maks)" hint="1–20. Bila pertanyaan yang sama terus kembali sesudah dijawab sebanyak ini, pertanyaan itu diserahkan ke kamu. Pertanyaan berbeda tak dihitung.">
                   <Input type="number" min={1} max={20} aria-label="maksimum jawaban berulang per pertanyaan" placeholder="mis. 3"
                     value={settings.draft.maxAutoAnswers} disabled={!cfg}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => settings.setDraft({ ...settings.draft, maxAutoAnswers: e.target.value })} />
-                </Field>
-                <Field label="Syarat integrasi ke main" hint="Berlaku untuk integrasi yang diputuskan lead.">
-                  <Select size="sm" aria-label="syarat integrasi ke main"
-                    value={settings.draft.requireGreen ? "wajib" : "bebas"}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                      settings.setDraft({ ...settings.draft, requireGreen: e.target.value === "wajib" })}
-                    options={[{ value: "wajib", label: "plan harus tuntas dulu" }, { value: "bebas", label: "tanpa syarat" }]} />
                 </Field>
               </div>
               {/* SPEC-488 · mesin yang MENJALANKAN lead. `?.` disengaja: dashboard bisa lebih baru daripada server. */}

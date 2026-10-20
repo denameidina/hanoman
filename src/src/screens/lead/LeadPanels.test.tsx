@@ -1,7 +1,7 @@
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { LEAD_DEFAULTS, type LeadApprovalView, type LeadEventView, type LeadSessionView } from "@hanoman/shared";
+import { LEAD_DEFAULTS, type Lead, type LeadApprovalView, type LeadEventView, type LeadSessionView } from "@hanoman/shared";
 import { LeadApprovalsPanel } from "./LeadApprovalsPanel";
 import { LeadInboxPanel } from "./LeadInboxPanel";
 import { LeadSessionsPanel } from "./LeadSessionsPanel";
@@ -97,7 +97,7 @@ describe("LeadSessionsPanel", () => {
 
 describe("LeadAuthorityPanel", () => {
   it("menyimpan wewenang & perintah verifikasi untuk project terpilih, tanpa menyentuh project lain", async () => {
-    const onSave = vi.fn(async () => true);
+    const onSave = vi.fn(async (_next: Lead) => true);
     const config = { ...LEAD_DEFAULTS, projects: { lain: { targetBranch: "develop" } } };
     render(<LeadAuthorityPanel config={config} busy={false} onSave={onSave}
       projects={[{ id: "erp", name: "ERP" }, { id: "lain", name: "Lain" }]} />);
@@ -105,7 +105,7 @@ describe("LeadAuthorityPanel", () => {
     fireEvent.change(screen.getByLabelText("perintah verifikasi"), { target: { value: "pnpm test" } });
     fireEvent.click(screen.getByRole("button", { name: /Simpan wewenang/ }));
     await Promise.resolve();
-    const next = onSave.mock.calls[0]![0] as typeof config & { projects: Record<string, { authority: Record<string, string>; verifyCommand: string }> };
+    const next = onSave.mock.calls[0]![0] as unknown as { projects: Record<string, { authority: Record<string, string>; verifyCommand: string }> };
     expect(next.projects.erp!.authority["integrate-main"]).toBe("auto");
     expect(next.projects.erp!.verifyCommand).toBe("pnpm test");
     expect(next.projects.lain).toEqual({ targetBranch: "develop" });

@@ -485,10 +485,10 @@ describe("LeadScreen · pengaturan (draft + Simpan, Fase 3F)", () => {
     getLeadDecisions.mockResolvedValue(DECISIONS);
     putLeadConfig.mockResolvedValue(CONFIG);
     renderScreen();
-    const field = await screen.findByLabelText("batas waktu keputusan (detik)");
-    fireEvent.change(field, { target: { value: "5" } });
+    const field = await screen.findByLabelText("maksimum jawaban berulang per pertanyaan");
+    fireEvent.change(field, { target: { value: "99" } });
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Simpan pengaturan" })); });
-    await waitFor(() => expect(putLeadConfig).toHaveBeenCalledWith(expect.objectContaining({ timeoutSec: 10 })));
+    await waitFor(() => expect(putLeadConfig).toHaveBeenCalledWith(expect.objectContaining({ maxAutoAnswers: 20 })));
   });
 
   it("dikosongkan lalu disimpan tanpa perubahan nilai tak menulis apa pun", async () => {

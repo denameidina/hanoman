@@ -8,7 +8,6 @@ import { decide, takeDelivery } from "../services/lead/decide";
 import { applyAction } from "../services/lead/apply";
 import { listDecisions, overrideDecision, cancelDecision, toDecisionView } from "../services/lead/trail";
 import { closeFlow, toFlowView, LeadFlowClosedError } from "../services/lead/flow";
-import { LeadBusyError } from "../services/lead/gate";
 import { resetSession } from "../services/lead/detect";
 import { buildLeadStatus, buildLeadDecisions, buildLeadFlows } from "../services/lead/views";
 import { closeEvent, listInboxPage } from "../services/lead/inbox";
@@ -129,14 +128,9 @@ export default async function (app: FastifyInstance) {
       // SPEC-485 · 409 · rantai yang sudah ditutup tak menerima pertanyaan lanjutan. Bukan 400
       // (bentuknya sah) dan bukan 404 (alurnya ada, hanya sudah selesai).
       if (e instanceof LeadFlowClosedError) return reply.code(409).send({ error: e.message });
-      if (!(e instanceof LeadBusyError)) throw e;
-      // 503, dan sengaja BUKAN dua kode yang sudah dipakai di sini: 409 berarti "tak ada yang
-      // menjawab, tunggu manusia" (lead mati/dijeda) dan 504 berarti "lead sudah mencoba lalu
-      // kehabisan waktu" — keduanya menyuruh peminta menyerah. Ini kebalikannya: lead sehat,
-      // hanya penuh, dan permintaan yang sama layak dikirim lagi.
-      return reply.code(503)
-        .header("retry-after", String(Math.max(5, cfg.queueWaitSec)))
-        .send({ error: e.message, retryable: true, queued: e.queued });
+      // ADR-0228 · 503 "gerbang penuh" dicabut bersama brain: pertanyaan mengantre di inbox sesi
+      // lead, dan tenggat yang lewat menjawab 504 di bawah (baris `gagal`, diserahkan ke manusia).
+      throw e;
     }
     if (!row) return reply.code(409).send({ error: "lead tidak aktif untuk project ini" });
     // SPEC-480 · kontrak eksplisit tak mengetik ke pane, tapi ia tetap mengambil putusan
