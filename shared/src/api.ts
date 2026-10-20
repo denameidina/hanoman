@@ -231,6 +231,11 @@ export const paths = {
   leadFlows: `${API}/lead/flows`,
   leadFlowSubmit: (id: string) => `${API}/lead/flows/${encodeURIComponent(id)}/submit`,
   leadFlowCancel: (id: string) => `${API}/lead/flows/${encodeURIComponent(id)}/cancel`,
+  // ADR-0228 · sesi lead: inbox, antrean izin, dan pane lead per proyek.
+  leadInboxTake: (id: string) => `${API}/lead/inbox/${encodeURIComponent(id)}/take`,
+  leadApprovalDecide: (id: string) => `${API}/lead/approvals/${encodeURIComponent(id)}/decide`,
+  leadSession: (projectId: string, op: "start" | "stop" | "rotate") =>
+    `${API}/lead/sessions/${encodeURIComponent(projectId)}/${op}`,
   // SPEC-450 · ADR-0094 · katalog custom agent. `?projectId=` → himpunan EFEKTIF (global+project).
   customAgents: `${API}/custom-agents`,
   customAgentMetrics: `${API}/custom-agents/metrics`,

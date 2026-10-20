@@ -2665,12 +2665,12 @@ UI (ikuti `internal/docs/design-system/**`: editorial, bone paper, brass accent;
 - **Inbox**: tabel event (jenis, pertanyaan terpangkas, status, umur, tenggat tersisa untuk `ask`); tombol **Ambil alih** untuk event `open`/`delivered` → `api.leadInboxTake` lalu `onGotoTerminal(event.sessionId)` bila ada.
 - **Wewenang & proyek** (di panel setelan yang ada, `useServerDraft`): per proyek — pilih mode `auto/ask/off` untuk `answer-session`, `start-session`, `integrate-main`, `stop-session`, `resume-session`; field `targetBranch`, `verifyCommand` (dengan teks bantu: "kosong = merge selalu minta izin"), `quotaStopPct`, `rampStep`, `rampProbeMin`, `failStreak`, `answerSlaSec`. Hapus kontrol `maxConcurrent`/`queueWaitSec`/`timeoutSec` dari form (Task 15 mencabut knobnya).
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
   - `server/test/lead-views.test.ts`: buat 1 event open, 1 approval pending → `buildLeadStatus()` memuat keduanya; event `done` tak muncul.
   - `LeadApprovalsPanel.test.tsx`: render 1 approval → tombol Setujui memanggil `onDecide(id, true)`; Tolak + catatan memanggil `onDecide(id, false, "catatan")`.
 
-- [ ] **Step 2: Jalankan → FAIL** (`pnpm vitest --run src/src/screens/lead` untuk frontend; perintah Global Constraints untuk server).
-- [ ] **Step 3: Implementasi.** Komponen panel menerima data + callback lewat props (tanpa fetch sendiri); `LeadScreen` mengisinya dari `state` (frame `lead`) dan memanggil `api.*`. Contoh kerangka `LeadApprovalsPanel.tsx`:
+- [x] **Step 2: Jalankan → FAIL** (`pnpm vitest --run src/src/screens/lead` untuk frontend; perintah Global Constraints untuk server).
+- [x] **Step 3: Implementasi.** Komponen panel menerima data + callback lewat props (tanpa fetch sendiri); `LeadScreen` mengisinya dari `state` (frame `lead`) dan memanggil `api.*`. Contoh kerangka `LeadApprovalsPanel.tsx`:
 
 ```tsx
 import * as React from "react";
@@ -2717,8 +2717,8 @@ export function LeadApprovalsPanel({ approvals, busy, onDecide }: LeadApprovalsP
 
   Nama kelas CSS: pakai kelas/komponen panel yang sudah dipakai LeadScreen (baca `LeadScreen.tsx` bagian render), bukan kelas baru, kecuali tak ada padanan. Tiga panel lain dibuat dengan pola props yang sama.
 
-- [ ] **Step 4: Test → PASS.** Lalu bukti render: boot dev server (`pnpm dev`), buka layar Lead, ambil screenshot (skill `run`/browser-testing bila tersedia) di lebar desktop dan 390px.
-- [ ] **Step 5: Commit** `feat(ui): layar Lead — sesi lead, inbox, antrean izin, wewenang per proyek`
+- [x] **Step 4: Test → PASS.** Lalu bukti render: boot dev server (`pnpm dev`), buka layar Lead, ambil screenshot (skill `run`/browser-testing bila tersedia) di lebar desktop dan 390px.
+- [x] **Step 5: Commit** `feat(ui): layar Lead — sesi lead, inbox, antrean izin, wewenang per proyek`
 
 ---
 

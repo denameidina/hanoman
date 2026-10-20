@@ -8,6 +8,7 @@ import { zProject, zBriefPayload, zQaPayload, zGoalPayload, zSpec, zScheduler, z
 import {
   zLeadGate, zLeadKind, zLeadConfidence, zLeadAction, zLeadStatus, zLeadChoice,
   zLeadFlowStatus, zLeadSelect,
+  type LeadEventView, type LeadApprovalView, type LeadSessionView,
 } from "./lead";
 import { zAutoMerge } from "./auto-merge";
 import { zHandledBy, zHandledByView } from "./handled-by";
@@ -314,6 +315,11 @@ export const zLeadStatusView = z.object({
     queued: z.number(),
     capacity: z.number(),
   }).default({ inFlight: 0, queued: 0, capacity: 1 }),
+  // ADR-0228 · sesi lead: inbox terbuka/terlambat, izin yang menunggu, dan pane lead per proyek.
+  // `.default([])` supaya klien lama tetap mem-parse respons ini.
+  inbox: z.array(z.custom<LeadEventView>()).default([]),
+  approvals: z.array(z.custom<LeadApprovalView>()).default([]),
+  sessions: z.array(z.custom<LeadSessionView>()).default([]),
 });
 export type LeadStatusView = z.infer<typeof zLeadStatusView>;
 

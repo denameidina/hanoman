@@ -13,7 +13,11 @@ import type { ConfirmOptions, FilterChip } from "../ds";
 import { api } from "../api/client";
 import { useLiveTopic } from "../api/live";
 import { AGENT_RUNTIME_LABELS } from "@hanoman/shared";
-import type { Lead, LeadStatusView, LeadDecisionView, LeadFlowView } from "@hanoman/shared";
+import type { Lead, LeadStatusView, LeadDecisionView, LeadFlowView, LeadEventView } from "@hanoman/shared";
+import { LeadApprovalsPanel } from "./lead/LeadApprovalsPanel";
+import { LeadInboxPanel } from "./lead/LeadInboxPanel";
+import { LeadSessionsPanel, type LeadSessionOp } from "./lead/LeadSessionsPanel";
+import { LeadAuthorityPanel } from "./lead/LeadAuthorityPanel";
 import type { ProjectVM } from "./types";
 import { usePersistedState, useResetOnChange, ResetViewButton, isStr, isNum, oneOf } from "../ui-state";
 import { failureMessage } from "../lib/report-error";
@@ -459,6 +463,55 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
     finally { setBusyId(null); }
   }, [load, onToast]);
 
+  // ADR-0228 · sesi lead: izin, ambil alih event, dan kendali pane. Datanya datang lewat frame `lead`.
+  const decideApproval = React.useCallback(async (id: string, approve: boolean, note?: string) => {
+    setBusyId(id);
+    try {
+      await api.decideLeadApproval(id, approve, note);
+      onToast(approve ? "Tindakan lead disetujui" : "Penolakan dikirim ke lead", "ok", "check");
+      load(true);
+    } catch (e) { onToast(failureMessage(approve ? "menyetujui tindakan lead" : "menolak tindakan lead", e), "err", "x-circle"); }
+    finally { setBusyId(null); }
+  }, [load, onToast]);
+
+  const takeEvent = React.useCallback(async (ev: LeadEventView) => {
+    setBusyId(ev.id);
+    try {
+      await api.takeLeadEvent(ev.id);
+      onToast("Event diambil alih — lead tak akan menjawabnya", "ok", "check");
+      load(true);
+      if (ev.sessionId) onGotoTerminal(ev.sessionId);
+    } catch (e) { onToast(failureMessage("mengambil alih event", e), "err", "x-circle"); }
+    finally { setBusyId(null); }
+  }, [load, onToast, onGotoTerminal]);
+
+  const sessionOp = React.useCallback(async (projectId: string, op: LeadSessionOp) => {
+    setBusyId(`session:${projectId}`);
+    try {
+      await api.leadSession(projectId, op);
+      onToast(op === "start" ? "Sesi lead dimulai" : op === "stop" ? "Sesi lead dihentikan" : "Sesi lead dirotasi", "ok", "check");
+      load(true);
+    } catch (e) { onToast(failureMessage("mengendalikan sesi lead", e), "err", "x-circle"); }
+    finally { setBusyId(null); }
+  }, [load, onToast]);
+
+  const askSessionOp = (projectId: string, op: LeadSessionOp) => {
+    if (op === "start") { void sessionOp(projectId, op); return; }
+    void confirm(op === "stop"
+      ? {
+        title: "Hentikan sesi lead?", eyebrow: "lead · sesi",
+        message: "Pertanyaan sesi pekerja jatuh ke kamu sampai sesi lead lahir lagi. Lead melahirkannya kembali saat ada event baru — jeda project untuk benar-benar berhenti.",
+        confirmLabel: "Hentikan sesi lead", icon: "ban", tone: "danger",
+        run: () => sessionOp(projectId, op),
+      }
+      : {
+        title: "Rotasi sesi lead?", eyebrow: "lead · sesi",
+        message: "Sesi lead dihentikan lalu dilahirkan lagi dengan konteks bersih. Keputusan & inbox tersimpan di server, jadi tak ada yang hilang.",
+        confirmLabel: "Rotasi", icon: "refresh-cw", tone: "default",
+        run: () => sessionOp(projectId, op),
+      });
+  };
+
   const runCancelDecision = React.useCallback(async (id: string) => {
     setBusyId(id);
     try { await api.cancelLeadDecision(id); onToast("Keputusan dibatalkan", "ok"); load(true); }
@@ -517,6 +570,10 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
   const mode: Mode = !state.config.enabled ? "mati" : state.config.paused ? "jeda" : "aktif";
   const optIn = new Set(state.projects.map((p) => p.projectId));
   const waiting = state.waiting;
+  // ADR-0228 · `?? []`: dashboard bisa lebih baru daripada server.
+  const inbox = state.inbox ?? [];
+  const approvals = state.approvals ?? [];
+  const sessions = state.sessions ?? [];
   const deciding = new Set(state.deciding);
   // SPEC-479 · `queued`/`gate` punya default di `zLeadStatusView`, tapi respons instance lama bisa tanpa keduanya.
   const queued = new Set(state.queued ?? []);
@@ -550,11 +607,17 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
   return (
     <div className="hn-lead">
       <p className="hn-lead-summary">
-        Lead {MODE_LABEL[mode]} · {waiting.length} menunggu kamu · {queued.size} antre
+        Lead {MODE_LABEL[mode]} · {approvals.length} minta izin · {waiting.length} menunggu kamu · {inbox.length} di inbox
       </p>
 
       <div className="hn-lead-layout">
         <div className="hn-lead-main">
+          {/* ADR-0228 · izin lebih dulu: tindakan lead yang tertahan tak jalan sampai kamu memutuskan. */}
+          <section className="hn-lead-section" aria-labelledby="lead-izin-h">
+            <h2 id="lead-izin-h" className="hn-lead-h">Menunggu izinmu ({approvals.length})</h2>
+            <LeadApprovalsPanel approvals={approvals} projectName={projectName} busyId={busyId} onDecide={(id, ok, note) => void decideApproval(id, ok, note)} />
+          </section>
+
           <section className="hn-lead-section" aria-labelledby="lead-menunggu-h">
             <h2 id="lead-menunggu-h" className="hn-lead-h">Menunggu kamu ({waiting.length})</h2>
             {gate.queued > 0 && (
@@ -577,6 +640,12 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
                     );
                   })}
                 </ul>}
+          </section>
+
+          <section className="hn-lead-section" aria-labelledby="lead-inbox-h">
+            <h2 id="lead-inbox-h" className="hn-lead-h">Inbox sesi lead ({inbox.length})</h2>
+            <p className="hn-lead-hint">Yang sedang diputuskan sesi lead. Ambil alih bila kamu ingin memutuskannya sendiri.</p>
+            <LeadInboxPanel events={inbox} projectName={projectName} busyId={busyId} onTake={(e) => void takeEvent(e)} onGoto={onGotoTerminal} />
           </section>
 
           <section className="hn-lead-section" aria-labelledby="lead-riwayat-h">
@@ -639,6 +708,18 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
               Produksi, VPS, dan penghapusan data tetap terkunci untuk lead, apa pun setelannya.
             </Callout>
           </section>
+
+          <section className="hn-lead-section" aria-labelledby="lead-sesi-h">
+            <h2 id="lead-sesi-h" className="hn-lead-h">Sesi lead</h2>
+            <p className="hn-lead-hint">Satu sesi per project. Buka terminalnya untuk melihat dan mengarahkan lead langsung.</p>
+            <LeadSessionsPanel sessions={sessions} projectName={projectName} busyId={busyId} onGoto={onGotoTerminal} onOp={askSessionOp} />
+          </section>
+
+          <details className="hn-lead-disclosure">
+            <summary>Wewenang & jatah per project</summary>
+            <LeadAuthorityPanel config={state.config} busy={busy} onSave={(next) => writeConfig(next)}
+              projects={projects.filter((p) => optIn.has(p.id)).map((p) => ({ id: p.id, name: p.name }))} />
+          </details>
 
           <details className="hn-lead-disclosure">
             <summary>Project yang dipimpin · {optIn.size} dari {projects.length} diurus lead</summary>

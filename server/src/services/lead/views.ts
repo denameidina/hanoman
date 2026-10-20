@@ -9,6 +9,10 @@ import { listFlows, toFlowView } from "./flow";
 import { decidingIds, queuedIds } from "./deciding";
 import { leadGateStats } from "./gate";
 import { lastPulse } from "./engine";
+import { toEventView } from "./inbox";
+import { toApprovalView } from "./approvals";
+import { leadSessionStates } from "./lead-session";
+import { isLeadIdle } from "./courier";
 
 // SPEC-908 · satu definisi untuk ketiga route lead dan topik siar `lead`. Sebelumnya inline di
 // routes/lead.ts; menyalinnya ke hub berarti dua serializer yang bisa berselisih diam-diam.
@@ -48,6 +52,15 @@ export async function buildLeadStatus(): Promise<LeadStatusView> {
     // SPEC-479 · keadaan gerbang konkurensi. Tanpa ini "lead sedang penuh" dan "lead diam"
     // terlihat identik di layar, dan salah baca itulah yang melahirkan tiketnya.
     gate: { ...leadGateStats(), capacity: cfg.maxConcurrent },
+    // ADR-0228 · inbox yang masih hidup (plus yang terlambat 24 jam terakhir — operator perlu
+    // melihat apa yang jatuh ke tangannya), izin yang menunggu, dan pane lead per proyek.
+    inbox: (await prisma.leadEvent.findMany({
+      where: { OR: [{ status: { in: ["open", "delivered"] } }, { status: "late", closedAt: { gte: since } }] },
+      orderBy: [{ priority: "asc" }, { createdAt: "asc" }], take: 50,
+    })).map(toEventView),
+    approvals: (await prisma.leadApproval.findMany({ where: { status: "pending" }, orderBy: { createdAt: "asc" }, take: 50 }))
+      .map(toApprovalView),
+    sessions: await leadSessionStates(isLeadIdle).catch(() => []),
   };
 }
 
