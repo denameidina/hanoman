@@ -320,7 +320,7 @@ describe("katalog MCP · sesi lead (ADR-0228)", () => {
   it("membangun request yang tepat", () => {
     expect(byName("hanoman_lead_approval_decide").build({ approval: "a 1", approve: true, note: "ok" }))
       .toEqual({ method: "POST", path: "/lead/approvals/a%201/decide", body: { approve: true, note: "ok" } });
-    expect(byName("hanoman_lead_approval_decide").build({ approval: "a1", approve: "ya" }).body).toEqual({ approve: false });
+    expect(byName("hanoman_lead_approval_decide").build({ approval: "a1", approve: "ya" })?.body).toEqual({ approve: false });
     expect(byName("hanoman_lead_session_rotate").build({ project: "erp" })).toEqual({ method: "POST", path: "/lead/sessions/erp/rotate" });
   });
   it("tak pernah membungkus permukaan pane lead", () => {

@@ -45,16 +45,20 @@ branch. lalu tidak ada lead hanoman sesi nya sehingga human tidak bisa control."
    (jatah, kuota, sesi hidup, backlog siap, inbox) dan `POST /api/lead-pane/act`, diautentikasi HMAC
    (`HANOMAN_SESSION_ID` + `HANOMAN_EVENT_TOKEN`) persis seperti `/api/session-events`. Peta
    capability: `COOKIE_ONLY` — meniru "pane lead proyek X" adalah peniruan identitas, bukan izin.
-5. **Kurir** menyuntik BATCH event ke pane hanya saat pane diam (hook Stop) dan manusia tak mengetik
-   dalam 120 dtk. Prioritas kelas: pertanyaan pekerja → sesi selesai/gagal → manusia/penolakan →
+5. **Kurir** menyuntik BATCH event ke pane hanya saat pane diam (hook Stop — atau, sesudah restart
+   server saat penanda in-memory hilang, tmux mencatat ≥ 30 dtk tanpa keluaran) dan manusia tak
+   mengetik dalam 120 dtk. Batch ditulis ke `$HANOMAN_HOME/lead-batches/<proyek>/` dan pane menerima
+   satu baris penunjuk (`sendToPane` meratakan baris & memotong per 1 KB). Prioritas kelas: pertanyaan pekerja → sesi selesai/gagal → manusia/penolakan →
    denyut. Pertanyaan pekerja punya tenggat `answerSlaSec` (default 300) → lewat = `late`, jatuh ke
    manusia (ADR-0167). Pane dirotasi setelah `rotateAfterEvents` event saat diam dan inbox kosong;
    event yang dua kali dikembalikan sapuan → rotasi.
 6. **Gerbang deterministik (`lead/guard.ts`)** untuk setiap `act`: event masih terbuka → allowlist →
    aturan objektif per tindakan → mode wewenang. `start-session`: spec belum selesai, disetujui
    diluncurkan, ber-objective, tanpa blocker, tanpa sesi hidup, alasan + bukti yang merujuk id spec,
-   dan **jatah ≥ 1**. `answer-session`: sesi masih menunggu; teks yang menyentuh daftar sensitif
-   (produksi, kredensial, akun, director, deploy, hapus data, …) **selalu minta izin**.
+   dan **jatah ≥ 1**. `answer-session`: sesi masih menunggu. Untuk SETIAP jawaban atas pertanyaan
+   (event `ask`, apa pun `action`-nya — jawaban kontrak ber-`none` tetap dijalankan peminta), teks
+   yang menyentuh daftar sensitif (produksi, kredensial, akun, director, deploy, hapus data, …)
+   **selalu minta izin**.
 7. **Jatah peluncuran (`lead/budget.ts`)** = min(slot scheduler, gerbang host, kuota engine <
    `quotaStopPct` 85 %, ramp `rampStep` 1 per `rampProbeMin` 10 menit); data kuota tak terbaca = 0;
    `failStreak` 2 kegagalan sesi lead beruntun → 0 + proyek di-pause + notifikasi. Denyut hanya
@@ -75,6 +79,22 @@ branch. lalu tidak ada lead hanoman sesi nya sehingga human tidak bisa control."
 
 Skema: `LeadEvent`, `LeadApproval` (LOCAL-ONLY, tanpa FK), `LeadDecision.eventId` — migration
 `20261020120000_lead_session_inbox`.
+
+## Verifikasi nyata (2026-10-20)
+
+Server uji terisolasi (`HANOMAN_HOME`, DB, socket tmux sendiri, port 8899), repo git sementara:
+pane `lead-demo` (engine codex, seperti produksi) menerima batch, membaca README, dan menjawab
+kontrak lewat `act` — percobaan `answer-session` tanpa sesi ditolak `no-session`, lead
+memperbaikinya sendiri, peminta menerima 201 dengan `choice` & `refs` benar. Pertanyaan "deploy ke
+produksi?" menjadi izin berbukti; tolak → 200, ulang → 409, peminta 504, lead menerima event
+`rejected` berisi catatan. 7 backlog siap dengan kuota terbaca → jatah **1**, satu event "pilih
+paling banyak 1", lead menahan karena detail spec tak terbaca, **nol** baris antrean. Uji ini
+menemukan dua cacat yang sudah diperbaiki dalam commit yang sama: penanda diam kurir hilang
+sesudah restart, dan daftar sensitif yang tadinya hanya menilai `answer-session`.
+
+Artefak lingkungan uji (bukan cacat produk): dialog "trust this folder" Claude untuk repo di
+`/private/tmp` yang belum pernah dipercaya (repo sungguhan mewariskan trust ke `.worktrees/*`), dan
+Claude di pane yang menolak token saat server dijalankan dari dalam sesi Claude Code.
 
 ## Konsekuensi
 

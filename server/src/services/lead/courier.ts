@@ -30,6 +30,13 @@ export const batchDir = (projectId: string): string => join(resolveHome(), "lead
 
 export type CourierDeps = {
   live: (id: string) => Promise<boolean>;
+  /**
+   * Penanda "diam" hanya hidup di memori. Sesudah restart server, pane yang sebenarnya diam tak
+   * akan pernah mengirim Stop lagi — tanpa jalur ini event baru tak pernah diantar (ditemukan uji
+   * nyata ADR-0228). Pane tanpa keluaran ≥ `PANE_QUIET_S` dianggap diam; spinner TUI agen yang
+   * sedang berpikir terus memperbarui `activityAt`, jadi pane yang bekerja tak salah terbaca.
+   */
+  quiet: (id: string) => Promise<boolean>;
   batch: (projectId: string) => Promise<LeadEvent[]>;
   human: (id: string) => number | null;
   brief: (projectId: string) => Promise<string>;
@@ -45,8 +52,14 @@ let briefFn: (projectId: string) => Promise<string> = async () => "(situasi tak 
 /** Dipasang route lead-pane — sumber `brief` yang SAMA dengan GET /lead-pane/brief. */
 export function setBriefBuilder(fn: (projectId: string) => Promise<string>): void { briefFn = fn; }
 
+export const PANE_QUIET_S = 30;
+
 export const prodCourierDeps: CourierDeps = {
   live: async (id) => { const s = await getSessionAsync(id).catch(() => undefined); return !!s && !s.exited; },
+  quiet: async (id) => {
+    const s = await getSessionAsync(id).catch(() => undefined);
+    return !!s && s.activityAt > 0 && Date.now() / 1000 - s.activityAt >= PANE_QUIET_S;
+  },
   batch: pendingBatch,
   human: humanActiveAt,
   brief: (p) => briefFn(p).catch(() => "(situasi tak tersedia — panggil /brief)"),
@@ -68,7 +81,10 @@ export async function deliver(projectId: string, deps: CourierDeps = prodCourier
   const id = leadSessionId(projectId);
   if (sending.has(id)) return 0;
   if (!(await deps.live(id))) { await deps.ensure(projectId); return 0; }
-  if (!idle.has(id)) return 0;
+  if (!idle.has(id)) {
+    if (!(await deps.quiet(id))) return 0;
+    idle.add(id);
+  }
   const h = deps.human(id);
   if (h !== null && deps.now() - h < HUMAN_QUIET_MS) return 0;
   sending.add(id);

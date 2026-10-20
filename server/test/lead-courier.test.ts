@@ -14,6 +14,7 @@ const deps = (over: Partial<CourierDeps> = {}): CourierDeps & Rec => {
   return {
     ...rec,
     live: async () => true,
+    quiet: async () => false,
     batch: async () => [ev("e1"), ev("e2", "pulse")] as never,
     human: () => null,
     brief: async () => "BRIEF",
@@ -44,6 +45,10 @@ describe("kurir", () => {
     const d = deps();
     expect(await deliver("p", d)).toBe(0);
     expect(d.sent).toEqual([]);
+  });
+  it("sesudah restart (penanda diam hilang), pane yang hening dianggap diam dan diantari", async () => {
+    const d = deps({ quiet: async () => true });
+    expect(await deliver("p", d)).toBe(2);
   });
   it("tak mengirim saat manusia baru mengetik", async () => {
     markLeadIdle("lead-p");

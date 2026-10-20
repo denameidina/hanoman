@@ -87,9 +87,6 @@ export async function checkAct(i: GuardInput, deps: GuardDeps = prodGuardDeps): 
     case "answer-session": {
       if (!i.sessionId) return no("no-session", "tak menunjuk sesi");
       if (!deps.sessionWaiting(i.sessionId)) return no("not-waiting", `sesi ${i.sessionId} tak lagi menunggu jawaban`);
-      if (isSensitiveText([i.decision, ...i.choices].join("\n"))) {
-        mustAsk = true; report.push("jawaban menyentuh daftar sensitif (produksi/kredensial/akun/data/deploy)");
-      }
       break;
     }
     case "integrate-main": {
@@ -104,6 +101,13 @@ export async function checkAct(i: GuardInput, deps: GuardDeps = prodGuardDeps): 
       break;
     }
     default: break;
+  }
+  // Jawaban atas PERTANYAAN (pintu deteksi maupun kontrak) dijalankan oleh peminta, apa pun
+  // `action`-nya — jawaban kontrak ber-`none` tetap bisa berbunyi "deploy sekarang". Karena itu
+  // daftar sensitif menilai teks jawabannya untuk SETIAP event `ask`, bukan hanya `answer-session`
+  // (celah yang ditemukan uji nyata ADR-0228).
+  if (i.eventKind === "ask" && isSensitiveText([i.decision, ...i.choices].join("\n"))) {
+    mustAsk = true; report.push("jawaban menyentuh daftar sensitif (produksi/kredensial/akun/data/deploy)");
   }
   return { outcome: mustAsk ? "butuh-izin" : "lolos", report };
 }

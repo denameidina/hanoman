@@ -71,6 +71,14 @@ describe("checkAct · answer-session", () => {
     const r = await checkAct(ask({ decision: "Bootstrap director sementara di staging", choices: ["Bootstrap director sementara"] }), deps());
     expect(r.outcome).toBe("butuh-izin");
   });
+  it("jawaban kontrak ber-action none yang sensitif tetap butuh-izin", async () => {
+    const r = await checkAct(inp({ eventKind: "ask", action: "none", specId: null, decision: "Deploy ke produksi sekarang" }), deps());
+    expect(r.outcome).toBe("butuh-izin");
+  });
+  it("teks sensitif di event denyut tak menahan apa pun (bukan jawaban pertanyaan)", async () => {
+    const r = await checkAct(inp({ eventKind: "session-ended", action: "none", specId: null, decision: "deploy belum perlu" }), deps());
+    expect(r.outcome).toBe("lolos");
+  });
   it("sesi tak lagi menunggu → not-waiting", async () => {
     expect((await checkAct(ask(), deps({ sessionWaiting: () => false }))).code).toBe("not-waiting");
   });

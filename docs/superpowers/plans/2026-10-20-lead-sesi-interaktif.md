@@ -2763,15 +2763,15 @@ Expected: semua PASS. Lalu `pnpm --filter server exec tsc --noEmit` dan `pnpm --
 
 ### Task 17: Verifikasi nyata di lokal
 
-- [ ] **Step 1:** Build & boot: `pnpm -r build` lalu `node server/dist/server.js` dengan `HANOMAN_HOME` sementara (`/usr/bin/env HANOMAN_HOME=/private/tmp/hanoman-lead-e2e node server/dist/server.js`) agar DB operasional tak tersentuh. Login/buat user lewat alur setup yang ada.
-- [ ] **Step 2:** Siapkan proyek uji: buat repo git sementara (`git init /private/tmp/lead-e2e-repo` + satu commit), `POST /api/projects` dengan binding ke repo itu, `leadOptIn: true`, `schedulerOptIn: true`; `PUT /api/lead/config` `{ enabled: true, projects: { <id>: { verifyCommand: "true" } } }`.
-- [ ] **Step 3:** curl tiap endpoint baru dan catat status:
+- [x] **Step 1:** Build & boot: `pnpm -r build` lalu `node server/dist/server.js` dengan `HANOMAN_HOME` sementara (`/usr/bin/env HANOMAN_HOME=/private/tmp/hanoman-lead-e2e node server/dist/server.js`) agar DB operasional tak tersentuh. Login/buat user lewat alur setup yang ada.
+- [x] **Step 2:** Siapkan proyek uji: buat repo git sementara (`git init /private/tmp/lead-e2e-repo` + satu commit), `POST /api/projects` dengan binding ke repo itu, `leadOptIn: true`, `schedulerOptIn: true`; `PUT /api/lead/config` `{ enabled: true, projects: { <id>: { verifyCommand: "true" } } }`.
+- [x] **Step 3:** curl tiap endpoint baru dan catat status:
   - `POST /api/lead/sessions/<id>/start` → 200 `{ started: true }`; `tmux ls` memuat `lead-<id>`.
   - `GET /api/lead-pane/brief` dengan header token pane (ambil `HANOMAN_EVENT_TOKEN` dari env pane: `tmux show-environment -t <nama tmux pane lead> HANOMAN_EVENT_TOKEN`) → 200; tanpa token → 401; header sesi `spec-x` → 403.
   - Buat event lewat `POST /api/lead/decisions` (kontrak) dengan pertanyaan + 2 opsi → amati batch tersuntik ke pane lead (`tmux capture-pane -p -t <pane>`), lead memanggil `act`, request kontrak kembali 201.
   - Buat pertanyaan sensitif ("deploy ke produksi?") → `act` menghasilkan `butuh-izin`; `GET /api/lead/approvals` memuat kartunya; `POST /api/lead/approvals/<id>/decide {approve:false}` → 200, kedua kali → 409.
   - `POST /api/lead/inbox/<id>/take` → 200 lalu 409.
   - `POST /api/lead/sessions/<id>/rotate` → pane baru lahir; `stop` → pane hilang.
-- [ ] **Step 4:** Skenario regresi 7 backlog: buat 7 spec siap (stage `spec-ready`, approved) di proyek uji, nyalakan scheduler; tunggu satu denyut → hanya ≤ 1 baris `SchedulerQueueItem` `source=lead` baru; `brief` melaporkan ramp.
-- [ ] **Step 5:** Bila ada yang gagal, perbaiki dan ulangi dari step yang gagal sampai hijau. Catat hasil (perintah + status) di deskripsi PR. Hentikan server, `tmux kill-session` pane uji, hapus `/private/tmp/lead-e2e-*`.
-- [ ] **Step 6: Commit** (bila ada perbaikan) dan centang seluruh kotak plan ini.
+- [x] **Step 4:** Skenario regresi 7 backlog: buat 7 spec siap (stage `spec-ready`, approved) di proyek uji, nyalakan scheduler; tunggu satu denyut → hanya ≤ 1 baris `SchedulerQueueItem` `source=lead` baru; `brief` melaporkan ramp.
+- [x] **Step 5:** Bila ada yang gagal, perbaiki dan ulangi dari step yang gagal sampai hijau. Catat hasil (perintah + status) di deskripsi PR. Hentikan server, `tmux kill-session` pane uji, hapus `/private/tmp/lead-e2e-*`.
+- [x] **Step 6: Commit** (bila ada perbaikan) dan centang seluruh kotak plan ini.
