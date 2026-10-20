@@ -1968,7 +1968,7 @@ Alur `processAct`:
 5. `butuh-izin` → `createApproval({ event, verdict, evidence, report })`; event tetap terbuka (waiter tetap menunggu sampai disetujui/ditolak/tenggat) → `{ outcome: "butuh-izin", approvalId }`.
 6. `lolos` → `resolveEvent(event.id, { verdict, evidence })`. Waiter (rantai dialog / route kontrak / `pulse`) yang menjalankan `decide()` → baris jejak + tindakan. Tak ada waiter (proses restart) → event tetap `done`; pemanggilnya sudah mati sehingga **tak ada eksekusi ganda** — catat di `detail`: "tak ada penunggu; keputusan dicatat saja".
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
 
 `server/test/lead-act.test.ts`:
 
@@ -2070,9 +2070,9 @@ describe("/api/lead-pane", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan → FAIL.**
+- [x] **Step 2: Jalankan → FAIL.**
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `server/src/services/lead/act.ts`:
 
@@ -2236,8 +2236,8 @@ export default async function leadPane(app: FastifyInstance): Promise<void> {
 
 `app.ts`: tambah `if (path.startsWith("/api/lead-pane/")) return;` tepat setelah baris `/api/session-events` (`:223`) dengan komentar ADR-0228 yang sama polanya; registrasikan `leadPane` di blok route `/api` yang sama dengan `sessionEvents`. `agent-capabilities.ts:81`: `if (top === "session-events" || top === "lead-pane") return "COOKIE_ONLY";` dan tambah kalimat ADR-0228 ke komentar paragraf di atasnya. Perbarui `server/test/agent-capabilities.test.ts` bila ia mengunci daftar route COOKIE_ONLY.
 
-- [ ] **Step 4: Test → PASS** (`server/test/lead-act.test.ts server/test/lead-pane.route.test.ts server/test/agent-capabilities.test.ts`).
-- [ ] **Step 5: Commit** `feat(lead): pane lead memeriksa (brief) & bertindak (act) lewat token sesi, digerbangi server`
+- [x] **Step 4: Test → PASS** (`server/test/lead-act.test.ts server/test/lead-pane.route.test.ts server/test/agent-capabilities.test.ts`).
+- [x] **Step 5: Commit** `feat(lead): pane lead memeriksa (brief) & bertindak (act) lewat token sesi, digerbangi server`
 
 ### Task 11: `approvals.ts` + Telegram Setujui/Tolak + route manusia
 
@@ -2256,7 +2256,7 @@ export default async function leadPane(app: FastifyInstance): Promise<void> {
   - Route: `GET /lead/approvals?projectId&status&page&limit`, `POST /lead/approvals/:id/decide` body `{ approve: boolean, note?: string }` (409 bila bukan pending), `GET /lead/inbox?projectId&status&page&limit`, `POST /lead/inbox/:id/take` (manusia mengambil event → `closeEvent(id,"human")`, 409 bila tertutup)
   - Telegram callback `tgla:<approvalId>:approve|deny` → `decideApproval(id, { approve, by: "telegram:<userId>" })`
 
-- [ ] **Step 1: Test gagal** `server/test/lead-approvals.test.ts`:
+- [x] **Step 1: Test gagal** `server/test/lead-approvals.test.ts`:
 
 ```ts
 import { describe, it, expect, beforeEach } from "vitest";
@@ -2318,9 +2318,9 @@ describe("approval lead", () => {
 
 Tambah ke `lead-routes.test.ts`: `POST /api/lead/approvals/:id/decide` 200 lalu 409 untuk keputusan kedua; `POST /api/lead/inbox/:id/take` 200 lalu 409.
 
-- [ ] **Step 2: Jalankan → FAIL.**
+- [x] **Step 2: Jalankan → FAIL.**
 
-- [ ] **Step 3: Implementasi** `server/src/services/lead/approvals.ts`:
+- [x] **Step 3: Implementasi** `server/src/services/lead/approvals.ts`:
 
 ```ts
 import type { LeadApproval, Prisma } from "@prisma/client";
@@ -2443,8 +2443,8 @@ Catatan:
 
   `listApprovalsPage`/`listInboxPage` mengikuti pola paginasi `listDecisions` (`trail.ts:79`, `{ items, total, page, pageSize }`, default 20, maks 100). Taruh di `approvals.ts` dan `inbox.ts`.
 
-- [ ] **Step 4: Test → PASS** (`server/test/lead-approvals.test.ts server/test/lead-routes.test.ts` + test gateway Telegram).
-- [ ] **Step 5: Commit** `feat(lead): antrean izin — setujui/tolak di UI & Telegram, kedaluwarsa = ditolak`
+- [x] **Step 4: Test → PASS** (`server/test/lead-approvals.test.ts server/test/lead-routes.test.ts` + test gateway Telegram).
+- [x] **Step 5: Commit** `feat(lead): antrean izin — setujui/tolak di UI & Telegram, kedaluwarsa = ditolak`
 
 ---
 

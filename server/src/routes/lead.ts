@@ -11,6 +11,11 @@ import { closeFlow, toFlowView, LeadFlowClosedError } from "../services/lead/flo
 import { LeadBusyError } from "../services/lead/gate";
 import { resetSession } from "../services/lead/detect";
 import { buildLeadStatus, buildLeadDecisions, buildLeadFlows } from "../services/lead/views";
+import { closeEvent, listInboxPage } from "../services/lead/inbox";
+import { decideApproval, listApprovalsPage } from "../services/lead/approvals";
+import { z } from "zod";
+
+const zLeadApprovalDecide = z.object({ approve: z.boolean(), note: z.string().max(2000).optional() });
 
 // SPEC-409 · ADR-0091 · permukaan HTTP hanoman-lead.
 // SPEC-908 · ADR-0145 · dashboard tak lagi men-poll ketiga endpoint ini: ia berlangganan topik
@@ -167,6 +172,27 @@ export default async function (app: FastifyInstance) {
 
   // AC-28 · operator menimpa. Keputusan lama → `ditimpa`, jawaban operator jadi yang berlaku, dan
   // bila panenya masih hidup jawaban baru itu DIKETIK ke sesi yang bersangkutan.
+  // ADR-0228 · INBOX sesi lead — dibaca manusia, dan event mana pun boleh DIAMBIL manusia (event
+  // tertutup untuk pane lead; jawaban lead yang datang sesudahnya kalah di penutupan atomik).
+  app.get("/lead/inbox", async (req) =>
+    listInboxPage(req.query as { projectId?: string; status?: string; page?: string; limit?: string }));
+  app.post("/lead/inbox/:id/take", async (req, reply) => {
+    const ok = await closeEvent((req.params as { id: string }).id, "human");
+    return ok ? { ok: true } : reply.code(409).send({ error: "event sudah ditutup atau tak ada" });
+  });
+
+  // ADR-0228 · ANTREAN IZIN. Memutuskan bisa MERGE ke branch target → capability `lead:approve`
+  // (danger, tak diimplikasikan `lead:write`; peta di agent-capabilities.ts).
+  app.get("/lead/approvals", async (req) =>
+    listApprovalsPage(req.query as { projectId?: string; status?: string; page?: string; limit?: string }));
+  app.post("/lead/approvals/:id/decide", async (req, reply) => {
+    const body = zLeadApprovalDecide.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
+    const by = req.agent ? `agent:${req.agent.id}` : req.user?.id ? `user:${req.user.id}` : "operator";
+    const v = await decideApproval((req.params as { id: string }).id, { ...body.data, by });
+    return v ?? reply.code(409).send({ error: "izin sudah diputuskan atau tak ada" });
+  });
+
   app.post("/lead/decisions/:id/override", async (req, reply) => {
     const { id } = req.params as { id: string };
     const parsed = zLeadOverride.safeParse(req.body);

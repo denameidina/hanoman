@@ -37,6 +37,7 @@ import overview from "./routes/overview";
 import sessionResults from "./routes/session-results";
 import sessionHistory from "./routes/session-history";
 import sessionEvents from "./routes/session-events";
+import leadPane from "./routes/lead-pane";
 import config from "./routes/config";
 import help from "./routes/help";
 import tickets from "./routes/tickets";
@@ -221,6 +222,8 @@ export function buildApp(
         // benar bila urutan cabang ini kelak berubah — tapi jangan mengandalkannya sebagai lapis
         // kedua yang aktif hari ini. Yang menutup pintunya adalah HMAC di route.
         if (path === "/api/session-events") return;
+        // ADR-0228 · pane lead: token HMAC per sesi yang sama, di-enforce `routes/lead-pane.ts`.
+        if (path.startsWith("/api/lead-pane/")) return;
         if (path.startsWith("/api/help")) return;
         if (user) return; // cookie sesi = akses penuh (tak ada RBAC, konsisten model sekarang)
         // SPEC-257 · ADR-0065 · jalur auth kedua: agent token Bearer. WS browser memakai tiket sekali pakai.
@@ -293,6 +296,7 @@ await api.register(deviceAccessRequests); // ADR-0217 · opsi C (ADR-0216): POST
     await api.register(sessionResults);
     await api.register(sessionHistory);  // SPEC-362 · riwayat sesi terminal (di belakang gate cookie)
     await api.register(sessionEvents);   // SPEC-909 · event hook sesi (token sesi, gate di-bypass di atas)
+    await api.register(leadPane);        // ADR-0228 · pane lead: brief & act (token sesi, gate di-bypass di atas)
     await api.register(config);
     await api.register(help);     // SPEC-253 · Help Center publik (gate di-bypass di atas)
     await api.register(tickets, { publicBase: ingress.publicBase });  // SPEC-253 · triase (di belakang gate cookie)

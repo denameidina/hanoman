@@ -3,6 +3,7 @@ import {
   inboundDigest,
   normalizeTelegramCommand,
   parseConfirmationCallback,
+  parseLeadApprovalCallback,
   parseTelegramUpdate,
   sanitizeTelegramOutput,
   splitTelegramText,
@@ -63,6 +64,23 @@ describe("Telegram inbound protocol (SPEC-476)", () => {
     });
     expect(parseConfirmationCallback("tgcf:abc_123:deny")).toEqual({ token: "abc_123", action: "deny" });
     expect(parseConfirmationCallback(`tgcf:${"x".repeat(61)}:approve`)).toBeNull();
+  });
+
+  // ADR-0228 · tombol izin hanoman-lead.
+  it("parses lead approval callbacks, still behind the allowlist", () => {
+    const cb = (data: string, from = 7) => ({
+      update_id: 19,
+      callback_query: {
+        id: "cb-2", from: { id: from, is_bot: false, first_name: "Dena" },
+        message: { message_id: 9, date: 1, chat: { id: 42, type: "private" } }, data,
+      },
+    });
+    expect(parseTelegramUpdate(cb("tgla:cmabc123:approve"), allowed)).toMatchObject({
+      ok: true, input: { kind: "callback", leadApprovalId: "cmabc123", callbackAction: "approve", callbackQueryId: "cb-2" },
+    });
+    expect(parseTelegramUpdate(cb("tgla:cmabc123:deny", 8), allowed)).toMatchObject({ ok: false, reason: "not-allowed" });
+    expect(parseLeadApprovalCallback("tgla:x:maybe")).toBeNull();
+    expect(parseLeadApprovalCallback("tgla:cm1:deny")).toEqual({ approvalId: "cm1", action: "deny" });
   });
 
   it("produces a stable digest without echoing the inbound text", () => {

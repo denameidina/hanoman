@@ -32,6 +32,11 @@ type GatewayDeps = {
   progress: boolean;
   pollTimeout?: number;
   typing?: TelegramTypingIndicator;
+  /**
+   * ADR-0228 · tombol izin hanoman-lead. Opsional: default memuat `lead/approvals` saat tombol
+   * pertama ditekan, supaya gateway tak menarik seluruh modul lead saat boot.
+   */
+  decideLeadApproval?: (id: string, d: { approve: boolean; by: string }) => Promise<{ status: string } | null>;
 };
 
 const digestRaw = (update: unknown): string => createHash("sha256").update(JSON.stringify(update)).digest("hex");
@@ -96,6 +101,20 @@ export class TelegramGateway {
     }
     if (!await this.deps.store.claimUpdate(input.updateId)) return;
     try {
+      if (input.kind === "callback" && input.leadApprovalId && input.callbackAction && input.callbackQueryId) {
+        // ADR-0228 · identitas pengirim sudah lolos allowlist di `parseTelegramUpdate`.
+        const decide = this.deps.decideLeadApproval
+          ?? (async (id: string, d: { approve: boolean; by: string }) => (await import("../lead/approvals")).decideApproval(id, d));
+        const v = await decide(input.leadApprovalId, {
+          approve: input.callbackAction === "approve", by: `telegram:${input.userId}`,
+        }).catch(() => null);
+        await this.deps.client.answerCallbackQuery({
+          callbackQueryId: input.callbackQueryId,
+          text: v ? (v.status === "approved" ? "Disetujui" : "Ditolak") : "Sudah diputuskan atau tak berlaku",
+        });
+        await this.deps.store.markDispatched(input.updateId);
+        return;
+      }
       if (input.kind === "callback" && input.callbackToken && input.callbackAction && input.callbackQueryId) {
         const outcome = await this.deps.store.resolveConfirmation({
           callbackToken: input.callbackToken,

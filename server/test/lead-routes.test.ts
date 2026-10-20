@@ -11,6 +11,8 @@ import { capabilityForRoute, checkAgentCapability } from "../src/services/agent-
 import { setLead } from "../src/services/lead/config";
 import { recordDecision } from "../src/services/lead/trail";
 import { runGated, __resetLeadGate } from "../src/services/lead/gate";
+import { openEvent } from "../src/services/lead/inbox";
+import { createApproval } from "../src/services/lead/approvals";
 
 // SPEC-409 · ADR-0091 · permukaan HTTP hanoman-lead.
 
@@ -466,5 +468,38 @@ describe("SPEC-485 · pilihan jamak & rantai (HTTP)", () => {
     expect(capabilityForRoute("POST", "/api/lead/flows/x/submit")).toBe("lead:write");
     expect(checkAgentCapability(["lead:read"], "POST", "/api/lead/flows/x/submit"))
       .toMatchObject({ ok: false, need: "lead:write" });
+  });
+});
+
+// ADR-0228 · inbox & antrean izin untuk manusia.
+describe("inbox & izin lead (ADR-0228)", () => {
+  const payload = { prompt: "p", gate: "pulse" as const, leadKind: "quality" as const, options: [], select: null };
+  beforeEach(async () => { await prisma.leadApproval.deleteMany(); await prisma.leadEvent.deleteMany(); });
+
+  it("GET /lead/inbox berpaginasi; POST take menutup event sekali", async () => {
+    const cookie = await login();
+    const e = await openEvent({ projectId: "demo", kind: "ask", question: "q", payload });
+    const list = await app.inject({ method: "GET", url: "/api/lead/inbox?projectId=demo", headers: { cookie } });
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toMatchObject({ total: 1, items: [{ id: e.id, status: "open" }] });
+    const take = () => app.inject({ method: "POST", url: `/api/lead/inbox/${e.id}/take`, headers: { cookie } });
+    expect((await take()).statusCode).toBe(200);
+    expect((await take()).statusCode).toBe(409);
+  });
+
+  it("POST /lead/approvals/:id/decide: 400 bentuk salah, 200 sekali, 409 kedua kali", async () => {
+    const cookie = await login();
+    const e = await openEvent({ projectId: "demo", kind: "session-ended", question: "q", payload });
+    const { id } = await createApproval({ eventId: e.id, projectId: "demo", target: null, report: [],
+      act: { eventId: e.id, evidence: [], verdict: { decision: "d", reason: "r", refs: [], confidence: "tinggi", action: "none", choice: "", choices: [], missing: [], reply: "" } } },
+      { notice: async () => {}, push: async () => 0 });
+    const decide = (payload: object) => app.inject({ method: "POST", url: `/api/lead/approvals/${id}/decide`, headers: { cookie }, payload });
+    expect((await decide({ approve: "ya" })).statusCode).toBe(400);
+    const ok = await decide({ approve: false, note: "nanti" });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toMatchObject({ status: "rejected", note: "nanti" });
+    expect((await decide({ approve: true })).statusCode).toBe(409);
+    const list = await app.inject({ method: "GET", url: "/api/lead/approvals?status=rejected", headers: { cookie } });
+    expect(list.json().total).toBe(1);
   });
 });

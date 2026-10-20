@@ -78,7 +78,9 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // tak bisa dibungkus secara teknis: `auth/{status,setup,login,logout}` (cookie sesi/bootstrap),
   // `sync` (Bearer device-token mesin-ke-mesin), `session-events` (token HMAC per sesi),
   // `terminal/workspace` (tata letak browser per-akun). (`portal` tulis tetap cookie-only: ADR-0195.)
-  if (top === "session-events") return "COOKIE_ONLY";
+  // ADR-0228 · `lead-pane` (brief & act pane hanoman-lead) memakai token HMAC per sesi yang sama:
+  // agen yang bisa meniru "pane lead proyek X" bisa menggerakkan seluruh proyek itu.
+  if (top === "session-events" || top === "lead-pane") return "COOKIE_ONLY";
   if (top === "auth") {
     // Hanya pengelolaan akun yang terbuka. status/setup/login/logout = cookie sesi & bootstrap.
     if (seg[1] === "users") return read ? "access:read" : "access:admin";

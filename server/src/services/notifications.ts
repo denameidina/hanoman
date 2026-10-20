@@ -132,6 +132,16 @@ export async function recordLeadDecision(
   }).catch(() => { /* P2002: sudah ada untuk keputusan ini */ });
 }
 
+/**
+ * ADR-0228 · notifikasi lead yang TAK menunjuk baris keputusan (izin menunggu, proyek dijeda,
+ * pane lead gagal lahir). `key` disediakan pemanggil supaya satu kejadian = satu notifikasi.
+ */
+export async function recordLeadNotice(key: string, title: string, projectId: string | null): Promise<void> {
+  await prisma.notification.create({
+    data: { type: "lead", key: `lead:${key}`, projectId, title },
+  }).catch(() => { /* P2002: sudah diberitahukan */ });
+}
+
 // SPEC-909 · ADR-0146 · sesi yang lahir SEBELUM pembaruan tak punya hook event, dan pemindainya
 // sudah dicabut — jadi hanoman-lead tak akan menjawabnya. Menyisakan pemindai "hanya untuk sesi
 // lama" berarti mempertahankan persis biaya yang dicabut SPEC ini, untuk populasi yang menyusut
