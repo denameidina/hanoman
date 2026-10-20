@@ -4,7 +4,7 @@ import { SESSION_KINDS, SESSION_KIND_LABEL, restartableKind, zSessionKind } from
 describe("SessionKind (SPEC-362)", () => {
   it("mencakup setiap jenis sesi yang bisa lahir dari createSession", () => {
     expect([...SESSION_KINDS].sort()).toEqual([
-      "breakdown", "prd", "reverse", "scaffold", "shell",
+      "breakdown", "lead", "prd", "reverse", "scaffold", "shell",
       "spec", "telegram", "terminal", "vps", "worktree",
     ]);
   });

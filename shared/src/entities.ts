@@ -4,6 +4,7 @@ import { zStage, zSpecSource, zDocStatus, zPriority, zProjectKind, zAgent, zVeri
 import { TELEGRAM_DEFAULTS, zTelegramSettings } from "./telegram";
 import { zAgentEngine, type AgentEngine } from "./agent-engine";
 import { zAutoMerge } from "./auto-merge";
+import { zLeadProject } from "./lead";
 import { DEFAULT_METHOD } from "./method-catalog";
 import { REMOTE_CONTROL_DEFAULTS, zRemoteControl } from "./relay";
 import { LOG_RETENTION_DEFAULTS, LOG_SHIPPING_DEFAULTS, zLogRetention, zLogShipping } from "./logs";
@@ -405,6 +406,14 @@ export const zLead = z.object({
   // OQ-3 · syarat objektif sebelum lead boleh mengintegrasikan ke branch utama. Default MENYALA:
   // risiko "kode masuk main tanpa mata manusia" diterima sadar, tapi syaratnya tetap terukur.
   requireGreenBeforeIntegrate: z.boolean().default(true),
+  // ADR-0228 · sesi lead. Knob GLOBAL: tenggat antar-jemput event, umur izin, dan kapan pane
+  // lead dirotasi supaya konteksnya tak menumpuk tanpa batas.
+  deliverTimeoutSec: z.number().int().min(60).max(3600).default(600),
+  approvalTtlMin: z.number().int().min(5).max(10080).default(1440),
+  rotateAfterEvents: z.number().int().min(5).max(500).default(40),
+  // Setelan PER PROYEK (wewenang, branch target, perintah verifikasi, jatah). Proyek yang tak
+  // disebut memakai default `zLeadProject` — penggabungnya `lead/project-config.ts`.
+  projects: z.record(z.string(), zLeadProject.partial()).default({}),
   engine: zLeadEngine.default({}),
 });
 export type Lead = z.infer<typeof zLead>;

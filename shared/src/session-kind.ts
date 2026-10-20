@@ -5,6 +5,9 @@ import { z } from "zod";
 // grid yang merender slug mentah membuat fiturnya tak ketemu saat dicari manusia.
 export const SESSION_KINDS = [
   "spec", "reverse", "prd", "scaffold", "breakdown", "vps", "shell", "worktree", "terminal", "telegram",
+  // ADR-0228 · pane hanoman-lead per proyek (`lead-<proyek>`). Tak restartable: ia dilahirkan
+  // ulang oleh server sendiri, bukan oleh tombol "Mulai lagi".
+  "lead",
 ] as const;
 export type SessionKind = (typeof SESSION_KINDS)[number];
 export const zSessionKind = z.enum(SESSION_KINDS);
@@ -20,6 +23,7 @@ export const SESSION_KIND_LABEL: Record<SessionKind, string> = {
   worktree: "Worktree (konflik)",
   terminal: "Sesi agen",
   telegram: "Operator Telegram",
+  lead: "Lead",
 };
 
 // "Mulai lagi" tak pernah menghidupkan proses lama (tmux sudah membunuhnya) — ia men-spawn sesi
