@@ -1021,7 +1021,7 @@ Rapikan: pindahkan `import { sessionIdForSpec }` ke blok impor atas dan hapus he
   - `toEventView(e: LeadEvent): LeadEventView`
   - `__resetInbox(): void`
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
 
 ```ts
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
@@ -1078,9 +1078,9 @@ describe("inbox lead", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan → FAIL.**
+- [x] **Step 2: Jalankan → FAIL.**
 
-- [ ] **Step 3: Implementasi** `server/src/services/lead/inbox.ts`:
+- [x] **Step 3: Implementasi** `server/src/services/lead/inbox.ts`:
 
 ```ts
 import type { LeadEvent, Prisma } from "@prisma/client";
@@ -1196,8 +1196,8 @@ export function toEventView(e: LeadEvent): LeadEventView {
 
 `LeadGate`, `LeadKind`, `LeadSelect` sudah diekspor `@hanoman/shared` (dipakai `decide.ts:28-44`); verifikasi nama persisnya dengan `grep -n "export type Lead\(Gate\|Kind\|Select\)" shared/src/lead.ts`.
 
-- [ ] **Step 4: Test → PASS.**
-- [ ] **Step 5: Commit** `feat(lead): inbox event persisten + waiter + batch berprioritas + sapuan tenggat`
+- [x] **Step 4: Test → PASS.**
+- [x] **Step 5: Commit** `feat(lead): inbox event persisten + waiter + batch berprioritas + sapuan tenggat`
 
 ### Task 7: `thinkViaSession` + `decide()` tanpa `runGated`
 
