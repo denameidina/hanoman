@@ -17,6 +17,10 @@ export const CAPABILITY_IDS = [
   // baris jejak & bisa menggerakkan sesi), dan SPEC-405 sudah membuktikan apa yang terjadi saat
   // endpoint tulis menumpang prefix status yang dipetakan tanpa melihat method (AC-5).
   "lead:read", "lead:write",
+  // ADR-0228 · menyetujui tindakan lead yang menunggu izin (bisa MERGE ke branch target). Akses
+  // `danger`, tak diimplikasikan `lead:write`: pane lead & agen peminta putusan memegang write,
+  // dan mereka tak boleh menyetujui tindakannya sendiri (ADR-0192).
+  "lead:approve",
   // SPEC-450 · ADR-0094 · custom agent. Domain TERSENDIRI, dipetakan MENURUT METHOD: menulis
   // definisi agen mengubah apa yang dilihat SETIAP sesi baru di seluruh workspace, jadi izin
   // baca tak pernah cukup untuk itu (kelas bug SPEC-405).
@@ -113,6 +117,7 @@ export const CAPABILITIES: CapabilityInfo[] = [
   { id: "notifications:write", domain: "notifications", access: "write", label: "Notifikasi — tulis", desc: "Tandai terbaca / bersihkan notifikasi." },
   { id: "lead:read", domain: "lead", access: "read", label: "Lead — baca", desc: "Baca jejak keputusan hanoman-lead & statusnya." },
   { id: "lead:write", domain: "lead", access: "write", label: "Lead — tulis", desc: "Minta putusan ke hanoman-lead (keputusan bisa menggerakkan sesi).", risk: "exec" },
+  { id: "lead:approve", domain: "lead", access: "danger", label: "Lead — setujui", desc: "Setujui/tolak tindakan hanoman-lead yang menunggu izin — termasuk merge branch sesi ke branch target. Beri HANYA ke token manusia, bukan token yang dipakai agen di dalam sesi.", risk: "exec" },
   { id: "agents:read", domain: "agents", access: "read", label: "Custom agent — baca", desc: "Lihat katalog custom agent global & per project." },
   { id: "agents:write", domain: "agents", access: "write", label: "Custom agent — tulis", desc: "Buat/ubah/hapus custom agent; definisinya dipakai setiap sesi baru.", risk: "exec" },
   { id: "skills:read", domain: "skills", access: "read", label: "Skills — baca", desc: "Lihat skill global, plugin & per project beserta isi berkasnya." },

@@ -122,6 +122,28 @@ describe("TelegramGateway inbound state machine (SPEC-476)", () => {
     expect(x.client.answered).toEqual([{ callbackQueryId: "cb-1", text: "Disetujui" }]);
     expect(x.dispatch.inputs).toHaveLength(1);
   });
+
+  // ADR-0228 · tombol izin lead diputuskan di gateway, tidak diteruskan ke sesi percakapan.
+  it("decides a lead approval button once and never dispatches it to the operator session", async () => {
+    const decided: { id: string; approve: boolean; by: string }[] = [];
+    const client = fakeClient();
+    const dispatch = dispatcher();
+    const g = new TelegramGateway({
+      client, store, dispatcher: dispatch, allowedUserIds: new Set(["7"]),
+      rateLimit: { limit: 20, windowMs: 60_000 }, exactSecrets: [], progress: false,
+      decideLeadApproval: async (id, d) => { decided.push({ id, ...d }); return { status: d.approve ? "approved" : "rejected" }; },
+    });
+    await g.processUpdates([{
+      update_id: 30,
+      callback_query: {
+        id: "cb-9", from: { id: 7, is_bot: false, first_name: "Dena" }, data: "tgla:cmapr1:approve",
+        message: { message_id: 9, date: 1, chat: { id: 42, type: "private" } },
+      },
+    }]);
+    expect(decided).toEqual([{ id: "cmapr1", approve: true, by: "telegram:7" }]);
+    expect(client.answered).toEqual([{ callbackQueryId: "cb-9", text: "Disetujui" }]);
+    expect(dispatch.inputs).toEqual([]);
+  });
 });
 
 describe("TelegramGateway explicit outbox (SPEC-476)", () => {

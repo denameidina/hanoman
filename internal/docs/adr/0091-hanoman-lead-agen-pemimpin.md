@@ -1,5 +1,9 @@
 # ADR-0091 — hanoman-lead: agen pemimpin di atas agen; manusia jadi pembatal, bukan gerbang
 
+- **Diamandemen [ADR-0228](0228-lead-sesi-interaktif-gerbang-server.md)** (2026-10-20): lead kini sesi
+  tmux interaktif per proyek, bukan `claude -p`/`codex exec` sekali-panggil; urutan kerja diganti
+  pemilihan ≤ jatah server; integrasi berverifikasi + wewenang/izin per proyek. Allowlist tindakan,
+  jejak, dan opt-in di bawah tetap berlaku.
 - Status: **Accepted** — mengamandemen [ADR-0035](0035-sesi-lanjut-fase-tanpa-berhenti-kecuali-keputusan.md)
   (bagian "berhenti untuk bertanya"), memperluas [ADR-0072](0072-scheduler-fondasi-engine-antrean-durable-cap.md) &
   [ADR-0065](0065-ai-agent-capability-agent-token.md). **Tidak** mencabut

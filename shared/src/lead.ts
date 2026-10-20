@@ -356,3 +356,98 @@ export const zLeadOverride = z.object({
    */
   choices: z.array(z.string().max(2000)).max(20).default([]),
 });
+
+// ── Sesi lead (ADR-0228) ─────────────────────────────────────────────────────────────────────
+// Lead bukan lagi `claude -p` sekali-panggil melainkan satu pane tmux per proyek. Yang hidup di
+// sini hanya KONTRAK yang dibagi server & UI: mode wewenang per tindakan, bentuk `act`, dan view.
+
+export const LEAD_AUTHORITY_MODES = ["auto", "ask", "off"] as const;
+export type LeadAuthorityMode = (typeof LEAD_AUTHORITY_MODES)[number];
+export const zLeadAuthorityMode = z.enum(LEAD_AUTHORITY_MODES);
+
+/** Default wewenang (spec §3): merge minta izin, sisanya jalan sendiri selama gerbang lolos. */
+export const LEAD_AUTHORITY_DEFAULTS: Record<LeadAction, LeadAuthorityMode> = {
+  none: "auto", "answer-session": "auto", "start-session": "auto", "stop-session": "auto",
+  "resume-session": "auto", "restart-session": "auto", "order-queue": "auto", "hold-work": "auto",
+  "push-branch": "auto", "integrate-main": "ask", "run-migration": "auto",
+};
+
+/**
+ * Setelan lead PER PROYEK. `Project` tak punya kolom branch target maupun perintah test, dan blok
+ * lead hidup di `Setting.data` (Json) — jadi tempatnya di sini, tanpa migration.
+ */
+export const zLeadProject = z.object({
+  // zod 3: record berkunci enum diinfer `Partial<Record<…>>` — tindakan yang tak disebut memakai default.
+  authority: z.record(zLeadAction, zLeadAuthorityMode).default({}),
+  targetBranch: z.string().min(1).default("main"),
+  /** Kosong = integrasi lead SELALU minta izin (server tak bisa membuktikan test hijau). */
+  verifyCommand: z.string().default(""),
+  quotaStopPct: z.number().int().min(1).max(100).default(85),
+  rampStep: z.number().int().min(1).max(16).default(1),
+  rampProbeMin: z.number().int().min(1).max(240).default(10),
+  failStreak: z.number().int().min(1).max(20).default(2),
+  answerSlaSec: z.number().int().min(30).max(3600).default(300),
+});
+export type LeadProject = z.infer<typeof zLeadProject>;
+export type LeadProjectInput = z.input<typeof zLeadProject>;
+
+/** Bentuk yang dikirim pane lead ke `POST /api/lead-pane/act`. `verdict` = `zLeadVerdict` apa adanya. */
+export const zLeadAct = z.object({
+  eventId: z.string().min(1),
+  verdict: zLeadVerdict,
+  evidence: z.array(z.string().max(500)).max(50).default([]),
+});
+export type LeadAct = z.infer<typeof zLeadAct>;
+
+export const LEAD_EVENT_KINDS = ["ask", "session-ended", "pulse", "human", "rejected", "integrate-failed"] as const;
+export type LeadEventKind = (typeof LEAD_EVENT_KINDS)[number];
+export const LEAD_EVENT_STATUSES = ["open", "delivered", "done", "late", "human"] as const;
+export type LeadEventStatus = (typeof LEAD_EVENT_STATUSES)[number];
+/** Prioritas kelas (spec §1): kecil = didahulukan. Denyut tak pernah menahan jawaban pertanyaan. */
+export const LEAD_EVENT_PRIORITY: Record<LeadEventKind, number> = {
+  ask: 0, "session-ended": 1, "integrate-failed": 1, human: 2, rejected: 2, pulse: 3,
+};
+
+export type LeadRefusalCode =
+  | "event-closed" | "authority-off" | "budget-zero" | "spec-done" | "spec-not-approved"
+  | "spec-empty" | "blocked" | "session-live" | "no-reason" | "no-evidence"
+  | "not-waiting" | "plan-open" | "worktree-dirty" | "conflict" | "verify-failed"
+  | "integrate-busy" | "no-session" | "action-locked";
+
+export type LeadActResult = {
+  outcome: "lolos" | "butuh-izin" | "ditolak";
+  code?: LeadRefusalCode;
+  detail: string;
+  approvalId?: string;
+};
+
+export type LeadEventView = {
+  id: string; projectId: string; kind: LeadEventKind; status: LeadEventStatus; priority: number;
+  question: string; specId: string | null; sessionId: string | null;
+  deadlineAt: string | null; deliveredAt: string | null; createdAt: string; decisionId: string | null;
+};
+export type LeadApprovalStatus = "pending" | "approved" | "rejected" | "expired";
+export type LeadApprovalView = {
+  id: string; eventId: string; projectId: string; action: string; target: string | null;
+  reason: string; evidence: string[]; gateReport: string[]; status: LeadApprovalStatus;
+  decidedBy: string | null; decidedAt: string | null; note: string | null; createdAt: string;
+};
+export type LeadSessionView = {
+  projectId: string; sessionId: string; alive: boolean; idle: boolean;
+  humanActive: boolean; delivered: number; restarts: number;
+};
+
+/**
+ * Daftar sensitif (spec §2): jawaban yang menyentuh salah satunya SELALU minta izin, apa pun mode
+ * wewenangnya. Kata, bukan regex bebas — operator harus bisa membaca daftarnya. Kasus asal:
+ * lead memilih sendiri "bootstrap director sementara" di staging (SPEC-1450, 2026-10-20).
+ */
+export const LEAD_SENSITIVE_TERMS = [
+  "produksi", "production", "kredensial", "credential", "secret", "password", "token",
+  "akun", "account", "director", "hapus data", "delete data", "drop table", "truncate",
+  "migrasi produksi", "deploy", "rollback", "force push", "--force",
+] as const;
+export function isSensitiveText(s: string): boolean {
+  const t = s.toLowerCase();
+  return LEAD_SENSITIVE_TERMS.some((w) => t.includes(w));
+}

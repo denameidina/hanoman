@@ -736,6 +736,7 @@ model LeadDecision {
   step           Int?      // urutan langkah dalam rantai, 1-basis
   choices        Json?     // {index,option}[] — SELALU daftar
   select         Json?     // {mode,min,max} sebagaimana dikirim peminta
+  eventId        String?   // ADR-0228 · event inbox sesi lead yang dijawab baris ini
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -743,6 +744,51 @@ model LeadDecision {
   @@index([specId])
   @@index([sessionId])
   @@index([flowId])
+}
+
+// ADR-0228 · INBOX SESI LEAD. Satu baris = satu hal yang harus diputuskan pane `lead-<proyek>`.
+// LOCAL-ONLY (cermin LeadDecision): menunjuk sesi tmux & worktree mesin ini, tanpa FK ke Project.
+model LeadEvent {
+  id          String    @id @default(cuid())
+  projectId   String
+  kind        String    // ask | session-ended | pulse | human | rejected | integrate-failed
+  priority    Int       // LEAD_EVENT_PRIORITY — kecil didahulukan
+  status      String    @default("open") // open | delivered | done | late | human
+  question    String    // baris yang dibaca manusia di inbox
+  payload     Json      // { prompt, gate, leadKind, options, select, mode?, request?, flowId?, step? }
+  sessionId   String?
+  specId      String?
+  deadlineAt  DateTime?
+  deliveredAt DateTime?
+  attempts    Int       @default(0)
+  closedAt    DateTime?
+  decisionId  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([projectId, status, priority, createdAt])
+}
+
+// ADR-0228 · tindakan lead yang menunggu izin manusia. Verdict lead DITAHAN apa adanya dan
+// dilepas saat disetujui. Kedaluwarsa = ditolak: tak pernah jalan karena manusia diam.
+model LeadApproval {
+  id         String    @id @default(cuid())
+  eventId    String
+  projectId  String
+  action     String
+  target     String?
+  reason     String
+  evidence   Json      // string[]
+  gateReport Json      // string[]
+  verdict    Json      // zLeadVerdict yang ditahan
+  status     String    @default("pending") // pending | approved | rejected | expired
+  decidedBy  String?
+  decidedAt  DateTime?
+  note       String?
+  createdAt  DateTime  @default(now())
+
+  @@index([projectId, status])
+  @@index([eventId])
 }
 
 // SPEC-215 · ADR-0049 · LOCAL-ONLY: override config runtime (env → DB). Tak pernah disync.

@@ -3,14 +3,13 @@ import type { SessionAsk } from "@hanoman/shared";
 import {
   admitAsk, answerAsk, askSignature, dialogFits, __resetDetect, answerCount, failureCount, type DetectDeps,
 } from "../src/services/lead/detect";
-import { __resetLeadGate } from "../src/services/lead/gate";
 import { readDialogScreen } from "../src/services/tui-dialog";
 import { __resetDeciding } from "../src/services/lead/deciding";
 
 const LEAD = {
-  enabled: true, paused: false, pausedProjects: [] as string[], everyMin: 5, timeoutSec: 600,
-  maxAutoAnswers: 3, maxConcurrent: 2, queueWaitSec: 120, flowTtlMin: 60,
-  requireGreenBeforeIntegrate: true,
+  enabled: true, paused: false, pausedProjects: [] as string[], everyMin: 5,
+  maxAutoAnswers: 3, flowTtlMin: 60,
+  requireGreenBeforeIntegrate: true, deliverTimeoutSec: 600, approvalTtlMin: 1440, rotateAfterEvents: 40, projects: {},
   engine: { enabled: false, agent: "claude", model: "m", effort: "high" },
 } as never;
 
@@ -92,7 +91,7 @@ function deps(over: Partial<DetectDeps> = {}): DetectDeps {
   } as unknown as DetectDeps;
 }
 
-beforeEach(() => { __resetDetect(); __resetLeadGate(); __resetDeciding(); });
+beforeEach(() => { __resetDetect(); __resetDeciding(); });
 
 describe("admitAsk — pagar lama, satu sesi per panggilan", () => {
   it("meloloskan sesi yang opt-in & lead aktif", async () => {

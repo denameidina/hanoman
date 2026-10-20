@@ -7,8 +7,12 @@ import { getLead, leadActive } from "./config";
 import { listDecisions, toDecisionView } from "./trail";
 import { listFlows, toFlowView } from "./flow";
 import { decidingIds, queuedIds } from "./deciding";
-import { leadGateStats } from "./gate";
+import { ASK_POOL } from "./ask";
 import { lastPulse } from "./engine";
+import { toEventView } from "./inbox";
+import { toApprovalView } from "./approvals";
+import { leadSessionStates } from "./lead-session";
+import { isLeadIdle } from "./courier";
 
 // SPEC-908 · satu definisi untuk ketiga route lead dan topik siar `lead`. Sebelumnya inline di
 // routes/lead.ts; menyalinnya ke hub berarti dua serializer yang bisa berselisih diam-diam.
@@ -45,9 +49,18 @@ export async function buildLeadStatus(): Promise<LeadStatusView> {
     })),
     deciding: decidingIds(), queued: queuedIds(), waiting,
     lastPulseAt: last ? new Date(last).toISOString() : null,
-    // SPEC-479 · keadaan gerbang konkurensi. Tanpa ini "lead sedang penuh" dan "lead diam"
-    // terlihat identik di layar, dan salah baca itulah yang melahirkan tiketnya.
-    gate: { ...leadGateStats(), capacity: cfg.maxConcurrent },
+    // SPEC-479 · keadaan antrean pertanyaan. ADR-0228 · gerbang konkurensi brain dicabut; yang
+    // tersisa kolam pekerja tanya (`ASK_POOL`) — sedang menunggu pane lead vs mengantre giliran.
+    gate: { inFlight: decidingIds().length, queued: queuedIds().length, capacity: ASK_POOL },
+    // ADR-0228 · inbox yang masih hidup (plus yang terlambat 24 jam terakhir — operator perlu
+    // melihat apa yang jatuh ke tangannya), izin yang menunggu, dan pane lead per proyek.
+    inbox: (await prisma.leadEvent.findMany({
+      where: { OR: [{ status: { in: ["open", "delivered"] } }, { status: "late", closedAt: { gte: since } }] },
+      orderBy: [{ priority: "asc" }, { createdAt: "asc" }], take: 50,
+    })).map(toEventView),
+    approvals: (await prisma.leadApproval.findMany({ where: { status: "pending" }, orderBy: { createdAt: "asc" }, take: 50 }))
+      .map(toApprovalView),
+    sessions: await leadSessionStates(isLeadIdle).catch(() => []),
   };
 }
 

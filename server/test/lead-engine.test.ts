@@ -26,15 +26,14 @@ const cfg = (over: Partial<Lead> = {}): Lead => ({ ...LEAD_DEFAULTS, enabled: tr
 // yang menstempel akhir denyut — kalau keduanya berjalan di jam berbeda, "jeda sejak denyut
 // selesai" tak bisa diuji sama sekali.
 function counters() {
-  const c = { legacy: 0, prune: 0, pulse: 0 };
+  const c = { legacy: 0, prune: 0, pulse: 0, sessions: 0 };
   const clock = { t: 0 };
   const pulse = {
     sessions: () => [], areas: async () => [], planDone: () => true, finished: () => false,
-    decide: (async () => null) as unknown as PulseDeps["decide"],
-    decideDeps: {} as PulseDeps["decideDeps"],
-    apply: (async () => ({ ok: true, detail: "" })) as unknown as PulseDeps["apply"],
-    enqueue: async () => { /* diam */ },
-    notify: async () => { /* diam */ },
+    post: async () => null,
+    openPosted: async () => false,
+    budget: async () => ({ n: 0, reasons: [], tripped: false }),
+    pauseProject: async () => { /* diam */ },
     optIn: async () => { c.pulse++; return []; },
     cfg: async () => cfg(),
     scheduler: async () => SCHEDULER_DEFAULTS,
@@ -46,6 +45,7 @@ function counters() {
     live: () => [],
     legacy: async () => { c.legacy++; },
     prune: () => { c.prune++; },
+    sessions: async () => { c.sessions++; },
   };
   /** Majukan jam ke `t` lalu jalankan satu tick di sana. */
   const at = (t: number) => { clock.t = t; return tick(t, deps); };
@@ -57,7 +57,16 @@ describe("lead engine tick", () => {
     await setLead({ ...LEAD_DEFAULTS, enabled: false });
     const { c, at } = counters();
     await at(1_000_000);
-    expect(c).toEqual({ legacy: 0, prune: 0, pulse: 0 });
+    expect(c).toEqual({ legacy: 0, prune: 0, pulse: 0, sessions: 0 });
+  });
+
+  // ADR-0228 · rumah tangga sesi lead menumpang tick yang sama — satu kali per tick, tanpa timer baru.
+  it("runs the lead-session housekeeping once per tick", async () => {
+    await setLead(cfg());
+    const { c, at } = counters();
+    await at(1_000_000);
+    await at(1_060_000);
+    expect(c.sessions).toBe(2);
   });
 
   // SPEC-909 · ADR-0146 · iramanya RUMAH TANGGA, bukan lagi 5 detik: tak ada lagi yang menunggu

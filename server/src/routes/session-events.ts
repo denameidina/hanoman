@@ -3,6 +3,7 @@ import { parseHookEvent } from "@hanoman/shared";
 import { verifySessionEventToken } from "../services/session-event-token";
 import { getSessionAsync } from "../services/pty";
 import { intakeAsk } from "../services/lead/ask";
+import { onLeadStop } from "../services/lead/courier";
 import { startAgentInvocation, stopAgentInvocation } from "../services/agent-invocations";
 import { refreshPhaseInvocations } from "../services/phase-invocations";
 import { recordCronReport } from "../services/scheduler/cron-report";
@@ -53,6 +54,13 @@ export default async function (app: FastifyInstance) {
 
     const body = recordOf(req.body);
     const lifecycle = body?.hook_event_name;
+    // ADR-0228 · pane lead. Stop = gilirannya selesai → ia diam, kurir boleh mengantar batch
+    // berikutnya. Pertanyaan DARI pane lead tak pernah masuk inbox lead sendiri (ADR-0192: agen
+    // tak memutuskan sesinya sendiri) — dialognya menunggu manusia di pane, seperti sebelum lead.
+    if (sessionId.startsWith("lead-")) {
+      if (lifecycle === "Stop") void onLeadStop(sessionId, s.projectId).catch((e) => console.error("kurir lead:", e));
+      return reply.code(202).send({ lead: true });
+    }
     // ADR-0222 · pesan akhir sesi cron = laporan run-nya (giliran terakhir menang). Sebelum
     // `parseHookEvent` dengan sengaja: yang dibaca di sini adalah isi pesan, bukan "apakah agen
     // bertanya", dan `stop_hook_active` tak boleh membuangnya. Gagal menulis laporan tak boleh

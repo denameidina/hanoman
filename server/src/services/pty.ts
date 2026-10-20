@@ -33,6 +33,7 @@ import { controlHost, loadIngressPolicy } from "./ingress-policy";
 import { sessionEventToken } from "./session-event-token";
 import { assertAntigravityLaunch, RuntimeLaunchError, sandboxCommand } from "./session-sandbox";
 import { sessionEventDir } from "./session-event-spool";
+import { noteHumanInput } from "./lead/human-input";
 import { agentDefinitionHash, resolveDbUrl } from "@hanoman/runner";
 export { sessionEventDir } from "./session-event-spool";
 
@@ -771,6 +772,7 @@ export function sessionKind(
   o: { id: string; specId?: string; flow?: string; command?: string[] }, projectId: string, cwd: string,
 ): SessionKind {
   if (o.specId) return "spec";
+  if (o.id.startsWith("lead-")) return "lead";            // ADR-0228 · pane hanoman-lead per proyek
   if (o.flow === "reverse" || o.flow === "prd" || o.flow === "scaffold" || o.flow === "breakdown") return o.flow;
   if (projectId.startsWith("telegram:")) return "telegram";
   if (projectId.startsWith("vps")) return "vps";           // routes/vps.ts: "vps:<id>" & "vps-console:<id>"
@@ -1196,8 +1198,9 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // SPEC-338 · mesin sesi ikut tersimpan di tmux — sumber kebenaran sesi tetap tmux, bukan DB.
   tmux("set-option", "-t", name(id), "@hanoman_agent", agent);
   const kind = sessionKind({ ...opts, id }, projectId, cwd);
+  // ADR-0228 · pane lead bukan pekerjaan backlog: kelas `terminal` supaya tak memakan slot cap agen.
   tmux("set-option", "-t", name(id), "@hanoman_launch_class",
-    opts.command || kind === "terminal" ? "terminal" : "agent");
+    opts.command || kind === "terminal" || kind === "lead" ? "terminal" : "agent");
   // ADR-0164 · model/effort orchestrator + penanda orkestrasi → chip header sel terminal.
   if (!opts.command && opts.model) tmux("set-option", "-t", name(id), "@hanoman_model", opts.model);
   if (!opts.command && sessionEffort) tmux("set-option", "-t", name(id), "@hanoman_effort", sessionEffort);
@@ -1779,6 +1782,9 @@ export const detach = (id: string, c: Client): void => { attached.get(id)?.clien
 export function writeTo(id: string, d: string, from?: Client): void {
   const a = attached.get(id);
   if (!a) return;
+  // ADR-0228 · manusia mengetik di pane lead → kurir menahan suntikan event. Hanya ketikan dari
+  // klien terminal (`from`), bukan pemanggil internal.
+  if (from && id.startsWith("lead-") && !isTerminalResponse(d)) noteHumanInput(id);
   if (from && isTerminalResponse(d) && a.clients.values().next().value !== from) return;
   a.pty.write(d);
 }

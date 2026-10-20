@@ -2,6 +2,7 @@ import { prisma } from "../../db";
 import type { Prisma } from "@prisma/client";
 import { coerceCodexEffort, type Lead, type Agent } from "@hanoman/shared";
 import { getSetting, sessionAgentDefaults } from "../settings";
+import { recordLeadNotice } from "../notifications";
 
 // SPEC-409 · ADR-0091 · blok lead hidup di dalam Setting singleton (id=1), cermin scheduler
 // (SPEC-294) & conflict (SPEC-383). getSetting sudah mengisi default (zSetting.lead =
@@ -48,4 +49,16 @@ export function leadActive(cfg: Lead, projectId?: string | null): boolean {
 export async function leadProjects(): Promise<string[]> {
   const rows = await prisma.project.findMany({ where: { leadOptIn: true }, select: { id: true } });
   return rows.map((r) => r.id);
+}
+
+/**
+ * ADR-0228 · rem otomatis per proyek: pemutus beruntun (`budget.ts`) atau pane lead yang gagal lahir
+ * berulang. Memakai pause per-project yang sudah ada (AC-15) — operator membukanya dari tempat yang
+ * sama. Idempoten: proyek yang sudah dijeda tak dijeda/dinotifikasi lagi.
+ */
+export async function pauseLeadProject(projectId: string, why: string): Promise<void> {
+  const cfg = await getLead();
+  if (cfg.pausedProjects.includes(projectId)) return;
+  await setLead({ ...cfg, pausedProjects: [...cfg.pausedProjects, projectId] });
+  await recordLeadNotice(`pause:${projectId}:${Date.now()}`, `Lead menjeda ${projectId}: ${why}`, projectId).catch(() => undefined);
 }

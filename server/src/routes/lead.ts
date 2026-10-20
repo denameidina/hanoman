@@ -8,9 +8,14 @@ import { decide, takeDelivery } from "../services/lead/decide";
 import { applyAction } from "../services/lead/apply";
 import { listDecisions, overrideDecision, cancelDecision, toDecisionView } from "../services/lead/trail";
 import { closeFlow, toFlowView, LeadFlowClosedError } from "../services/lead/flow";
-import { LeadBusyError } from "../services/lead/gate";
 import { resetSession } from "../services/lead/detect";
 import { buildLeadStatus, buildLeadDecisions, buildLeadFlows } from "../services/lead/views";
+import { closeEvent, listInboxPage } from "../services/lead/inbox";
+import { decideApproval, listApprovalsPage } from "../services/lead/approvals";
+import { ensureLeadSession, stopLeadSession, rotateLeadSession } from "../services/lead/lead-session";
+import { z } from "zod";
+
+const zLeadApprovalDecide = z.object({ approve: z.boolean(), note: z.string().max(2000).optional() });
 
 // SPEC-409 · ADR-0091 · permukaan HTTP hanoman-lead.
 // SPEC-908 · ADR-0145 · dashboard tak lagi men-poll ketiga endpoint ini: ia berlangganan topik
@@ -123,14 +128,9 @@ export default async function (app: FastifyInstance) {
       // SPEC-485 · 409 · rantai yang sudah ditutup tak menerima pertanyaan lanjutan. Bukan 400
       // (bentuknya sah) dan bukan 404 (alurnya ada, hanya sudah selesai).
       if (e instanceof LeadFlowClosedError) return reply.code(409).send({ error: e.message });
-      if (!(e instanceof LeadBusyError)) throw e;
-      // 503, dan sengaja BUKAN dua kode yang sudah dipakai di sini: 409 berarti "tak ada yang
-      // menjawab, tunggu manusia" (lead mati/dijeda) dan 504 berarti "lead sudah mencoba lalu
-      // kehabisan waktu" — keduanya menyuruh peminta menyerah. Ini kebalikannya: lead sehat,
-      // hanya penuh, dan permintaan yang sama layak dikirim lagi.
-      return reply.code(503)
-        .header("retry-after", String(Math.max(5, cfg.queueWaitSec)))
-        .send({ error: e.message, retryable: true, queued: e.queued });
+      // ADR-0228 · 503 "gerbang penuh" dicabut bersama brain: pertanyaan mengantre di inbox sesi
+      // lead, dan tenggat yang lewat menjawab 504 di bawah (baris `gagal`, diserahkan ke manusia).
+      throw e;
     }
     if (!row) return reply.code(409).send({ error: "lead tidak aktif untuk project ini" });
     // SPEC-480 · kontrak eksplisit tak mengetik ke pane, tapi ia tetap mengambil putusan
@@ -167,6 +167,49 @@ export default async function (app: FastifyInstance) {
 
   // AC-28 · operator menimpa. Keputusan lama → `ditimpa`, jawaban operator jadi yang berlaku, dan
   // bila panenya masih hidup jawaban baru itu DIKETIK ke sesi yang bersangkutan.
+  // ADR-0228 · INBOX sesi lead — dibaca manusia, dan event mana pun boleh DIAMBIL manusia (event
+  // tertutup untuk pane lead; jawaban lead yang datang sesudahnya kalah di penutupan atomik).
+  app.get("/lead/inbox", async (req) =>
+    listInboxPage(req.query as { projectId?: string; status?: string; page?: string; limit?: string }));
+  app.post("/lead/inbox/:id/take", async (req, reply) => {
+    const ok = await closeEvent((req.params as { id: string }).id, "human");
+    return ok ? { ok: true } : reply.code(409).send({ error: "event sudah ditutup atau tak ada" });
+  });
+
+  // ADR-0228 · ANTREAN IZIN. Memutuskan bisa MERGE ke branch target → capability `lead:approve`
+  // (danger, tak diimplikasikan `lead:write`; peta di agent-capabilities.ts).
+  app.get("/lead/approvals", async (req) =>
+    listApprovalsPage(req.query as { projectId?: string; status?: string; page?: string; limit?: string }));
+  app.post("/lead/approvals/:id/decide", async (req, reply) => {
+    const body = zLeadApprovalDecide.safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: body.error.flatten() });
+    const by = req.agent ? `agent:${req.agent.id}` : req.user?.id ? `user:${req.user.id}` : "operator";
+    const v = await decideApproval((req.params as { id: string }).id, { ...body.data, by });
+    return v ?? reply.code(409).send({ error: "izin sudah diputuskan atau tak ada" });
+  });
+
+  // ADR-0228 · pane lead per proyek. Mulai/hentikan/rotasi dari dashboard atau MCP; kelahiran
+  // otomatis tetap milik tick lead (`housekeeping.ts`).
+  app.post("/lead/sessions/:projectId/start", async (req, reply) => {
+    const { projectId } = req.params as { projectId: string };
+    try {
+      const r = await ensureLeadSession(projectId);
+      return r ?? reply.code(409).send({ error: "lead tidak aktif untuk project ini, project belum di-bind, atau pane sedang backoff" });
+    } catch (e) {
+      return reply.code(500).send({ error: `pane lead gagal lahir: ${(e as Error).message}` });
+    }
+  });
+  app.post("/lead/sessions/:projectId/stop", async (req) =>
+    ({ stopped: stopLeadSession((req.params as { projectId: string }).projectId) }));
+  app.post("/lead/sessions/:projectId/rotate", async (req, reply) => {
+    try {
+      const r = await rotateLeadSession((req.params as { projectId: string }).projectId);
+      return r ?? reply.code(409).send({ error: "lead tidak aktif untuk project ini" });
+    } catch (e) {
+      return reply.code(500).send({ error: `pane lead gagal lahir: ${(e as Error).message}` });
+    }
+  });
+
   app.post("/lead/decisions/:id/override", async (req, reply) => {
     const { id } = req.params as { id: string };
     const parsed = zLeadOverride.safeParse(req.body);

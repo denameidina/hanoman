@@ -3,20 +3,19 @@ import {
   isWeightyDecision, leadActionAllowed, leadRefusalReason,
   resolveChoices, normalizeSelect, checkChoiceCount,
   clampProse, optionActionHint, LEAD_DECISION_MAX, LEAD_REASON_MAX,
-  type Agent, type LeadAction, type LeadDelivery, type LeadGate, type LeadKind,
+  type LeadAction, type LeadDelivery, type LeadGate, type LeadKind,
   type LeadSelect,
 } from "@hanoman/shared";
 import { prisma } from "../../db";
 import { resolveRepoDir } from "../local-binding";
 import { listSessions } from "../pty";
 import { recordLeadDecision } from "../notifications";
-import { getLead, leadActive, leadAgentDefaults } from "./config";
+import { getLead, leadActive } from "./config";
 import { leadPrompt, type LeadContext } from "./prompt";
 import { parseLeadVerdict, keepExistingRefs } from "./verdict";
 import { recordDecision } from "./trail";
-import { think as thinkProd } from "./brain";
-import { markDeciding, clearDeciding, markQueued, clearQueued } from "./deciding";
-import { runGated, LeadBusyError } from "./gate";
+import { thinkViaSession, thinkTimeoutMs, type ThinkCtx } from "./session-think";
+import { markDeciding, clearDeciding } from "./deciding";
 import { openFlow, joinFlow, markFlowStep, closeFlow } from "./flow";
 
 // SPEC-409 · ADR-0091 · SATU otak, dua pintu (G6). Baik kontrak eksplisit (pintu #1) maupun deteksi
@@ -44,16 +43,15 @@ export type DecideRequest = {
 };
 
 export type DecideDeps = {
-  think: (prompt: string, o: { agent: Agent; model: string; effort: string; cwd?: string; timeoutMs: number }) => Promise<string>;
-  defaults: () => Promise<{ agent: Agent; model: string; effort: string }>;
+  /** ADR-0228 · otak lead = pane sesi lead (`thinkViaSession`); disuntik supaya teruji tanpa tmux. */
+  think: (prompt: string, o: ThinkCtx) => Promise<string>;
   repoDir: (projectId: string) => Promise<string | null>;
   liveSessions: () => { id: string; projectId: string; specId?: string; flow?: string; branch?: string; exited: boolean }[];
   notify: (decisionId: string, title: string, projectId: string, specId: string | null, sessionId: string | null) => Promise<void>;
 };
 
 export const prodDecideDeps: DecideDeps = {
-  think: thinkProd,
-  defaults: leadAgentDefaults,
+  think: (prompt, o) => thinkViaSession(prompt, o),
   repoDir: resolveRepoDir,
   liveSessions: () => {
     // SPEC-402 · bacaan tmux yang gagal MELEMPAR. Konteks "sesi tetangga" itu pelengkap, bukan
@@ -78,6 +76,41 @@ const notifTitle = (kind: LeadKind, question: string, answer: string, confidence
  * menunggu manusia.
  */
 export async function decide(req: DecideRequest, deps: DecideDeps = prodDecideDeps): Promise<LeadDecision | null> {
+  const p = await prepareDecision(req, deps);
+  if (!p) return null;
+
+  // ADR-0228 · tak ada lagi gerbang konkurensi: proses mahal kini satu pane per proyek yang hidup
+  // terus, dan antreannya adalah inbox (DB), bukan slot in-memory. `markDeciding` tetap dipasang
+  // supaya route terminal tahu sesi pekerja sedang ditunggu jawabannya.
+  let eventId: string | null = null;
+  if (req.sessionId) markDeciding(req.sessionId);
+  let raw: string;
+  try {
+    raw = await deps.think(p.prompt, {
+      projectId: req.projectId, gate: req.gate, kind: req.kind, question: req.question,
+      options: p.options, select: req.select ?? null, sessionId: req.sessionId ?? null,
+      specId: req.specId ?? null, timeoutMs: p.timeoutMs, onEvent: (id) => { eventId = id; },
+    });
+  } catch (e) {
+    const row = await fail(req, deps, `lead tak menghasilkan keputusan: ${(e as Error).message}`, p.flowId, p.step, eventId);
+    return closeAfter(row, p.flowId, req.chain);
+  } finally {
+    if (req.sessionId) clearDeciding(req.sessionId);
+  }
+  return finalizeDecision(p, raw, deps, eventId);
+}
+
+/**
+ * ADR-0228 · separuh PERTAMA `decide()`: semua yang terjadi sebelum otak dipanggil — gerbang aktif,
+ * alur, bukti, prompt. Dipakai juga `post.ts` untuk event denyut yang tak ditunggu siapa pun.
+ * `null` = lead tak aktif untuk project itu.
+ */
+export type PreparedDecision = {
+  req: DecideRequest; flowId: string; step: number; prompt: string; repoDir: string | null;
+  options: string[]; bounds: ReturnType<typeof normalizeSelect>; timeoutMs: number;
+};
+
+export async function prepareDecision(req: DecideRequest, deps: DecideDeps = prodDecideDeps): Promise<PreparedDecision | null> {
   const cfg = await getLead();
   if (!leadActive(cfg, req.projectId)) return null;
 
@@ -111,15 +144,15 @@ export async function decide(req: DecideRequest, deps: DecideDeps = prodDecideDe
 
   const options = req.options ?? [];
   const bounds = normalizeSelect(req.select ?? { mode: "single", min: 0, max: null }, options.length);
+  const timeoutMs = await thinkTimeoutMs(req.projectId, req.gate, req.kind);
 
   const ctx: LeadContext = {
     projectId: req.projectId,
     projectName: project?.name ?? req.projectId,
     repoDir,
-    // SPEC-432 · anggaran yang disebut prompt WAJIB berasal dari cfg yang sama yang dipakai
-    // `think()` di bawah. Dua sumber angka akan berselisih diam-diam begitu operator menggeser
-    // knob-nya, dan agen yang dianggarkan salah gagal persis seperti agen yang tak dianggarkan.
-    timeoutSec: cfg.timeoutSec,
+    // SPEC-432 · anggaran yang disebut prompt WAJIB angka yang sama dengan tenggat sebenarnya.
+    // ADR-0228 · tenggat itu kini milik inbox (`answerSlaSec` / `deliverTimeoutSec`), bukan proses.
+    timeoutSec: Math.round(timeoutMs / 1000),
     spec,
     liveSessions: deps.liveSessions()
       .filter((s) => !s.exited && s.projectId === req.projectId && s.id !== req.sessionId)
@@ -138,48 +171,23 @@ export async function decide(req: DecideRequest, deps: DecideDeps = prodDecideDe
     })),
   };
 
-  const { agent, model, effort } = await deps.defaults();
   const prompt = leadPrompt({ kind: req.kind, question: req.question, options: req.options }, ctx);
+  return { req, flowId: flow.id, step, prompt, repoDir, options, bounds, timeoutMs };
+}
 
-  // SPEC-479 (QA) · GERBANG KONKURENSI. Ia duduk di sini dan hanya di sini: `decide()` sudah jadi
-  // choke point tunggal ketiga pintu (ADR-0091 G6), jadi satu gerbang di atasnya menggantikan tiga
-  // batas yang tak pernah dinyatakan. Menyalinnya ke tiap pintu adalah kelas bug SPEC-431/448/475.
-  //
-  // Yang dibungkus HANYA panggilan agennya, bukan pengumpulan buktinya di atas: bukti itu beberapa
-  // query SQLite, sementara slot yang mahal adalah proses `claude -p`. Mengunci slot selama query
-  // berjalan hanya memperkecil kapasitas tanpa menghemat apa pun.
-  if (req.sessionId) markQueued(req.sessionId);
-  let raw: string;
-  try {
-    raw = await runGated({ capacity: cfg.maxConcurrent, waitMs: cfg.queueWaitSec * 1000 }, async () => {
-      if (req.sessionId) { clearQueued(req.sessionId); markDeciding(req.sessionId); }
-      try {
-        return await deps.think(prompt, { agent, model, effort, cwd: repoDir ?? undefined, timeoutMs: cfg.timeoutSec * 1000 });
-      } finally {
-        if (req.sessionId) clearDeciding(req.sessionId);
-      }
-    });
-  } catch (e) {
-    // `LeadBusyError` DILEWATKAN apa adanya — ia bukan kegagalan lead melainkan backpressure, dan
-    // menuliskannya sebagai baris `gagal` justru membangun kembali cacat C: pagar SPEC-472 akan
-    // membacanya sebagai sebab permanen lalu menutup sesi itu selamanya lewat `failCapped`. Enam
-    // call site menanganinya sendiri-sendiri; lihat komentar masing-masing.
-    if (e instanceof LeadBusyError) {
-      // SPEC-485 · alur yang terlanjur dibuka untuk permintaan yang DITOLAK gerbang tak boleh
-      // menggantung. Ia ditutup sebagai `kedaluwarsa` (bukan `tunggal`): tak satu langkah pun
-      // pernah dijalankan di dalamnya, dan peminta memang disuruh mencoba lagi dari awal.
-      if (!req.flowId) await closeFlow(flow.id, "kedaluwarsa").catch(() => null);
-      throw e;
-    }
-    return closeAfter(await fail(req, deps, `lead tak menghasilkan keputusan: ${(e as Error).message}`, flow.id, step), flow.id, req.chain);
-  } finally {
-    if (req.sessionId) clearQueued(req.sessionId);
-  }
-
+/**
+ * ADR-0228 · separuh KEDUA `decide()`: dari keluaran otak sampai baris jejak + notifikasi. Dipakai
+ * juga `post.ts` saat event denyut dijawab pane atau izinnya disetujui manusia.
+ */
+export async function finalizeDecision(
+  p: PreparedDecision, raw: string, deps: DecideDeps = prodDecideDeps, eventId: string | null = null,
+): Promise<LeadDecision> {
+  const { req, repoDir, options, bounds, step } = p;
+  const flow = { id: p.flowId };
   const verdict = parseLeadVerdict(raw);
   // AC-22 melarang keraguan berakhir tanpa keputusan; ini kasus LAIN — agen tak mengembalikan
   // bentuk yang bisa dibaca sama sekali. Menebak isinya lebih berbahaya daripada jatuh ke manusia.
-  if (!verdict) return closeAfter(await fail(req, deps, "keluaran lead tak memuat blok json keputusan yang sah", flow.id, step), flow.id, req.chain);
+  if (!verdict) return closeAfter(await fail(req, deps, "keluaran lead tak memuat blok json keputusan yang sah", flow.id, step, eventId), flow.id, req.chain);
 
   const refs = keepExistingRefs(verdict.refs, repoDir);
   const allowed = leadActionAllowed(verdict.action);
@@ -255,7 +263,7 @@ export async function decide(req: DecideRequest, deps: DecideDeps = prodDecideDe
     refs, confidence, action, weighty,
     choice: choice?.option ?? null, choiceIndex: choice?.index ?? null,
     choices, select: bounds, flowId: flow.id, step,
-    options, missing,
+    options, missing, eventId,
   });
   // SPEC-485 · alur diurus SESUDAH barisnya ditulis, di satu tempat untuk jalur sukses maupun
   // gagal (`closeAfter`). Alur tunggal ditutup apa pun status barisnya: baris `gagal` di dalam alur
@@ -311,7 +319,7 @@ export function takeDelivery(decisionId: string): LeadDelivery | null {
  */
 async function fail(
   req: DecideRequest, deps: DecideDeps, reason: string,
-  flowId: string | null = null, step: number | null = null,
+  flowId: string | null = null, step: number | null = null, eventId: string | null = null,
 ): Promise<LeadDecision> {
   const prev = await prisma.leadDecision.findFirst({
     where: { projectId: req.projectId, gate: req.gate, kind: req.kind },
@@ -323,7 +331,7 @@ async function fail(
     answer: "", reason, refs: [], confidence: "ragu", action: "none",
     // SPEC-485 · langkah yang gagal tetap duduk di alurnya: alur yang seluruh langkahnya gagal
     // harus tetap terbaca sebagai satu urusan, bukan sebagai baris yatim.
-    flowId, step,
+    flowId, step, eventId,
     status: "gagal", weighty: true,
   });
   if (prev?.status !== "gagal") {

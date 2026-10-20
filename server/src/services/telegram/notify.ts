@@ -1,6 +1,6 @@
 import { effectiveStr } from "../../config";
 import { getSetting as getSettingReal } from "../settings";
-import { TelegramApiClient, type TelegramTransport } from "./client";
+import { TelegramApiClient, type TelegramInlineKeyboardMarkup, type TelegramTransport } from "./client";
 import { sanitizeTelegramOutput } from "./protocol";
 
 /**
@@ -57,6 +57,42 @@ export function decisionMessage(push: DecisionPush, origin: string | null): stri
  * pemanggil/test bisa mengamati tanpa mengandalkan efek samping jaringan.
  */
 export async function pushDecisionToTelegram(push: DecisionPush, deps: DecisionPushDeps = {}): Promise<number> {
+  return pushToAllowlist((origin) => ({ text: decisionMessage(push, origin) }), deps);
+}
+
+/**
+ * ADR-0228 · tindakan hanoman-lead yang menunggu izin. Toggle yang sama (`notifyDecisionTelegram`)
+ * — "sesuatu menunggu keputusanmu" bagi operator adalah satu kategori. Tombolnya `tgla:<id>:…`,
+ * ditangani gateway percakapan; bila gateway mati, tautan dashboard tetap ada di pesannya.
+ */
+export type ApprovalPush = { id: string; title: string; reason: string; report: string[] };
+
+export function approvalMessage(push: ApprovalPush, origin: string | null): string {
+  const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+  return [
+    "Lead minta izin",
+    clip(push.title, TITLE_MAX),
+    `Alasan: ${clip(push.reason, 600)}`,
+    ...(push.report.length ? [`Gerbang: ${clip(push.report.join("; "), 600)}`] : []),
+    ...(origin ? [`${origin}/lead`] : []),
+  ].join("\n");
+}
+
+export async function pushApprovalToTelegram(push: ApprovalPush, deps: DecisionPushDeps = {}): Promise<number> {
+  return pushToAllowlist((origin) => ({
+    text: approvalMessage(push, origin),
+    replyMarkup: { inline_keyboard: [[
+      { text: "Setujui", callback_data: `tgla:${push.id}:approve` },
+      { text: "Tolak", callback_data: `tgla:${push.id}:deny` },
+    ]] },
+  }), deps);
+}
+
+/** Satu jalur kirim untuk kedua push: bot token + allowlist, timeout, galat per penerima dicatat. */
+async function pushToAllowlist(
+  build: (origin: string | null) => { text: string; replyMarkup?: TelegramInlineKeyboardMarkup },
+  deps: DecisionPushDeps,
+): Promise<number> {
   try {
     const read = deps.read ?? effectiveStr;
     const setting = await (deps.getSetting ?? getSettingReal)();
@@ -69,9 +105,9 @@ export async function pushDecisionToTelegram(push: DecisionPush, deps: DecisionP
     const timer = setTimeout(() => controller.abort(), deps.timeoutMs ?? SEND_TIMEOUT_MS);
     const send = deps.transport ?? ((url: string, init?: RequestInit) => fetch(url, init));
     const client = new TelegramApiClient(botToken, (url, init) => send(url, { ...init, signal: controller.signal }));
-    const text = decisionMessage(push, deps.origin === undefined ? dashboardOrigin() : deps.origin);
+    const msg = build(deps.origin === undefined ? dashboardOrigin() : deps.origin);
     try {
-      const results = await Promise.allSettled(ids.map((chatId) => client.sendMessage({ chatId, text })));
+      const results = await Promise.allSettled(ids.map((chatId) => client.sendMessage({ chatId, ...msg })));
       let sent = 0;
       for (const [i, r] of results.entries()) {
         if (r.status === "fulfilled") { sent++; continue; }

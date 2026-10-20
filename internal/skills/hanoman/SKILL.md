@@ -922,6 +922,26 @@ Pakai skill lebih sempit saat task cocok:
   `goalChunks` (burst ≥1024 char → `[Pasted Content]` SENYAP, ADR-0085); rujukan disaring terhadap
   repo (path absolut & `..` ditolak); dan marker sesi **codex** menyala juga saat selesai wajar
   (ADR-0074) → `services/lead/pane.ts` bias ke DIAM.
+- **Lead = sesi interaktif per proyek, dibatasi gerbang server** ([ADR-0228](../../docs/adr/0228-lead-sesi-interaktif-gerbang-server.md),
+  **menggantikan otak sekali-panggil di atas**; `brain.ts`, `gate.ts`, knob `timeoutSec`/`maxConcurrent`/
+  `queueWaitSec`, dan 503 "gerbang penuh" sudah TAK ADA). Satu pane `lead-<proyek>` (kind `lead`,
+  `launchClass: "terminal"` → tak makan slot) di worktree baca `.worktrees/lead-<proyek>`; manusia bisa
+  attach/mengetik. `DecideDeps.think` = `thinkViaSession` (`lead/session-think.ts`): prompt `leadPrompt`
+  → `LeadEvent` (inbox DB, `lead/inbox.ts`) → kurir (`lead/courier.ts`) menulis batch ke
+  `$HANOMAN_HOME/lead-batches/<proyek>/` dan mengetik SATU baris penunjuk saat pane diam (hook Stop) &
+  manusia tak mengetik 120 dtk → pane memeriksa `GET /api/lead-pane/brief` lalu menjawab
+  `POST /api/lead-pane/act` (HMAC token sesi, COOKIE_ONLY). Pintu kontrak/deteksi MENUNGGU (tenggat
+  `answerSlaSec`, lewat → baris `gagal`, jatuh ke manusia); pintu denyut **tanpa penunggu**
+  (`lead/post.ts`), dieksekusi saat `act`/izin — tick tak pernah menunggu pane. Tiap `act` lewat
+  `lead/guard.ts` (allowlist → aturan objektif → wewenang `auto/ask/off` per proyek; teks sensitif →
+  izin) + `lead/budget.ts` (jatah = min(slot, host ADR-0161, kuota < `quotaStopPct`, ramp); pemutus
+  `failStreak` menjeda proyek). `integrate-main` diperketat (`apply.ts`): worktree bersih,
+  `verifyCommand` DIJALANKAN server, `targetBranch` per proyek, mutex per proyek; `verifyCommand`
+  kosong ⇒ selalu minta izin. Izin = `LeadApproval` (UI + Telegram `tgla:<id>:…`, capability danger
+  **`lead:approve`**); kedaluwarsa = ditolak. **Gotcha:** kolam tanya `ASK_POOL` (8) BUKAN 2 — batas
+  kecil membuat pertanyaan paralel mengantre di `ask.ts` sehingga batch pane tak pernah terisi;
+  `sendToPane` meratakan baris & memotong 1 KB, jadi batch DITULIS KE BERKAS, bukan diketik; rotasi
+  hanya di `onLeadStop` saat inbox kosong (rotasi di tengah giliran memutus batch).
 - **Runtime/model/effort lead punya permukaan operator** (SPEC-488, tanpa ADR — skema `Setting`
   tak berubah): blok `Setting.lead.engine` `{enabled,agent,model,effort}` ada sejak ADR-0091 dan
   `leadAgentDefaults()` sudah menyalurkannya ke `decide()` → `think()` → `leadArgv()`, tetapi
@@ -975,7 +995,8 @@ Pakai skill lebih sempit saat task cocok:
   pane selesai dari cap menukar antrean mandek dengan **pane menumpuk tanpa batas** dan menutup
   terminal tanpa keputusan siapa pun; yang benar adalah menutup panenya. Konsekuensi: selama
   `Setting.lead.enabled` mati (default) perilakunya **tak berubah** — operator yang menutup sesinya.
-- **`services/lead/brain.ts` adalah titik spawn agen KEDUA — satu-satunya di luar `pty.ts`**
+- **[SEJARAH — `brain.ts` dicabut ADR-0228; pane lead lahir lewat `createSession` di `pty.ts`]**
+  **`services/lead/brain.ts` adalah titik spawn agen KEDUA — satu-satunya di luar `pty.ts`**
   (SPEC-448, tanpa ADR — QA; ADR-0091 ditegakkan, ADR-0037 utuh). Konsekuensinya mengikat: **setiap
   pelajaran spawn yang sudah dibayar di `pty.ts` harus dibayar ulang di sini**, dan sampai spec ini
   tak ada satu pun test yang menjalankannya (`lead-decide.test.ts` menyuntik `think` sebagai stub).
@@ -1137,7 +1158,8 @@ Pakai skill lebih sempit saat task cocok:
   snapshot sesinya diambil **sekali** di awal loop, dan urutan `tmux list-panes -a` **stabil** →
   ekor daftar selalu di ekor: **kelaparan yang bisa direproduksi**, bukan antrean lambat. M1 (median
   ≤ 2 mnt) pecah di **N=5** pada keputusan tercepat terukur dan **N=2** pada anggaran penuh.
-  Perbaikannya satu gerbang penerimaan **FIFO** (`services/lead/gate.ts`, kapasitas
+  Perbaikannya [SEJARAH — gerbang ini dicabut ADR-0228; antreannya kini inbox sesi lead + `ASK_POOL`]
+  satu gerbang penerimaan **FIFO** (`services/lead/gate.ts`, kapasitas
   `lead.maxConcurrent` default **2**, deadline `lead.queueWaitSec` default **120** — keduanya di
   kolom `Json`, tanpa migration) dipasang di choke point yang **sudah tunggal**, `decide()`; FIFO
   bukan gaya melainkan syarat, sebab gerbang "siapa cepat" di atas urutan tmux yang stabil
@@ -1363,7 +1385,8 @@ Pakai skill lebih sempit saat task cocok:
   dan lapis 2 lenyap; (6) nama tool yang dibuang senyap **aman** karena membuang hanya mengurangi
   kemampuan; (7) `"customAgent"` wajib ikut `PG_ORDER` + seluruh kolomnya di `FIELDS.customAgent`.
   Domain capability **baru `agents`**, dipetakan **menurut method** (kelas bug SPEC-405). **Bukan**
-  titik spawn agen baru — `services/lead/brain.ts` tetap satu-satunya di luar `pty.ts` (SPEC-448).
+  titik spawn agen baru — `services/lead/brain.ts` tetap satu-satunya di luar `pty.ts` (SPEC-448;
+  `brain.ts` sendiri dicabut ADR-0228 — kini `pty.ts` satu-satunya).
   **Gotcha native SPEC-950:** `--dangerously-bypass-hook-trust` Codex sudah datang dari
   `agentFlags()` dan wajib muncul **tepat sekali** — jangan menambahkannya lagi di materializer;
   Codex menolak flag duplikat dan pane mati sebelum TUI. Test read-only juga wajib mengeksekusi

@@ -10,6 +10,8 @@ export type AcceptedTelegramInput = {
   callbackQueryId?: string;
   callbackToken?: string;
   callbackAction?: "approve" | "deny";
+  /** ADR-0228 · tombol izin hanoman-lead (`tgla:<approvalId>:approve|deny`). */
+  leadApprovalId?: string;
 };
 
 export type TelegramUpdateResult =
@@ -33,6 +35,13 @@ export function parseConfirmationCallback(data: string): { token: string; action
   if (data.length > 64) return null;
   const match = data.match(/^tgcf:([A-Za-z0-9_-]{1,40}):(approve|deny)$/);
   return match ? { token: match[1]!, action: match[2] as "approve" | "deny" } : null;
+}
+
+/** ADR-0228 · `tgla:<approvalId>:approve|deny` — tombol izin tindakan hanoman-lead. */
+export function parseLeadApprovalCallback(data: string): { approvalId: string; action: "approve" | "deny" } | null {
+  if (data.length > 64) return null;
+  const match = data.match(/^tgla:([A-Za-z0-9_-]{1,40}):(approve|deny)$/);
+  return match ? { approvalId: match[1]!, action: match[2] as "approve" | "deny" } : null;
 }
 
 export function parseTelegramUpdate(update: unknown, allowlist: ReadonlySet<string>, maxText = 12_000): TelegramUpdateResult {
@@ -61,6 +70,16 @@ export function parseTelegramUpdate(update: unknown, allowlist: ReadonlySet<stri
   if (callback) {
     const callbackQueryId = typeof callback.id === "string" ? callback.id : "";
     const data = typeof callback.data === "string" ? callback.data : "";
+    const lead = parseLeadApprovalCallback(data);
+    if (callbackQueryId && lead) {
+      return {
+        ok: true,
+        input: {
+          updateId, chatId, userId, messageId, kind: "callback", text: data,
+          callbackQueryId, callbackAction: lead.action, leadApprovalId: lead.approvalId,
+        },
+      };
+    }
     const parsed = parseConfirmationCallback(data);
     if (!callbackQueryId || !parsed) return { ok: false, updateId, reason: "invalid-callback", chatId, userId };
     return {

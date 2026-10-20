@@ -33,6 +33,8 @@ export const ASK_QUEUE_MAX = 8;
  * Dua cukup untuk dua panggilan yang tiba tertukar; lebih dari itu dialognya memang tak tampil.
  */
 export const ASK_MISMATCH_MAX = 2;
+/** ADR-0228 · berapa sesi pekerja boleh sekaligus menunggu jawaban pane lead (lihat `run`). */
+export const ASK_POOL = 8;
 
 type Item = { ask: SessionAsk; ctx: AskCtx; skips: number };
 
@@ -100,7 +102,7 @@ export const prodAskDeps: AskDeps = {
     try { return (await listSessionsAsync()).filter((s) => !s.exited).map((s) => s.id); }
     catch { return [...entries.keys()]; }
   },
-  maxConcurrent: async () => (await getLead()).maxConcurrent,
+  maxConcurrent: async () => ASK_POOL,
   now: Date.now,
 };
 
@@ -163,7 +165,7 @@ export async function intakeAsk(
   const bucket = perSession.get(input.sessionId) ?? { tokens: ASK_BUCKET.capacity, at: now };
   perSession.set(input.sessionId, bucket);
   // Batas laju SEBELUM pagar: ditolak karena ramai tak boleh menulis baris jejak maupun
-  // menotifikasi — ia hilang dengan menunggu, persis seperti `LeadBusyError` (SPEC-479).
+  // menotifikasi — ia hilang dengan menunggu (SPEC-479).
   if (!take(bucket, ASK_BUCKET, now) || !take(global, GLOBAL_BUCKET, now))
     return { status: "rate-limited" };
 
@@ -227,10 +229,11 @@ async function prune(deps: AskDeps): Promise<void> {
   }
 }
 
-// Kolam pekerja: batas yang SAMA dengan `runPool(ready, cfg.maxConcurrent)` yang digantikannya —
-// yang berubah cuma umur antreannya, bukan angkanya. Satu rantai dialog mem-poll pane sampai 20×
-// per langkah dan `tmux()` memblokir event loop 6,28 ms per panggilan; fan-out tanpa batas menukar
-// kelaparan dengan server yang tersendat.
+// Kolam pekerja. Satu rantai dialog mem-poll pane sampai 20× per langkah dan `tmux()` memblokir
+// event loop 6,28 ms per panggilan; fan-out tanpa batas menukar kelaparan dengan server yang
+// tersendat. ADR-0228 · batasnya bukan lagi `lead.maxConcurrent` (proses brain, dicabut): pekerja
+// kini sebagian besar MENUNGGU jawaban pane lead di inbox, dan batas 2 akan membuat pertanyaan
+// sesi paralel mengantre di sini sehingga batch pane lead tak pernah terisi.
 let inFlight = 0;
 const waiting: string[] = [];
 

@@ -90,11 +90,12 @@ describe("leadPrompt · putusan ringkas & terstruktur (SPEC-480)", () => {
   });
 });
 
-describe("LEAD_DEFAULTS.timeoutSec (audit SPEC-432)", () => {
-  // 120 dtk bukan angka yang terlalu kecil sedikit — ia lebih kecil daripada ongkos terukur SATU
-  // keputusan nyata (306 dtk), jadi tiap keputusan pasti gagal, bukan kadang-kadang.
-  it("is larger than the measured cost of one real decision (306 s)", () => {
-    expect(LEAD_DEFAULTS.timeoutSec).toBeGreaterThan(306);
+describe("tenggat lead (audit SPEC-432 · ADR-0228)", () => {
+  // SPEC-432 · satu keputusan nyata terukur 306 dtk; tenggat yang lebih kecil membuat tiap keputusan
+  // pasti gagal. ADR-0228 · tenggatnya kini milik inbox, tapi ukurannya tetap harus di atas itu
+  // untuk keputusan denyut (dua kali `deliverTimeoutSec`).
+  it("gives pulse decisions more than the measured cost of one real decision (306 s)", () => {
+    expect(LEAD_DEFAULTS.deliverTimeoutSec * 2).toBeGreaterThan(306);
   });
 });
 

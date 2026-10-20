@@ -212,6 +212,7 @@ describe("tingkat mode", () => {
 const DANGER_CAPS = new Set([
   "sessions:spawn", "ide:git", "backlog:lifecycle", "vps:exec", "qa:delete", "sessions:decide", "telegram:admin",
   "access:admin", "remote:control", "relay:exec", "sync:resolve", "instance:admin",
+  "lead:approve",   // ADR-0228
 ]);
 
 // Tool DESTRUKTIF yang capability-nya tetap `:write` — bukan karena ringan, melainkan karena tak
@@ -235,6 +236,10 @@ const DESTRUCTIVE_BUT_WRITE = new Set<string>([
   // sesi baru — menahannya di sini akan salah alamat. `integrate` sesi sama halnya.
   "hanoman_session_close", "hanoman_session_history_purge", "hanoman_session_integrate",
   "hanoman_agent_delete", "hanoman_lead_flow_submit",
+  // ADR-0228 · melahirkan/menghentikan/merotasi pane lead menggerakkan sebuah agen hidup, tapi
+  // domain `lead` hanya punya `lead:approve` sebagai pecahan danger — dan menyetujui tindakan
+  // lead bukan hal yang sama dengan menyalakan pane-nya.
+  "hanoman_lead_session_start", "hanoman_lead_session_stop", "hanoman_lead_session_rotate",
   "hanoman_ticket_delete", "hanoman_notifications_clear",
   // Mengirim pesan ke MANUSIA di luar hanoman: tak ada undo, tapi domainnya tak punya
   // pecahan `danger`.
@@ -299,5 +304,26 @@ describe("mode ⇔ capability", () => {
 
   it("tool memori project dan changelog tidak lagi ditawarkan", () => {
     expect(MCP_TOOLS.filter((t) => /^hanoman_(memory|changelog)_/.test(t.name))).toEqual([]);
+  });
+});
+
+// ADR-0228 · permukaan sesi lead untuk manusia & agen eksternal.
+describe("katalog MCP · sesi lead (ADR-0228)", () => {
+  it("menawarkan inbox, izin, dan kendali pane lead dengan tingkat & capability yang benar", () => {
+    expect(byName("hanoman_lead_inbox")).toMatchObject({ mode: "read", capability: "lead:read" });
+    expect(byName("hanoman_lead_inbox_take")).toMatchObject({ mode: "write", capability: "lead:write" });
+    expect(byName("hanoman_lead_approvals_list")).toMatchObject({ mode: "read", capability: "lead:read" });
+    expect(byName("hanoman_lead_approval_decide")).toMatchObject({ mode: "danger", capability: "lead:approve" });
+    for (const op of ["start", "stop", "rotate"])
+      expect(byName(`hanoman_lead_session_${op}`)).toMatchObject({ mode: "danger", capability: "lead:write" });
+  });
+  it("membangun request yang tepat", () => {
+    expect(byName("hanoman_lead_approval_decide").build({ approval: "a 1", approve: true, note: "ok" }))
+      .toEqual({ method: "POST", path: "/lead/approvals/a%201/decide", body: { approve: true, note: "ok" } });
+    expect(byName("hanoman_lead_approval_decide").build({ approval: "a1", approve: "ya" })?.body).toEqual({ approve: false });
+    expect(byName("hanoman_lead_session_rotate").build({ project: "erp" })).toEqual({ method: "POST", path: "/lead/sessions/erp/rotate" });
+  });
+  it("tak pernah membungkus permukaan pane lead", () => {
+    expect(MCP_TOOLS.filter((t) => t.samplePath.startsWith("/lead-pane"))).toEqual([]);
   });
 });

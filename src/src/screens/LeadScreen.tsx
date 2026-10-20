@@ -13,7 +13,11 @@ import type { ConfirmOptions, FilterChip } from "../ds";
 import { api } from "../api/client";
 import { useLiveTopic } from "../api/live";
 import { AGENT_RUNTIME_LABELS } from "@hanoman/shared";
-import type { Lead, LeadStatusView, LeadDecisionView, LeadFlowView } from "@hanoman/shared";
+import type { Lead, LeadStatusView, LeadDecisionView, LeadFlowView, LeadEventView } from "@hanoman/shared";
+import { LeadApprovalsPanel } from "./lead/LeadApprovalsPanel";
+import { LeadInboxPanel } from "./lead/LeadInboxPanel";
+import { LeadSessionsPanel, type LeadSessionOp } from "./lead/LeadSessionsPanel";
+import { LeadAuthorityPanel } from "./lead/LeadAuthorityPanel";
 import type { ProjectVM } from "./types";
 import { usePersistedState, useResetOnChange, ResetViewButton, isStr, isNum, oneOf } from "../ui-state";
 import { failureMessage } from "../lib/report-error";
@@ -48,12 +52,13 @@ const FLOW_TONE: Record<string, Tone> = {
 const FLOW_OPEN = new Set(["menunggu", "sebagian"]);
 
 // Pengaturan lead sebagai draft string: input angka boleh kosong saat diketik.
-type SettingsDraft = { everyMin: string; timeoutSec: string; maxAutoAnswers: string; requireGreen: boolean };
+// ADR-0228 · `timeoutSec` (proses brain) dan `requireGreenBeforeIntegrate` (tak lagi melonggarkan
+// jalur lead) tak ditampilkan lagi; tenggat & syarat integrasi kini per project di panel Wewenang.
+type SettingsDraft = { everyMin: string; maxAutoAnswers: string };
 const toDraft = (c: Lead): SettingsDraft => ({
-  everyMin: String(c.everyMin), timeoutSec: String(c.timeoutSec),
-  maxAutoAnswers: String(c.maxAutoAnswers), requireGreen: c.requireGreenBeforeIntegrate,
+  everyMin: String(c.everyMin), maxAutoAnswers: String(c.maxAutoAnswers),
 });
-const EMPTY_DRAFT: SettingsDraft = { everyMin: "5", timeoutSec: "600", maxAutoAnswers: "3", requireGreen: true };
+const EMPTY_DRAFT: SettingsDraft = { everyMin: "5", maxAutoAnswers: "3" };
 
 /* Pager sumber tunggal (keputusan atau rangkaian) — rentang & total eksak. */
 function LeadPager({ total, page, onPage, unit }:
@@ -411,9 +416,7 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
     const next: Lead = {
       ...cfg,
       everyMin: clampNumber(settings.draft.everyMin, 1, 1440, cfg.everyMin),
-      timeoutSec: clampNumber(settings.draft.timeoutSec, 10, 900, cfg.timeoutSec),
       maxAutoAnswers: clampNumber(settings.draft.maxAutoAnswers, 1, 20, cfg.maxAutoAnswers),
-      requireGreenBeforeIntegrate: settings.draft.requireGreen,
     };
     // Kolom yang dikosongkan kembali ke nilai tersimpan: tak ada yang berubah, jadi tak ada tulisan.
     if (JSON.stringify(toDraft(next)) === JSON.stringify(toDraft(cfg))) { settings.setDraft(toDraft(cfg)); return; }
@@ -458,6 +461,55 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
     } catch (e) { onToast(failureMessage("menutup rangkaian", e), "err", "x-circle"); }
     finally { setBusyId(null); }
   }, [load, onToast]);
+
+  // ADR-0228 · sesi lead: izin, ambil alih event, dan kendali pane. Datanya datang lewat frame `lead`.
+  const decideApproval = React.useCallback(async (id: string, approve: boolean, note?: string) => {
+    setBusyId(id);
+    try {
+      await api.decideLeadApproval(id, approve, note);
+      onToast(approve ? "Tindakan lead disetujui" : "Penolakan dikirim ke lead", "ok", "check");
+      load(true);
+    } catch (e) { onToast(failureMessage(approve ? "menyetujui tindakan lead" : "menolak tindakan lead", e), "err", "x-circle"); }
+    finally { setBusyId(null); }
+  }, [load, onToast]);
+
+  const takeEvent = React.useCallback(async (ev: LeadEventView) => {
+    setBusyId(ev.id);
+    try {
+      await api.takeLeadEvent(ev.id);
+      onToast("Event diambil alih — lead tak akan menjawabnya", "ok", "check");
+      load(true);
+      if (ev.sessionId) onGotoTerminal(ev.sessionId);
+    } catch (e) { onToast(failureMessage("mengambil alih event", e), "err", "x-circle"); }
+    finally { setBusyId(null); }
+  }, [load, onToast, onGotoTerminal]);
+
+  const sessionOp = React.useCallback(async (projectId: string, op: LeadSessionOp) => {
+    setBusyId(`session:${projectId}`);
+    try {
+      await api.leadSession(projectId, op);
+      onToast(op === "start" ? "Sesi lead dimulai" : op === "stop" ? "Sesi lead dihentikan" : "Sesi lead dirotasi", "ok", "check");
+      load(true);
+    } catch (e) { onToast(failureMessage("mengendalikan sesi lead", e), "err", "x-circle"); }
+    finally { setBusyId(null); }
+  }, [load, onToast]);
+
+  const askSessionOp = (projectId: string, op: LeadSessionOp) => {
+    if (op === "start") { void sessionOp(projectId, op); return; }
+    void confirm(op === "stop"
+      ? {
+        title: "Hentikan sesi lead?", eyebrow: "lead · sesi",
+        message: "Pertanyaan sesi pekerja jatuh ke kamu sampai sesi lead lahir lagi. Lead melahirkannya kembali saat ada event baru — jeda project untuk benar-benar berhenti.",
+        confirmLabel: "Hentikan sesi lead", icon: "ban", tone: "danger",
+        run: () => sessionOp(projectId, op),
+      }
+      : {
+        title: "Rotasi sesi lead?", eyebrow: "lead · sesi",
+        message: "Sesi lead dihentikan lalu dilahirkan lagi dengan konteks bersih. Keputusan & inbox tersimpan di server, jadi tak ada yang hilang.",
+        confirmLabel: "Rotasi", icon: "refresh-cw", tone: "default",
+        run: () => sessionOp(projectId, op),
+      });
+  };
 
   const runCancelDecision = React.useCallback(async (id: string) => {
     setBusyId(id);
@@ -517,6 +569,10 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
   const mode: Mode = !state.config.enabled ? "mati" : state.config.paused ? "jeda" : "aktif";
   const optIn = new Set(state.projects.map((p) => p.projectId));
   const waiting = state.waiting;
+  // ADR-0228 · `?? []`: dashboard bisa lebih baru daripada server.
+  const inbox = state.inbox ?? [];
+  const approvals = state.approvals ?? [];
+  const sessions = state.sessions ?? [];
   const deciding = new Set(state.deciding);
   // SPEC-479 · `queued`/`gate` punya default di `zLeadStatusView`, tapi respons instance lama bisa tanpa keduanya.
   const queued = new Set(state.queued ?? []);
@@ -550,11 +606,17 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
   return (
     <div className="hn-lead">
       <p className="hn-lead-summary">
-        Lead {MODE_LABEL[mode]} · {waiting.length} menunggu kamu · {queued.size} antre
+        Lead {MODE_LABEL[mode]} · {approvals.length} minta izin · {waiting.length} menunggu kamu · {inbox.length} di inbox
       </p>
 
       <div className="hn-lead-layout">
         <div className="hn-lead-main">
+          {/* ADR-0228 · izin lebih dulu: tindakan lead yang tertahan tak jalan sampai kamu memutuskan. */}
+          <section className="hn-lead-section" aria-labelledby="lead-izin-h">
+            <h2 id="lead-izin-h" className="hn-lead-h">Menunggu izinmu ({approvals.length})</h2>
+            <LeadApprovalsPanel approvals={approvals} projectName={projectName} busyId={busyId} onDecide={(id, ok, note) => void decideApproval(id, ok, note)} />
+          </section>
+
           <section className="hn-lead-section" aria-labelledby="lead-menunggu-h">
             <h2 id="lead-menunggu-h" className="hn-lead-h">Menunggu kamu ({waiting.length})</h2>
             {gate.queued > 0 && (
@@ -577,6 +639,12 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
                     );
                   })}
                 </ul>}
+          </section>
+
+          <section className="hn-lead-section" aria-labelledby="lead-inbox-h">
+            <h2 id="lead-inbox-h" className="hn-lead-h">Inbox sesi lead ({inbox.length})</h2>
+            <p className="hn-lead-hint">Yang sedang diputuskan sesi lead. Ambil alih bila kamu ingin memutuskannya sendiri.</p>
+            <LeadInboxPanel events={inbox} projectName={projectName} busyId={busyId} onTake={(e) => void takeEvent(e)} onGoto={onGotoTerminal} />
           </section>
 
           <section className="hn-lead-section" aria-labelledby="lead-riwayat-h">
@@ -640,6 +708,18 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
             </Callout>
           </section>
 
+          <section className="hn-lead-section" aria-labelledby="lead-sesi-h">
+            <h2 id="lead-sesi-h" className="hn-lead-h">Sesi lead</h2>
+            <p className="hn-lead-hint">Satu sesi per project. Buka terminalnya untuk melihat dan mengarahkan lead langsung.</p>
+            <LeadSessionsPanel sessions={sessions} projectName={projectName} busyId={busyId} onGoto={onGotoTerminal} onOp={askSessionOp} />
+          </section>
+
+          <details className="hn-lead-disclosure">
+            <summary>Wewenang & jatah per project</summary>
+            <LeadAuthorityPanel config={state.config} busy={busy} onSave={(next) => writeConfig(next)}
+              projects={projects.filter((p) => optIn.has(p.id)).map((p) => ({ id: p.id, name: p.name }))} />
+          </details>
+
           <details className="hn-lead-disclosure">
             <summary>Project yang dipimpin · {optIn.size} dari {projects.length} diurus lead</summary>
             <p className="hn-lead-hint">Lead hanya menyentuh project yang diserahkan kepadanya. Default: tidak diserahkan.</p>
@@ -678,22 +758,10 @@ export function LeadScreen({ projects, onProjectChanged, onToast, onGotoTerminal
                     value={settings.draft.everyMin} disabled={!cfg}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => settings.setDraft({ ...settings.draft, everyMin: e.target.value })} />
                 </Field>
-                <Field label="Batas waktu keputusan (detik)" hint="10–900. Lewat dari ini, keputusan gagal.">
-                  <Input type="number" min={10} max={900} aria-label="batas waktu keputusan (detik)" placeholder="mis. 600"
-                    value={settings.draft.timeoutSec} disabled={!cfg}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => settings.setDraft({ ...settings.draft, timeoutSec: e.target.value })} />
-                </Field>
                 <Field label="Jawaban berulang per pertanyaan (maks)" hint="1–20. Bila pertanyaan yang sama terus kembali sesudah dijawab sebanyak ini, pertanyaan itu diserahkan ke kamu. Pertanyaan berbeda tak dihitung.">
                   <Input type="number" min={1} max={20} aria-label="maksimum jawaban berulang per pertanyaan" placeholder="mis. 3"
                     value={settings.draft.maxAutoAnswers} disabled={!cfg}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => settings.setDraft({ ...settings.draft, maxAutoAnswers: e.target.value })} />
-                </Field>
-                <Field label="Syarat integrasi ke main" hint="Berlaku untuk integrasi yang diputuskan lead.">
-                  <Select size="sm" aria-label="syarat integrasi ke main"
-                    value={settings.draft.requireGreen ? "wajib" : "bebas"}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                      settings.setDraft({ ...settings.draft, requireGreen: e.target.value === "wajib" })}
-                    options={[{ value: "wajib", label: "plan harus tuntas dulu" }, { value: "bebas", label: "tanpa syarat" }]} />
                 </Field>
               </div>
               {/* SPEC-488 · mesin yang MENJALANKAN lead. `?.` disengaja: dashboard bisa lebih baru daripada server. */}

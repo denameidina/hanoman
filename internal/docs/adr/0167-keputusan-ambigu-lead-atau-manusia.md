@@ -1,6 +1,9 @@
 # ADR-0167 — Keputusan ambigu selalu ditanyakan: lead bila aktif, selain itu manusia
 
 **Status:** diterima · 2026-09-19 · tanpa nomor SPEC (dikerjakan langsung atas permintaan operator).
+**Diamandemen [ADR-0228](0228-lead-sesi-interaktif-gerbang-server.md)** (2026-10-20): "lead bila aktif"
+kini berarti sesi lead proyek itu, dengan tenggat `answerSlaSec`; pertanyaan yang tak terjawab dalam
+tenggat (atau saat pane lead mati/proyek dijeda) jatuh ke manusia.
 **Mengamandemen** SPEC-298 (arti `scheduler.autonomy = full-control`) dan
 [0164](0164-orkestrasi-subagent-per-fase.md) (kontrak laporan agen fase & langkah 4 relay orchestrator).
 **Menegakkan** [0146](0146-lead-dipicu-event-hook.md) & [0091](0091-hanoman-lead-agen-pemimpin.md) (lead sebagai

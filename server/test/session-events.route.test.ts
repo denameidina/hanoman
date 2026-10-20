@@ -25,7 +25,13 @@ const PANE: Record<string, unknown> = {
           { name: "hanoman-fase-plan", phase: "Plan", model: "claude-sonnet-5", effort: "low", definitionHash: "b".repeat(64) },
         ] },
   dead: { id: "dead", projectId: "p1", exited: true, agent: "claude", cwd: "/w" },
+  "lead-p1": { id: "lead-p1", projectId: "p1", exited: false, agent: "claude", cwd: "/repo/.worktrees/lead-p1" },
 };
+const { leadStops } = vi.hoisted(() => ({ leadStops: [] as string[] }));
+vi.mock("../src/services/lead/courier", async (orig) => ({
+  ...(await orig<typeof import("../src/services/lead/courier")>()),
+  onLeadStop: vi.fn(async (id: string) => { leadStops.push(id); return "idle"; }),
+}));
 vi.mock("../src/services/pty", async (orig) => ({
   ...(await orig<typeof import("../src/services/pty")>()),
   getSession: vi.fn((id: string) => PANE[id]),
@@ -65,6 +71,24 @@ beforeEach(async () => {
   await setLead({ ...LEAD_DEFAULTS, enabled: true });
 });
 afterAll(clean);
+
+// ADR-0228 · pane lead: Stop membangunkan kurir; pertanyaan pane lead tak pernah masuk inbox lead.
+describe("POST /api/session-events · pane lead", () => {
+  it("Stop dari pane lead menandai pane diam lewat kurir", async () => {
+    leadStops.length = 0;
+    const r = await post(buildApp(), { hook_event_name: "Stop" }, auth("lead-p1"));
+    expect(r.statusCode).toBe(202);
+    expect(r.json()).toEqual({ lead: true });
+    expect(leadStops).toEqual(["lead-p1"]);
+  });
+  it("AskUserQuestion dari pane lead tak menjadi keputusan lead", async () => {
+    leadStops.length = 0;
+    const r = await post(buildApp(), CLAUDE, auth("lead-p1"));
+    expect(r.statusCode).toBe(202);
+    expect(leadStops).toEqual([]);
+    expect(await prisma.leadDecision.count()).toBe(0);
+  });
+});
 
 describe("POST /api/session-events", () => {
   it("menerima event bertoken sah", async () => {

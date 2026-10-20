@@ -10,14 +10,21 @@ import { LEAD_DEFAULTS } from "@hanoman/shared";
 import { capabilityForRoute, checkAgentCapability } from "../src/services/agent-capabilities";
 import { setLead } from "../src/services/lead/config";
 import { recordDecision } from "../src/services/lead/trail";
-import { runGated, __resetLeadGate } from "../src/services/lead/gate";
+import { markDeciding, clearDeciding } from "../src/services/lead/deciding";
+import { ASK_POOL } from "../src/services/lead/ask";
+import { openEvent } from "../src/services/lead/inbox";
+import { createApproval } from "../src/services/lead/approvals";
 
 // SPEC-409 · ADR-0091 · permukaan HTTP hanoman-lead.
 
-// SPEC-480 · agen lead disuntik di titik spawn-nya (`brain.think`) — satu-satunya jalan menguji
-// jalur 201 tanpa men-spawn `claude -p` sungguhan. `leadOutput` diganti per test.
-const { leadOutput } = vi.hoisted(() => ({ leadOutput: { raw: "" } }));
-vi.mock("../src/services/lead/brain", () => ({ think: async () => leadOutput.raw }));
+// SPEC-480 · otak lead disuntik di titiknya — ADR-0228: `thinkViaSession` (pane sesi lead) —
+// satu-satunya jalan menguji jalur 201 tanpa pane tmux sungguhan. `leadOutput` diganti per test;
+// Error = pane tak menjawab dalam tenggat.
+const { leadOutput } = vi.hoisted(() => ({ leadOutput: { raw: "" as string | Error } }));
+vi.mock("../src/services/lead/session-think", async (orig) => ({
+  ...(await orig<typeof import("../src/services/lead/session-think")>()),
+  thinkViaSession: async () => { if (leadOutput.raw instanceof Error) throw leadOutput.raw; return leadOutput.raw; },
+}));
 
 const app = buildApp();
 const clean = async () => {
@@ -33,7 +40,6 @@ const clean = async () => {
 };
 beforeEach(async () => {
   await clean();
-  __resetLeadGate();
   await prisma.project.create({ data: { id: "demo", name: "Demo", desc: "", kind: "web", leadOptIn: true } });
 });
 afterAll(clean);
@@ -139,50 +145,30 @@ describe("POST /api/lead/decisions (pintu #1)", () => {
     expect(r.json().need).toBe("lead:write");
   });
 
-  // SPEC-479 (QA) · pintu ini tak punya pengereman apa pun sebelumnya: terukur 12 permintaan
-  // bersamaan → 12 proses `claude -p --effort xhigh` sekaligus. Sekarang ia mengantre, dan antrean
-  // yang penuh menjawab EKSPLISIT alih-alih menggantung.
-  it("503 + Retry-After saat gerbang penuh — bukan 409 (lead mati) dan bukan 504 (sudah mencoba)", async () => {
+  // ADR-0228 · 503 "gerbang penuh" dicabut bersama brain: pertanyaan kini mengantre di inbox
+  // sesi lead, dan tenggat yang lewat menjawab 504 (baris `gagal`, jatuh ke manusia).
+  it("504 saat sesi lead tak menjawab dalam tenggat", async () => {
     const cookie = await login();
-    await setLead({ ...LEAD_DEFAULTS, enabled: true, maxConcurrent: 1, queueWaitSec: 0 });
-
-    let release!: () => void;
-    const held = new Promise<void>((r) => { release = r; });
-    const occupied = runGated({ capacity: 1, waitMs: 5_000 }, async () => { await held; });
-    await new Promise((r) => setTimeout(r, 5));
-
+    await setLead({ ...LEAD_DEFAULTS, enabled: true });
+    leadOutput.raw = new Error("sesi lead tak menjawab dalam 300 dtk — diserahkan ke manusia");
     const r = await app.inject({ method: "POST", url: "/api/lead/decisions", headers: { cookie },
       payload: { projectId: "demo", question: "pakai kolom baru?" } });
-    expect(r.statusCode).toBe(503);
-    expect(Number(r.headers["retry-after"])).toBeGreaterThan(0);
-    // Peminta harus TAHU bahwa ini layak diulang — itu bedanya dengan 409/504.
-    expect(r.json().retryable).toBe(true);
-    // Dan tak ada baris `gagal` yang menyesatkan jejak operator (temuan C).
-    expect(await prisma.leadDecision.count()).toBe(0);
-
-    release();
-    await occupied;
+    expect(r.statusCode).toBe(504);
+    expect(r.json().error).toContain("manusia");
   });
 });
 
-describe("GET /api/lead/status · gerbang konkurensi (SPEC-479)", () => {
-  it("melaporkan berapa yang sedang disusun dan berapa yang mengantre", async () => {
+describe("GET /api/lead/status · antrean pertanyaan (SPEC-479, ADR-0228)", () => {
+  it("melaporkan sesi yang menunggu pane lead dan kapasitas kolam tanya", async () => {
     const cookie = await login();
-    await setLead({ ...LEAD_DEFAULTS, enabled: true, maxConcurrent: 1 });
-
-    let release!: () => void;
-    const held = new Promise<void>((r) => { release = r; });
-    const occupied = runGated({ capacity: 1, waitMs: 5_000 }, async () => { await held; });
-    await new Promise((r) => setTimeout(r, 5));
-
-    const r = await app.inject({ method: "GET", url: "/api/lead/status", headers: { cookie } });
-    expect(r.statusCode).toBe(200);
-    // Batas yang tak terlihat operator akan terbaca lagi sebagai "lead diam" — persis salah baca
-    // yang melahirkan tiket ini.
-    expect(r.json().gate).toEqual({ inFlight: 1, queued: 0, capacity: 1 });
-
-    release();
-    await occupied;
+    await setLead({ ...LEAD_DEFAULTS, enabled: true });
+    markDeciding("s1");
+    try {
+      const r = await app.inject({ method: "GET", url: "/api/lead/status", headers: { cookie } });
+      expect(r.statusCode).toBe(200);
+      expect(r.json().gate).toEqual({ inFlight: 1, queued: 0, capacity: ASK_POOL });
+      expect(r.json()).toMatchObject({ inbox: [], approvals: [] });
+    } finally { clearDeciding("s1"); }
   });
 });
 
@@ -475,5 +461,38 @@ describe("SPEC-485 · pilihan jamak & rantai (HTTP)", () => {
     expect(capabilityForRoute("POST", "/api/lead/flows/x/submit")).toBe("lead:write");
     expect(checkAgentCapability(["lead:read"], "POST", "/api/lead/flows/x/submit"))
       .toMatchObject({ ok: false, need: "lead:write" });
+  });
+});
+
+// ADR-0228 · inbox & antrean izin untuk manusia.
+describe("inbox & izin lead (ADR-0228)", () => {
+  const payload = { prompt: "p", gate: "pulse" as const, leadKind: "quality" as const, options: [], select: null };
+  beforeEach(async () => { await prisma.leadApproval.deleteMany(); await prisma.leadEvent.deleteMany(); });
+
+  it("GET /lead/inbox berpaginasi; POST take menutup event sekali", async () => {
+    const cookie = await login();
+    const e = await openEvent({ projectId: "demo", kind: "ask", question: "q", payload });
+    const list = await app.inject({ method: "GET", url: "/api/lead/inbox?projectId=demo", headers: { cookie } });
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toMatchObject({ total: 1, items: [{ id: e.id, status: "open" }] });
+    const take = () => app.inject({ method: "POST", url: `/api/lead/inbox/${e.id}/take`, headers: { cookie } });
+    expect((await take()).statusCode).toBe(200);
+    expect((await take()).statusCode).toBe(409);
+  });
+
+  it("POST /lead/approvals/:id/decide: 400 bentuk salah, 200 sekali, 409 kedua kali", async () => {
+    const cookie = await login();
+    const e = await openEvent({ projectId: "demo", kind: "session-ended", question: "q", payload });
+    const { id } = await createApproval({ eventId: e.id, projectId: "demo", target: null, report: [],
+      act: { eventId: e.id, evidence: [], verdict: { decision: "d", reason: "r", refs: [], confidence: "tinggi", action: "none", choice: "", choices: [], missing: [], reply: "" } } },
+      { notice: async () => {}, push: async () => 0 });
+    const decide = (payload: object) => app.inject({ method: "POST", url: `/api/lead/approvals/${id}/decide`, headers: { cookie }, payload });
+    expect((await decide({ approve: "ya" })).statusCode).toBe(400);
+    const ok = await decide({ approve: false, note: "nanti" });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toMatchObject({ status: "rejected", note: "nanti" });
+    expect((await decide({ approve: true })).statusCode).toBe(409);
+    const list = await app.inject({ method: "GET", url: "/api/lead/approvals?status=rejected", headers: { cookie } });
+    expect(list.json().total).toBe(1);
   });
 });
