@@ -2481,7 +2481,7 @@ Opsi `followUpComplete` menjadi:
 ```
 (`target` = `leadProjectConfig(cfg, s.projectId).targetBranch`; ganti kata "main" di pertanyaan dengan `target`). `followUpFinished` mendapat opsi tambahan `"stop-session — hentikan; worktree utuh"`. Integrasi gagal → event `integrate-failed` dibuka oleh `executeEventVerdict` (Task 7b), bukan oleh `pulse`.
 
-- [ ] **Step 1: Test gagal** — tambah ke `server/test/lead-pulse.test.ts` (harness pulse yang ada sudah menyuntik `decide`, `enqueue`, `sessions`; tambahkan `budget`, `pauseProject`):
+- [x] **Step 1: Test gagal** — tambah ke `server/test/lead-pulse.test.ts` (harness pulse yang ada sudah menyuntik `decide`, `enqueue`, `sessions`; tambahkan `budget`, `pauseProject`):
 
 ```ts
 describe("denyut berbasis jatah (ADR-0228)", () => {
@@ -2519,8 +2519,8 @@ describe("denyut berbasis jatah (ADR-0228)", () => {
 
 Ganti dep `decide`/`decideDeps` di `PulseDeps` dengan `post: typeof postDecision` dan `openPosted: typeof hasOpenPosted`; harness merekam `posted` (request yang dikirim). Sesuaikan nama field dengan `server/test/lead-pulse.test.ts` yang ada (baca dulu). Penolakan "memilih melebihi jatah" diuji di `lead-act.test.ts` (Task 10); enqueue hanya-pilihan diuji di `lead-post.test.ts` (Task 7b). Hapus test lama yang mengunci "minimal dua item", "sisa masuk antrean di belakang", dan `apply` yang dipanggil dari dalam `pulse`.
 
-- [ ] **Step 2: Jalankan → FAIL.**
-- [ ] **Step 3: Implementasi** sesuai uraian di atas. Hapus `lastReadySig`/`__resetPulse` (perbarui pemanggil test). `prodPulseDeps.budget = (p) => launchBudget(p)`; `prodPulseDeps.pauseProject`:
+- [x] **Step 2: Jalankan → FAIL.**
+- [x] **Step 3: Implementasi** sesuai uraian di atas. Hapus `lastReadySig`/`__resetPulse` (perbarui pemanggil test). `prodPulseDeps.budget = (p) => launchBudget(p)`; `prodPulseDeps.pauseProject`:
 
 ```ts
   pauseProject: async (projectId, why) => {
@@ -2531,8 +2531,8 @@ Ganti dep `decide`/`decideDeps` di `PulseDeps` dengan `post: typeof postDecision
   },
 ```
 
-- [ ] **Step 4: Test → PASS** (`server/test/lead-pulse.test.ts server/test/lead-engine.test.ts`).
-- [ ] **Step 5: Commit** `feat(lead): denyut memilih ≤ jatah backlog, pemutus beruntun mem-pause proyek, integrasi gagal jadi event`
+- [x] **Step 4: Test → PASS** (`server/test/lead-pulse.test.ts server/test/lead-engine.test.ts`).
+- [x] **Step 5: Commit** `feat(lead): denyut memilih ≤ jatah backlog, pemutus beruntun mem-pause proyek, integrasi gagal jadi event`
 
 ### Task 13: Engine tick + route sesi lead + MCP + capability
 

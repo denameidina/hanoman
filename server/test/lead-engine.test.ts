@@ -30,11 +30,10 @@ function counters() {
   const clock = { t: 0 };
   const pulse = {
     sessions: () => [], areas: async () => [], planDone: () => true, finished: () => false,
-    decide: (async () => null) as unknown as PulseDeps["decide"],
-    decideDeps: {} as PulseDeps["decideDeps"],
-    apply: (async () => ({ ok: true, detail: "" })) as unknown as PulseDeps["apply"],
-    enqueue: async () => { /* diam */ },
-    notify: async () => { /* diam */ },
+    post: async () => null,
+    openPosted: async () => false,
+    budget: async () => ({ n: 0, reasons: [], tripped: false }),
+    pauseProject: async () => { /* diam */ },
     optIn: async () => { c.pulse++; return []; },
     cfg: async () => cfg(),
     scheduler: async () => SCHEDULER_DEFAULTS,

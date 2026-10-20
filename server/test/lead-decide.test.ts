@@ -216,7 +216,8 @@ describe("decide · otak sesi lead (ADR-0228)", () => {
       think: async () => { await held; return block({ decision: "a", reason: "b" }); },
     };
     const first = decide({ ...ask, sessionId: "s1" }, holder);
-    await new Promise((r) => setTimeout(r, 5));
+    // `prepareDecision` membaca DB lebih dulu — tunggu sampai penandanya terpasang, jangan jeda tetap.
+    for (let i = 0; i < 200 && decidingIds().length === 0; i++) await new Promise((r) => setTimeout(r, 5));
     expect(decidingIds()).toEqual(["s1"]);
     release();
     await first;
