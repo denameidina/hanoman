@@ -5,6 +5,7 @@ import { pruneAsks } from "./ask";
 import { expireFlows } from "./flow";
 import { recordLeadDecision, recordLegacySession } from "../notifications";
 import { liveDecisionsAsync } from "../live-phases";
+import { leadSessionHousekeeping } from "./housekeeping";
 
 // SPEC-409 · ADR-0091 · SPEC-909 · ADR-0146 · irama hanoman-lead.
 //
@@ -54,6 +55,8 @@ export type LeadTickDeps = {
   /** SPEC-909 · pemangkas penghitung sesi mati — pengganti `sweep()` yang dulu ikut pemindaian. */
   prune?: () => void;
   cfg?: () => Promise<Lead>;
+  /** ADR-0228 · rumah tangga sesi lead (inbox, izin, pane, kurir). */
+  sessions?: (now: number, cfg: Lead) => Promise<void>;
 };
 
 /**
@@ -106,6 +109,11 @@ export async function tick(now: number, deps: LeadTickDeps = {}): Promise<void> 
     }
     (deps.prune ?? pruneAsks)();
   })().catch((e) => { console.error("lead legacy:", e); }));
+
+  // ADR-0228 · sesi lead: sapu tenggat & izin, hidupkan/rotasi pane, antar batch tertunda. Pause
+  // tetap menyapu (menutup bukan memutuskan) tapi tak menghidupkan pane maupun mengantar.
+  jobs.push((deps.sessions ?? leadSessionHousekeeping)(now, cfg)
+    .catch((e) => { console.error("lead sesi:", e); }));
 
   // Rem darurat: denyut proaktif ikut diam saat Pause.
   if (!cfg.paused && !busyPulse && now - Math.max(lastPulseAt, pulseEndedAt) >= cfg.everyMin * 60_000) {

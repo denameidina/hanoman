@@ -139,6 +139,10 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // melahirkan baris jejak permanen dan keputusannya bisa menggerakkan sesi. Capability baca tak
   // pernah cukup untuk memanggilnya (AC-5) — `rw()` sudah menurunkannya dari method, jadi tak ada
   // pengulangan kelas bug SPEC-405 (prefix status yang dipetakan ke GLOBAL_READ tanpa lihat method).
+  // ADR-0228 · memutuskan izin lead bisa MERGE ke branch target — capability danger tersendiri,
+  // bukan `lead:write`: pane lead & agen peminta putusan memegang write, dan mereka tak boleh
+  // menyetujui tindakannya sendiri (ADR-0192). Dicocokkan ke panjang segmen + method persis.
+  if (top === "lead" && method === "POST" && seg.length === 4 && seg[1] === "approvals" && seg[3] === "decide") return "lead:approve";
   if (top === "lead") return rw("lead");
   // SPEC-450 · ADR-0094 keputusan 8 · dipetakan MENURUT METHOD, bukan prefix (kelas bug SPEC-405):
   // menulis definisi agen mengubah apa yang dilihat SETIAP sesi baru di seluruh workspace.

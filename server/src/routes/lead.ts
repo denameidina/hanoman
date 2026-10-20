@@ -13,6 +13,7 @@ import { resetSession } from "../services/lead/detect";
 import { buildLeadStatus, buildLeadDecisions, buildLeadFlows } from "../services/lead/views";
 import { closeEvent, listInboxPage } from "../services/lead/inbox";
 import { decideApproval, listApprovalsPage } from "../services/lead/approvals";
+import { ensureLeadSession, stopLeadSession, rotateLeadSession } from "../services/lead/lead-session";
 import { z } from "zod";
 
 const zLeadApprovalDecide = z.object({ approve: z.boolean(), note: z.string().max(2000).optional() });
@@ -191,6 +192,28 @@ export default async function (app: FastifyInstance) {
     const by = req.agent ? `agent:${req.agent.id}` : req.user?.id ? `user:${req.user.id}` : "operator";
     const v = await decideApproval((req.params as { id: string }).id, { ...body.data, by });
     return v ?? reply.code(409).send({ error: "izin sudah diputuskan atau tak ada" });
+  });
+
+  // ADR-0228 · pane lead per proyek. Mulai/hentikan/rotasi dari dashboard atau MCP; kelahiran
+  // otomatis tetap milik tick lead (`housekeeping.ts`).
+  app.post("/lead/sessions/:projectId/start", async (req, reply) => {
+    const { projectId } = req.params as { projectId: string };
+    try {
+      const r = await ensureLeadSession(projectId);
+      return r ?? reply.code(409).send({ error: "lead tidak aktif untuk project ini, project belum di-bind, atau pane sedang backoff" });
+    } catch (e) {
+      return reply.code(500).send({ error: `pane lead gagal lahir: ${(e as Error).message}` });
+    }
+  });
+  app.post("/lead/sessions/:projectId/stop", async (req) =>
+    ({ stopped: stopLeadSession((req.params as { projectId: string }).projectId) }));
+  app.post("/lead/sessions/:projectId/rotate", async (req, reply) => {
+    try {
+      const r = await rotateLeadSession((req.params as { projectId: string }).projectId);
+      return r ?? reply.code(409).send({ error: "lead tidak aktif untuk project ini" });
+    } catch (e) {
+      return reply.code(500).send({ error: `pane lead gagal lahir: ${(e as Error).message}` });
+    }
   });
 
   app.post("/lead/decisions/:id/override", async (req, reply) => {

@@ -2550,7 +2550,7 @@ Ganti dep `decide`/`decideDeps` di `PulseDeps` dengan `post: typeof postDecision
   - Peta capability: `GET /lead/approvals`, `GET /lead/inbox` → `lead:read`; `POST /lead/approvals/:id/decide` → `lead:approve`; `POST /lead/inbox/:id/take` → `lead:write`; `POST /lead/sessions/*` → `lead:write`.
   - MCP tools: `hanoman_lead_inbox` (read, `lead:read`), `hanoman_lead_approvals_list` (read, `lead:read`), `hanoman_lead_approval_decide` (danger, `lead:approve`), `hanoman_lead_inbox_take` (write, `lead:write`), `hanoman_lead_session_start`/`_stop`/`_rotate` (danger, `lead:write`).
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
   - `lead-engine.test.ts`: tick memanggil sweep inbox & approval sekali per tick (suntik deps); 3 kegagalan lahir → proyek masuk `pausedProjects`.
   - `agent-capabilities.test.ts`:
 
@@ -2566,9 +2566,9 @@ it("ADR-0228 · route lead baru dipetakan per method", () => {
 
   - `mcp-catalog.test.ts`: tambah ketujuh nama ke daftar tool lead yang dikunci; `hanoman_lead_approval_decide` `mode: "danger"`, capability `lead:approve`.
 
-- [ ] **Step 2: Jalankan → FAIL.**
+- [x] **Step 2: Jalankan → FAIL.**
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
   - `agent-capabilities.ts`: prefix `lead` saat ini dipetakan ke `lead:read`/`lead:write` (`:140`). Tambah sebelum pemetaan umum itu:
 
 ```ts
@@ -2640,8 +2640,8 @@ it("ADR-0228 · route lead baru dipetakan per method", () => {
 
   `pauseLeadProject` = fungsi yang sama dengan `prodPulseDeps.pauseProject` (Task 12) — ekstrak ke `lead/config.ts` sebagai `pauseLeadProject(projectId, why)` dan pakai di kedua tempat. Pastikan `engine.ts` mengimpor `./courier` dan `./approvals` (memasang hook `setEventOpenedHook`/`setCreateApproval` saat start).
 
-- [ ] **Step 4: Test → PASS.**
-- [ ] **Step 5: Commit** `feat(lead): engine menyapu inbox/izin & menghidupkan pane lead; route sesi, MCP & capability lead:approve`
+- [x] **Step 4: Test → PASS.**
+- [x] **Step 5: Commit** `feat(lead): engine menyapu inbox/izin & menghidupkan pane lead; route sesi, MCP & capability lead:approve`
 
 ---
 

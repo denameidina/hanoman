@@ -34,7 +34,7 @@ const CORE: readonly McpToolDef[] = [
     name: "hanoman_lead_ask",
     title: "Minta putusan hanoman-lead",
     description:
-      "Minta putusan ke hanoman-lead saat menemui persimpangan yang biasanya butuh manusia. Jawabannya terbaca mesin (`decision`, `reason`, `refs`, `confidence`, `action`, `choices`) dan `refs` hanya memuat rujukan yang benar-benar ada di repo. Bila opsinya TIDAK saling eksklusif, set `multi: true` — balasannya memuat `choices` (daftar), bukan hanya `choice`. Panggilan ini melahirkan jejak permanen dan putusannya bisa menggerakkan sesi — pakai hanya saat memang buntu. 409 = lead tak aktif atau proyek belum opt-in: kembali ke perilaku biasa, berhenti dan tunggu manusia; 400 = bentuk `multi`/`minChoices`/`maxChoices` mustahil dipenuhi oleh daftar opsi yang kamu kirim.",
+      "Minta putusan ke hanoman-lead saat menemui persimpangan yang biasanya butuh manusia. Pertanyaanmu masuk inbox sesi lead proyek itu dan dijawab pane lead setelah ia memeriksa; panggilan ini MENUNGGU sampai dijawab atau tenggat `answerSlaSec` proyek (default 300 dtk). Jawabannya terbaca mesin (`decision`, `reason`, `refs`, `confidence`, `action`, `choices`) dan `refs` hanya memuat rujukan yang benar-benar ada di repo. Bila opsinya TIDAK saling eksklusif, set `multi: true` — balasannya memuat `choices` (daftar), bukan hanya `choice`. Panggilan ini melahirkan jejak permanen dan putusannya bisa menggerakkan sesi — pakai hanya saat memang buntu. 409 = lead tak aktif atau proyek belum opt-in: berhenti dan tunggu manusia; 504 = sesi lead tak menjawab dalam tenggat (diserahkan ke manusia); 400 = bentuk `multi`/`minChoices`/`maxChoices` mustahil dipenuhi oleh daftar opsi yang kamu kirim.",
     inputSchema: obj({
       properties: {
         project: str("Id proyek."),
@@ -188,4 +188,86 @@ const MORE: readonly McpToolDef[] = [
   },
 ];
 
-export const LEAD_TOOLS: readonly McpToolDef[] = [...CORE, ...MORE];
+// ADR-0228 · sesi lead: inbox, antrean izin, dan pane lead per proyek. Pane lead sendiri TIDAK
+// memakai MCP — ia bertindak lewat /api/lead-pane/* ber-token sesi (COOKIE_ONLY di peta capability).
+const listParams = {
+  project: str("Saring menurut id proyek."),
+  status: str("Saring menurut status."),
+  page: int("Halaman, mulai 1.", { minimum: 1 }),
+  limit: int("Item per halaman.", { minimum: 1, maximum: 100 }),
+};
+const listQuery = (a: Record<string, unknown>) =>
+  query({ projectId: s(a.project), status: s(a.status), page: n(a.page)?.toString(), limit: n(a.limit)?.toString() });
+
+const SESSION: readonly McpToolDef[] = [
+  {
+    name: "hanoman_lead_inbox",
+    title: "Inbox sesi lead",
+    description:
+      "Event yang diantarkan ke sesi hanoman-lead, terbaru dulu: pertanyaan sesi pekerja (`ask`), sesi selesai/gagal (`session-ended`), pilihan backlog (`pulse`), penolakan manusia (`rejected`), integrasi gagal (`integrate-failed`). `status`: `open` (menunggu diantar), `delivered` (sudah di pane lead), `done`, `late` (lewat tenggat → manusia), `human` (diambil manusia).",
+    inputSchema: obj({ properties: listParams }),
+    mode: "read", capability: "lead:read",
+    samplePath: "/lead/inbox", sampleMethod: "GET",
+    build: (a) => ({ method: "GET", path: "/lead/inbox", query: listQuery(a) }),
+    shape: (raw) => raw,
+  },
+  {
+    name: "hanoman_lead_inbox_take",
+    title: "Ambil alih event lead",
+    description:
+      "Mengambil satu event inbox dari sesi lead supaya MANUSIA yang memutuskannya. Jawaban lead yang datang sesudahnya ditolak server. Event yang sudah ditutup menjawab 409.",
+    inputSchema: obj({ properties: { event: str("Id event, dari hanoman_lead_inbox.") }, required: ["event"] }),
+    mode: "write", capability: "lead:write",
+    samplePath: "/lead/inbox/e1/take", sampleMethod: "POST",
+    build: (a) => ({ method: "POST", path: `/lead/inbox/${enc(String(a.event))}/take` }),
+    shape: (raw) => raw,
+  },
+  {
+    name: "hanoman_lead_approvals_list",
+    title: "Tindakan lead yang menunggu izin",
+    description:
+      "Tindakan hanoman-lead yang ditahan gerbang server menunggu izin manusia (mis. merge ke branch target, jawaban yang menyentuh produksi/kredensial). Tiap kartu membawa `reason` lead, `evidence` yang ia periksa, dan `gateReport` dari server. `status`: `pending`, `approved`, `rejected`, `expired` (kedaluwarsa = ditolak).",
+    inputSchema: obj({ properties: listParams }),
+    mode: "read", capability: "lead:read",
+    samplePath: "/lead/approvals", sampleMethod: "GET",
+    build: (a) => ({ method: "GET", path: "/lead/approvals", query: listQuery(a) }),
+    shape: (raw) => raw,
+  },
+  {
+    name: "hanoman_lead_approval_decide",
+    title: "Setujui/tolak tindakan lead (BERBAHAYA)",
+    description:
+      "BERBAHAYA — menyetujui atau menolak tindakan hanoman-lead yang menunggu izin. Menyetujui MENJALANKAN tindakan itu apa adanya, termasuk merge branch sesi ke branch target (server tetap menjalankan verifikasinya lebih dulu). Baca dulu kartunya lewat hanoman_lead_approvals_list. Penolakan dikirim balik ke lead beserta `note`. Izin yang sudah diputuskan menjawab 409. Butuh capability `lead:approve`. Hanya muncul saat tingkat `--danger` menyala.",
+    inputSchema: obj({
+      properties: {
+        approval: str("Id izin, dari hanoman_lead_approvals_list."),
+        approve: bool("`true` = setujui, `false` = tolak."),
+        note: str("Opsional. Catatan untuk lead, maksimum 2000 karakter."),
+      },
+      required: ["approval", "approve"],
+    }),
+    mode: "danger", capability: "lead:approve",
+    samplePath: "/lead/approvals/a1/decide", sampleMethod: "POST",
+    build: (a) => ({
+      method: "POST", path: `/lead/approvals/${enc(String(a.approval))}/decide`,
+      body: { approve: a.approve === true, ...(s(a.note) ? { note: a.note } : {}) },
+    }),
+    shape: (raw) => raw,
+  },
+  ...(["start", "stop", "rotate"] as const).map((op): McpToolDef => ({
+    name: `hanoman_lead_session_${op}`,
+    title: op === "start" ? "Mulai sesi lead (BERBAHAYA)" : op === "stop" ? "Hentikan sesi lead (BERBAHAYA)" : "Rotasi sesi lead (BERBAHAYA)",
+    description: op === "start"
+      ? "BERBAHAYA — melahirkan pane `lead-<proyek>` (agen hidup yang menjawab pertanyaan sesi pekerja, memilih backlog, dan memutuskan nasib sesi yang selesai). 409 = lead tak aktif/proyek belum opt-in atau belum di-bind, atau pane sedang backoff sesudah gagal lahir. Hanya muncul saat tingkat `--danger` menyala."
+      : op === "stop"
+        ? "BERBAHAYA — menghentikan pane lead proyek. Pertanyaan sesi pekerja jatuh ke manusia sampai pane lahir lagi (tick lead melahirkannya kembali bila inbox berisi dan lead tak dijeda — jeda proyeknya untuk benar-benar menghentikan). Hanya muncul saat tingkat `--danger` menyala."
+        : "BERBAHAYA — menghentikan pane lead lalu melahirkannya lagi dengan konteks bersih (state ada di DB). Event yang sedang diproses dikembalikan ke inbox oleh sapuan. Hanya muncul saat tingkat `--danger` menyala.",
+    inputSchema: obj({ properties: { project: str("Id proyek.") }, required: ["project"] }),
+    mode: "danger", capability: "lead:write",
+    samplePath: `/lead/sessions/p1/${op}`, sampleMethod: "POST",
+    build: (a) => ({ method: "POST", path: `/lead/sessions/${enc(String(a.project))}/${op}` }),
+    shape: (raw) => raw,
+  })),
+];
+
+export const LEAD_TOOLS: readonly McpToolDef[] = [...CORE, ...MORE, ...SESSION];

@@ -52,6 +52,10 @@ const UNWRAPPED = new Map<string, string>([
   ["GET /terminal/workspace", "tata letak tab/pane BROWSER per akun (req.user.id); agent token tak punya req.user"],
   ["PUT /terminal/workspace", "tata letak tab/pane BROWSER per akun (req.user.id); agent token tak punya req.user"],
   ["POST /session-events", "kredensial = token HMAC turunan per sesi (header x-hanoman-session), bukan agent token; gate cookie mem-bypass-nya dan agent token dijawab 401 (SPEC-909/ADR-0146)"],
+  // ADR-0228 · permukaan pane lead — token HMAC sesi yang sama; meniru "pane lead proyek X" adalah
+  // peniruan identitas, bukan capability. Manusia/agen memakai /lead/inbox & /lead/approvals.
+  ["GET /lead-pane/brief", "hanya pane lead `lead-<proyek>` (token HMAC per sesi, ADR-0228); agen eksternal memakai hanoman_lead_status / hanoman_lead_inbox"],
+  ["POST /lead-pane/act", "hanya pane lead `lead-<proyek>` (token HMAC per sesi, ADR-0228); manusia/agen memutuskan lewat hanoman_lead_inbox_take & hanoman_lead_approval_decide"],
   // ADR-0199 §3 · kanal sync MESIN-KE-MESIN. Semuanya COOKIE_ONLY di peta capability (jadi gerbang
   // di atas tak menuntutnya), dan dicatat di sini supaya alasannya terbaca: auth-nya Bearer
   // DEVICE-TOKEN (atau tiket WS) yang ditegakkan route-nya sendiri. Agent token BUKAN device token —
