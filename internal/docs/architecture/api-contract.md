@@ -315,7 +315,12 @@ POST /specs/batch         { project, items:[BreakdownItem], branchFrom?, prdPath
 #   bukan diri sendiri → 400 dengan alasannya. Siklus mustahil di POST (spec baru belum bisa dirujuk).
 #   SPEC-761 · launchApprovedAt/By hanya diisi bila principal adalah cookie admin atau AgentToken
 #   dengan `sessions:write`; capability backlog/settings/projects sendiri membuat Spec TIDAK approved.
-PATCH /specs/:id          { branchFrom?: string|null, stage?, confirmDelete?, dependsOn?, autoMerge? }   -> Spec
+PATCH /specs/:id          { branchFrom?: string|null, stage?, confirmDelete?, dependsOn?, autoMerge?, projectId? }   -> Spec
+#   `projectId` = pindah backlog ke project lain. Ikut gerbang edit konten (SPEC-186): hanya selagi
+#   stage `brainstorming` & belum dimulai, else 409. Project tujuan tak ada → 400. Branch asal & dependency
+#   dikosongkan (terikat repo project asal); 409 bila backlog lain bergantung padanya (akan jadi dependency
+#   lintas project, ditolak ADR-0093). `SpecAttachment.projectId` (denormal) ikut pindah, satu transaksi.
+#   Tool MCP: `hanoman_backlog_update.projectId`.
 #   branchFrom null = kembali ke default project (main); menentukan basis sesi BERIKUTNYA. Lihat ADR-0032.
 #   stage = revert backward-only atas perintah human (SPEC-167/ADR-0027): 422 bila maju/sama,
 #   400 bila stage tak dikenal. Bila mundur menghapus artefak docs & confirmDelete≠true →

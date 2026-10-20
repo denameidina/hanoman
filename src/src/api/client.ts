@@ -303,7 +303,7 @@ export function createApi(o: { base?: string } = {}) {
     j<{ status: "clean"; detail: string } | { status: "conflict"; sessionId: string }>(
       paths.specIntegrate(id), { method: "POST", ...body({ op, target }) }),
   patchSpec: (id: string, b: { branchFrom?: string | null; stage?: string; confirmDelete?: boolean;
-    title?: string; priority?: string; payload?: unknown;
+    title?: string; priority?: string; payload?: unknown; projectId?: string;
     dependsOn?: string[];   // SPEC-447 · ADR-0093 · divalidasi server (400 bila tak sah)
     autoMerge?: AutoMerge | null }) =>   // SPEC-486 · ADR-0103 · null = kembali ikut project
     j<Spec | RevertPending>(paths.spec(id), { method: "PATCH", ...body(b) }),

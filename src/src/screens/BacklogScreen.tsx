@@ -218,8 +218,9 @@ type ItemActions = {
   running?: boolean;
 };
 
-function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, onRequestDelete, onUndoable, projectPolicy, allSpecs, onAttachmentToast, running, onOpenRun, projectName, presenceOn }:
+function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, onOpenReview, onStart, onIntegrate, onEditSpec, onPromoteToQa, onPromoteToBrief, onPromoteToPrd, onEditDeps, onEditAutoMerge, onChangeSource, onRequestDelete, onUndoable, projectPolicy, allSpecs, onAttachmentToast, running, onOpenRun, projectName, projects, presenceOn }:
   {
+    projects?: ProjectVM[];
     spec: DetailSpec | null; onClose: () => void; onEditBranch?: (s: SpecSlim, b: string | null) => void;
     onRevertStage?: (s: SpecSlim, target: string, confirmDelete?: boolean) => Promise<any>;
     // SPEC-804 · ADR-0120 · maju ke `done` tanpa sesi. Bersebelahan dengan revert: satu blok,
@@ -228,7 +229,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
     onOpenReview?: (s: SpecSlim) => void;
     onStart?: (s: SpecSlim) => void;
     onIntegrate?: (s: SpecSlim, op: "merge" | "rebase", target: string) => void;
-    onEditSpec?: (s: SpecSlim, patch: { title?: string; priority?: string; payload?: unknown }) => void;
+    onEditSpec?: (s: SpecSlim, patch: { title?: string; priority?: string; payload?: unknown; projectId?: string }) => void;
     // SPEC-237 · naikkan audit → Finding QA. SPEC-340 · ADR-0076 · dua pintu lagi (brief & PRD);
     // argumen kedua = rekomendasi terbaca (null bila dokumen audit belum punya blok escalation).
     onPromoteToQa?: (s: SpecListItem, e: AuditEscalation | null) => void;
@@ -277,7 +278,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
   const startEdit = () => {
     if (!spec) return;
     const pp = (spec.payload || {}) as Record<string, string>;
-    setForm({ title: spec.title, priority: spec.priority, ...pp });
+    setForm({ title: spec.title, priority: spec.priority, ...pp, projectId: spec.projectId });
     setEditing(true);
   };
   const setField = (k: string) => (e: React.ChangeEvent<any>) => setForm((s) => ({ ...s, [k]: e.target.value }));
@@ -296,7 +297,8 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
   }, [escSpecId]);
   const saveEdit = () => {
     if (!spec || !onEditSpec) return;
-    const patch = spec.source === "qa"
+    const move = form.projectId && form.projectId !== spec.projectId ? { projectId: form.projectId } : {};
+    const base = spec.source === "qa"
       // SPEC-826 · `?? ""` bukan hiasan: item qa yang lahir sebelum spec ini tak punya field ini
       // di payload, jadi `form.constraints` undefined sampai operator mengetiknya.
       ? { title: form.title, payload: { severity: form.severity, steps: form.steps, expected: form.expected,
@@ -307,7 +309,7 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
       : payloadShapeFor(spec.source) === "goal"
       ? { title: form.title, priority: form.priority, payload: { goal: form.goal, done: form.done ?? "", constraints: form.constraints ?? "", priority: form.priority } }
       : { title: form.title, priority: form.priority, payload: { context: form.context, outcome: form.outcome, constraints: form.constraints, priority: form.priority } };
-    onEditSpec(spec, patch);
+    onEditSpec(spec, { ...base, ...move });
     setEditing(false);
   };
   // Prioritas diubah langsung (tanpa form), dan bisa diurungkan. Hanya selagi item masih boleh diedit.
@@ -403,6 +405,12 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
             <div><dt>Dibuat</dt><dd>{fmtCreated(spec.createdAt) || "—"}</dd></div>
             <div><dt>Branch asal</dt><dd>{spec.branchFrom || "—"}</dd></div>
           </dl>
+          {editing && projects && projects.length > 1 && (
+            <Field label="Project">
+              <Select value={form.projectId ?? spec.projectId} onChange={setField("projectId")}
+                options={projects.map((x) => ({ value: x.id, label: x.name }))} className="hn-bl-full" />
+            </Field>
+          )}
           {editable && !editing && (
             <div className="hn-bl-inline-row">
               <Select size="sm" aria-label="Prioritas item ini" value={spec.priority}
@@ -954,7 +962,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
     // ADR-0218 · tandai/batalkan "sudah ditinjau" pada item selesai. Galat dari App sudah ditangani di sana.
     onMarkReviewed?: (s: SpecSlim, reviewed: boolean) => Promise<void>;
     onIntegrate?: (s: SpecSlim, op: "merge" | "rebase", target: string) => void;
-    onEditSpec?: (s: SpecSlim, patch: { title?: string; priority?: string; payload?: unknown }) => void;
+    onEditSpec?: (s: SpecSlim, patch: { title?: string; priority?: string; payload?: unknown; projectId?: string }) => void;
     // SPEC-447 · ADR-0093 · ubah dependency item (di luar gerbang edit SPEC-186).
     onEditDeps?: (s: SpecSlim, ids: string[]) => void;
     // SPEC-486 · ADR-0103 · ubah kebijakan auto-merge item (null = kembali ikut project).
@@ -1283,7 +1291,7 @@ export function BacklogScreen({ backlog, projects, pageSize = 20, onStart, activ
         onEditDeps={onEditDeps} onEditAutoMerge={onEditAutoMerge} onChangeSource={onChangeSource}
         onRequestDelete={requestDelete} onUndoable={undoable}
         projectPolicy={(projects.find((x) => x.id === backlog.find((s) => s.id === detailId)?.projectId) as { autoMerge?: unknown } | undefined)?.autoMerge}
-        projectName={projects.find((x) => x.id === detailSpec?.projectId)?.name}
+        projectName={projects.find((x) => x.id === detailSpec?.projectId)?.name} projects={projects}
         allSpecs={backlog}
         onAttachmentToast={(m, tone) => onToast?.(m, tone ?? "ok", "paperclip")} />
       <ToastHost toast={toast} />

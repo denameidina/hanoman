@@ -107,6 +107,8 @@ export const zPatchSpec = z.object({
   title: z.string().min(1).optional(),
   priority: zPriority.optional(),
   payload: z.union([zBriefPayload, zQaPayload, zGoalPayload]).optional(),   // SPEC-407 · +goal
+  // Pindah project: konten-sejenis, jadi ikut gerbang `editingContent` (hanya selagi belum dimulai).
+  projectId: z.string().min(1).optional(),
   // SPEC-447 · ADR-0093 · SENGAJA di luar gerbang `editingContent` (SPEC-186): gerbang itu
   // melindungi konten yang sudah jadi dasar kerja sesi berjalan, sedangkan dependsOn hanya
   // menggerbangi peluncuran BERIKUTNYA. `[]` = kosongkan.

@@ -224,14 +224,27 @@ export default async function (app: FastifyInstance) {
       return reply.code(403).send({ error: "capability required", need: "backlog:lifecycle" });
     const spec = await prisma.spec.findUnique({ where: { id } });
     if (!spec) return reply.code(404).send({ error: "not found" });
-    const { branchFrom, stage, confirmDelete, title, priority: newPriority, payload, dependsOn, autoMerge } = parsed.data;
-    const editingContent = title !== undefined || newPriority !== undefined || payload !== undefined;
+    const { branchFrom, stage, confirmDelete, title, priority: newPriority, payload, dependsOn, autoMerge, projectId: newProjectId } = parsed.data;
+    const moving = newProjectId !== undefined && newProjectId !== spec.projectId;
+    const editingContent = title !== undefined || newPriority !== undefined || payload !== undefined || moving;
     // SPEC-186 · konten hanya boleh diubah selagi item masih di backlog & belum dimulai.
     if (editingContent && (spec.stage !== "brainstorming" || spec.baseSha !== null))
       return reply.code(409).send({ error: "backlog item sudah dimulai — tak bisa diedit" });
+    // Pindah project: branch & dependency terikat repo project asal, jadi dikosongkan; item lain
+    // yang bergantung padanya akan menjadi dependency lintas project (ditolak ADR-0093) → tolak.
+    if (moving) {
+      if (!(await prisma.project.findUnique({ where: { id: newProjectId! }, select: { id: true } })))
+        return reply.code(400).send({ error: "project tujuan tidak ditemukan" });
+      if (dependsOn?.length) return reply.code(400).send({ error: "dependency harus di project yang sama" });
+      const siblings = await prisma.spec.findMany({ where: { projectId: spec.projectId }, select: { id: true, dependsOn: true } });
+      const dependents = siblings.filter((r) => dependsOnOf(r).includes(id)).map((r) => r.id);
+      if (dependents.length)
+        return reply.code(409).send({ error: `masih dipakai sebagai dependency oleh ${dependents.join(", ")}` });
+    }
+    const effProjectId = moving ? newProjectId! : spec.projectId;
     if (branchFrom) {
       // SPEC-217 · validasi branch di path efektif (binding lokal per-mesin ?? Project.repoDir).
-      if (await branchUnknown(await resolveRepoDir(spec.projectId), branchFrom))
+      if (await branchUnknown(await resolveRepoDir(effProjectId), branchFrom))
         return reply.code(400).send({ error: `branch "${branchFrom}" tidak ada di repo project` });
     }
     // SPEC-447 · ADR-0093 · SENGAJA tak ikut gerbang `editingContent` di atas: dependency
@@ -239,14 +252,14 @@ export default async function (app: FastifyInstance) {
     // menguncinya berarti item yang terlanjur terblokir salah tulis hanya bisa dihapus.
     let depIds: string[] | undefined;
     if (dependsOn !== undefined) {
-      const d = await validateDependsOn(spec.id, spec.projectId, dependsOn);
+      const d = await validateDependsOn(spec.id, effProjectId, dependsOn);
       if (!d.ok) return reply.code(400).send({ error: d.error });
       depIds = d.ids;
     }
     // SPEC-486 · ADR-0103 · cermin dependsOn: di luar gerbang `editingContent`, divalidasi
     // terhadap repo efektif project item ini.
     if ("autoMerge" in parsed.data) {
-      const gate = await checkAutoMerge(await resolveRepoDir(spec.projectId), autoMerge);
+      const gate = await checkAutoMerge(await resolveRepoDir(effProjectId), autoMerge);
       if (!gate.ok) return reply.code(gate.code).send({ error: gate.error });
     }
     if (stage !== undefined) {
@@ -257,7 +270,7 @@ export default async function (app: FastifyInstance) {
         return reply.send({ pending: true, stage, wouldDelete });
       for (const rel of wouldDelete) await deleteDoc(spec.projectId, rel).catch(() => { });
     }
-    const data: { branchFrom?: string | null; stage?: string; title?: string; priority?: string; objective?: string; payload?: any; dependsOn?: string[]; autoMerge?: any; reviewedAt?: null } = {};
+    const data: { branchFrom?: string | null; stage?: string; title?: string; priority?: string; objective?: string; payload?: any; dependsOn?: string[]; autoMerge?: any; reviewedAt?: null; projectId?: string } = {};
     if (branchFrom !== undefined) data.branchFrom = branchFrom;
     if (depIds !== undefined) data.dependsOn = depIds;   // SPEC-447 · ADR-0093
     // SPEC-486 · Prisma `Json?` menolak `null` polos — `Prisma.DbNull` yang mengosongkan kolomnya.
@@ -265,6 +278,11 @@ export default async function (app: FastifyInstance) {
     // ADR-0218 · stage hanya mundur (422 di atas), jadi setiap penulisan stage di sini meninggalkan
     // `done` bila ia dulu `done`. Tanda "sudah ditinjau" lama tak berlaku untuk penyelesaian berikutnya.
     if (stage !== undefined) { data.stage = stage; data.reviewedAt = null; }
+    if (moving) {
+      data.projectId = newProjectId;
+      if (branchFrom === undefined) data.branchFrom = null;
+      if (depIds === undefined) data.dependsOn = [];
+    }
     if (editingContent) {
       const effPayload = payload ?? spec.payload;
       const { priority, objective } = deriveSpecFields(spec.source, effPayload, newPriority ?? spec.priority);
@@ -273,7 +291,11 @@ export default async function (app: FastifyInstance) {
       data.priority = priority;
       data.objective = objective;
     }
-    const updated = await prisma.spec.update({ where: { id }, data });
+    // SpecAttachment.projectId denormal (kuota & isolasi) — harus ikut pindah, atomik dengan spec.
+    const [updated] = await prisma.$transaction([
+      prisma.spec.update({ where: { id }, data }),
+      ...(moving ? [prisma.specAttachment.updateMany({ where: { specId: id }, data: { projectId: newProjectId! } })] : []),
+    ]);
     await notifySynced("spec", id); // SPEC-213/330 · sadar-peran: client antre push, hub publish ke feed
     return updated;
   });

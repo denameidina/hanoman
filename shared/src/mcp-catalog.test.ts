@@ -78,7 +78,7 @@ describe("katalog tool MCP", () => {
   it("backlog_update hanya konten — tak ada stage/confirmDelete yang bisa menghapus artefak", () => {
     const t = byName("hanoman_backlog_update");
     expect(Object.keys(t.inputSchema.properties).sort())
-      .toEqual(["dependsOn", "payload", "priority", "spec", "title"]);
+      .toEqual(["dependsOn", "payload", "priority", "projectId", "spec", "title"]);
   });
 
   it("backlog_get membaca GET /specs/:id (detail penuh), bukan daftar", () => {

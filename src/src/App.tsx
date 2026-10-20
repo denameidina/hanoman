@@ -1398,7 +1398,7 @@ function AppInner() {
   }
 
   // SPEC-186 · edit konten backlog selagi belum dimulai. 409 = keburu dimulai sesi lain.
-  async function editSpec(spec: SpecSlim, patch: { title?: string; priority?: string; payload?: unknown }) {
+  async function editSpec(spec: SpecSlim, patch: { title?: string; priority?: string; payload?: unknown; projectId?: string }) {
     try {
       const updated = await api.patchSpec(spec.id, patch);
       if ("pending" in updated) return;
@@ -1406,7 +1406,7 @@ function AppInner() {
       showToast(spec.id + " diperbarui", "ok", "check");
     } catch (e) {
       const started = e instanceof ApiError && e.status === 409;
-      showToast(started ? spec.id + " sudah dimulai — tak bisa diedit" : "Gagal menyimpan " + spec.id, "warn", "x-circle");
+      showToast(started ? spec.id + " sudah dimulai atau masih dipakai sebagai dependency — tak bisa diedit" : "Gagal menyimpan " + spec.id, "warn", "x-circle");
     }
   }
 

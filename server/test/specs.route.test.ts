@@ -327,6 +327,19 @@ describe("specs routes", () => {
     expect(res.json().objective).toBe("hasil baru");     // outcome → objective
     expect(res.json().payload.context).toBe("c1");
   });
+  it("PATCH projectId memindahkan backlog & mengosongkan branch/dependency", async () => {
+    const res = await app.inject({ method: "PATCH", url: "/api/specs/SPEC-186A", payload: { projectId: "p2" } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().projectId).toBe("p2");
+    expect(res.json().branchFrom).toBeNull();
+    await app.inject({ method: "PATCH", url: "/api/specs/SPEC-186A", payload: { projectId: "p1" } });
+  });
+  it("PATCH projectId ke project tak dikenal → 400; pada item dimulai → 409", async () => {
+    const bad = await app.inject({ method: "PATCH", url: "/api/specs/SPEC-186A", payload: { projectId: "nope" } });
+    expect(bad.statusCode).toBe(400);
+    const started = await app.inject({ method: "PATCH", url: "/api/specs/SPEC-186B", payload: { projectId: "p2" } });
+    expect(started.statusCode).toBe(409);
+  });
   it("PATCH konten pada item yang sudah dimulai (baseSha) → 409", async () => {
     const res = await app.inject({
       method: "PATCH", url: "/api/specs/SPEC-186B", payload: { title: "tak boleh" },
