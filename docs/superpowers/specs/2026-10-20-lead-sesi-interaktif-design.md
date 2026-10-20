@@ -153,7 +153,7 @@ Jatah disuntikkan ke setiap event denyut agar lead tahu batasnya sejak awal.
 
 | Tindakan | Ditolak bila | Catatan |
 |---|---|---|
-| `start-session` (ambil backlog) | jatah 0; spec belum `ready` atau tanpa plan/AC; blocker dependensi (ADR-0093); sesi sudah ada; `reason` kosong; `evidence[]` tak merujuk spec/plan | Denyut hanya dikirim bila jatah ≥ 1 **dan** ada backlog siap. Lead tak lagi diminta mengurutkan seluruh daftar. |
+| `start-session` (ambil backlog) | jatah 0; spec `done`, belum disetujui diluncurkan (`assertLaunchApproved`) atau objective kosong; blocker dependensi (ADR-0093); sesi sudah ada; `reason` kosong; `evidence[]` tak merujuk id spec; memilih lebih banyak dari jatah | Plan dibuat oleh sesi pekerja sendiri, jadi tak dijadikan syarat peluncuran. |
 | `answer-session` | sesi sudah tak menunggu; tenggat lewat / sudah ke manusia | Opsi yang menyentuh **daftar sensitif** (`LEAD_FORBIDDEN` + kata kunci: produksi, kredensial, akun, hapus data, migrasi produksi, deploy) dipaksa `butuh-izin`. |
 | `integrate` (merge) | plan masih ada `- [ ]`; worktree kotor; konflik terhadap `project.baseBranch` (bukan `main` terpatok); **test yang dijalankan ulang server** merah; integrasi lain sedang berjalan di proyek yang sama | Default mode `ask`. `requireGreenBeforeIntegrate` tak bisa dimatikan untuk jalur lead. |
 | `resume-session` / `stop-session` | sesi tak ada / sudah dalam keadaan target | — |
