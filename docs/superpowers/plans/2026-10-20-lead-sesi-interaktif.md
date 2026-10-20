@@ -1449,7 +1449,7 @@ describe("event tanpa penunggu", () => {
   - `formatBatch(events: LeadEvent[], brief: string): string`
 - Env yang dipasang ke pane: `HANOMAN_LEAD_URL=http://127.0.0.1:<port>/api/lead-pane`, `HANOMAN_LEAD_PROJECT=<projectId>` (token & id sesi sudah dipasang pty: `HANOMAN_SESSION_ID`, `HANOMAN_EVENT_TOKEN`, `pty.ts:669-671`).
 
-- [ ] **Step 1: Test gagal**
+- [x] **Step 1: Test gagal**
 
 ```ts
 import { describe, it, expect, beforeEach } from "vitest";
@@ -1522,9 +1522,9 @@ describe("sesi lead", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan → FAIL.**
+- [x] **Step 2: Jalankan → FAIL.**
 
-- [ ] **Step 3: Implementasi**
+- [x] **Step 3: Implementasi**
 
 `pty.ts` `sessionKind` — tambah baris pertama sesudah `specId`:
 
@@ -1714,8 +1714,8 @@ Catatan implementer:
 - `serverPort()` — cari sumber port yang dipakai `pty.ts:670` untuk `HANOMAN_EVENT_URL` dan pakai fungsi yang sama.
 - `leadProjects()` mengembalikan proyek `leadOptIn` (`config.ts:48`).
 
-- [ ] **Step 4: Test → PASS.**
-- [ ] **Step 5: Commit** `feat(lead): pane lead per proyek — lahir di worktree baca, backoff, prompt sistem, kind lead`
+- [x] **Step 4: Test → PASS.**
+- [x] **Step 5: Commit** `feat(lead): pane lead per proyek — lahir di worktree baca, backoff, prompt sistem, kind lead`
 
 ### Task 9: `courier.ts` + Stop hook pane lead
 
