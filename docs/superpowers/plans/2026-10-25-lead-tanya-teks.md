@@ -28,17 +28,17 @@ Spec: [`docs/superpowers/specs/2026-10-25-lead-tanya-teks-design.md`](../specs/2
 `export const TEXT_ASK_ROUTE: string`; `guardSettings(decisionFile, goal, eventHook, statusLine, askText?: boolean)`;
 `agentFlags({ …, askText?: boolean })`.
 
-- [ ] Test gagal: untuk startPrompt/resumePrompt/continuePrompt/startGoalPrompt/startProjectPrompt/
+- [x] Test gagal: untuk startPrompt/resumePrompt/continuePrompt/startGoalPrompt/startProjectPrompt/
   startScaffoldPrompt/startPrdPrompt/startBreakdownPrompt/cronPrompt (mode tunggal) dan
   `orchestratorClause(plan claude)` serta `agentDelegationClause(defs, "claude")`: keluaran memuat
   `AskUserQuestion` sebelum `textAsk`, tak memuat sesudahnya, dan memuat `TEXT_ASK_ROUTE`/frasa teks;
   `textAsk` idempoten; string tanpa frasa → tak berubah. `guardSettings(..., true)` → `hooks.Stop` memuat
   `EVENT_HOOK_COMMAND`; tanpa flag → JSON identik.
-- [ ] Implementasi: frasa claude dijadikan konstanta bernama (`ASK_ROUTE`, langkah 3 `askEscalation`,
+- [x] Implementasi: frasa claude dijadikan konstanta bernama (`ASK_ROUTE`, langkah 3 `askEscalation`,
   langkah 4 `askDecisions`, relay custom agent) dan `textAsk` menukar tiap konstanta dengan padanan teks
   (pakai frasa codex yang sudah ada + "JANGAN memakai AskUserQuestion"). `guardSettings`: bila `askText`
   dan `eventHook`, push `{ hooks: [{ type: "command", command: EVENT_HOOK_COMMAND }] }` ke `hooks.Stop`.
-- [ ] Test runner hijau, golden tak berubah. Commit.
+- [x] Test runner hijau, golden tak berubah. Commit.
 
 ### Task 2: shared + lead — parse Stop claude, `readTurn`, `leadDecides`, `askViaFor`
 

@@ -56,7 +56,7 @@ const busySnapshotCommand = (quotedSubFile: string): string =>
   `node -e '${BUSY_SNAPSHOT_SCRIPT}' ${quotedSubFile} >/dev/null 2>&1`;
 
 export const guardSettings = (
-  decisionFile?: string, goal?: string, eventHook?: boolean, subagentStatusLine?: string,
+  decisionFile?: string, goal?: string, eventHook?: boolean, subagentStatusLine?: string, askText?: boolean,
 ) => {
   const hooks: Record<string, unknown[]> = {};
   // SPEC-184 · sinyal "agen minta masukan manusia" dari Claude sendiri. Notification idle/izin/
@@ -107,6 +107,10 @@ export const guardSettings = (
       hooks.UserPromptSubmit = [{ hooks: [{ type: "command", command: `: > ${f}; : > ${sub}` }] }];
     }
   }
+  // ADR-0231 · sesi yang bertanya lewat teks biasa (lead menjawab project-nya saat sesi lahir): akhir
+  // giliran dikirim ke jalur event, persis padanan hook Stop codex — lead membaca `last_assistant_message`.
+  if (eventHook && askText)
+    (hooks.Stop ??= []).push({ hooks: [{ type: "command", command: EVENT_HOOK_COMMAND }] });
   // SPEC-332 · ADR-0073 · mode goal: mesin yang SAMA dipasang `/goal` di dalam sesi
   // (sessionHooksRegistry.add(cwd,"Stop","",{type:"prompt",prompt})), tapi dari luar dan saat sesi
   // lahir — jadi ia tak bergantung timing TUI maupun kepatuhan agen. BUKAN guardrail deny: ADR-0037
