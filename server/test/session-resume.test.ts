@@ -202,7 +202,7 @@ describe("SPEC-394 · resume tanpa worktree, fresh, dan stage done", () => {
     expect(row.headSha).toBeNull();
     const prompt = readFileSync(promptFilePath(r.id), "utf8");
     expect(prompt).not.toContain("MELANJUTKAN");
-    expect(prompt).toContain("Kerjakan fase berurutan: Audit → Spec → Plan → Execute.");
+    expect(prompt).toContain("Kerjakan fase berurutan: Audit → Spec → Plan → Execute → Review.");
     killSession(r.id);
   });
 

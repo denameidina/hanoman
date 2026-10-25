@@ -1,4 +1,4 @@
-import { PLAN_DIRS } from "@hanoman/shared";
+import { PLAN_DIRS, UNSKIPPABLE_PHASES } from "@hanoman/shared";
 import { PIPELINES } from "./prompt";
 import type { Flow } from "./types";
 import { EVENT_HOOK_COMMAND } from "./settings";
@@ -83,7 +83,8 @@ export function codexGoalScript(o: {
   ];
   for (const p of phases) {
     lines.push(
-      `grep -qE ${shq(`^${p} (done|skipped)[[:space:]]*$`)} "$PF" 2>/dev/null || `
+      // ADR-0230 · fase `UNSKIPPABLE_PHASES` (Review) hanya lolos dengan `done`.
+      `grep -qE ${shq(`^${p} ${UNSKIPPABLE_PHASES.has(p) ? "done" : "(done|skipped)"}[[:space:]]*$`)} "$PF" 2>/dev/null || `
       + `missing="$missing\\n- fase ${p} belum tercatat di \\$HANOMAN_PHASE_FILE"`,
     );
   }

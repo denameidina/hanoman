@@ -29,7 +29,7 @@ describe("liveSpecs · merekam headSha saat stage maju ke done (SPEC-475)", () =
     const wt = makeRepoWithBranches();
     const expected = spawnSync("git", ["rev-parse", "HEAD"], { cwd: wt, encoding: "utf8" }).stdout.trim();
     vi.mocked(sessionPhasesBySpecAsync).mockResolvedValueOnce(
-      new Map([["SPEC-LH1", { phases: [{ name: "Execute", state: "done" }], cwd: wt }]]) as never);
+      new Map([["SPEC-LH1", { phases: [{ name: "Execute", state: "done" }, { name: "Review", state: "done" }], cwd: wt }]]) as never);
     await liveSpecs({ project: "plh" });
     const row = await prisma.spec.findUnique({ where: { id: "SPEC-LH1" } });
     expect(row!.stage).toBe("done");

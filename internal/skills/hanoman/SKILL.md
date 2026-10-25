@@ -811,9 +811,10 @@ Pakai skill lebih sempit saat task cocok:
   **ADR-0170 P2** · subagent foreground (env sesi) → agen fase boleh mendelegasikan: klausa `=== DELEGASI ===`
   per peran fase disusun `withPhaseDelegation` di `createSession` dari roster custom agent yang hidup.
   Execute claude mengikuti **`executeMode` per flow (ADR-0173)**: default `inline` = `executing-plans` + agen fase mengerjakan task sendiri; `subagent` = `subagent-driven-development` (implementer + review per task, final review skill dilewati bila reviewer ada); codex & sesi tunggal selalu inline. Laporannya wajib tabel `AC → bukti`; Plan wajib bernama
-  `<YYYY-MM-DD>-<spec-id>-<slug>.md`. Flow feature/qa punya reviewer independen `hanoman-fase-review`
-  (bukan fase; invocation di bawah Execute) yang dipanggil orchestrator sebelum `Execute done`
-  (`Verdict: lulus|rework`, maks 2 putaran rework lalu `Keputusan terbuka`).
+  `<YYYY-MM-DD>-<spec-id>-<slug>.md`. Flow feature/qa ditutup **fase Review resmi** (ADR-0230): agennya
+  reviewer independen `hanoman-fase-review`, dipanggil sesudah `Execute done` (`Verdict: lulus|rework`,
+  maks 2 putaran rework lalu `Keputusan terbuka`); `Review done` hanya sesudah `lulus`, tak pernah
+  `skipped`, dan baru `Review done` yang membawa backlog ke `done`. Sesi tunggal menjalankan review mandiri.
 - **Mode goal per sesi backlog** (SPEC-332/ADR-0073): sesi bisa lahir membawa gate `Stop` — `guardSettings` menyisipkan `hooks.Stop=[{type:"prompt",prompt:<kondisi>}]` ke `--settings` (mesin yang sama dipasang `/goal` Claude Code, tapi deterministik saat sesi lahir), plus keystroke `/goal` best-effort ke pane untuk visibilitas TUI. Kondisi default = DoD hanoman (semua fase tercatat di phase file, plan tak menyisakan `- [ ]`, push sukses) dan menuntut **bukti segar** karena evaluator hook `prompt` tak punya tool dan hanya membaca transkrip (yang bisa terpotong). Knob `Setting.goal` (default mati) + override `goal`/`goalCondition` saat Start; sesi scheduler mengikuti default global. **Bukan** guardrail deny — ADR-0037 tetap berlaku; interrupt manusia (`Esc`) bukan event Stop, jadi kendali tetap ada.
 - **Mode goal codex memakai goal NATIVE codex** (SPEC-397/ADR-0085, mengamandemen ADR-0074 butir (b)):
   `armGoalInTui` **tak lagi khusus claude** — codex-cli **0.146.0** punya mode goal native

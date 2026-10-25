@@ -32,20 +32,20 @@ describe("phaseFilePath", () => {
 describe("readPhases", () => {
   it("berkas belum ada → fase pertama aktif, sisanya pending, tanpa melempar", () => {
     expect(states()).toEqual([
-      "Brainstorm:active", "Objective:pending", "Spec:pending", "Plan:pending", "Execute:pending",
+      "Brainstorm:active", "Objective:pending", "Spec:pending", "Plan:pending", "Execute:pending", "Review:pending",
     ]);
   });
 
   it("baris done menandai fase, dan yang berikutnya menjadi aktif", () => {
     write("Brainstorm done\nObjective done\n");
     expect(states()).toEqual([
-      "Brainstorm:done", "Objective:done", "Spec:active", "Plan:pending", "Execute:pending",
+      "Brainstorm:done", "Objective:done", "Spec:active", "Plan:pending", "Execute:pending", "Review:pending",
     ]);
   });
 
   it("skipped diperlakukan sebagai tercatat, bukan sebagai aktif", () => {
     write("Audit done\nSpec skipped\nPlan skipped\n");
-    expect(states("qa")).toEqual(["Audit:done", "Spec:skipped", "Plan:skipped", "Execute:active"]);
+    expect(states("qa")).toEqual(["Audit:done", "Spec:skipped", "Plan:skipped", "Execute:active", "Review:pending"]);
   });
 
   // "Docs teknis" / "Konvensi & index" mengandung spasi: state adalah token TERAKHIR,
@@ -57,14 +57,14 @@ describe("readPhases", () => {
   });
 
   it("seluruh fase tercatat → tak ada yang aktif", () => {
-    write("Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\n");
+    write("Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\nReview done\n");
     expect(states().filter((s) => s.endsWith(":active"))).toEqual([]);
   });
 
   it("baris sampah, fase asing, dan state asing diabaikan diam-diam", () => {
     write("\n???\nBrainstorm done\nMandi pagi\nTidur selesai\nObjective menyala\n");
     expect(states()).toEqual([
-      "Brainstorm:done", "Objective:active", "Spec:pending", "Plan:pending", "Execute:pending",
+      "Brainstorm:done", "Objective:active", "Spec:pending", "Plan:pending", "Execute:pending", "Review:pending",
     ]);
   });
 });
@@ -78,7 +78,17 @@ describe("stageFor", () => {
     expect(stageFor(P([["Spec", "done"]]))).toBe("spec-ready");
     expect(stageFor(P([["Plan", "done"]]))).toBe("planned");
     expect(stageFor(P([["Execute", "active"]]))).toBe("executing");
-    expect(stageFor(P([["Execute", "done"]]))).toBe("done");
+    expect(stageFor(P([["Execute", "done"]]))).toBe("executing");
+    expect(stageFor(P([["Execute", "done"], ["Review", "done"]]))).toBe("done");
+  });
+  // ADR-0230 · Review = fase resmi penutup feature & qa; Execute done saja belum `done`.
+  it("Review aktif → executing; Review done → done; Review skipped TIDAK tercapai", () => {
+    const pre: [string, string][] = [["Brainstorm", "done"], ["Objective", "done"], ["Spec", "done"], ["Plan", "done"]];
+    expect(stageFor(P([...pre, ["Execute", "done"], ["Review", "active"]]))).toBe("executing");
+    expect(stageFor(P([...pre, ["Execute", "done"], ["Review", "done"]]))).toBe("done");
+    expect(stageFor(P([...pre, ["Execute", "done"], ["Review", "skipped"]]))).toBe("executing");
+    expect(phasesComplete(P([...pre, ["Execute", "done"], ["Review", "skipped"]]))).toBe(false);
+    expect(phasesComplete(P([...pre, ["Execute", "done"], ["Review", "done"]]))).toBe(true);
   });
   it("Audit done setara Objective done (flow qa)", () => {
     expect(stageFor(P([["Audit", "done"]]))).toBe("objective");
@@ -146,7 +156,7 @@ describe("stageForRun", () => {
     expect(stageForRun(P([["Execute", "done"]]), mkPlan("- [x] a\n- [ ] b\n"), "SPEC-173")).toBe("executing");
   });
   it("Execute done + plan tuntas → done", () => {
-    expect(stageForRun(P([["Execute", "done"]]), mkPlan("- [x] a\n- [x] b\n"), "SPEC-173")).toBe("done");
+    expect(stageForRun(P([["Execute", "done"], ["Review", "done"]]), mkPlan("- [x] a\n- [x] b\n"), "SPEC-173")).toBe("done");
   });
   it("stage non-done tak terpengaruh gerbang", () => {
     expect(stageForRun(P([["Plan", "done"]]), mkPlan("- [ ] b\n"), "SPEC-173")).toBe("planned");
@@ -161,7 +171,7 @@ describe("stageForRun", () => {
 
   // qa fast-path: Plan `skipped`, bukan `done` → perilaku lama tak berubah.
   it("Plan skipped (fast-path qa) + tak ada plan ber-spec-id → tetap done", () => {
-    expect(stageForRun(P([["Plan", "skipped"], ["Execute", "done"]]), mkWorktree({}), "SPEC-173")).toBe("done");
+    expect(stageForRun(P([["Plan", "skipped"], ["Execute", "done"], ["Review", "done"]]), mkWorktree({}), "SPEC-173")).toBe("done");
   });
 
   // Flow tanpa fase Plan sama sekali (goal/no_effort/audit/dokumen) → tak ada entri "Plan" di
@@ -424,7 +434,7 @@ describe("enrichPhases (ADR-0164)", () => {
     expect(enrichPhases(phases, roster, [], new Map(), 10_000_000, 0)[2]!.agent)
       .toMatchObject({ attempts: 0, evidence: "pending" });
   });
-  // ADR-0170 · reviewer Execute tercatat di bawah fase Execute (roster `phase: "Execute"`), tapi
+  // ADR-0170 · data LAMA (sebelum ADR-0230): reviewer Execute tercatat di bawah fase Execute, tapi
   // bukan percobaan Execute: chip tetap milik agen Execute, status = invocation agen Execute terakhir.
   it("reviewer satu fase tak dihitung sebagai percobaan agen fasenya", () => {
     const exec: Phase[] = [{ name: "Execute", state: "active" }];
@@ -439,6 +449,22 @@ describe("enrichPhases (ADR-0164)", () => {
         startedAt: "2026-09-14T00:05:00.000Z" }),
     ], new Map(), 0, 0);
     expect(e!.agent).toMatchObject({ name: "hanoman-fase-execute", attempts: 1, status: "completed" });
+  });
+  // ADR-0230 · reviewer kini agen fase Review sendiri: chip Review milik `hanoman-fase-review`.
+  it("fase Review berchip agen reviewer dengan invocation-nya sendiri", () => {
+    const ps: Phase[] = [{ name: "Execute", state: "done" }, { name: "Review", state: "active" }];
+    const r = [
+      { name: "hanoman-fase-execute", phase: "Execute", model: "claude-sonnet-5", effort: "high" },
+      { name: "hanoman-fase-review", phase: "Review", model: "claude-opus-5", effort: "high" },
+    ];
+    const [e, rv] = enrichPhases(ps, r, [
+      inv({ phase: "Execute", agentName: "hanoman-fase-execute", runtimeInvocationId: "x1", status: "completed",
+        startedAt: "2026-09-14T00:00:00.000Z" }),
+      inv({ phase: "Review", agentName: "hanoman-fase-review", runtimeInvocationId: "r1", status: "running",
+        startedAt: "2026-09-14T00:05:00.000Z" }),
+    ], new Map(), 0, 0);
+    expect(e!.agent).toMatchObject({ name: "hanoman-fase-execute", attempts: 1 });
+    expect(rv!.agent).toMatchObject({ name: "hanoman-fase-review", model: "claude-opus-5", attempts: 1, status: "running" });
   });
 });
 
@@ -557,7 +583,7 @@ describe("gerbang plan · plan ber-spec-id di luar PLAN_DIRS", () => {
     }
     return wt;
   };
-  const done = P([["Plan", "done"], ["Execute", "done"]]);
+  const done = P([["Plan", "done"], ["Execute", "done"], ["Review", "done"]]);
 
   it("plan tuntas di internal/docs/superpowers/plans → done", async () => {
     const wt = mkRepo({ "internal/docs/superpowers/plans/2026-09-25-spec-1341-soap-plan.md": "- [x] a\n" });

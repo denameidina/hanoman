@@ -772,7 +772,7 @@ describe("terminal routes · sesi backlog", () => {
     await makeSpec({ id: "SPEC-910", projectId: "p1", stage: "planned" });
     await start("SPEC-910");
     writePlan("spec-910", "- [x] a\n- [ ] b\n");
-    appendFileSync(phaseFilePath(repoDir, "spec-910"), "Execute done\n");
+    appendFileSync(phaseFilePath(repoDir, "spec-910"), "Execute done\nReview done\n");
     await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-910" });
     const spec = await prisma.spec.findUniqueOrThrow({ where: { id: "SPEC-910" } });
     expect(spec.stage).toBe("executing");
@@ -783,7 +783,7 @@ describe("terminal routes · sesi backlog", () => {
     await makeSpec({ id: "SPEC-911", projectId: "p1", stage: "planned" });
     await start("SPEC-911");
     writePlan("spec-911", "- [x] a\n- [x] b\n");
-    appendFileSync(phaseFilePath(repoDir, "spec-911"), "Execute done\n");
+    appendFileSync(phaseFilePath(repoDir, "spec-911"), "Execute done\nReview done\n");
     await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-911" });
     const spec = await prisma.spec.findUniqueOrThrow({ where: { id: "SPEC-911" } });
     expect(spec.stage).toBe("done");
@@ -794,7 +794,7 @@ describe("terminal routes · sesi backlog", () => {
     await makeSpec({ id: "SPEC-914", projectId: "p1", stage: "planned", title: "Judul 914" });
     await start("SPEC-914");
     writePlan("spec-914", "- [x] a\n");
-    appendFileSync(phaseFilePath(repoDir, "spec-914"), "Execute done\n");
+    appendFileSync(phaseFilePath(repoDir, "spec-914"), "Execute done\nReview done\n");
     await app.inject({ method: "DELETE", url: "/api/terminal/sessions/spec-914" });
     const notif = await prisma.notification.findFirst({ where: { specId: "SPEC-914" } });
     expect(notif?.title).toBe("Judul 914");
@@ -1083,7 +1083,7 @@ describe("GET /specs · stage live dari sesi", () => {
     await makeSpec({ id: "SPEC-912", projectId: "p1", stage: "planned" });
     await start("SPEC-912");
     writeLivePlan("spec-912", "- [x] a\n- [ ] b\n");
-    appendFileSync(phaseFilePath(repoDir, "spec-912"), "Execute done\n");
+    appendFileSync(phaseFilePath(repoDir, "spec-912"), "Execute done\nReview done\n");
     expect(await stageOf("SPEC-912")).toBe("executing");
     const row = await prisma.spec.findUniqueOrThrow({ where: { id: "SPEC-912" } });
     expect(row.stage).toBe("executing"); // persist ikut tertahan, bukan done
@@ -1095,7 +1095,7 @@ describe("GET /specs · stage live dari sesi", () => {
     await makeSpec({ id: "SPEC-913", projectId: "p1", stage: "planned", title: "Judul 913" });
     await start("SPEC-913");
     writeLivePlan("spec-913", "- [x] a\n- [x] b\n");
-    appendFileSync(phaseFilePath(repoDir, "spec-913"), "Execute done\n");
+    appendFileSync(phaseFilePath(repoDir, "spec-913"), "Execute done\nReview done\n");
     expect(await stageOf("SPEC-913")).toBe("done");
     // SPEC-180 · jalur write-through GET /specs juga mencatat notifikasi saat masuk done.
     const notif = await prisma.notification.findFirst({ where: { specId: "SPEC-913" } });

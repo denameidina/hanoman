@@ -12,8 +12,9 @@ export type OrchestrationFlow = (typeof ORCHESTRATION_FLOWS)[number];
 // lama. Ia pindah ke sini karena Settings & modal Start butuh daftar yang sama, dan frontend tak
 // mengimpor runner.
 export const FLOW_PHASES: Readonly<Record<OrchestrationFlow, readonly string[]>> = {
-  feature: ["Brainstorm", "Objective", "Spec", "Plan", "Execute"],
-  qa: ["Audit", "Spec", "Plan", "Execute"],
+  // ADR-0230 · `Review` = fase resmi sesudah Execute (dulu langkah R di dalam Execute, ADR-0170 #4).
+  feature: ["Brainstorm", "Objective", "Spec", "Plan", "Execute", "Review"],
+  qa: ["Audit", "Spec", "Plan", "Execute", "Review"],
   scaffold: ["Brainstorm", "Objective", "Doc index"],
   reverse: ["Scan", "Docs teknis", "Wawancara", "Konvensi & index", "Serah terima"],
   prd: ["Brainstorm", "PRD"],
@@ -55,25 +56,25 @@ export const EXECUTE_MODE_FLOWS: ReadonlySet<OrchestrationFlow> = new Set(
 
 export type PhasePlanEntry = { phase: string; agentName: string; model: string; effort: string | null };
 
-// ADR-0170 P2 · reviewer independen hasil Execute (feature & qa). BUKAN fase pipeline — FLOW_PHASES,
-// peta stage, UI fase, dan data lama tak berubah. Ia agen ber-generate per sesi dengan awalan yang
-// dicadangkan, jadi agen fase (yang dilarang memanggil `hanoman-fase-*`) tak bisa memanggilnya: hanya
-// orchestrator. `phase` = fase pemilik invocation-nya di AgentInvocation/roster (Execute).
-// Sel Setting `orchestration.<flow>.<runtime>.Review` (kunci lenient, tanpa migration) dan
-// `phaseOverrides.Review` meng-override default di bawah.
+// ADR-0170 P2 · reviewer independen hasil Execute. ADR-0230 · kini agen fase `Review` biasa (fase
+// pipeline resmi flow feature & qa), bukan lampiran Execute. Defaultnya tetap konstanta peran — penilai
+// independen butuh model kuat walau orchestrator murah — dan sel Setting
+// `orchestration.<flow>.<runtime>.Review` / `phaseOverrides.Review` meng-override-nya. Agen fase lain
+// (yang dilarang memanggil `hanoman-fase-*`) tetap tak bisa memanggilnya: hanya orchestrator.
 export const REVIEWER_CELL = "Review";
-export const REVIEWER_FLOWS: ReadonlySet<OrchestrationFlow> = new Set(["feature", "qa"]);
+export const REVIEWER_FLOWS: ReadonlySet<OrchestrationFlow> = new Set(
+  ORCHESTRATION_FLOWS.filter((f) => FLOW_PHASES[f].includes(REVIEWER_CELL)),
+);
 export const REVIEWER_DEFAULTS: Readonly<Record<Agent, { model: string; effort: string | null }>> = {
   claude: { model: "opus", effort: "high" },
   codex: { model: "gpt-5.6-sol", effort: "high" },
   antigravity: { model: "inherit", effort: null },
 };
-export type PhaseReviewerEntry = { agentName: string; phase: "Execute"; model: string; effort: string | null };
+/** ADR-0230 · fase yang `skipped`-nya TIDAK dihitung tercapai/lengkap (server, gate codex, prompt). */
+export const UNSKIPPABLE_PHASES: ReadonlySet<string> = new Set([REVIEWER_CELL]);
 
 export type PhasePlan = {
   flow: OrchestrationFlow; runtime: Agent; phases: PhasePlanEntry[];
-  /** ADR-0170 P2 · hanya flow `REVIEWER_FLOWS`; absen = tanpa reviewer (prompt tak berubah). */
-  reviewer?: PhaseReviewerEntry;
   /** Amandemen ADR-0170 P2 · absen (pemanggil lama) = `inline`. */
   executeMode?: ExecuteMode;
 };

@@ -101,6 +101,8 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
         "superpowers:test-driven-development",
         VERIFICATION_GATE,
       ],
+      // ADR-0230 · fase Review resmi: audit spec & plan vs diff + gerbang verifikasi.
+      Review: ["superpowers:requesting-code-review", VERIFICATION_GATE],
       // SPEC-407 · fase `Goal` sengaja TANPA skill: seluruh inti flow itu membebaskan sesi dari
       // proses kaku. Yang tetap dijaga cuma pintu keluarnya.
       Verifikasi: [VERIFICATION_GATE],
@@ -144,6 +146,8 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
         "mattpocock-skills:tdd",
         "mattpocock-skills:code-review",
       ],
+      // ADR-0230 · fase Review resmi: audit spec & plan vs diff + gerbang verifikasi.
+      Review: ["mattpocock-skills:code-review", VERIFICATION_GATE],
       Verifikasi: [VERIFICATION_GATE],
     },
     exitSkills: [VERIFICATION_GATE],
@@ -184,6 +188,8 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
         "agent-skills:test-driven-development",
         "agent-skills:code-review-and-quality",
       ],
+      // ADR-0230 · fase Review resmi: audit spec & plan vs diff + gerbang verifikasi.
+      Review: ["agent-skills:code-review-and-quality", VERIFICATION_GATE],
       Verifikasi: [VERIFICATION_GATE],
     },
     exitSkills: [VERIFICATION_GATE],

@@ -274,8 +274,8 @@ describe("session-launch", () => {
     killSession(r.id);
   });
 
-  // ADR-0170 P2 · + reviewer independen Execute (bukan fase; invocation-nya di bawah Execute).
-  it("continue (stage done) hanya membawa agen fase Execute + reviewer-nya", async () => {
+  // ADR-0230 · continue melanjutkan Execute lalu fase Review (agennya reviewer independen ADR-0170).
+  it("continue (stage done) hanya membawa agen fase Execute + Review", async () => {
     process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
     const seeded = await seedRepo("SPEC-ORCH3");
     const spec = await prisma.spec.update({ where: { id: seeded.id }, data: { stage: "done" } });
@@ -295,13 +295,14 @@ describe("session-launch", () => {
     const id = sessionIdForSpec(spec.id);
     mkdirSync(join(repoDir, ".worktrees", ".phases"), { recursive: true });
     writeFileSync(join(repoDir, ".worktrees", ".phases", id),
-      "Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\n");
+      "Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\nReview done\n");
     const r = await startSpecSession(spec, { flow: "feature" });
     const born = getSession(r.id)!.doneAtBirth ?? [];
     expect(born).toEqual(expect.arrayContaining(["Brainstorm", "Plan"]));
     expect(born).not.toContain("Execute");
+    expect(born).not.toContain("Review");
     const prompt = readFileSync(promptFilePath(r.id), "utf8");
-    expect(prompt).toContain("baris `Execute done` LAMA");
+    expect(prompt).toContain("baris `Execute done` dan `Review done` LAMA");
     killSession(r.id);
   });
 

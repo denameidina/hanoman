@@ -161,3 +161,34 @@ describe("executeMode (amandemen ADR-0170 P2)", () => {
     expect(r!.data.orchestration.feature.executeMode).toBe("inline");
   });
 });
+
+// ADR-0230 · `Review` baru masuk FLOW_PHASES. Sebelumnya sel `Review` (override reviewer ADR-0170) tak
+// pernah ditandai `user`, jadi marker lama tak memuat kuncinya — upgrade versi tak boleh menimpanya.
+describe("sel fase Review (ADR-0230)", () => {
+  const base = { autoDefault: true, autoScaffold: true, notifyFail: true };
+  const oldMarker = () => {
+    const m = structuredClone(BUILTIN_RUNTIME_DEFAULTS);
+    m.version = "2026-09-23-v2";
+    for (const key of Object.keys(m.orchestration)) if (key.includes(".Review.")) delete m.orchestration[key];
+    return m;
+  };
+  it("seed bawaan feature & qa memuat Review ber-model reviewer", () => {
+    const r = applyRuntimeDefaults(undefined)!;
+    for (const flow of ["feature", "qa"] as const) {
+      expect(r.data.orchestration[flow].claude.Review).toEqual({ model: "opus", effort: "high" });
+      expect(r.data.orchestration[flow].codex.Review).toEqual({ model: "gpt-5.6-sol", effort: "high" });
+    }
+  });
+  it("upgrade dari marker lama mempertahankan sel Review yang diisi operator", () => {
+    const seeded = applyRuntimeDefaults(undefined)!.data;
+    const raw = structuredClone(seeded) as Record<string, any>;
+    raw.builtinRuntimeDefaults = oldMarker();
+    raw.orchestration.feature.claude.Review = { model: "sonnet", effort: "medium" };
+    delete raw.orchestration.qa.claude.Review;
+    const r = applyRuntimeDefaults({ ...base, ...raw })!;
+    expect(r.data.orchestration.feature.claude.Review).toEqual({ model: "sonnet", effort: "medium" });
+    expect(r.data.builtinRuntimeDefaults.orchestration["feature.claude.Review.model"]).toBe("user");
+    expect(r.data.orchestration.qa.claude.Review).toEqual({ model: "opus", effort: "high" });
+    expect(r.data.builtinRuntimeDefaults.orchestration["qa.claude.Review.model"]).toBe("seeded");
+  });
+});

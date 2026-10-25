@@ -1,5 +1,5 @@
 import type { Agent, Flow, SpecBrief, ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd, Autonomy, VerifyScope, ResumeCtx, AttachmentCtx } from "./types";
-import { resolveMethod, FLOW_PHASES, type ExecuteMode, type MethodDef, type PhasePlan } from "@hanoman/shared";
+import { resolveMethod, FLOW_PHASES, REVIEWER_CELL, type ExecuteMode, type MethodDef, type PhasePlan } from "@hanoman/shared";
 import { REVERSE_STANDARD } from "./reverse-standard";
 import { verifyScopeClause } from "./verify-scope";
 import { CODE_STYLE_CLAUSE } from "./code-style";
@@ -97,8 +97,20 @@ const phaseInstruction = (phases: readonly string[], method: MethodDef) => {
     + `\nExecute BELUM selesai selama plan (\`${method.planDir}/**\`) masih punya task `
     + `\`- [ ]\`: kerjakan SEMUA PR/task sampai tiap kotak jadi \`- [x]\` sebelum menulis `
     + `\`Execute done\`. hanoman menahan backlog di \`executing\`, bukan \`done\`, selama masih ada \`- [ ]\`.`
-    + `\n${PLAN_SHAPE}`;
+    + `\n${PLAN_SHAPE}`
+    + (phases.includes(REVIEWER_CELL) ? `\n${SELF_REVIEW_CLAUSE}` : "");
 };
+
+// ADR-0230 · fase Review di sesi tunggal (tanpa agen fase): agen yang sama memeriksa hasil Execute-nya
+// sendiri dengan gerbang bukti reviewer ADR-0170, sebelum backlog boleh mencapai `done`.
+export const SELF_REVIEW_CLAUSE =
+  "Fase Review (sesudah `Execute done`): periksa ulang hasil Execute terhadap dokumen spec & plan backlog "
+  + "ini — baca seluruh perubahan sesi ini (diff dari commit awal worktree) dan jalankan test sesuai scope "
+  + "verifikasi. Tulis "
+  + "tabel `AC → putusan → bukti` (setiap acceptance criteria → perintah & hasil yang kamu baca, atau path:baris) "
+  + "lalu satu baris `Verdict: lulus` atau `Verdict: rework`. `rework` → perbaiki temuannya, lalu review ulang; "
+  + "maks 2 putaran rework, sisanya jadi keputusan terbuka. Tulis `Review done` HANYA sesudah `Verdict: lulus`; "
+  + "Review TIDAK PERNAH `skipped`.";
 
 // SPEC-734 · ADR-0113 · peta fase → skill datang dari registry metode (`METHODS` di
 // @hanoman/shared), bukan konstanta di sini. Objective dan Spec adalah keluaran skill brainstorming
@@ -234,38 +246,30 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
   const phaseList = plan.phases
     .map((p, i) => `${i + 1}. ${p.phase} → \`${p.agentName}\` · ${runtimeLabel(p)}`)
     .join("\n");
-  // ADR-0170 P2 · reviewer independen Execute (feature/qa). Bukan fase: tak punya baris marker, dan
-  // invocation-nya tercatat di bawah Execute (roster `phase`).
-  const reviewer = plan.reviewer && plan.phases.some((p) => p.phase === plan.reviewer!.phase)
-    ? plan.reviewer : undefined;
-  const list = reviewer
-    ? `${phaseList}\nReviewer Execute → \`${reviewer.agentName}\` · ${runtimeLabel(reviewer)} `
-      + "(bukan fase — hanya dipanggil di langkah R)"
-    : phaseList;
+  // ADR-0230 · reviewer independen ADR-0170 kini fase `Review` resmi (feature/qa): punya baris marker
+  // sendiri dan tercantum di daftar fase seperti yang lain; aturan rework-nya di langkah R.
+  const review = plan.phases.find((p) => p.phase === REVIEWER_CELL);
   const hasExecute = plan.phases.some((p) => p.phase === "Execute");
   // ADR-0170 P2 · path plan PERSIS (Plan melapor `<YYYY-MM-DD>-<spec-id>-<slug>.md`), bukan glob.
   const artefactRule = "Baris `Artefak fase sebelumnya:` diisi path PERSIS yang dilaporkan fase sebelumnya di "
     + "`Artefak:` laporannya"
     + (hasExecute ? " — untuk Execute: dokumen spec DAN berkas plan yang dilaporkan fase Plan" : "")
+    + (review ? "; untuk Review: dokumen spec & berkas plan yang SAMA dengan Execute" : "")
     + ", bukan pola glob.";
-  const reviewStep = reviewer
-    ? "R. Review Execute: sesudah agen Execute melapor `Status: selesai` dengan bukti dan tanpa keputusan "
-      + "terbuka, SEBELUM menulis `Execute done`, panggil "
-      + (antigravity ? `\`${reviewer.agentName}\` lewat invoke_subagent`
-        : codex ? `\`${reviewer.agentName}\` lewat spawn_agent`
-        : `tool Agent dengan \`subagent_type\` \`${reviewer.agentName}\``)
-      + " (deskripsi `Review Execute`) dengan blok serah-terima:\n"
-      + "Tujuan: <objective backlog>\nBase SHA: $HANOMAN_BASE_SHA\n"
+  const reviewStep = review
+    ? "R. Fase Review: sesudah `Execute done` tercatat, panggil agen fasenya seperti langkah 1 dengan baris "
+      + "serah-terima tambahan:\n"
       + "Artefak: <path PERSIS dokumen spec & berkas plan> (qa yang melewati Spec & Plan: dokumen audit)\n"
       + "Laporan Execute: <tabel AC → bukti dari laporannya>\nPutaran rework: <r>/2\n\n"
-      + "`Verdict: lulus` → langkah 2 (tulis `Execute done`). `Verdict: rework` → lanjutkan agen Execute yang "
+      + "`Verdict: lulus` → langkah 2 (tulis `Review done`). `Verdict: rework` → lanjutkan agen Execute yang "
       + `SAMA lewat ${resume} dengan \`Temuan wajib diperbaiki:\` reviewer apa adanya; sesudah ia melapor `
       + `\`selesai\` lagi, lanjutkan reviewer yang SAMA lewat ${resume} dengan laporan barunya. Batasnya `
       + "maks 2 putaran rework: masih `rework` sesudah putaran ke-2 → perlakukan temuan tersisa sebagai "
       + "`Keputusan terbuka` langkah 4 (tanyakan, teruskan jawabannya ke agen Execute, lalu review lagi). "
-      + "Putaran rework bukan percobaan ulang langkah 3; reviewer galat atau tanpa baris `Verdict:` → "
-      + "langkah 3 berlaku padanya, `menunggu-keputusan` → langkah 4. JANGAN memperbaiki temuan sendiri dan "
-      + "JANGAN menulis `Execute done` tanpa `Verdict: lulus`."
+      + "Putaran rework bukan percobaan ulang langkah 3 dan tak menulis ulang `Execute done`; reviewer galat "
+      + "atau tanpa baris `Verdict:` → langkah 3 berlaku padanya, `menunggu-keputusan` → langkah 4. JANGAN "
+      + "memperbaiki temuan sendiri, JANGAN menulis `Review done` tanpa `Verdict: lulus`, dan Review tak "
+      + "pernah `skipped`."
     : "";
   return [
     antigravity
@@ -276,7 +280,7 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
         + "one-shot/bridge untuk sesi kerja child. Kamu TIDAK mengerjakan isi fase sendiri."
       : "Sesi ini ORCHESTRATOR. Setiap fase dikerjakan subagent fase miliknya dengan model & effort yang "
         + "sudah terkunci di definisinya — kamu TIDAK mengerjakan isi fase sendiri.",
-    `Fase berurutan:\n${list}`,
+    `Fase berurutan:\n${phaseList}`,
     "Untuk SETIAP fase, berurutan:",
     `1. Panggil subagent fasenya lewat ${call}, tugasnya berupa blok serah-terima berbentuk tetap:\n`
       + "Urutan: <n>/<total> · <Nama Fase>\nTujuan: <objective backlog/project>\n"
@@ -287,7 +291,7 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "commit, atau push): jalankan persis `echo \"<Nama Fase> done\" >> \"$HANOMAN_PHASE_FILE\"`, lalu "
       + "verifikasi dengan `tail -1 \"$HANOMAN_PHASE_FILE\"` bahwa barisnya benar tertulis. Kamu "
       + "satu-satunya penulis berkas itu."
-      + (reviewer ? " Khusus Execute: langkah R dulu; marker ditulis sesudah `Verdict: lulus`." : ""),
+      + (review ? " Khusus Review: marker hanya sesudah `Verdict: lulus` (langkah R)." : ""),
     "3. `Status: sebagian`/`terhalang`, galat, atau laporan tanpa bukti → delegasikan ULANG SEKALI ke "
       + `subagent fase yang sama${retry} dengan laporan gagalnya disertakan (\`Percobaan: 2/2\`). Gagal lagi → `
       + `BERHENTI dan ${askEscalation} apa yang harus dilakukan. Aturan ini berlaku walau `
@@ -308,7 +312,8 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
     "DILARANG mengerjakan isi fase sendiri — termasuk saat subagent gagal. Menulis `skipped` untuk fase "
       + "yang dilewati bukan mengerjakannya.",
     "Pekerjaan ini BELUM selesai sampai SEMUA fase di daftar di atas punya baris `done` atau `skipped` di "
-      + "$HANOMAN_PHASE_FILE — JANGAN commit/push final atau menyatakan tuntas sebelum itu. Periksa dengan "
+      + "$HANOMAN_PHASE_FILE" + (review ? " (Review wajib `done`)" : "")
+      + " — JANGAN commit/push final atau menyatakan tuntas sebelum itu. Periksa dengan "
       + "`cat \"$HANOMAN_PHASE_FILE\"` sebelum commit terakhir.",
   ].filter(Boolean).join("\n\n");
 }
@@ -612,18 +617,25 @@ export function continuePrompt(
     + `docs yang tersentuh dan link-nya di index, dalam commit yang sama.`;
   const push = `Setelah selesai: commit, lalu \`git push origin HEAD:refs/heads/${branchTo}\`. Worktree `
     + `ini detached HEAD — itu memang disengaja.`;
+  const hasReview = plan ? plan.phases.some((p) => p.phase === REVIEWER_CELL) : PIPELINES[flow].includes(REVIEWER_CELL);
   if (plan) {
     return [
       head,
       `JANGAN mengulang fase awal — spec & plan sudah ada di ${m.planDir}/**. Lanjutkan HANYA fase `
-        + "Execute lewat subagent fasenya.",
+        + (hasReview ? "Execute lalu Review lewat subagent fasenya." : "Execute lewat subagent fasenya."),
       // S3 · berkas fase tak pernah dikosongkan: baris `Execute done` run lama masih ada dan akan
       // memenuhi gerbang penutup sebelum agen Execute sesi ini bekerja sama sekali.
-      "$HANOMAN_PHASE_FILE masih memuat baris `Execute done` LAMA dari sesi sebelumnya — baris itu "
-        + "TIDAK berlaku untuk sesi ini dan tidak memenuhi gerbang penutup. Sesudah agen fase Execute "
-        + "SESI INI melapor `Status: selesai` (dan lolos langkah R bila ada), tulis baris `Execute done` BARU "
-        + "(verifikasi `tail -1`); "
-        + "commit/push final baru sah sesudah baris baru itu.",
+      // ADR-0230 · sama untuk `Review done` lama.
+      hasReview
+        ? "$HANOMAN_PHASE_FILE bisa masih memuat baris `Execute done` dan `Review done` LAMA dari sesi "
+          + "sebelumnya — keduanya TIDAK berlaku untuk sesi ini dan tidak memenuhi gerbang penutup. Sesudah agen "
+          + "fase Execute SESI INI melapor `Status: selesai`, tulis baris `Execute done` BARU; sesudah agen fase "
+          + "Review SESI INI melapor `Verdict: lulus`, tulis baris `Review done` BARU (verifikasi `tail -1` "
+          + "tiap kali); commit/push final baru sah sesudah kedua baris baru itu."
+        : "$HANOMAN_PHASE_FILE masih memuat baris `Execute done` LAMA dari sesi sebelumnya — baris itu "
+          + "TIDAK berlaku untuk sesi ini dan tidak memenuhi gerbang penutup. Sesudah agen fase Execute "
+          + "SESI INI melapor `Status: selesai`, tulis baris `Execute done` BARU (verifikasi `tail -1`); "
+          + "commit/push final baru sah sesudah baris baru itu.",
       orchestratorClause(plan), autonomyClause(autonomy), orchestratorAttachmentClause(attachments), push,
       specContext(spec),
     ].filter(Boolean).join("\n\n");
@@ -632,13 +644,17 @@ export function continuePrompt(
     head,
     `JANGAN mengulang fase awal — spec & plan sudah ada. Lanjut di fase Execute: baca plan `
       + `di ${m.planDir}/** untuk backlog item ini, periksa task yang sudah \`[x]\` `
-      + `dan selesaikan yang masih \`[ ]\`. Verifikasi nyata sebelum klaim selesai.`,
+      + `dan selesaikan yang masih \`[ ]\`. Verifikasi nyata sebelum klaim selesai.`
+      // ADR-0230 · lalu fase Review; marker-nya ditulis agar sesi bisa tertutup (`Review done` lama
+      // — bila ada — tak berlaku).
+      + (hasReview ? " Sesudah itu jalankan fase Review, lalu tulis `echo \"Review done\" >> \"$HANOMAN_PHASE_FILE\"` "
+        + "BARU (baris `Review done` lama di berkas itu tak berlaku).\n" + SELF_REVIEW_CLAUSE : ""),
     autonomyClause(autonomy),
     scopeClause(flow, verifyScope),
     codeStyleClause(flow),
     methodClause(m),
     attachmentClause(attachments),
-    skillInstruction(flow, ["Execute"], m),
+    skillInstruction(flow, hasReview ? ["Execute", REVIEWER_CELL] : ["Execute"], m),
     push,
     specContext(spec),
   ].filter(Boolean).join("\n\n");

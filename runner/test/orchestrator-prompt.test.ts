@@ -260,11 +260,13 @@ describe("pembangun prompt · mode orchestrator (ADR-0164)", () => {
 });
 
 // ADR-0170 P2 · reviewer independen, kontrak path plan, dan lampiran di mode orchestrator.
-describe("P2 · orchestrator: reviewer Execute, path plan persis, lampiran (ADR-0170)", () => {
-  it.each(["claude", "codex"] as const)("%s: reviewer dipanggil sesudah Execute selesai & SEBELUM `Execute done`", (rt) => {
+// ADR-0230 · langkah R kini fase Review resmi: Execute ditutup lebih dulu, Review menutup pipeline.
+describe("P2 · orchestrator: fase Review, path plan persis, lampiran (ADR-0170, ADR-0230)", () => {
+  it.each(["claude", "codex"] as const)("%s: fase Review sesudah `Execute done`, `Review done` hanya sesudah lulus", (rt) => {
     const c = orchestratorClause(plan("feature", rt));
-    expect(c).toContain("`hanoman-fase-review`");
-    expect(c).toMatch(/SEBELUM menulis `Execute done`/);
+    expect(c).toContain("Review → `hanoman-fase-review`");
+    expect(c).not.toMatch(/SEBELUM menulis `Execute done`/);
+    expect(c).not.toContain("Reviewer Execute");
     expect(c).toContain("Artefak: <path PERSIS dokumen spec & berkas plan>");
     expect(c).toContain("Base SHA: $HANOMAN_BASE_SHA");
     expect(c).toContain("`Verdict: lulus`");
@@ -272,19 +274,25 @@ describe("P2 · orchestrator: reviewer Execute, path plan persis, lampiran (ADR-
     expect(c).toContain("maks 2 putaran rework");
     expect(c).toMatch(/masih `rework`.*`Keputusan terbuka`.*langkah 4/s);
     expect(c).toContain(rt === "codex" ? "send_input" : "SendMessage");
-    expect(c).toContain("`Review Execute`");
+    expect(c).toContain("agen Execute yang SAMA");
+    expect(c).toContain("JANGAN menulis `Review done` tanpa `Verdict: lulus`");
+    expect(c).toContain("Review tak pernah `skipped`");
+    expect(c).toContain("(Review wajib `done`) — JANGAN commit/push final");
+    expect(c).toContain("Periksa dengan `cat \"$HANOMAN_PHASE_FILE\"`");
   });
-  it("reviewer tercantum di daftar agen dengan model/effort-nya; flow tanpa reviewer tak berubah", () => {
-    expect(orchestratorClause(plan("qa"))).toContain("Reviewer Execute → `hanoman-fase-review` · opus · high");
+  it("Review tercantum di daftar fase dengan model/effort reviewer; flow tanpa Review tak berubah", () => {
+    expect(orchestratorClause(plan("qa"))).toContain("5. Review → `hanoman-fase-review` · opus · high");
     const g = orchestratorClause(plan("goal"));
     expect(g).not.toContain("hanoman-fase-review");
     expect(g).not.toContain("Verdict");
   });
-  it("continue (rencana Execute saja) tetap membawa langkah reviewer", () => {
+  it("continue (rencana Execute + Review) membawa langkah Review dan menolak baris lama keduanya", () => {
     const full = plan("feature");
     const p = continuePrompt("feature", spec, "b", undefined, undefined, undefined, undefined,
-      { ...full, phases: full.phases.filter((x) => x.phase === "Execute") });
+      { ...full, phases: full.phases.filter((x) => x.phase === "Execute" || x.phase === "Review") });
     expect(p).toContain("`hanoman-fase-review`");
+    expect(p).toContain("fase Execute lalu Review");
+    expect(p).toContain("`Review done` LAMA");
   });
   it("`Artefak fase sebelumnya:` diisi path PERSIS yang dilaporkan, termasuk berkas plan untuk Execute", () => {
     const c = orchestratorClause(plan("feature"));

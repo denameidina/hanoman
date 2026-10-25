@@ -317,24 +317,28 @@ describe("P2 · Execute & kontrak fase (ADR-0170)", () => {
   });
 });
 
-describe("P2 · reviewer independen Execute (ADR-0170)", () => {
-  it("feature & qa: agen `hanoman-fase-review` ber-fase Execute, opus/high, konteks bersama sama", () => {
+// ADR-0230 · reviewer independen ADR-0170 kini agen fase `Review` resmi (feature & qa).
+describe("P2 · reviewer independen = agen fase Review (ADR-0170, ADR-0230)", () => {
+  it("feature & qa: agen `hanoman-fase-review` ber-fase Review, opus/high, konteks bersama sama", () => {
     for (const flow of ["feature", "qa"] as const) {
-      const r = agentsFor(flow).find((d) => d.name === REVIEW)!;
-      expect(r).toMatchObject({ kind: "phase", phase: "Execute", model: "opus", effort: "high", tools: null,
+      const defs = agentsFor(flow);
+      const r = defs.find((d) => d.name === REVIEW)!;
+      expect(r).toMatchObject({ kind: "phase", phase: "Review", model: "opus", effort: "high", tools: null,
         context: "KONTEKS-UJI", mentions: [] });
       expect(r.description).toContain("hanya dipanggil orchestrator");
+      expect(defs.filter((d) => d.name === REVIEW)).toHaveLength(1);
+      expect(defs.at(-1)!.name).toBe(REVIEW);
     }
     for (const flow of ["goal", "audit", "reverse"] as const)
       expect(agentsFor(flow).some((d) => d.name === REVIEW)).toBe(false);
   });
-  it("continue (rencana hanya Execute) tetap membawa reviewer; rencana tanpa Execute tidak", () => {
+  it("continue (rencana Execute + Review) membawa reviewer; rencana tanpa Review tidak", () => {
     const full = planFor("feature");
-    const onlyExec = { ...full, phases: full.phases.filter((p) => p.phase === "Execute") };
+    const cont = { ...full, phases: full.phases.filter((p) => p.phase === "Execute" || p.phase === "Review") };
     const ctx = { flow: "feature" as const, method: resolveMethod(), context: "K" };
-    expect(buildPhaseAgents(onlyExec, ctx).map((d) => d.name)).toEqual(["hanoman-fase-execute", REVIEW]);
-    const noExec = { ...full, phases: full.phases.filter((p) => p.phase !== "Execute") };
-    expect(buildPhaseAgents(noExec, ctx).some((d) => d.name === REVIEW)).toBe(false);
+    expect(buildPhaseAgents(cont, ctx).map((d) => d.name)).toEqual(["hanoman-fase-execute", REVIEW]);
+    const noReview = { ...full, phases: full.phases.filter((p) => p.phase !== "Review") };
+    expect(buildPhaseAgents(noReview, ctx).some((d) => d.name === REVIEW)).toBe(false);
   });
   it("instruksi: baca spec/plan & diff base, jalankan test sesuai scope, read-only, laporan AC + Verdict", () => {
     const r = agentsFor("feature").find((d) => d.name === REVIEW)!.instructions;
@@ -502,7 +506,7 @@ describe("Antigravity phase protocol (SPEC-1442)", () => {
     expect(prompt).toContain("reviewer yang SAMA lewat send_message");
     expect(prompt).toContain("satu-satunya penulis berkas itu");
     expect(prompt).toContain('tail -1 "$HANOMAN_PHASE_FILE"');
-    expect(prompt).toContain("JANGAN menulis `Execute done` tanpa `Verdict: lulus`");
+    expect(prompt).toContain("JANGAN menulis `Review done` tanpa `Verdict: lulus`");
     expect(prompt).toContain("maks 2 putaran rework");
     expect(prompt).toContain("Percobaan: 2/2");
     expect(prompt).toContain('cat "$HANOMAN_PHASE_FILE"');
@@ -533,10 +537,10 @@ describe("Antigravity phase protocol (SPEC-1442)", () => {
     expect(reviewer.instructions).toContain("JANGAN mengubah, membuat, atau menghapus");
   });
   it.each([
-    // Hash defs diperbarui sengaja oleh ADR-0225 (bentuk plan, keputusan di depan, aturan foreground);
-    // hash parent tak berubah — klausa orchestrator tak disentuh.
-    ["claude", "26812ce4a0bd69e52ab388cfd259a44831b09a7f9b0969e0e2044880442fb0f4", "aef0fe90e7b00045ff5f35a04ad22cf85985ca7c5b90913818a86e5b184ff4ac"],
-    ["codex", "a77bc5f636771d2637d85d7f53bfd0c129fc53fcf2853a577beaf98bf8b7741a", "b60111bd6f3052aecc90cebd8c2b9f80c08be6b9d9e2c637ade494a8837e5c6d"],
+    // Hash defs diperbarui sengaja oleh ADR-0225 (bentuk plan, keputusan di depan, aturan foreground).
+    // ADR-0230 · parent & defs berubah sengaja: Review jadi fase resmi (langkah R pindah ke fase Review).
+    ["claude", "3005c24cf79478587df607e9f24d79679bec16932a5793187580aac3800b49a8", "94e51b35e3881e9ae1cd513eec0b1b1d227ded9befa34faa62e3b25bd0a76e47"],
+    ["codex", "c4b997870f0ae9d870a4ee5448c2ec2300d4fdee755d380b8d5ef187b8b49877", "72998f71a47d725352e7fd572e8bdb3a426a08d556fe48af42e948fcd1038ddc"],
   ] as const)("%s existing parent/phase prompts stay byte-identical", (runtime, parentHash, defsHash) => {
     const plan = planFor("feature", runtime);
     const defs = withPhaseDelegation(buildPhaseAgents(plan, { flow: "feature", method: resolveMethod("superpowers"), verifyScope: "changed", context: "KONTEKS-UJI" }), [], runtime);

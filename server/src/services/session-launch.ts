@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import type { Spec } from "@prisma/client";
 import { realGit, startPrompt, continuePrompt, resumePrompt, startGoalPrompt, resolveGoalCondition, buildPhaseAgents, fromAuditOf, specContext, goalContext, type Flow, type Autonomy, type VerifyScope, type ResumeCtx } from "@hanoman/runner";
-import { resolveMethod, readSpecMethod, stampSpecMethod, isGoalShapedFlow, LOCAL_DEVICE_ID, type Agent, type PhaseOverrides } from "@hanoman/shared";
+import { resolveMethod, readSpecMethod, stampSpecMethod, isGoalShapedFlow, LOCAL_DEVICE_ID, REVIEWER_CELL, type Agent, type PhaseOverrides } from "@hanoman/shared";
 import { resolveRepoDir } from "./local-binding";
 import { CheckoutError, cloneProjectCheckout, fetchRefIfMissing } from "./project-checkout";
 import { getSetting } from "./settings";
@@ -262,10 +262,11 @@ export async function startSpecSession(
     const resumeCtx = resume ? buildResumeCtx(repoDir, id, opts.flow, resume.worktreeKept) : undefined;
     // ADR-0164 · rencana fase dihitung SEKALI; prompt orchestrator, agen fase, dan prompt mode tunggal
     // lahir dari input yang SAMA, jadi fallback all-or-nothing di createSession tak merakit ulang apa pun.
-    // SPEC-172 · continue hanya melanjutkan Execute; flow goal tak punya Execute dan tetap utuh.
+    // SPEC-172 · continue hanya melanjutkan Execute — ADR-0230 · lalu Review, yang menutup feature/qa;
+    // flow goal tak punya Execute dan tetap utuh.
     let plan = fullPlan;
     if (fullPlan && isContinue && !isGoalFlow) {
-      const phases = fullPlan.phases.filter((p) => p.phase === "Execute");
+      const phases = fullPlan.phases.filter((p) => p.phase === "Execute" || p.phase === REVIEWER_CELL);
       // ADR-0164 · flow tanpa fase Execute (mis. audit) menyaring jadi KOSONG — pakai `null`, bukan
       // plan dengan `phases: []`, supaya prompt orchestrator tak dirakit atas daftar fase kosong.
       plan = phases.length ? { ...fullPlan, phases } : null;
@@ -301,7 +302,7 @@ export async function startSpecSession(
       decisionFile: decisionFilePath(repoDir, id),
       attachmentsDir: attachments.items.length ? attachments.dir : undefined,
       prompt, legacyPrompt, phaseAgents,
-      // S3 · SPEC-172 · berkas fase continue masih memuat `Execute done` run lama; fase yang DIKERJAKAN
+      // S3 · SPEC-172 · berkas fase continue masih memuat `Execute done` (ADR-0230 · dan `Review done`) run lama; fase yang DIKERJAKAN
       // ULANG sesi ini tak boleh dihitung `doneAtBirth`, supaya ⚠ bukti tetap bisa menyala.
       ...(isContinue && plan ? { rerunPhases: plan.phases.map((p) => p.phase) } : {}),
       env: scopeEnv,

@@ -12,6 +12,7 @@
 - [0162 — Worktree yatim dipungut setelah konfirmasi operator](0162-pemungutan-worktree-yatim-dengan-konfirmasi.md) — SPEC-1109: deteksi boot dan tab Worktrees memakai history + tmux; pemungutan manual menjaga resume ADR-0084. Mode yatim tidak menutup sesi yang kembali hidup, rename gagal tidak jatuh ke penghapusan sinkron, dan reaper tetap `.trash/**`.
 
 - [0229 — Scope verifikasi `none`: sesi tak menjalankan test sama sekali](0229-scope-verifikasi-none.md) — **memperluas 0080**. Nilai ketiga `verifyScope` untuk perangkat yang tak kuat menjalankan test bahkan dengan scope `changed`. Klausa tanpa jalan keluar "perluas bila perlu" (biaya test alasan operator memilihnya); menimpa skill TDD, fase Verifikasi/review, dan DoD repo target; typecheck maks sekali per paket tersentuh; laporan wajib jujur bahwa test tak dijalankan. Tanpa migration, tanpa endpoint baru.
+- [0230 — Fase Review resmi untuk flow feature & qa](0230-fase-review-resmi.md) — **mengamandemen 0170 #4**. Review = fase pipeline feature/qa sesudah Execute (semua mode sesi); Review menutup stage `done` dan tak boleh `skipped`; reviewer jadi agen fase Review.
 
 Sub-index dari [internal/docs/README.md](../README.md). Index utama menyimpan daftar **satu baris per
 ADR**; berkas ini menyimpan **narasinya** — apa yang diperluas, dicabut, atau diamandemen tiap

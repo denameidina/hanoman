@@ -79,7 +79,7 @@ describe("codexGoalScript", () => {
 
   it("meloloskan (exit 0) saat semua fase tercatat & tak ada plan tersisa", () => {
     writeFileSync(join(dir, "phases"),
-      "Brainstorm done\nObjective done\nSpec skipped\nPlan done\nExecute done\n");
+      "Brainstorm done\nObjective done\nSpec skipped\nPlan done\nExecute done\nReview done\n");
     mkdirSync(join(dir, "wt/docs/superpowers/plans"), { recursive: true });
     writeFileSync(join(dir, "wt/docs/superpowers/plans/2026-07-27-x-spec-338.md"), "- [x] beres\n");
     expect(runGate(gate()).code).toBe(0);
@@ -87,7 +87,7 @@ describe("codexGoalScript", () => {
 
   it("memblok saat plan spec ini masih punya - [ ]", () => {
     writeFileSync(join(dir, "phases"),
-      "Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\n");
+      "Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\nReview done\n");
     mkdirSync(join(dir, "wt/docs/superpowers/plans"), { recursive: true });
     writeFileSync(join(dir, "wt/docs/superpowers/plans/2026-07-27-x-spec-338.md"), "- [ ] belum\n");
     const r = runGate(gate());
@@ -97,10 +97,22 @@ describe("codexGoalScript", () => {
 
   it("mengabaikan plan milik spec lain", () => {
     writeFileSync(join(dir, "phases"),
-      "Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\n");
+      "Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\nReview done\n");
     mkdirSync(join(dir, "wt/docs/superpowers/plans"), { recursive: true });
     writeFileSync(join(dir, "wt/docs/superpowers/plans/2026-07-01-lain-spec-299.md"), "- [ ] belum\n");
     expect(runGate(gate()).code).toBe(0);
+  });
+
+  // ADR-0230 · Review tak boleh dilewati: `Review skipped` memblok, `Execute done` saja juga.
+  it("memblok saat Review skipped atau belum tercatat", () => {
+    mkdirSync(join(dir, "wt/docs/superpowers/plans"), { recursive: true });
+    writeFileSync(join(dir, "wt/docs/superpowers/plans/2026-07-27-x-spec-338.md"), "- [x] beres\n");
+    for (const tail of ["Review skipped\n", ""]) {
+      writeFileSync(join(dir, "phases"), `Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\n${tail}`);
+      const r = runGate(gate());
+      expect(r.code).toBe(2);
+      expect(r.stderr).toContain("fase Review");
+    }
   });
 
   it("flow tanpa Plan+Execute tak menggerbang plan sama sekali", () => {

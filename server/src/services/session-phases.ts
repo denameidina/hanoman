@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { promisify } from "node:util";
 import { PIPELINES, WORK_PHASES, type Flow } from "@hanoman/runner";
-import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, phaseAgentName, type Stage, type Agent } from "@hanoman/shared";
+import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, UNSKIPPABLE_PHASES, phaseAgentName, type Stage, type Agent } from "@hanoman/shared";
 import { STAGES } from "./stage-machine";
 
 export type PhaseState = "done" | "skipped" | "active" | "pending";
@@ -174,7 +174,9 @@ export function trackDoneSeen(phases: Phase[], doneSeenAt: Map<string, number>, 
 // Execute/plan; `planComplete` true → `stageForRun` tak menahan di `executing`). Nama unik lintas PIPELINES.
 const REACHED: Record<string, Stage> = {
   Objective: "objective", Audit: "objective", Spec: "spec-ready", Plan: "planned",
-  Laporan: "done", Execute: "done",
+  // ADR-0230 · flow feature & qa ditutup fase Review resmi: Execute selesai baru `executing`, Review
+  // yang mencapai `done`. `Review` unik lintas PIPELINES dan bukan fase kerja (`WORK_PHASES`).
+  Laporan: "done", Execute: "executing", Review: "done",
   // SPEC-407 · ADR-0089 · flow goal (Goal → Verifikasi): fase kerja mencapai `executing`, fase
   // verifikasi yang mencapai `done`. Kedua nama unik lintas PIPELINES — peta ini berkunci nama.
   Goal: "executing", Verifikasi: "done",
@@ -191,6 +193,8 @@ export function stageFor(phases: Phase[]): Stage | null {
     if ((WORK_PHASES as readonly string[]).includes(p.name) && p.state === "active")
       best = Math.max(best, STAGES.indexOf("executing"));
     if (p.state !== "done" && p.state !== "skipped") continue;
+    // ADR-0230 · Review tak boleh dilewati: `Review skipped` bukan tercapai.
+    if (p.state === "skipped" && UNSKIPPABLE_PHASES.has(p.name)) continue;
     const s = REACHED[p.name];
     if (s) best = Math.max(best, STAGES.indexOf(s));
   }
@@ -301,8 +305,10 @@ export async function planCompleteAsync(worktree: string, specId: string, planPh
 //
 // Daftar kosong = "tak tahu apa-apa" (flow tak dikenal / sesi tanpa fase) → false, bukan
 // vacuous true; kalau tidak, setiap terminal biasa akan lahir dengan label "Selesai".
+// ADR-0230 · `skipped` pada fase `UNSKIPPABLE_PHASES` (Review) tak menutup pipeline.
 export const phasesComplete = (phases: Phase[]): boolean =>
-  phases.length > 0 && phases.every((p) => p.state === "done" || p.state === "skipped");
+  phases.length > 0 && phases.every((p) =>
+    p.state === "done" || (p.state === "skipped" && !UNSKIPPABLE_PHASES.has(p.name)));
 
 // Verdict yang dikirim ke Terminal. Gerbang plan-nya SAMA dengan `stageForRun` (ADR-0029):
 // berkas fase bisa berkata `Execute done` sementara plan masih menyisakan `- [ ]`, dan hanoman

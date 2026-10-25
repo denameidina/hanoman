@@ -68,7 +68,7 @@ latar adalah *menunggu*, bukan *memanggil*.
      SHA, jangkar), baca SEMUA laporan anak, `Keputusan terbuka:` anak diteruskan, anak dilarang
      `git push`/`git stash`.
    Kerjakan/Verifikasi/reviewer tanpa klausa. Roster kosong → klausa generik tanpa nama.
-4. **Reviewer independen Execute `hanoman-fase-review`** untuk flow feature & qa — BUKAN fase pipeline
+4. **[Diamandemen ADR-0230: Review kini fase pipeline resmi feature/qa — langkah R pindah ke fase Review, `PhasePlan.reviewer` dicabut]** **Reviewer independen Execute `hanoman-fase-review`** untuk flow feature & qa — BUKAN fase pipeline
    (`FLOW_PHASES`, peta stage, UI, data lama tak berubah). `PhasePlan.reviewer` dari `resolvePhasePlan`:
    default claude `opus`·`high`, codex `gpt-5.6-sol`·`high`, tak mewarisi orchestrator; override lewat sel
    Setting `orchestration.<flow>.<runtime>.Review` (tanpa migration). Instruksi turunan `spec-auditor` +
