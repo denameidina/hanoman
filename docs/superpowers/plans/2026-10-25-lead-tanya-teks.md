@@ -67,8 +67,8 @@ Spec: [`docs/superpowers/specs/2026-10-25-lead-tanya-teks-design.md`](../specs/2
 
 ### Task 4: docs & verifikasi
 
-- [ ] ADR-0231 (amandemen ADR-0167), catatan amandemen di ADR-0167, index `internal/docs/README.md` &
+- [x] ADR-0231 (amandemen ADR-0167), catatan amandemen di ADR-0167, index `internal/docs/README.md` &
   `internal/docs/adr/README.md`, `internal/skills/hanoman/SKILL.md` (bagian lead/ask).
-- [ ] Typecheck shared/runner/server; test `--changed main` dibanding `main`; boot server lokal: buat
+- [x] Typecheck shared/runner/server; test `--changed main` dibanding `main`; boot server lokal: buat
   project + opt-in lead + start sesi backlog dummy (`HANOMAN_CLAUDE_BIN=/bin/echo`) dan periksa berkas
   prompt-nya, lalu matikan lead dan ulangi. Centang plan, commit.
