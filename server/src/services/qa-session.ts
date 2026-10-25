@@ -10,6 +10,7 @@ import { sessionAgentDefaults, getSetting } from "./settings";
 import { ensureCodexTrust } from "./codex-trust";
 import { readQaAttachmentBytes } from "./qa-attachment-transfer";
 import { saveSessionUpload, sessionUploadDir } from "./uploads";
+import { askViaFor } from "./lead/ask-via";
 
 export class QaSessionError extends Error {
   constructor(public code: number, message: string, public needsBind = false) { super(message); }
@@ -63,8 +64,10 @@ export async function startQaFindingSession(d: QaReportDetail, fid: string): Pro
       `Kerjakan pada branch ${branch}. Laporkan perubahan, bukti verifikasi dan langkah retest; integrasi diputuskan operator melalui Terminal. Jangan menandai temuan selesai sebelum retest operator.`,
       verifyScopeClause(verifyScope), CODE_STYLE_CLAUSE, reused ? RESUMED_WORKTREE_NOTE : "",
     ].filter(Boolean).join("\n\n");
+    // ADR-0231 · cara bertanya dikunci saat lahir: teks bila lead menjawab project ini.
+    const askVia = await askViaFor(d.projectId, agent);
     const s = createSession(d.projectId, wt, {
-      id, branch, agent, model, effort, prompt,
+      id, branch, agent, model, effort, prompt, askVia,
       env: { HANOMAN_BASE_SHA: baseSha, HANOMAN_VERIFY_SCOPE: verifyScope },
       attachmentsDir: files.length ? sessionUploadDir(id) : undefined,
     });

@@ -3,6 +3,10 @@ import { CODE_STYLE_CLAUSE } from "./code-style";
 import { DECIDER } from "./prompt";
 import { READ_ONLY_POLICY } from "./agent-readonly";
 
+// ADR-0167 · relay custom agent claude; ADR-0231 · diekspor supaya `textAsk` bisa menukarnya.
+export const ASK_RELAY_TOOL = "ajukan semuanya lewat AskUserQuestion (pecah per 4 pertanyaan), lalu teruskan jawabannya lewat "
+  + "SendMessage ke agent ID yang sama";
+
 // SPEC-450/950 · ADR-0094/0159 · bagian murni renderer native dua runtime. Claude menerima JSON
 // `--agents`; Codex TOML dirakit di `codex-agent-config.ts`. Pemanggil yang menulis berkas temp.
 
@@ -370,8 +374,7 @@ export function agentDelegationClause(
     : codex
     ? "ajukan semuanya di terminal ini (bernomor, tiap pertanyaan diakhiri `?`), lalu teruskan jawabannya "
       + "lewat send_input ke agent id yang sama"
-    : "ajukan semuanya lewat AskUserQuestion (pecah per 4 pertanyaan), lalu teruskan jawabannya lewat "
-      + "SendMessage ke agent ID yang sama";
+    : ASK_RELAY_TOOL;
   return [
     "",
     "",

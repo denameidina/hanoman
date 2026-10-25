@@ -18,6 +18,8 @@ export type AgentFlagsOpts = {
   eventHook?: boolean;
   /** ADR-0164 · command `subagentStatusLine` claude; hanya sesi orchestrator. Codex tak punya padanan. */
   subagentStatusLine?: string;
+  /** ADR-0231 · claude: sesi bertanya lewat teks biasa → hook Stop ikut ke jalur event. */
+  askText?: boolean;
 };
 
 /** Flag agen TANPA binary dan TANPA prompt positional — pemanggil yang mengutip tiap elemen. */
@@ -53,6 +55,6 @@ export function agentFlags(o: AgentFlagsOpts): string[] {
     ...(o.model ? ["--model", o.model] : []),
     ...(o.effort ? ["--effort", o.effort] : []),
     "--dangerously-skip-permissions",
-    "--settings", JSON.stringify(guardSettings(o.decisionFile, o.goal, o.eventHook, o.subagentStatusLine)),
+    "--settings", JSON.stringify(guardSettings(o.decisionFile, o.goal, o.eventHook, o.subagentStatusLine, o.askText)),
   ];
 }

@@ -8,6 +8,7 @@ export * from "./goal-spec";
 export * from "./codex-settings";
 export * from "./agent-cli";
 export * from "./custom-agents";
+export * from "./ask-via";
 export * from "./agent-definition";
 export * from "./phase-agents";
 export * from "./agent-readonly";

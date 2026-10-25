@@ -18,6 +18,7 @@ import { presenceView } from "./presence/view";
 import { remoteSessionVerdict } from "./presence/remote-session";
 import { recentlyOffline } from "./presence/registry";
 import { appendEvent } from "./logs/event-log";
+import { askViaFor } from "./lead/ask-via";
 
 // Re-ekspor supaya pemanggil (governor, test) punya satu titik impor jalur peluncuran.
 export { sessionIdForSpec } from "./pty";
@@ -296,8 +297,10 @@ export async function startSpecSession(
     // meneruskannya, klausa "berkas yang berubah" tak bisa dieksekusi tanpa menebak: worktree
     // lahir `--detach`, jadi `main` belum tentu ada dan `HEAD~1` salah.
     const scopeEnv: Record<string, string> = { HANOMAN_BASE_SHA: baseSha, HANOMAN_VERIFY_SCOPE: verifyScope };
+    // ADR-0231 · cara bertanya dikunci saat lahir: teks bila lead menjawab project ini.
+    const askVia = await askViaFor(spec.projectId, agent);
     const s = createSession(spec.projectId, worktree, {
-      specId: spec.id, flow: opts.flow, model, effort, goal, agent,
+      specId: spec.id, flow: opts.flow, model, effort, goal, agent, askVia,
       phaseFile: phaseFilePath(repoDir, id),
       decisionFile: decisionFilePath(repoDir, id),
       attachmentsDir: attachments.items.length ? attachments.dir : undefined,

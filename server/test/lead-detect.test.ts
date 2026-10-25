@@ -69,7 +69,7 @@ const rantai = (over: Partial<SessionAsk> = {}): SessionAsk => ask({
   ...over,
 });
 
-/** Giliran codex yang benar-benar bertanya — gerbangnya `readCodexTurn(ask.message)`, bukan layar. */
+/** Giliran codex yang benar-benar bertanya — gerbangnya `readTurn(ask.message)`, bukan layar. */
 const codex = (message: string): SessionAsk =>
   ask({ agent: "codex", source: "turn-end", questions: [], message });
 

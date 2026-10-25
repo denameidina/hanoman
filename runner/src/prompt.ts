@@ -34,12 +34,20 @@ export const DECIDER = "hanoman-lead bila aktif untuk project ini, selain itu ma
 // ADR-0167 · netral-agen tanpa cabang runtime (pola ADR-0074). Claude WAJIB lewat AskUserQuestion:
 // pertanyaan teks biasa dari claude tak terbaca lead sejak ADR-0146 (pemicunya PreToolUse). Codex tak
 // punya tool itu; lead membacanya dari hook `Stop` lewat ASK_SIGNALS (baris diakhiri `?`, bernomor).
-const ASK_ROUTE =
+// ADR-0231 · frasa rute-tanya claude diekspor supaya `textAsk` (ask-via.ts) bisa menukarnya dengan
+// padanan teks untuk sesi yang lahir saat lead menjawab project-nya.
+export const ASK_ROUTE =
   "ajukan lewat AskUserQuestion bila agenmu punya tool itu (paling banyak 4 pertanyaan per panggilan — "
   + "pecah sisanya ke panggilan berikutnya); bila tidak, tanyakan di terminal ini sekaligus, tiap "
   + "pertanyaan bernomor dan diakhiri `?` beserta opsinya, lalu tunggu jawabannya. Tak ada batas jumlah "
   + "pertanyaan: selama masih ambigu dan akan mempengaruhi hasil, tanyakan. Yang menjawab ditentukan "
   + `hanoman — ${DECIDER}; jangan menjawabnya sendiri.`;
+
+// ADR-0231 · langkah 3 & 4 orchestrator claude (eskalasi & relay keputusan).
+export const ASK_ESCALATION_TOOL = "tanyakan lewat AskUserQuestion";
+export const ASK_DECISIONS_TOOL =
+  "lewat AskUserQuestion — tool itu memuat paling banyak 4 pertanyaan per panggilan, jadi pecah "
+  + "sisanya ke panggilan berikutnya sampai semuanya terjawab";
 
 const AMBIGUOUS =
   "hal yang masih ambigu dan akan mempengaruhi hasil (data model, kontrak API, scope, perilaku yang "
@@ -217,7 +225,7 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
   // otonomi menyuruh manusia dijawab di terminal); orchestrator claude tetap AskUserQuestion.
   const askEscalation = codex || antigravity
     ? "tanyakan di terminal ini lalu tunggu jawaban"
-    : "tanyakan lewat AskUserQuestion";
+    : ASK_ESCALATION_TOOL;
   // ADR-0167 · tanpa batas jumlah: batas 4 milik tool AskUserQuestion, bukan kebijakan — dipecah.
   const askDecisions = antigravity
     ? "di terminal ini sekaligus dalam satu pesan, tiap pertanyaan bernomor dan diakhiri `?` beserta "
@@ -225,8 +233,7 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
     : codex
     ? "di terminal ini sekaligus dalam satu pesan, tiap pertanyaan bernomor dan diakhiri `?` beserta "
       + "opsinya, lalu tunggu jawaban"
-    : "lewat AskUserQuestion — tool itu memuat paling banyak 4 pertanyaan per panggilan, jadi pecah "
-      + "sisanya ke panggilan berikutnya sampai semuanya terjawab";
+    : ASK_DECISIONS_TOOL;
   // Audit R4 · fase bergiliran dengan manusia (Wawancara reverse, Brainstorm prd/scaffold) kini melapor
   // satu topik per putaran lewat `Keputusan terbuka:` — relaynya langkah 4 yang SAMA. Dulu claude
   // disuruh bertanya "di terminal ini" untuk fase itu; teks biasa claude tak terbaca lead (ADR-0167 #6).

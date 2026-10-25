@@ -39,7 +39,8 @@ const ASK_SIGNALS = [
  * TIDAK berubah — `CODEX_FINISHED` dan `ASK_SIGNALS` yang sama, supaya cakupan codex sesudah SPEC
  * ini setara dengan sebelumnya, bukan lebih longgar.
  */
-export function readCodexTurn(message: string): { asking: boolean; reason: string } {
+// ADR-0231 · gerbang yang sama kini juga membaca giliran claude yang bertanya lewat teks biasa.
+export function readTurn(message: string): { asking: boolean; reason: string } {
   const body = message.trim();
   if (!body) return { asking: false, reason: "giliran codex berakhir tanpa pesan" };
   if (CODEX_FINISHED.some((re) => re.test(body)))

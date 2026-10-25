@@ -21,10 +21,10 @@ export type SessionAskQuestion = {
 /** Peristiwa hook yang sudah dinormalkan; `null` dari `parseHookEvent` = bukan pertanyaan. */
 export type HookEvent = {
   source: "ask-tool" | "turn-end";
-  /** Kunci idempotensi milik AGEN: `tool_use_id` (claude) / `turn_id` (codex). */
+  /** Kunci idempotensi milik AGEN: `tool_use_id` (claude) / `turn_id` (codex) / sintetis Stop claude (ADR-0231). */
   askId: string;
   questions: SessionAskQuestion[];
-  /** Teks giliran terakhir codex; "" untuk claude, yang pertanyaannya terstruktur. */
+  /** Teks giliran terakhir (codex, atau claude yang bertanya lewat teks — ADR-0231); "" untuk AskUserQuestion. */
   message: string;
 };
 
@@ -99,7 +99,11 @@ const zAskTool = z.object({
 
 const zTurnEnd = z.object({
   hook_event_name: z.literal("Stop"),
-  turn_id: z.string().min(1),
+  // ADR-0231 · codex mengirim `turn_id`; Stop claude (sesi bertanya lewat teks) tidak — ia membawa
+  // `prompt_id` dan `background_tasks`.
+  turn_id: z.string().min(1).optional(),
+  prompt_id: z.string().optional(),
+  background_tasks: z.array(z.object({ status: z.string().optional() }).passthrough()).optional(),
   last_assistant_message: z.string().optional(),
   // Codex menyalakan bendera ini saat Stop dipicu oleh hook Stop lain. Melayani giliran yang
   // dibangkitkan gate mode goal (ADR-0074) berarti lead menjawab dirinya sendiri.
@@ -126,12 +130,23 @@ export function parseHookEvent(body: unknown): HookEvent | null {
   }
   const turn = zTurnEnd.safeParse(body);
   if (turn.success && !turn.data.stop_hook_active) {
+    // ADR-0231 · giliran yang berhenti selagi task latar masih berjalan sedang menunggu kerja, bukan bertanya.
+    if (turn.data.background_tasks?.some((t) => t.status === "running")) return null;
+    const message = clip(turn.data.last_assistant_message, ASK_MESSAGE_MAX);
     return {
       source: "turn-end",
-      askId: turn.data.turn_id,
+      askId: turn.data.turn_id ?? `stop:${turn.data.prompt_id ?? ""}:${fnv1a(message)}`,
       questions: [],
-      message: clip(turn.data.last_assistant_message, ASK_MESSAGE_MAX),
+      message,
     };
   }
   return null;
+}
+
+// ADR-0231 · hash ringkas & deterministik untuk askId sintetis (tanpa node:crypto — modul ini juga
+// dipakai frontend).
+function fnv1a(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(16);
 }

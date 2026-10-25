@@ -7,7 +7,7 @@ import { beginAnswer, endAnswer } from "../session-dialog";
 import { getLead, leadActive, leadProjects } from "./config";
 import { isTakenOver } from "./deciding";
 import { closeFlow, LeadFlowClosedError } from "./flow";
-import { readCodexTurn } from "./pane";
+import { readTurn } from "./pane";
 import { decide, prodDecideDeps, takeDelivery, type DecideDeps } from "./decide";
 import { recordDecision } from "./trail";
 
@@ -377,7 +377,7 @@ async function runChain(ask: SessionAsk, s: AskCtx, deps: DetectDeps): Promise<C
   // codex: satu langkah prosa ke kolom chat. Gerbangnya PESAN GILIRAN, bukan layar — teks penuh,
   // tak dipotong lebar pane, dan nol invokasi tmux. Ambangnya sama persis (AC-9 utuh).
   if (ask.source === "turn-end") {
-    const read = readCodexTurn(ask.message);
+    const read = readTurn(ask.message);
     if (!read.asking) return stop(read.reason);
   }
 
