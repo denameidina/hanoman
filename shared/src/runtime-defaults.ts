@@ -3,7 +3,7 @@ import { z } from "zod";
 
 // Naikkan versi ini setiap kali rekomendasi bawaan berubah. Seed server memakai versi ini
 // bersama marker per bagian untuk memperbarui konfigurasi bawaan tanpa menimpa edit operator.
-export const RUNTIME_DEFAULTS_VERSION = "2026-09-23-v2";
+export const RUNTIME_DEFAULTS_VERSION = "2026-10-25-v1";
 
 export const zRuntimeDefaultState = z.enum(["seeded", "user"]);
 export type RuntimeDefaultState = z.infer<typeof zRuntimeDefaultState>;
@@ -81,6 +81,7 @@ const flow = (
 //   dan medium cenderung menambah putaran revisi yang justru lebih mahal per task selesai.
 // - Fase interaktif dengan manusia (Brainstorm, Objective, Wawancara) → Sonnet/Terra · medium.
 // - Verifikasi → Opus/Sol · medium: model berbeda dari eksekutor menangkap hijau palsu.
+// - Review (ADR-0230, feature & qa) → Opus/Sol · high = `REVIEWER_DEFAULTS`: penilai independen.
 // - Menulis ulang temuan (Laporan, Serah terima) → Sonnet/Terra · medium/low.
 // no_effort sengaja mati sebagai pagar agar task remeh tidak menyalakan pipeline.
 export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefault> = {
@@ -91,6 +92,7 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
       Spec: cell("opus", "high"),
       Plan: cell("opus", "high"),
       Execute: cell("sonnet", "high"),
+      Review: cell("opus", "high"),
     },
     {
       Brainstorm: cell("gpt-5.6-terra", "medium"),
@@ -98,6 +100,7 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
       Spec: cell("gpt-5.6-sol", "high"),
       Plan: cell("gpt-5.6-sol", "high"),
       Execute: cell("gpt-5.6-terra", "high"),
+      Review: cell("gpt-5.6-sol", "high"),
     },
   ),
   qa: flow(
@@ -106,12 +109,14 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
       Spec: cell("opus", "high"),
       Plan: cell("sonnet", "high"),
       Execute: cell("sonnet", "high"),
+      Review: cell("opus", "high"),
     },
     {
       Audit: cell("gpt-5.6-sol", "high"),
       Spec: cell("gpt-5.6-sol", "high"),
       Plan: cell("gpt-5.6-terra", "high"),
       Execute: cell("gpt-5.6-terra", "high"),
+      Review: cell("gpt-5.6-sol", "high"),
     },
   ),
   scaffold: flow(

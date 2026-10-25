@@ -8,8 +8,8 @@ import {
 /** Nilai `model` subagent claude yang berarti "model percakapan utama" (dokumen sub-agents Claude Code). */
 export const CLAUDE_SUBAGENT_INHERIT = "inherit";
 import {
-  FLOW_PHASES, REVIEWER_CELL, REVIEWER_DEFAULTS, REVIEWER_FLOWS, phaseAgentName,
-  type OrchestrationFlow, type PhasePlan, type PhaseReviewerEntry,
+  FLOW_PHASES, REVIEWER_CELL, REVIEWER_DEFAULTS, phaseAgentName,
+  type OrchestrationFlow, type PhasePlan,
 } from "./orchestration";
 
 // ADR-0164 · resolver rencana fase. Satu fungsi murni dipakai server (kelahiran sesi) dan UI
@@ -69,19 +69,15 @@ export function resolvePhasePlan(input: PhasePlanInput): PhasePlan | null {
     const model = input.runtime === "claude" && picked === CLAUDE_DEFAULT_ALIAS ? CLAUDE_SUBAGENT_INHERIT : picked;
     return { model, effort: coerce(model, override?.effort ?? cell?.effort ?? fallback.effort ?? "medium") };
   };
-  // ADR-0170 P2 · reviewer TIDAK mewarisi orchestrator: default-nya konstanta peran (penilai
-  // independen butuh model kuat walau orchestrator murah), sel/override `Review` menimpanya.
-  const reviewer: PhaseReviewerEntry | undefined = REVIEWER_FLOWS.has(input.flow)
-    ? { agentName: phaseAgentName(REVIEWER_CELL), phase: "Execute",
-        ...resolve(REVIEWER_CELL, REVIEWER_DEFAULTS[input.runtime]) }
-    : undefined;
   return {
     flow: input.flow,
     runtime: input.runtime,
+    // ADR-0170 P2 · ADR-0230 · fase Review TIDAK mewarisi orchestrator: default-nya konstanta peran,
+    // sel/override `Review` menimpanya.
     phases: FLOW_PHASES[input.flow].map((phase) => ({
-      phase, agentName: phaseAgentName(phase), ...resolve(phase, input.orchestrator),
+      phase, agentName: phaseAgentName(phase),
+      ...resolve(phase, phase === REVIEWER_CELL ? REVIEWER_DEFAULTS[input.runtime] : input.orchestrator),
     })),
-    ...(reviewer ? { reviewer } : {}),
     // Amandemen ADR-0170 P2 · cara Execute mengerjakan plan; hanya dipakai sesi claude.
     executeMode: cfg?.executeMode ?? "inline",
   };

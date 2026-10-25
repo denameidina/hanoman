@@ -40,7 +40,7 @@ Spec: [`docs/superpowers/specs/2026-10-25-fase-review-resmi-design.md`](../specs
   `REVIEWER_CELL` tetap `"Review"`; `REVIEWER_FLOWS` diturunkan = flow yang `FLOW_PHASES`-nya memuat `REVIEWER_CELL`;
   `PhasePlan.reviewer` dan tipe `PhaseReviewerEntry` **dihapus**.
 
-- [ ] **Step 1: Tulis test gagal** di `orchestration.test.ts` — ganti asersi `.reviewer` (baris ~161-255) menjadi
+- [x] **Step 1: Tulis test gagal** di `orchestration.test.ts` — ganti asersi `.reviewer` (baris ~161-255) menjadi
   asersi entri fase:
 
 ```ts
@@ -54,8 +54,8 @@ expect(review(resolvePhasePlan({ ...base, flow: "feature" }))).toMatchObject(
 expect(UNSKIPPABLE_PHASES.has("Review")).toBe(true);
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal.** `pnpm vitest --run shared/src/orchestration.test.ts`
-- [ ] **Step 3: Implementasi.**
+- [x] **Step 2: Jalankan, pastikan gagal.** `pnpm vitest --run shared/src/orchestration.test.ts`
+- [x] **Step 3: Implementasi.**
   - `FLOW_PHASES.feature = [..., "Execute", "Review"]`, `qa = [..., "Execute", "Review"]`, komentar ADR-0230.
   - Ganti komentar blok "BUKAN fase pipeline" menjadi penjelasan ADR-0230; tambah `UNSKIPPABLE_PHASES`.
   - `resolvePhasePlan`: hapus blok `reviewer`; di `phases.map` pakai
@@ -69,9 +69,9 @@ expect(UNSKIPPABLE_PHASES.has("Review")).toBe(true);
     `["superpowers:requesting-code-review", VERIFICATION_GATE]`; metode lain: skill review milik metode itu bila
     ada di katalognya, kalau tidak `[VERIFICATION_GATE]`. Catatan: `exitSkills` kini menempel ke fase TERAKHIR = Review
     (`phaseSkillsFor`), itu disengaja.
-- [ ] **Step 4: Jalankan test shared + runtime-defaults server**, perbaiki sampai hijau.
+- [x] **Step 4: Jalankan test shared + runtime-defaults server**, perbaiki sampai hijau.
   `pnpm vitest --run shared/src server/test/runtime-defaults* --no-file-parallelism`
-- [ ] **Step 5: Commit** `feat(orchestration): Review jadi fase pipeline feature & qa (shared)`
+- [x] **Step 5: Commit** `feat(orchestration): Review jadi fase pipeline feature & qa (shared)`
 
 ### Task 2: server & gate — peta stage, gerbang selesai, continue
 

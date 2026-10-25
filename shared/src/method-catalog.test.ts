@@ -149,3 +149,14 @@ describe("stampSpecMethod", () => {
     expect(stampSpecMethod("a", "matt")).toBeNull();
   });
 });
+
+// ADR-0230 · fase Review resmi: setiap metode yang punya Execute memberi skill review + gerbang verifikasi.
+describe("phaseSkills.Review (ADR-0230)", () => {
+  it("tiap metode ber-Execute punya Review berisi gerbang verifikasi", () => {
+    for (const [key, m] of Object.entries(METHODS)) {
+      if (!m.phaseSkills.Execute) continue;
+      expect(m.phaseSkills.Review, key).toContain(VERIFICATION_GATE);
+      expect(m.phaseSkills.Review!.length, key).toBeGreaterThan(1);
+    }
+  });
+});

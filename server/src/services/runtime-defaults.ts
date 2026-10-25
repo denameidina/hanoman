@@ -108,6 +108,25 @@ function statesFor(raw: unknown): RuntimeDefaultStates {
         if (key.startsWith(prefix)) orchestration[key] = state;
       }
     }
+    // ADR-0230 · fase yang baru masuk FLOW_PHASES (Review) belum punya kunci di marker lama, padahal
+    // selnya bisa sudah diisi operator (override reviewer ADR-0170). Nilai tersimpan tanpa kunci
+    // marker = milik operator, bukan seed yang boleh ditimpa. Antigravity sudah lewat `inferred` di atas.
+    const rawOrchestration = isRecord(object.orchestration) ? object.orchestration : {};
+    for (const flow of ORCHESTRATION_FLOWS) {
+      const rawFlow = isRecord(rawOrchestration[flow]) ? rawOrchestration[flow] : {};
+      for (const runtime of ["claude", "codex"] as const) {
+        const rawRuntime = isRecord(rawFlow[runtime]) ? rawFlow[runtime] : {};
+        for (const phase of FLOW_PHASES[flow]) {
+          const rawCell = rawRuntime[phase];
+          if (!isRecord(rawCell)) continue;
+          for (const field of ["model", "effort"] as const) {
+            const key = `${flow}.${runtime}.${phase}.${field}`;
+            if (!(key in marker.data.orchestration) && rawCell[field] !== undefined && rawCell[field] !== null)
+              orchestration[key] = "user";
+          }
+        }
+      }
+    }
     const rawMarker = isRecord(object.builtinRuntimeDefaults) ? object.builtinRuntimeDefaults : {};
     return { claude: marker.data.claude, codex: marker.data.codex,
       antigravity: rawMarker.antigravity === undefined ? inferAntigravityStates(object.antigravity) : marker.data.antigravity,

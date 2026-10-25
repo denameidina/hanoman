@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  EXECUTE_MODE_FLOWS, FLOW_PHASES, ORCHESTRATION_FLOWS, PHASE_AGENT_PREFIX, isPhaseAgentName, phaseAgentName,
+  EXECUTE_MODE_FLOWS, FLOW_PHASES, ORCHESTRATION_FLOWS, PHASE_AGENT_PREFIX, REVIEWER_FLOWS, UNSKIPPABLE_PHASES,
+  isPhaseAgentName, phaseAgentName,
 } from "./orchestration";
 import { codexNativeAgentsSupported, resolvePhasePlan } from "./orchestration-plan";
 import { CODEX_MODELS, MODELS, ORCHESTRATION_DEFAULTS, replaceModelCatalog, zOrchestration, zSetting } from "./entities";
@@ -14,7 +15,7 @@ const orchestrator = { model: "claude-opus-5", effort: "xhigh" };
 describe("FLOW_PHASES (ADR-0164)", () => {
   it("setiap flow orkestrasi punya daftar fase", () => {
     expect(Object.keys(FLOW_PHASES).sort()).toEqual([...ORCHESTRATION_FLOWS].sort());
-    expect(FLOW_PHASES.feature).toEqual(["Brainstorm", "Objective", "Spec", "Plan", "Execute"]);
+    expect(FLOW_PHASES.feature).toEqual(["Brainstorm", "Objective", "Spec", "Plan", "Execute", "Review"]);
     expect(FLOW_PHASES.reverse).toEqual(["Scan", "Docs teknis", "Wawancara", "Konvensi & index", "Serah terima"]);
   });
 });
@@ -154,27 +155,34 @@ describe("resolvePhasePlan", () => {
     expect(plan.phases.find((p) => p.phase === "Spec")).toMatchObject({ model: "opus" });
     expect(plan.phases.map((p) => p.model)).not.toContain("default");
   });
-  // ADR-0170 P2 · reviewer independen Execute: bukan fase pipeline (FLOW_PHASES tetap), tapi agen
-  // ber-generate per sesi dengan default opus/high · gpt-5.6-sol/high, bisa dioverride sel `Review`.
-  it("feature & qa punya reviewer Execute ber-default opus/high (claude) · gpt-5.6-sol/high (codex)", () => {
+  // ADR-0230 · Review = fase pipeline resmi feature & qa (amandemen ADR-0170 #4). Agen fasenya tetap
+  // reviewer independen: default opus/high · gpt-5.6-sol/high, TIDAK mewarisi orchestrator.
+  const review = (p: ReturnType<typeof resolvePhasePlan>) => p!.phases.find((e) => e.phase === "Review");
+  it("feature & qa berakhiran fase Review ber-default opus/high (claude) · gpt-5.6-sol/high (codex)", () => {
     for (const flow of ["feature", "qa"] as const) {
-      expect(resolvePhasePlan({ ...base, flow })!.reviewer)
-        .toEqual({ agentName: "hanoman-fase-review", phase: "Execute", model: "opus", effort: "high" });
-      expect(resolvePhasePlan({ ...base, flow, runtime: "codex", orchestrator: { model: "gpt-5.6-terra", effort: "low" } })!.reviewer)
-        .toEqual({ agentName: "hanoman-fase-review", phase: "Execute", model: "gpt-5.6-sol", effort: "high" });
+      expect(FLOW_PHASES[flow].at(-1)).toBe("Review");
+      expect(review(resolvePhasePlan({ ...base, flow })))
+        .toEqual({ agentName: "hanoman-fase-review", phase: "Review", model: "opus", effort: "high" });
+      expect(review(resolvePhasePlan({ ...base, flow, runtime: "codex", orchestrator: { model: "gpt-5.6-terra", effort: "low" } })))
+        .toEqual({ agentName: "hanoman-fase-review", phase: "Review", model: "gpt-5.6-sol", effort: "high" });
     }
-    for (const flow of ["goal", "audit", "reverse", "prd", "breakdown", "scaffold"] as const)
-      expect(resolvePhasePlan({ ...base, flow })?.reviewer).toBeUndefined();
+    for (const flow of ["goal", "audit", "reverse", "prd", "breakdown", "scaffold", "no_effort"] as const) {
+      expect(FLOW_PHASES[flow]).not.toContain("Review");
+      const plan = resolvePhasePlan({ ...base, flow });
+      if (plan) expect(review(plan)).toBeUndefined();
+    }
     expect(resolvePhasePlan({ ...base, flow: "qa" })!.phases.map((p) => p.phase)).toEqual(FLOW_PHASES.qa);
+    expect(UNSKIPPABLE_PHASES.has("Review")).toBe(true);
+    expect(REVIEWER_FLOWS).toEqual(new Set(["feature", "qa"]));
   });
-  it("reviewer: sel Setting `Review` & override sesi menang; effort dikoersi ke model hasil resolusi", () => {
+  it("Review: sel Setting `Review` & override sesi menang; effort dikoersi ke model hasil resolusi", () => {
     const orchestration = { ...ORCHESTRATION_DEFAULTS, feature: { ...ORCHESTRATION_DEFAULTS.feature,
       codex: { ...ORCHESTRATION_DEFAULTS.feature.codex, Review: { model: "gpt-5.6-luna", effort: "ultra" } } } };
-    expect(resolvePhasePlan({ ...base, runtime: "codex", orchestration })!.reviewer)
+    expect(review(resolvePhasePlan({ ...base, runtime: "codex", orchestration })))
       .toMatchObject({ model: "gpt-5.6-luna", effort: "xhigh" });
-    expect(resolvePhasePlan({ ...base, phaseOverrides: { Review: { model: "sonnet", effort: "medium" } } })!.reviewer)
+    expect(review(resolvePhasePlan({ ...base, phaseOverrides: { Review: { model: "sonnet", effort: "medium" } } })))
       .toMatchObject({ model: "sonnet", effort: "medium" });
-    expect(resolvePhasePlan({ ...base, phaseOverrides: { Review: { model: "default" } } })!.reviewer)
+    expect(review(resolvePhasePlan({ ...base, phaseOverrides: { Review: { model: "default" } } })))
       .toMatchObject({ model: "inherit", effort: "high" });
   });
   it("executeMode dibawa ke rencana: default inline, sel flow subagent menang", () => {
@@ -218,7 +226,7 @@ describe("Antigravity additive settings (SPEC-1442)", () => {
       orchestrator: { model: "gemini-3.8-flash-high", effort: "high" }, orchestration: settings.orchestration });
     expect(plan?.phases.find((p) => p.phase === "Plan")).toMatchObject({ model: "flash", effort: null });
     expect(plan?.phases[0]).toMatchObject({ model: "inherit", effort: null });
-    expect(plan?.reviewer).toMatchObject({ model: "inherit", effort: null });
+    expect(plan?.phases.find((p) => p.phase === "Review")).toMatchObject({ model: "inherit", effort: null });
   });
 });
 
@@ -252,7 +260,7 @@ it("explicit null native override resets a stored tier to inherit", () => {
   const plan = resolvePhasePlan({ flow: "feature", runtime: "antigravity", nativeAgents: true,
     orchestrator, orchestration, phaseOverrides: { Plan: { model: null, effort: null }, Review: { model: null, effort: null } } });
   expect(plan?.phases.find(p => p.phase === "Plan")).toMatchObject({ model: "inherit", effort: null });
-  expect(plan?.reviewer).toMatchObject({ model: "inherit", effort: null });
+  expect(plan?.phases.find((p) => p.phase === "Review")).toMatchObject({ model: "inherit", effort: null });
 });
 
 it("explicit null native effort overrides an incompatible legacy stored effort", () => {
