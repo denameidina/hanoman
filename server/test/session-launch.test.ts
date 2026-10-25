@@ -302,7 +302,7 @@ describe("session-launch", () => {
     expect(born).not.toContain("Execute");
     expect(born).not.toContain("Review");
     const prompt = readFileSync(promptFilePath(r.id), "utf8");
-    expect(prompt).toContain("baris `Execute done` LAMA");
+    expect(prompt).toContain("baris `Execute done` dan `Review done` LAMA");
     killSession(r.id);
   });
 

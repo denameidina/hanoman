@@ -179,9 +179,9 @@ expect(phasesComplete(P([...pre, ["Execute","done"], ["Review","done"]]))).toBe(
 
 ### Task 5: Verifikasi akhir
 
-- [ ] **Step 1:** Typecheck paket tersentuh: `pnpm --filter @hanoman/shared --filter @hanoman/runner --filter @hanoman/server --filter ./src exec tsc --noEmit` (sesuaikan nama filter dengan `package.json` tiap paket).
-- [ ] **Step 2:** `pnpm vitest --run --changed main --no-file-parallelism` dengan `TEST_DATABASE_URL` terisolasi → hijau.
-- [ ] **Step 3:** Boot server lokal dari worktree (`HANOMAN_HOME` sementara) dan curl endpoint pratinjau rencana fase (route
+- [x] **Step 1:** Typecheck paket tersentuh: `pnpm --filter @hanoman/shared --filter @hanoman/runner --filter @hanoman/server --filter ./src exec tsc --noEmit` (sesuaikan nama filter dengan `package.json` tiap paket).
+- [x] **Step 2:** `pnpm vitest --run --changed main --no-file-parallelism` dengan `TEST_DATABASE_URL` terisolasi → hijau.
+- [x] **Step 3:** Boot server lokal dari worktree (`HANOMAN_HOME` sementara) dan curl endpoint pratinjau rencana fase (route
   yang dipakai `PhasePlanPreview`, cari di `src/src/api/client.ts`) untuk flow `feature`: respons memuat fase `Review` dengan
   model reviewer. `hanoman_session_phases` (MCP) tak butuh perubahan — pastikan respons fase memuat Review.
-- [ ] **Step 4:** Centang semua kotak plan ini, commit.
+- [x] **Step 4:** Centang semua kotak plan ini, commit.
