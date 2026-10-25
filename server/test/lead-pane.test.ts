@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readCodexTurn } from "../src/services/lead/pane";
+import { readTurn } from "../src/services/lead/pane";
 
 // AC-9 · SPEC-909 · ADR-0146 · codex TIDAK punya `AskUserQuestion`; markernya diturunkan dari `Stop`
 // (ADR-0074) yang menembak di TIAP akhir turn, jadi ia menyala juga saat sesi selesai wajar.
@@ -11,14 +11,14 @@ import { readCodexTurn } from "../src/services/lead/pane";
 // longgar. Kasus yang hanya berarti untuk pane (ornamen TUI, baris giliran claude) ikut hilang
 // bersama fungsinya; yang tersisa di sini adalah gerbangnya sendiri.
 
-describe("readCodexTurn · penanda SELESAI (AC-9)", () => {
+describe("readTurn · penanda SELESAI (AC-9)", () => {
   it.each([
     ["Goal achieved\n• Ran 12 tests, all green", "Goal achieved"],
     ["Goal unmet — plan masih punya kotak kosong", "Goal unmet"],
     ["Selesai merapikan modul.\n245k tokens used", "tokens used"],
     ["To continue this session, run codex resume", "To continue"],
   ])("diam untuk giliran yang berakhir wajar (%s)", (message) => {
-    const r = readCodexTurn(message);
+    const r = readTurn(message);
     expect(r.asking).toBe(false);
     expect(r.reason).toContain("selesai wajar");
   });
@@ -27,29 +27,29 @@ describe("readCodexTurn · penanda SELESAI (AC-9)", () => {
     // Laporan akhir giliran sering memuat tanda tanya retoris atau daftar bernomor. Salah arah ke
     // "menjawab" membangunkan sesi yang sudah selesai; salah arah ke "diam" cuma mengembalikan
     // perilaku sebelum ADR-0091.
-    expect(readCodexTurn("Mau lanjut ke langkah berikutnya?\n\n245k tokens used").asking).toBe(false);
+    expect(readTurn("Mau lanjut ke langkah berikutnya?\n\n245k tokens used").asking).toBe(false);
   });
 });
 
-describe("readCodexTurn · sinyal BERTANYA", () => {
+describe("readTurn · sinyal BERTANYA", () => {
   it.each([
     "Pakai SQLite atau Postgres?",
     "1. SQLite\n2. Postgres",
     "Silakan pilih salah satu dari dua pendekatan itu.",
     "Should I proceed with the migration",
   ])("melayani giliran yang benar-benar meminta putusan (%s)", (message) => {
-    expect(readCodexTurn(message).asking).toBe(true);
+    expect(readTurn(message).asking).toBe(true);
   });
 
   it("diam saat giliran cuma melapor, tanpa satu pun sinyal pertanyaan", () => {
-    const r = readCodexTurn("Sudah kutambahkan indeks pada kolom createdAt dan memperbarui docs.");
+    const r = readTurn("Sudah kutambahkan indeks pada kolom createdAt dan memperbarui docs.");
     expect(r.asking).toBe(false);
     expect(r.reason).toContain("tak ada sinyal pertanyaan");
   });
 
   it("giliran tanpa pesan sama sekali bukan pertanyaan", () => {
-    expect(readCodexTurn("").asking).toBe(false);
-    expect(readCodexTurn("   \n\n  ").reason).toContain("tanpa pesan");
+    expect(readTurn("").asking).toBe(false);
+    expect(readTurn("   \n\n  ").reason).toContain("tanpa pesan");
   });
 });
 
@@ -57,13 +57,13 @@ describe("readCodexTurn · sinyal BERTANYA", () => {
 // `ASK_ROUTE`) mengajukan SEMUA keputusan terbuka dalam satu pesan, tiap pertanyaan bernomor dan
 // diakhiri `?`. Bila format itu tak lolos gerbang ini, lead tak pernah melihat pertanyaan codex dan
 // "lead aktif → lead memutuskan" bocor diam-diam. Sengaja > 4 butir: tak ada batas jumlah.
-describe("readCodexTurn · format keputusan terbuka ADR-0167", () => {
+describe("readTurn · format keputusan terbuka ADR-0167", () => {
   it("pesan relay berformat kontrak dibaca sebagai pertanyaan", () => {
     const message = [
       "Fase Brainstorm melaporkan keputusan terbuka:",
       ...Array.from({ length: 6 }, (_, i) =>
         `${i + 1}. Kolom status ke-${i + 1} disimpan sebagai enum atau string bebas?\n   a) enum  b) string — rekomendasi: enum`),
     ].join("\n");
-    expect(readCodexTurn(message)).toEqual({ asking: true, reason: "" });
+    expect(readTurn(message)).toEqual({ asking: true, reason: "" });
   });
 });

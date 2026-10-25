@@ -100,3 +100,28 @@ describe("parseHookEvent · pagar biaya", () => {
     expect(e.questions[0]!.options[0]!.description!.length).toBeLessThanOrEqual(400);
   });
 });
+
+// ADR-0231 · Stop claude (sesi bertanya lewat teks): tanpa `turn_id`; askId disintesis dari
+// `prompt_id` + hash pesan supaya pesan yang sama idempoten dan pesan berbeda tak tertukar.
+describe("parseHookEvent · Stop claude (ADR-0231)", () => {
+  const stop = (over: Record<string, unknown> = {}) => ({
+    session_id: "x", hook_event_name: "Stop", prompt_id: "p-1", stop_hook_active: false,
+    last_assistant_message: "1. Pakai kolom baru? (rekomendasi: ya)", background_tasks: [], ...over,
+  });
+  it("menjadi turn-end dengan askId sintetis yang stabil", () => {
+    const a = parseHookEvent(stop())!;
+    expect(a).toMatchObject({ source: "turn-end", questions: [], message: "1. Pakai kolom baru? (rekomendasi: ya)" });
+    expect(a.askId).toMatch(/^stop:p-1:[0-9a-f]+$/);
+    expect(parseHookEvent(stop())!.askId).toBe(a.askId);
+    expect(parseHookEvent(stop({ last_assistant_message: "2. Lain?" }))!.askId).not.toBe(a.askId);
+    expect(parseHookEvent(stop({ prompt_id: undefined }))!.askId).toMatch(/^stop::[0-9a-f]+$/);
+  });
+  it("stop_hook_active dan task latar yang masih berjalan bukan pertanyaan", () => {
+    expect(parseHookEvent(stop({ stop_hook_active: true }))).toBeNull();
+    expect(parseHookEvent(stop({ background_tasks: [{ id: "t", type: "subagent", status: "running" }] }))).toBeNull();
+    expect(parseHookEvent(stop({ background_tasks: [{ id: "t", type: "shell", status: "completed" }] }))).not.toBeNull();
+  });
+  it("Stop codex ber-turn_id tetap memakai turn_id", () => {
+    expect(parseHookEvent({ hook_event_name: "Stop", turn_id: "t-9", last_assistant_message: "Lanjut?" })!.askId).toBe("t-9");
+  });
+});

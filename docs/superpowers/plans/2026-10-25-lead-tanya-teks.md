@@ -46,13 +46,13 @@ Spec: [`docs/superpowers/specs/2026-10-25-lead-tanya-teks-design.md`](../specs/2
 
 **Produces:** `leadDecides(cfg, optIn, projectId): boolean`; `askViaFor(projectId, agent, deps?): Promise<AskVia | undefined>`; `readTurn(message)` (ganti nama `readCodexTurn`).
 
-- [ ] Test gagal: Stop claude (`hook_event_name: "Stop"`, `prompt_id`, `last_assistant_message`, tanpa
+- [x] Test gagal: Stop claude (`hook_event_name: "Stop"`, `prompt_id`, `last_assistant_message`, tanpa
   `turn_id`) → `turn-end` dengan askId `stop:<prompt_id>:<hash>` stabil; dua pesan berbeda → askId beda;
   `stop_hook_active: true` → null; `background_tasks` ber-status running → null; Stop codex lama tetap.
   `leadDecides` sesuai empat syarat; `askViaFor`: codex → undefined; claude + lead menjawab → "text";
-  lead mati/jeda/tak opt-in → "tool"; deps melempar → "tool". `admitAsk` memakai `leadDecides` (test lama hijau).
-- [ ] Implementasi sesuai interface di atas.
-- [ ] Test tersentuh hijau. Commit.
+  lead mati/jeda/tak opt-in → "tool"; deps melempar → "tool". `admitAsk` tetap memakai pemeriksaannya sendiri (alasan penolakan per syarat dipertahankan); `leadDecides` memakai syarat yang sama.
+- [x] Implementasi sesuai interface di atas.
+- [x] Test tersentuh hijau. Commit.
 
 ### Task 3: server — teruskan `askVia` ke `createSession`
 
