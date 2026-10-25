@@ -400,11 +400,12 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       {/* SPEC-376 · ADR-0080 · scope verifikasi: sesi menguji berkas yang berubah saja supaya
           RAM & CPU tetap tersisa untuk sesi lain di mesin yang sama. */}
       <Field label="Scope verifikasi"
-        hint="Hanya yang berubah = test/typecheck/lint hanya menyentuh berkas yang disentuh sesi ini. Suite penuh tetap dijalankan manusia sebelum merge.">
+        hint="Hanya yang berubah = test/typecheck/lint hanya menyentuh berkas yang disentuh sesi ini. Jangan jalankan test = sesi tak menjalankan test sama sekali. Suite penuh tetap dijalankan manusia sebelum merge.">
         <Select aria-label="Scope verifikasi" value={verifyScope} className="hn-w-full"
           options={[
             { value: "changed", label: "Hanya yang berubah — hemat RAM & CPU" },
             { value: "full", label: "Seluruh project" },
+            { value: "none", label: "Jangan jalankan test — perangkat tak kuat" },
           ]}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setVerifyScope(e.target.value as VerifyScope)} />
       </Field>

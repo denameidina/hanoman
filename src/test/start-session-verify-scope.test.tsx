@@ -45,6 +45,15 @@ describe("StartSessionModal · scope verifikasi", () => {
       expect.objectContaining({ verifyScope: "full" })));
   });
 
+  it("memilih none mengirim verifyScope none (ADR-0229)", async () => {
+    render(<StartSessionModal open spec={spec} onClose={() => {}} onStarted={() => {}} />);
+    await waitFor(() => expect(screen.getByLabelText("Scope verifikasi")).toHaveValue("changed"));
+    fireEvent.change(screen.getByLabelText("Scope verifikasi"), { target: { value: "none" } });
+    fireEvent.click(screen.getByText("Mulai"));
+    await waitFor(() => expect(api.startSession).toHaveBeenCalledWith(
+      expect.objectContaining({ verifyScope: "none" })));
+  });
+
   // Respons yang di-cache dari server sebelum SPEC-376 tak punya kunci ini; picker tak boleh kosong.
   it("setelan tanpa verifyScope jatuh ke changed", async () => {
     const s: any = settings("changed"); delete s.verifyScope;

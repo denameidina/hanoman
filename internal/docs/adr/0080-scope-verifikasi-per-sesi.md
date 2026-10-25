@@ -4,6 +4,7 @@
 sesi), ADR-0074 (agen per sesi) — pola "properti sesi" yang sama. Terkait ADR-0002 (isolasi
 worktree), ADR-0029 (gate plan terceklist), ADR-0072 (cap concurrency scheduler).
 **TIDAK membalik ADR-0037** — tak ada hook deny yang dihidupkan kembali.
+**Diperluas ADR-0229** — nilai ketiga `"none"` (sesi tak menjalankan test sama sekali).
 
 ## Konteks
 

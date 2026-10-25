@@ -68,7 +68,8 @@ hanoman --version | --help
   log memperlihatkan `SQLite database hanoman.test.db created` **di tengah** run. Pakai
   `TEST_DATABASE_URL="file:$(mktemp -d)/t.test.db"`; suite yang gagal ramai dengan **404/P2022**
   hampir selalu ini, bukan regresi. Sesi
-  hanoman default `verifyScope=changed` (SPEC-376, ADR-0080): jangan menjalankan suite penuh,
+  hanoman default `verifyScope=changed` (SPEC-376, ADR-0080; bila `HANOMAN_VERIFY_SCOPE=none`,
+  ADR-0229, **jangan jalankan test sama sekali** — poin ini mengalah ke sana): jangan menjalankan suite penuh,
   `pnpm -r typecheck`, atau build penuh sebagai rutinitas — mesin ini menjalankan beberapa sesi
   sekaligus. Perluas scope hanya bila perubahannya memang berdampak luas, dan katakan alasannya.
   Jebakan: `--changed` menyalakan `passWithNoTests`, jadi nol test **terlihat hijau**.

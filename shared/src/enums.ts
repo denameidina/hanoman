@@ -14,9 +14,10 @@ export const zSeverity = z.enum(["critical","major","minor"]);
 export const zTicketCategory = z.enum(["bug","fitur","pertanyaan","lainnya"]);  // SPEC-253 · kategori keluhan
 export const zTicketStatus = z.enum(["new","accepted","rejected"]);  // SPEC-253 · status triase tiket
 // SPEC-376 · ADR-0080 · scope verifikasi sesi. changed = uji hanya yang berubah (default —
-// beberapa sesi berjalan bersamaan di satu mesin); full = perilaku lama (seluruh project).
+// beberapa sesi berjalan bersamaan di satu mesin); full = perilaku lama (seluruh project);
+// none = jangan jalankan test sama sekali (perangkat tak kuat, ADR-0229).
 // Cermin `VerifyScope` di @hanoman/runner (pola yang sama dipakai Flow/zFlow & Agent/zAgent):
 // zod untuk validasi di batas HTTP, union TS untuk lapis runner.
-export const VERIFY_SCOPES = ["changed", "full"] as const;
+export const VERIFY_SCOPES = ["changed", "full", "none"] as const;
 export const zVerifyScope = z.enum(VERIFY_SCOPES);
 export type VerifyScope = (typeof VERIFY_SCOPES)[number];

@@ -51,5 +51,31 @@ const CHANGED = [
   "dan katakan alasannya. Ini panduan biaya, bukan larangan.",
 ].join("\n");
 
+// Mode `none` — untuk perangkat yang tak kuat menjalankan test sama sekali (bahkan set
+// `--changed` yang sempit membuat mesin operator tersendat). Sama seperti CHANGED ia mengarahkan,
+// bukan memaksa; bedanya ia tak memberi jalan keluar "perluas bila berdampak luas" — operator
+// memilihnya justru karena biaya test, jadi keputusan itu bukan milik sesi. Verifikasi bergeser
+// ke membaca kode, dan laporan wajib jujur bahwa test belum dijalankan.
+const NONE = [
+  "Scope verifikasi: TANPA menjalankan test. Operator memilih mode ini karena perangkatnya tak",
+  "kuat menjalankan test — run sebelumnya membuat mesin tersendat.",
+  "",
+  "- JANGAN menjalankan test apa pun: `pnpm test`, `vitest` (termasuk `--changed`/`related`),",
+  "  `jest`, `pytest`, `go test`, Playwright/e2e, maupun skrip yang memanggilnya. Aturan ini",
+  "  MENIMPA instruksi skill/metode (mis. TDD \"jalankan test, lihat merah lalu hijau\"), instruksi",
+  "  fase Verifikasi/review, dan Definition of Done repo target.",
+  "- Menulis atau memperbarui berkas test tetap boleh — hanya jangan menjalankannya.",
+  "- JANGAN build, lint seluruh repo, boot server + curl, atau smoke end-to-end.",
+  "- Typecheck: paling banyak SEKALI di akhir, hanya untuk paket yang tersentuh",
+  "  (mis. `pnpm --filter ./server typecheck`). JANGAN `pnpm -r typecheck`.",
+  "- Verifikasi dengan MEMBACA: telusuri diff-mu (`git diff \"$HANOMAN_BASE_SHA\"...HEAD`,",
+  "  `git status --porcelain`), periksa pemanggil, tipe, dan cabang error dengan grep/baca berkas.",
+  "- Laporan: nyatakan terang bahwa test TIDAK dijalankan (scope verifikasi `none`) dan sebut berkas",
+  "  test yang perlu dijalankan manusia. Jangan pernah mengklaim test hijau.",
+  "",
+  "Menjalankan test adalah tugas MANUSIA sebelum merge, bukan tugas sesi.",
+].join("\n");
+
 /** Klausa prompt untuk scope verifikasi. `full` = string kosong (prompt persis seperti dulu). */
-export const verifyScopeClause = (scope: VerifyScope): string => scope === "changed" ? CHANGED : "";
+export const verifyScopeClause = (scope: VerifyScope): string =>
+  scope === "changed" ? CHANGED : scope === "none" ? NONE : "";

@@ -13,7 +13,7 @@ export type Agent = "claude" | "codex" | "antigravity";
 
 // SPEC-376 · ADR-0080 · scope verifikasi sesi. Cermin `zVerifyScope` di @hanoman/shared (pola
 // yang sama dipakai Flow/zFlow dan Agent/zAgent).
-export type VerifyScope = "changed" | "full";
+export type VerifyScope = "changed" | "full" | "none";
 
 // Backlog item yang dikerjakan sebuah sesi. Id-nya saja tak berarti apa-apa di dalam
 // worktree yang masih segar (spec hidup di Postgres, bukan di repo), jadi ia harus

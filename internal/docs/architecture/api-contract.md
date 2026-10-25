@@ -716,7 +716,7 @@ GET/PUT  /settings                      # Setting blob (zSetting): model, effort
 #                                           dikoersi saat dibaca (coerceCodexEffort). Blok selalu ADA di
 #                                           response (zod .default()) → baris Setting lama tetap parse,
 #                                           TANPA migration. Tak ada override per-request di body integrate.
-#                                         verifyScope: "changed"|"full" (default "changed") — SPEC-376/ADR-0080 ·
+#                                         verifyScope: "changed"|"full"|"none" (default "changed") — SPEC-376/ADR-0080, none ADR-0229 ·
 #                                           scope verifikasi default sesi backlog; per sesi di-override saat Start.
 #                                           Kunci selalu ADA di response (zod .default()), jadi baris Setting lama
 #                                           tetap parse tanpa migration.
@@ -1122,7 +1122,7 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #       final berada di `startSpecSession` sebelum kill/worktree/tmux, jadi semua jalur scheduler,
 #       governor, lead, dan route backlog manual tunduk pada pemeriksaan yang sama. Start manual oleh
 #       cookie admin atau AgentToken `sessions:write` memberi approval atomik terlebih dahulu.
-#     verifyScope?: "changed"|"full" — scope verifikasi PER SESI; kosong → Setting.verifyScope
+#     verifyScope?: "changed"|"full"|"none" — scope verifikasi PER SESI (none = tanpa run test, ADR-0229); kosong → Setting.verifyScope
 #       (default "changed"). "changed" menyisipkan klausa scope ke prompt (uji berkas yang berubah
 #       saja: `vitest --changed "$HANOMAN_BASE_SHA"`/`vitest related`, typecheck per paket, lint per
 #       berkas, build & smoke server hanya bila relevan) dan HANYA untuk flow ber-fase Execute —

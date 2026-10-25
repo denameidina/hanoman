@@ -303,12 +303,14 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
 
       {/* SPEC-376 · ADR-0080 · scope verifikasi: default global untuk sesi backlog. Bukan gerbang. */}
       <Card eyebrow="verifikasi" title="Scope verifikasi — sesi backlog" data-setting-card
-        data-search="scope verifikasi hanya yang berubah seluruh project uji">
+        data-search="scope verifikasi hanya yang berubah seluruh project uji jangan jalankan test">
         <Prose>
           Beberapa sesi berjalan bersamaan di perangkat ini. <b>Hanya yang berubah</b> menyuruh sesi menguji
           hanya berkas yang ia ubah — misalnya dengan <code>vitest --changed</code> (uji) dan typecheck per
           paket — alih-alih seluruh project. Dengan begitu RAM dan CPU tetap tersisa untuk sesi lain. Uji
-          penuh, lint penuh, dan build penuh tetap dijalankan manusia sebelum merge.
+          penuh, lint penuh, dan build penuh tetap dijalankan manusia sebelum merge. Bila perangkat tak kuat
+          menjalankan test sama sekali, pilih <b>Jangan jalankan test</b>: sesi tetap menulis test, tapi
+          memverifikasi dengan membaca kode dan menyerahkan run test ke manusia.
         </Prose>
         <SettingRow title="Scope default" last
           desc="Sesi backlog baru lahir dengan scope ini. Masih bisa diubah per sesi saat Start."
@@ -317,6 +319,7 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
             options={[
               { value: "changed", label: "Hanya yang berubah" },
               { value: "full", label: "Seluruh project" },
+              { value: "none", label: "Jangan jalankan test" },
             ]}
             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => verifyScope.set(e.target.value as Setting["verifyScope"])} />
         </SettingRow>

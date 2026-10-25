@@ -175,7 +175,7 @@ const MORE: readonly McpToolDef[] = [
         effort: str("Effort. Kosong = default global."),
         goal: bool("Mode goal per-sesi. Kosong = ikut setelan global."),
         goalCondition: str("Kondisi selesai mode goal (maks 4000 karakter)."),
-        verifyScope: enumStr(["changed", "full"], "Scope verifikasi. Kosong = ikut setelan global."),
+        verifyScope: enumStr(["changed", "full", "none"], "Scope verifikasi: changed = hanya yang berubah, full = seluruh project, none = jangan jalankan test. Kosong = ikut setelan global."),
         method: str("Metode workflow. Id tak dikenal jatuh ke default, bukan ditolak."),
         phaseOverrides: { type: "object", maxProperties: PHASE_OVERRIDE_LIMITS.phases,
           propertyNames: { type: "string", minLength: 1, maxLength: PHASE_OVERRIDE_LIMITS.phase },

@@ -19,7 +19,8 @@
 - **Telegram latency** — update sah di-steer/di-spawn dalam ≤5 dtk di luar waktu long-poll/network;
   progress berbasis state server, bukan streaming reasoning.
 - **Sumber daya** — beberapa sesi berjalan bersamaan di satu mesin operator, jadi sesi memverifikasi
-  **ber-scope** secara default (`Setting.verifyScope = "changed"`, SPEC-376/ADR-0080): test hanya untuk
+  **ber-scope** secara default (`Setting.verifyScope = "changed"`, SPEC-376/ADR-0080; `"none"` untuk
+  perangkat yang tak kuat menjalankan test sama sekali, ADR-0229): test hanya untuk
   berkas yang berubah, typecheck per paket, lint per berkas, build penuh & boot-server hanya bila
   relevan. Tanpa itu, N sesi melipatgandakan suite penuh (di repo ini: 258 berkas test + 6 proses
   `tsc` per sesi). Suite penuh adalah langkah **manusia** sebelum merge, bukan langkah sesi.

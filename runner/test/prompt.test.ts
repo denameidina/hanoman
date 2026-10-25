@@ -212,6 +212,20 @@ describe("startPrompt", () => {
     expect(p).not.toContain("$HANOMAN_BASE_SHA");
   });
 
+  // ADR-0229 · perangkat tak kuat menjalankan test: klausa melarang SEMUA run test, termasuk
+  // `--changed`, dan menimpa instruksi skill TDD — bukan sekadar mempersempit scope.
+  it("verifyScope none melarang menjalankan test dan menimpa skill", () => {
+    const p = startPrompt("feature", spec, "hanoman/spec-162", undefined, "none");
+    expect(p).toContain("TANPA menjalankan test");
+    expect(p).toContain("MENIMPA instruksi skill");
+    expect(p).not.toContain("--changed \"$HANOMAN_BASE_SHA\"");
+  });
+
+  it("flow audit tak membawa klausa none", () => {
+    const p = startPrompt("audit", spec, "hanoman/spec-237", undefined, "none");
+    expect(p).not.toContain("TANPA menjalankan test");
+  });
+
   // Flow audit-only tak menulis kode → tak ada test untuk dijalankan; klausa di sana hanya
   // menambah token. Sengaja tak disisipkan meski scope-nya `changed`.
   it("flow audit tak membawa klausa scope walau verifyScope changed", () => {
