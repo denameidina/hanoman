@@ -4,6 +4,8 @@
 **Diamandemen [ADR-0228](0228-lead-sesi-interaktif-gerbang-server.md)** (2026-10-20): "lead bila aktif"
 kini berarti sesi lead proyek itu, dengan tenggat `answerSlaSec`; pertanyaan yang tak terjawab dalam
 tenggat (atau saat pane lead mati/proyek dijeda) jatuh ke manusia.
+**Diamandemen [ADR-0231](0231-cara-bertanya-mengikuti-status-lead.md)** (2026-10-25): keputusan #2 & #6 —
+sesi claude yang lahir saat lead menjawab project-nya bertanya lewat teks biasa (dikunci saat lahir).
 **Mengamandemen** SPEC-298 (arti `scheduler.autonomy = full-control`) dan
 [0164](0164-orkestrasi-subagent-per-fase.md) (kontrak laporan agen fase & langkah 4 relay orchestrator).
 **Menegakkan** [0146](0146-lead-dipicu-event-hook.md) & [0091](0091-hanoman-lead-agen-pemimpin.md) (lead sebagai
@@ -39,7 +41,7 @@ yang bisa, dan hanya pertanyaan agen utama yang sampai ke hook lead (0146).
    claude dan codex, sesi tunggal maupun orchestrator, agen fase maupun custom agent. "Ambigu" = akan
    mempengaruhi hasil: data model, kontrak API, scope, perilaku terlihat pengguna, atau asumsi yang
    terpaksa diambil agar bisa lanjut.
-2. **Status lead TIDAK ditulis ke prompt.** Agen selalu bertanya; gerbang yang sudah ada (`admitAsk`)
+2. **[Diamandemen ADR-0231: cara bertanya sesi claude dikunci saat lahir dari status lead]** **Status lead TIDAK ditulis ke prompt.** Agen selalu bertanya; gerbang yang sudah ada (`admitAsk`)
    memilih lead atau membiarkan pertanyaan menunggu manusia. Prompt terkunci saat sesi lahir sedangkan
    lead bisa di-toggle di tengah sesi — status yang ditanam akan basi dan "wajib manusia" bocor.
 3. **Tanpa batas jumlah pertanyaan maupun putaran.** Batas 4 milik tool `AskUserQuestion` dipecah ke
@@ -53,7 +55,7 @@ yang bisa, dan hanya pertanyaan agen utama yang sampai ke hook lead (0146).
 5. **`full-control` diamandemen:** hanya mencabut checkpoint review/approval & menunggu persetujuan.
    Keputusan ambigu tetap ditanyakan; dengan lead mati sesi scheduler **boleh tertahan** menunggu manusia
    (pilihan operator yang disadari). Merge tetap manual ([0031](0031-rebase-merge-backlog.md)).
-6. **Claude wajib lewat `AskUserQuestion`** (klausa netral-agen: "bila agenmu punya tool itu"), sebab
+6. **[Diamandemen ADR-0231: hanya bila lead tak menjawab project saat sesi lahir; selain itu teks biasa]** **Claude wajib lewat `AskUserQuestion`** (klausa netral-agen: "bila agenmu punya tool itu"), sebab
    pertanyaan teks biasa dari claude tak terbaca lead sejak 0146.
 
 Implementasi: `runner/src/prompt.ts` (`DECIDER`, `ASK_ROUTE`, kedua klausa otonomi, `orchestratorClause`

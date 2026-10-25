@@ -902,7 +902,9 @@ Pakai skill lebih sempit saat task cocok:
   eksternal ber-`AgentToken`, capability domain **`lead`** dipetakan MENURUT METHOD — kelas bug
   SPEC-405), deteksi otomatis (**SPEC-909/ADR-0146: dipicu EVENT hook `AskUserQuestion`, bukan lagi
   memindai pane ber-marker** — payloadnya membawa pertanyaan & opsi terstruktur, jawabannya tetap
-  diketik lewat `pty.sendToPane`), dan
+  diketik lewat `pty.sendToPane`; **ADR-0231**: sesi claude yang lahir saat lead menjawab project-nya
+  bertanya lewat TEKS biasa — hook `Stop` ke jalur event, gerbang `readTurn`, dijawab seperti codex —
+  sedangkan saat lead mati/dijeda atau project tak opt-in ia memakai `AskUserQuestion` untuk manusia), dan
   denyut proaktif `setInterval` in-process (urutan kerja diserahkan ke antrean+governor ADR-0072,
   bukan antrean kedua; tabrakan area kerja dari diff worktree; tindak lanjut sesi ber-`exitCode ≠ 0`
   atau plan bersisa `- [ ]`). **Batas kerasnya di permukaan tindakan LEAD** (`LEAD_ACTIONS` =
