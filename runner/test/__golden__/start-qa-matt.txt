@@ -1,9 +1,10 @@
 hanoman qa. Ikuti internal/docs sebagai Source of Truth; perbarui docs yang tersentuh dan link-nya di index, dalam commit yang sama.
 
-Kerjakan fase berurutan: Audit → Spec → Plan → Execute.
+Kerjakan fase berurutan: Audit → Spec → Plan → Execute → Review.
 Setiap kali sebuah fase selesai (atau kamu putuskan dilewati), append satu baris ke berkas di $HANOMAN_PHASE_FILE — persis: `echo "<Nama Fase> done" >> "$HANOMAN_PHASE_FILE"`, atau `skipped` sebagai ganti `done`. Nama fase ditulis apa adanya seperti di atas.
 Execute BELUM selesai selama plan (`docs/matt/plans/**`) masih punya task `- [ ]`: kerjakan SEMUA PR/task sampai tiap kotak jadi `- [x]` sebelum menulis `Execute done`. hanoman menahan backlog di `executing`, bukan `done`, selama masih ada `- [ ]`.
 Bentuk plan: rencana, bukan kode. Tiap task `- [ ]` adalah satu irisan perilaku yang bisa diverifikasi: berkas yang disentuh, perilaku yang dibangun, AC yang dipenuhinya, dan test yang membuktikannya (nama test + kasus intinya dalam satu kalimat). JANGAN menulis isi implementasi maupun isi test lengkap — Execute yang menulisnya; kode di plan ditulis dua kali. Potongan kode hanya untuk kontrak yang tak boleh ditafsirkan (signature/tipe ekspor, skema, bentuk payload API), masing-masing pendek. Jangan memecah tulis-test, jalankan, implementasi, dan commit menjadi kotak terpisah. Sasaran ±300 baris; lebih panjang biasanya tanda kode ikut tertulis. Aturan ini mengalahkan anjuran "kode lengkap di setiap langkah" dan "langkah 2–5 menit" milik skill plan mana pun.
+Fase Review (sesudah `Execute done`): periksa ulang hasil Execute terhadap dokumen spec & plan backlog ini — baca seluruh perubahan sesi ini (diff dari commit awal worktree) dan jalankan test sesuai scope verifikasi. Tulis tabel `AC → putusan → bukti` (setiap acceptance criteria → perintah & hasil yang kamu baca, atau path:baris) lalu satu baris `Verdict: lulus` atau `Verdict: rework`. `rework` → perbaiki temuannya, lalu review ulang; maks 2 putaran rework, sisanya jadi keputusan terbuka. Tulis `Review done` HANYA sesudah `Verdict: lulus`; Review TIDAK PERNAH `skipped`.
 
 Keputusan pasca-Audit (qa): bila temuan berconfidence tinggi dan perbaikannya bisa dikerjakan langsung (diff kecil, akar masalah jelas), LEWATI Spec dan Plan — tandai keduanya `skipped` (`echo "Spec skipped" >> "$HANOMAN_PHASE_FILE"` lalu `echo "Plan skipped" >> "$HANOMAN_PHASE_FILE"`) dan langsung ke Execute; dokumen audit menjadi doc-of-record perbaikan itu. Bila temuan luas, berisiko, atau ambigu, jalankan Spec → Plan → Execute penuh. Keputusan ini milikmu berdasarkan hasil Audit, bukan default — jangan bayar perencanaan yang tak perlu untuk perbaikan sepele.
 
@@ -26,7 +27,8 @@ Skill mattpocock yang kontraknya mewawancarai manusia (`/grill-me`, `/to-spec`, 
 Skills mattpocock WAJIB: sebelum mengerjakan fase di bawah, muat & ikuti skill-nya dengan mekanisme yang tersedia di agenmu — bila skill relevan tersedia, pakai.
 - Audit: mattpocock-skills:diagnosing-bugs
 - Plan: mattpocock-skills:to-tickets
-- Execute: mattpocock-skills:implement, mattpocock-skills:tdd, mattpocock-skills:code-review, superpowers:verification-before-completion
+- Execute: mattpocock-skills:implement, mattpocock-skills:tdd, mattpocock-skills:code-review
+- Review: mattpocock-skills:code-review, superpowers:verification-before-completion
 
 Setelah fase terakhir: commit, lalu `git push origin HEAD:refs/heads/b`. Worktree ini detached HEAD — itu memang disengaja.
 

@@ -31,7 +31,7 @@ describe("resumePrompt", () => {
 
   it("tetap membawa kerangka startPrompt: fase, otonomi, skill, push, dan blok backlog", () => {
     const p = resumePrompt("qa", spec, "hanoman/spec-394", ctx);
-    expect(p).toContain("Kerjakan fase berurutan: Audit → Spec → Plan → Execute.");
+    expect(p).toContain("Kerjakan fase berurutan: Audit → Spec → Plan → Execute → Review.");
     expect(p).toContain("$HANOMAN_PHASE_FILE");
     expect(p).toContain("git push origin HEAD:refs/heads/hanoman/spec-394");
     expect(p).toContain(spec.id);
@@ -287,7 +287,9 @@ describe("continuePrompt", () => {
     expect(p).toContain("docs/superpowers/plans");
     expect(p).not.toContain("Brainstorm");
     expect(p).not.toContain("Kerjakan fase berurutan"); // phaseInstruction absen
-    expect(p).not.toContain("$HANOMAN_PHASE_FILE");
+    // ADR-0230 · berkas fase hanya disebut untuk marker fase Review yang dijalankan sesudah Execute.
+    expect(p).toContain('echo "Review done" >> "$HANOMAN_PHASE_FILE"');
+    expect(p).toContain("Verdict: lulus");
   });
 
   it("hanya skill fase Execute yang di-invoke", () => {

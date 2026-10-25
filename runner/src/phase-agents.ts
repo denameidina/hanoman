@@ -248,9 +248,9 @@ export function phaseAgentInstructions(
   const executeMode = plan.executeMode ?? "inline";
   const skills = phaseSkillsFor(flow, phase, method, plan.runtime, executeMode);
   // Amandemen ADR-0170 P2 · skill subagent-driven punya final whole-branch review sendiri; saat
-  // reviewer `hanoman-fase-review` ada, itu review akhir KEDUA atas diff yang sama — dilewati.
+  // fase Review (`hanoman-fase-review`, ADR-0230) ada, itu review akhir KEDUA atas diff yang sama — dilewati.
   const skipSkillFinalReview = phase === "Execute" && plan.runtime === "claude" && executeMode === "subagent"
-    && !!plan.reviewer && skills.includes("superpowers:subagent-driven-development");
+    && plan.phases.some((p) => p.phase === REVIEWER_CELL) && skills.includes("superpowers:subagent-driven-development");
   const work = (WORK_PHASES as readonly string[]).includes(phase);
   // ADR-0170 P2 · Verifikasi (goal) menjalankan test/typecheck — tanpa klausa scope ia jatuh ke DoD
   // repo target (suite penuh), lubang yang sama dengan ADR-0080. Gaya kode tetap hanya fase kerja.
@@ -267,7 +267,7 @@ export function phaseAgentInstructions(
       : "",
     skipSkillFinalReview
       ? "LEWATI final whole-branch review milik skill subagent-driven-development: review akhir dipegang "
-        + "reviewer `hanoman-fase-review` yang dipanggil orchestrator sesudah fase ini. Review per task tetap jalan."
+        + "fase Review (`hanoman-fase-review`) yang dipanggil orchestrator sesudah fase ini. Review per task tetap jalan."
       : "",
     verifies ? scopeClause(flow, ctx.verifyScope) : "",
     work ? codeStyleClause(flow) : "",
@@ -284,37 +284,29 @@ export function phaseAgentInstructions(
 }
 
 export function buildPhaseAgents(plan: PhasePlan, ctx: PhaseAgentContext): AgentDef[] {
-  const phases: AgentDef[] = plan.phases.map((entry, index) => ({
-    kind: "phase" as const,
-    phase: entry.phase,
-    name: entry.agentName,
-    description: `Fase ${entry.phase} flow ${plan.flow} hanoman — hanya dipanggil orchestrator sesi ini.`,
-    instructions: phaseAgentInstructions(entry, index, plan, ctx),
-    // T2 · konteks bersama dibawa TERPISAH (lihat `phasePromptOf`): claude merujuknya lewat satu
-    // berkas di temp dir sesi, codex tetap inline.
-    context: ctx.context,
-    tools: null,
-    model: entry.model,
-    effort: entry.effort,
-    mentions: [],
-    executeMode: plan.executeMode ?? "inline",
-  }));
-  // ADR-0170 P2 · reviewer hanya bila rencana memuat Execute (continue: rencana = Execute saja).
-  const r = plan.reviewer;
-  if (!r || !plan.phases.some((p) => p.phase === r.phase)) return phases;
-  return [...phases, {
-    kind: "phase" as const,
-    phase: r.phase,
-    name: r.agentName,
-    description: `Reviewer independen hasil fase Execute flow ${plan.flow} hanoman — hanya dipanggil `
-      + "orchestrator sesi ini, sesudah Execute melapor selesai.",
-    instructions: reviewerInstructions(plan, ctx),
-    context: ctx.context,
-    tools: null,
-    model: r.model,
-    effort: r.effort,
-    mentions: [],
-  }];
+  return plan.phases.map((entry, index) => {
+    // ADR-0170 P2 · ADR-0230 · agen fase Review = reviewer independen: instruksinya sendiri, bukan
+    // instruksi agen fase generik (tanpa skill fase, tanpa klausa delegasi).
+    const review = entry.phase === REVIEWER_CELL;
+    return {
+      kind: "phase" as const,
+      phase: entry.phase,
+      name: entry.agentName,
+      description: review
+        ? `Reviewer independen hasil fase Execute flow ${plan.flow} hanoman (fase Review) — hanya dipanggil `
+          + "orchestrator sesi ini, sesudah Execute ditutup."
+        : `Fase ${entry.phase} flow ${plan.flow} hanoman — hanya dipanggil orchestrator sesi ini.`,
+      instructions: review ? reviewerInstructions(plan, ctx) : phaseAgentInstructions(entry, index, plan, ctx),
+      // T2 · konteks bersama dibawa TERPISAH (lihat `phasePromptOf`): claude merujuknya lewat satu
+      // berkas di temp dir sesi, codex tetap inline.
+      context: ctx.context,
+      tools: null,
+      model: entry.model,
+      effort: entry.effort,
+      mentions: [],
+      ...(review ? {} : { executeMode: plan.executeMode ?? "inline" }),
+    };
+  });
 }
 
 // ADR-0170 P2 · reviewer independen. Diturunkan dari `spec-auditor` (builtin-agents.ts) + gerbang
@@ -338,8 +330,8 @@ const REVIEWER_RULES = [
 function reviewerInstructions(plan: PhasePlan, ctx: PhaseAgentContext): string {
   const m = ctx.method;
   return [
-    `Kamu reviewer independen hasil fase Execute flow ${plan.flow} hanoman. Kamu dipanggil orchestrator `
-      + "sesudah agen Execute melapor `Status: selesai` dan SEBELUM fase itu ditutup. Kamu pengadu janji: "
+    `Kamu agen fase Review — reviewer independen hasil fase Execute flow ${plan.flow} hanoman. Kamu dipanggil `
+      + "orchestrator sesudah fase Execute ditutup, dan fase Review baru ditutup bila kamu memberi `Verdict: lulus`. Kamu pengadu janji: "
       + "yang kamu nilai bukan bagus-tidaknya kode, melainkan apakah yang DIMINTA benar-benar ada dan "
       + "TERBUKTI pada keadaan akhir worktree ini.",
     "Prosedur:",

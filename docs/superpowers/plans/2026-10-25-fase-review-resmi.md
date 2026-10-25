@@ -122,7 +122,7 @@ expect(phasesComplete(P([...pre, ["Execute","done"], ["Review","done"]]))).toBe(
 **Interfaces:**
 - Consumes: `PhasePlan.phases` memuat entri `Review` (Task 1); tak ada lagi `plan.reviewer`.
 
-- [ ] **Step 1: Tulis/ubah test gagal:**
+- [x] **Step 1: Tulis/ubah test gagal:**
   - `buildPhaseAgents(planFeature)` → tepat satu def `name: "hanoman-fase-review"` dengan `phase: "Review"`
     dan instruksi `reviewerInstructions` (memuat `Verdict: lulus | rework`); tak ada def ber-`phase: "Execute"` selain execute.
   - Prompt orchestrator feature: memuat `Review → \`hanoman-fase-review\``, memuat `Review done` hanya sesudah
@@ -132,8 +132,8 @@ expect(phasesComplete(P([...pre, ["Execute","done"], ["Review","done"]]))).toBe(
     (tabel `AC → putusan → bukti`, `Verdict:`, maks 2 putaran, `Review` tak boleh `skipped`). Prompt goal/audit tanpa klausa itu.
   - `continuePrompt` (plan & tanpa plan): fase yang dilanjutkan Execute lalu Review; baris `Execute done` DAN
     `Review done` lama dinyatakan tak berlaku.
-- [ ] **Step 2: Jalankan, pastikan gagal.**
-- [ ] **Step 3: Implementasi.**
+- [x] **Step 2: Jalankan, pastikan gagal.**
+- [x] **Step 3: Implementasi.**
   - `phaseInstruction`: bila `phases.includes(REVIEWER_CELL)` tempelkan konstanta baru `SELF_REVIEW_CLAUSE`
     (review mandiri atas spec & plan vs diff `$HANOMAN_BASE_SHA...HEAD` + test sesuai scope; tabel AC → putusan → bukti;
     `Verdict: lulus | rework`; `rework` → perbaiki lalu review ulang, maks 2 putaran, sisanya keputusan terbuka;
@@ -157,10 +157,10 @@ expect(phasesComplete(P([...pre, ["Execute","done"], ["Review","done"]]))).toBe(
     baris `Execute done` dan `Review done` lama; tulis baris baru masing-masing sesudah sesi INI menyelesaikannya.
     Tanpa plan: "Lanjut di fase Execute … lalu fase Review" + `SELF_REVIEW_CLAUSE`, dan
     `skillInstruction(flow, ["Execute", REVIEWER_CELL], m)`.
-- [ ] **Step 4: Perbarui golden** `pnpm vitest --run runner/test/prompt-golden.test.ts -u`, lalu **baca diff** `runner/test/__golden__/`:
+- [x] **Step 4: Perbarui golden** `pnpm vitest --run runner/test/prompt-golden.test.ts -u`, lalu **baca diff** `runner/test/__golden__/`:
   yang boleh berubah hanya start-feature, start-qa-matt, continue-feature, resume-qa (dan hanya di bagian fase/review).
-- [ ] **Step 5: Jalankan test runner tersentuh**, hijau. `pnpm vitest --run runner/test`
-- [ ] **Step 6: Commit** `feat(prompt): fase Review di orchestrator & sesi tunggal, langkah R pindah ke fase Review`
+- [x] **Step 5: Jalankan test runner tersentuh**, hijau. `pnpm vitest --run runner/test`
+- [x] **Step 6: Commit** `feat(prompt): fase Review di orchestrator & sesi tunggal, langkah R pindah ke fase Review`
 
 ### Task 4: docs — ADR-0230 & Source of Truth
 
