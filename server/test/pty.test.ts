@@ -653,7 +653,7 @@ describe("pty service", () => {
     attach(s.id, c);
     await waitFor(() => phaseFrames(c).length > 0);
 
-    appendFileSync(phaseFile, "Audit done\nSpec skipped\nPlan skipped\nExecute done\n");
+    appendFileSync(phaseFile, "Audit done\nSpec skipped\nPlan skipped\nExecute done\nReview done\n");
     await waitFor(() => phaseFrames(c).some((f) => f.complete === true));
     // Pane-nya memang belum mati — itulah inti temuannya.
     expect(getSession(s.id)?.exited).toBe(false);
@@ -671,7 +671,7 @@ describe("pty service", () => {
     attach(s.id, c);
     await waitFor(() => phaseFrames(c).length > 0);
 
-    appendFileSync(phaseFile, "Audit done\nSpec skipped\nPlan skipped\nExecute done\n");
+    appendFileSync(phaseFile, "Audit done\nSpec skipped\nPlan skipped\nExecute done\nReview done\n");
     await waitFor(() => phaseFrames(c).some((f) => f.phases!.every((p) => p.state !== "active")));
     expect(phaseFrames(c).every((f) => f.complete === false)).toBe(true);
   });
@@ -691,7 +691,7 @@ describe("pty service", () => {
     attach(s.id, c);
     await waitFor(() => phaseFrames(c).length > 0);
 
-    appendFileSync(phaseFile, "Audit done\nSpec skipped\nPlan skipped\nExecute done\n");
+    appendFileSync(phaseFile, "Audit done\nSpec skipped\nPlan skipped\nExecute done\nReview done\n");
     await waitFor(() => phaseFrames(c).some((f) => f.phases!.every((p) => p.state !== "active")));
     expect(phaseFrames(c).every((f) => f.complete === false)).toBe(true);
 
@@ -708,7 +708,7 @@ describe("pty service", () => {
     const s = createSession("p1", repoDir, { specId: "SPEC-C5", flow: "qa", prompt: "x", phaseFile });
     expect(sessionFinished(s.id)).toBe(false);
 
-    writeFileSync(phaseFile, "Audit done\nSpec skipped\nPlan skipped\nExecute done\n");
+    writeFileSync(phaseFile, "Audit done\nSpec skipped\nPlan skipped\nExecute done\nReview done\n");
     expect(sessionFinished(s.id)).toBe(true);
     expect(getSession(s.id)?.exited).toBe(false);   // inti temuannya: selesai TANPA pane mati
   });

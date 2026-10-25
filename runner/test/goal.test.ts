@@ -11,7 +11,9 @@ describe("goal condition", () => {
   it("default memuat identitas backlog, seluruh fase, gate plan, dan push", () => {
     const c = defaultGoalCondition(args);
     expect(c).toContain("SPEC-332");
-    expect(c).toContain("Brainstorm → Objective → Spec → Plan → Execute");
+    expect(c).toContain("Brainstorm → Objective → Spec → Plan → Execute → Review");
+    // ADR-0230 · Review tak boleh `skipped`.
+    expect(c).toContain("`Review` wajib `done`");
     expect(c).toContain('cat "$HANOMAN_PHASE_FILE"');
     expect(c).toContain("docs/superpowers/plans/");
     expect(c).toContain("git push origin HEAD:refs/heads/hanoman/spec-332");

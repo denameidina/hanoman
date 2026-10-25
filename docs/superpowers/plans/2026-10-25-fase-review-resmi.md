@@ -84,7 +84,7 @@ expect(UNSKIPPABLE_PHASES.has("Review")).toBe(true);
 **Interfaces:**
 - Consumes: `UNSKIPPABLE_PHASES`, `FLOW_PHASES` dari Task 1.
 
-- [ ] **Step 1: Tulis test gagal:**
+- [x] **Step 1: Tulis test gagal:**
 
 ```ts
 const P = (rows: [string, PhaseState][]) => rows.map(([name, state]) => ({ name, state }));
@@ -101,16 +101,16 @@ expect(phasesComplete(P([...pre, ["Execute","done"], ["Review","done"]]))).toBe(
 
   Gate codex: `codexGoalScript({ flow: "feature", … })` memuat `^Review done[[:space:]]*$` (tanpa `skipped`) dan
   `^Execute (done|skipped)…`. Cermin yang sama di `goal.ts` bila ia menyusun daftar fase sendiri.
-- [ ] **Step 2: Jalankan, pastikan gagal.**
-- [ ] **Step 3: Implementasi.**
+- [x] **Step 2: Jalankan, pastikan gagal.**
+- [x] **Step 3: Implementasi.**
   - `REACHED`: `Execute: "executing"`, `Review: "done"` (komentar ADR-0230 di sebelah `Execute`).
   - `stageFor`: `if (p.state === "skipped" && UNSKIPPABLE_PHASES.has(p.name)) continue;` sebelum lookup REACHED.
   - `phasesComplete`: `p.state === "done" || (p.state === "skipped" && !UNSKIPPABLE_PHASES.has(p.name))`.
   - `session-launch.ts`: continue menyaring `["Execute", REVIEWER_CELL].includes(p.phase)`; perbarui komentar
     SPEC-172 ("continue melanjutkan Execute lalu Review"). `rerunPhases` ikut otomatis.
   - `codex-settings.ts`/`goal.ts`: pola grep per fase `UNSKIPPABLE_PHASES.has(p) ? "done" : "(done|skipped)"`.
-- [ ] **Step 4: Jalankan test tersentuh** (server serial + DB terisolasi), hijau.
-- [ ] **Step 5: Commit** `feat(phases): Review menutup stage done; Review tak boleh skipped`
+- [x] **Step 4: Jalankan test tersentuh** (server serial + DB terisolasi), hijau.
+- [x] **Step 5: Commit** `feat(phases): Review menutup stage done; Review tak boleh skipped`
 
 ### Task 3: runner — prompt orchestrator, agen fase, sesi tunggal, continue
 

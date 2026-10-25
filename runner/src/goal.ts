@@ -1,5 +1,5 @@
 import type { Flow } from "./types";
-import { PLAN_DIRS, isGoalShapedFlow } from "@hanoman/shared";
+import { PLAN_DIRS, UNSKIPPABLE_PHASES, isGoalShapedFlow } from "@hanoman/shared";
 import { PIPELINES } from "./prompt";
 import { readGoalPayload } from "./goal-spec";
 
@@ -49,7 +49,10 @@ export function defaultGoalCondition({ flow, specId, branchTo, spec }: GoalArgs)
   const planGate = phases.includes("Plan") && phases.includes("Execute");
   const clauses = [
     `1. output \`cat "$HANOMAN_PHASE_FILE"\` yang memuat satu baris untuk SETIAP fase `
-      + `${phases.join(" → ")}, masing-masing berakhiran \`done\` atau \`skipped\`;`,
+      + `${phases.join(" → ")}, masing-masing berakhiran \`done\` atau \`skipped\``
+      // ADR-0230 · fase yang tak boleh dilewati (Review) disebut eksplisit.
+      + phases.filter((p) => UNSKIPPABLE_PHASES.has(p)).map((p) => ` (\`${p}\` wajib \`done\`)`).join("")
+      + ";",
   ];
   if (planGate) {
     // SPEC-734 · INVARIAN 1 · gerbang ini menuntut hasil grep KOSONG sebagai bukti, jadi direktori
