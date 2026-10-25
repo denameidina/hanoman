@@ -296,10 +296,11 @@ Singleton `id = 1`, kolom `data` (Json) berbentuk `zSetting`:
   codex: {…}, antigravity: {…} }`. Default bawaan mengisi model/effort rekomendasi tiap fase (`no_effort.enabled=false`);
   nilai `null` pada konfigurasi user tetap berarti warisan orchestrator. Sesi ber-flow aktif lahir sebagai
   orchestrator; tiap fase dikerjakan subagent native `hanoman-fase-<slug>`. Baris lama tanpa blok ini
-  parse dan di-seed tanpa migration. Kunci sel `Review` (ADR-0170, hanya `feature`/`qa`) bukan fase:
-  ia meng-override model/effort reviewer independen `hanoman-fase-review` (default claude `opus`·`high`,
-  codex `gpt-5.6-sol`·`high`, TIDAK mewarisi orchestrator; `phaseOverrides.Review` juga berlaku). Belum
-  tampil di tab Orkestrasi — tetap tersimpan karena kunci sel lenient.
+  parse dan di-seed tanpa migration. Sel `Review` (hanya `feature`/`qa`) adalah fase resmi sejak
+  [ADR-0230](../adr/0230-fase-review-resmi.md): agennya reviewer independen `hanoman-fase-review` (ADR-0170;
+  default claude `opus`·`high`, codex `gpt-5.6-sol`·`high`, TIDAK mewarisi orchestrator;
+  `phaseOverrides.Review` juga berlaku), tampil di tab Orkestrasi seperti fase lain. Sel `Review` yang diisi
+  operator sebelum ADR-0230 dipertahankan seed (kunci marker absen + nilai tersimpan = milik operator).
   Antigravity memakai tier native `inherit|flash|pro` (default `inherit`) dan effort `null`,
   termasuk reviewer: tidak mewarisi slug/effort parent. Pembacaan baris lama tetap lenient;
   PUT menolak sel Antigravity baru/diubah yang membawa slug parent atau effort independen dengan

@@ -170,12 +170,12 @@ expect(phasesComplete(P([...pre, ["Execute","done"], ["Review","done"]]))).toBe(
 - Modify (bila menyebut reviewer-bukan-fase/langkah R): `internal/docs/adr/0164-…md` (catatan saja), `0173-…md`,
   `internal/docs/architecture/antigravity-runtime.md`, `internal/docs/architecture/data-model.md`, `internal/skills/hanoman/SKILL.md`
 
-- [ ] **Step 1:** Tulis ADR-0230 (format ADR repo: Status/Tanggal/SPEC/Terkait, Konteks, Keputusan = isi spec §1-§4, Konsekuensi:
+- [x] **Step 1:** Tulis ADR-0230 (format ADR repo: Status/Tanggal/SPEC/Terkait, Konteks, Keputusan = isi spec §1-§4, Konsekuensi:
   sesi lama di-continue menjalankan Review; stage `done` kini butuh `Review done`; satu baris marker lagi; review di sesi tunggal
   murni lewat prompt; `Verdict:` tetap belum ditegakkan server).
-- [ ] **Step 2:** Amandemen ADR-0170 #4: tambahkan `[Diamandemen ADR-0230: Review kini fase pipeline]` seperti pola #2. Tautkan ADR-0230 di kedua README.
-- [ ] **Step 3:** `grep -rn "langkah R\|bukan fase\|Reviewer Execute\|phase = Execute" internal/docs internal/skills` → perbarui sisa yang kini salah.
-- [ ] **Step 4: Commit** `docs(adr): ADR-0230 fase Review resmi`
+- [x] **Step 2:** Amandemen ADR-0170 #4: tambahkan `[Diamandemen ADR-0230: Review kini fase pipeline]` seperti pola #2. Tautkan ADR-0230 di kedua README.
+- [x] **Step 3:** `grep -rn "langkah R\|bukan fase\|Reviewer Execute\|phase = Execute" internal/docs internal/skills` → perbarui sisa yang kini salah.
+- [x] **Step 4: Commit** `docs(adr): ADR-0230 fase Review resmi`
 
 ### Task 5: Verifikasi akhir
 
