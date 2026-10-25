@@ -8,7 +8,8 @@ import { startSpecSession, LaunchError, sessionIdForSpec } from "../src/services
 import { createSession, killAll, killSession, agentsFilePath, promptFilePath, getSession } from "../src/services/pty";
 import { DEFAULT_SETTING } from "../src/services/settings";
 import { resolveGoalCondition } from "@hanoman/runner";
-import { ORCHESTRATION_DEFAULTS } from "@hanoman/shared";
+import { ORCHESTRATION_DEFAULTS, zLead } from "@hanoman/shared";
+import { setLead } from "../src/services/lead/config";
 import { makeRepoWithBranches } from "./factory";
 import { resolveRepoDir } from "../src/services/local-binding";
 
@@ -262,6 +263,47 @@ describe("session-launch", () => {
       .rejects.toMatchObject({ statusCode: 400 });
     expect(getSession(id)?.exited).toBe(true);
     killSession(id);
+  });
+
+  // ADR-0231 · cara bertanya dikunci saat lahir: lead menjawab project → teks; tidak → AskUserQuestion.
+  const eventHooks = (argv: string) => argv.split('POST \\"$HANOMAN_EVENT_URL').length - 1;
+  const leadOn = async (projectId: string) => {
+    await setLead({ ...zLead.parse({}), enabled: true, paused: false, pausedProjects: [] });
+    await prisma.project.update({ where: { id: projectId }, data: { leadOptIn: true } });
+  };
+  it("ADR-0231 · lead menjawab project → orchestrator & agen fase bertanya lewat teks, hook Stop terpasang", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    const spec = await seedRepo("SPEC-ASKTXT");
+    await leadOn(spec.projectId);
+    const r = await startSpecSession(spec, { flow: "feature" });
+    const prompt = readFileSync(promptFilePath(r.id), "utf8");
+    expect(prompt).toContain("JANGAN memakai AskUserQuestion");
+    expect(prompt).not.toContain("ajukan lewat AskUserQuestion");
+    expect(prompt).not.toContain("tanyakan lewat AskUserQuestion");
+    expect(readFileSync(agentsFilePath(r.id), "utf8")).not.toContain("lewat AskUserQuestion —");
+    expect(eventHooks(await argvOf(r.id))).toBe(4); // PreToolUse, SubagentStart, SubagentStop + Stop
+    killSession(r.id);
+  });
+  it("ADR-0231 · lead menjawab project, mode tunggal → klausa otonomi teks", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    await setOrchestration("feature", false);
+    const spec = await seedRepo("SPEC-ASKTXT2");
+    await leadOn(spec.projectId);
+    const r = await startSpecSession(spec, { flow: "feature" });
+    expect(readFileSync(promptFilePath(r.id), "utf8")).toContain("JANGAN memakai AskUserQuestion");
+    killSession(r.id);
+  });
+  it("ADR-0231 · lead mati atau project tak opt-in → AskUserQuestion, tanpa hook Stop event", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = "/bin/echo";
+    await setOrchestration("feature", false);
+    const spec = await seedRepo("SPEC-ASKTOOL");
+    await setLead({ ...zLead.parse({}), enabled: true, paused: false, pausedProjects: [] });
+    const r = await startSpecSession(spec, { flow: "feature" });
+    const prompt = readFileSync(promptFilePath(r.id), "utf8");
+    expect(prompt).toContain("ajukan lewat AskUserQuestion");
+    expect(prompt).not.toContain("JANGAN memakai AskUserQuestion");
+    expect(eventHooks(await argvOf(r.id))).toBe(3);
+    killSession(r.id);
   });
 
   it("orkestrasi flow mati → prompt mode tunggal, tanpa berkas agen", async () => {

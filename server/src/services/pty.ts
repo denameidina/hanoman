@@ -8,8 +8,8 @@ import { dirname, resolve as resolvePath } from "node:path";
 import { tmpdir } from "node:os";
 import {
   goalOneLine, goalChunks, agentFlags, agentEnvironment, ANTIGRAVITY_ENV_KEYS, codexGoalScript, ensureSpawnHelper, spawnWithHelperRecovery,
-  renderAgentsJson, agentDelegationClause, materializeCodexAgents, materializeAntigravityAgents, cleanupAntigravityAgents, writeReadOnlyHook, withPhaseDelegation,
-  writeSubagentStatusline, agentContractOf, type AgentContractFile, type AgentDef, type Flow, type Agent,
+  renderAgentsJson, agentDelegationClause, textAsk, materializeCodexAgents, materializeAntigravityAgents, cleanupAntigravityAgents, writeReadOnlyHook, withPhaseDelegation,
+  writeSubagentStatusline, agentContractOf, type AgentContractFile, type AgentDef, type Flow, type Agent, type AskVia,
 } from "@hanoman/runner";
 import {
   BUILTIN_AGENTS, SESSION_NAME_MAX, coerceCodexEffort, isPhaseAgentName, isTerminalResponse, resolveChoices, type SessionKind,
@@ -810,6 +810,10 @@ export type CreateOpts = {
   // S3 · SPEC-172 · fase yang DIKERJAKAN ULANG sesi ini (continue: Execute) — dikecualikan dari
   // `@hanoman_done_at_birth` walau berkas fase masih memuat barisnya dari run lama.
   rerunPhases?: string[];
+  // ADR-0231 · cara bertanya sesi claude, dikunci saat lahir oleh pemanggil (`askViaFor`): `text` =
+  // rute-tanya AskUserQuestion di prompt/agen ditukar teks (`textAsk`) dan hook Stop ikut ke jalur
+  // event; absen/`tool` = seperti sebelumnya. Runtime lain mengabaikannya.
+  askVia?: AskVia;
 };
 
 export function createSession(projectId: string, cwd: string, opts: CreateOpts = {}): SessionInfo {
@@ -869,10 +873,17 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // tak memasang flag apa pun.
   const sessionEffort = agentForDefs === "codex" && opts.model && opts.effort
     ? coerceCodexEffort(opts.model, opts.effort) : opts.effort;
-  const requestedPhaseDefs = opts.command ? [] : (opts.phaseAgents ?? []);
+  // ADR-0231 · satu titik untuk prompt sesi, agen fase, dan blok roster custom agent.
+  const askText = !opts.command && agentForDefs === "claude" && opts.askVia === "text";
+  const asked = (s: string): string => askText ? textAsk(s) : s;
+  const requestedPhaseDefs = opts.command ? [] : (opts.phaseAgents ?? [])
+    .map((d) => askText ? { ...d, instructions: textAsk(d.instructions) } : d);
   // R7 · smart activation melihat prompt yang BENAR-BENAR lahir: prompt orchestrator bila agen fase
   // diminta, `legacyPrompt` bila tidak — dan dipilih ulang dengan `legacyPrompt` saat fallback.
-  const bornPrompt = (orch: boolean): string | undefined => orch ? opts.prompt : (opts.legacyPrompt ?? opts.prompt);
+  const bornPrompt = (orch: boolean): string | undefined => {
+    const p = orch ? opts.prompt : (opts.legacyPrompt ?? opts.prompt);
+    return p === undefined ? p : asked(p);
+  };
   const selectionContext: AgentSelectionContext = {
     projectId, runtime: agentForDefs, flow: opts.flow, cwd,
     baseSha: opts.env?.HANOMAN_BASE_SHA, prompt: bornPrompt(requestedPhaseDefs.length > 0),
@@ -972,7 +983,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
           return [error instanceof Error ? error.message : String(error)];
         }
         agentsFile = file;
-        rosterBlock = agentDelegationClause(customDefs, "claude");
+        rosterBlock = asked(agentDelegationClause(customDefs, "claude"));
         liveAgentDefs = defs;
         renderedDefs = defs;
         return [];
@@ -1080,6 +1091,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
       // mentah di atas), jadi hook event hanya pernah terpasang di sesi agen.
       eventHook: true,
       subagentStatusLine: statusLineCommand,
+      askText,
     }).map(sq).join(" ");
     // GOTCHA ADR-0094 #4: `--agents` TIDAK boleh ikut `.map(sq)` seperti flag lain — ia harus tetap
     // berbentuk `"$(cat …)"` supaya `sh -c` yang melahirkan sesi meng-expand-nya. Di-`sq` sekali

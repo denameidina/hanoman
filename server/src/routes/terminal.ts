@@ -46,6 +46,7 @@ import { takeOverAsk } from "../services/lead/ask";
 import { SESSION_HEADER, recordLauncher, refuseSelfDecision } from "../services/decision-guard";
 import { readDialogScreen } from "../services/tui-dialog";
 import { telegramGatewayAgentTokenId } from "../services/telegram/runtime";
+import { askViaFor } from "../services/lead/ask-via";
 
 // SPEC-816 · lampiran gambar sesi terminal. Berkas + path, bukan gambar inline: yang bisa dikirim
 // ke PTY hanyalah teks, dan CLI-lah yang menyusun blok image dari berkas yang dibacanya.
@@ -239,8 +240,10 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         // ADR-0164 · rencana fase dari Setting yang sama; prompt lama ikut sebagai fallback.
         const plan = sessionPhasePlan(await getSetting(), "reverse", agent, { model, effort });
         const legacyPrompt = startProjectPrompt("reverse", brief, "reverse-docs") + resumeNote(reused);
+        // ADR-0231 · cara bertanya dikunci saat lahir: teks bila lead menjawab project ini.
+        const askVia = await askViaFor(project.id, agent);
         const s = createSession(project.id, wt, {
-          id, flow: "reverse", model, effort, agent,
+          id, flow: "reverse", model, effort, agent, askVia,
           phaseFile: phaseFilePath(repoDir, id),
           decisionFile: decisionFilePath(repoDir, id),
           prompt: plan ? startProjectPrompt("reverse", brief, "reverse-docs", plan) + resumeNote(reused) : legacyPrompt,
@@ -283,8 +286,10 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         const brief = { id: project.id, name: project.name, desc: project.desc, stack: project.stack };
         const plan = sessionPhasePlan(await getSetting(), "scaffold", agent, { model, effort });
         const legacyPrompt = startScaffoldPrompt(brief, "scaffold-docs") + resumeNote(reused);
+        // ADR-0231 · cara bertanya dikunci saat lahir: teks bila lead menjawab project ini.
+        const askVia = await askViaFor(project.id, agent);
         const s = createSession(project.id, wt, {
-          id, flow: "scaffold", model, effort, agent,
+          id, flow: "scaffold", model, effort, agent, askVia,
           phaseFile: phaseFilePath(repoDir, id),
           decisionFile: decisionFilePath(repoDir, id),
           prompt: plan ? startScaffoldPrompt(brief, "scaffold-docs", plan) + resumeNote(reused) : legacyPrompt,
@@ -332,8 +337,10 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         const audit = auditDoc ? { id: fromAudit!, path: auditDoc.path, content: auditDoc.content } : undefined;
         const plan = sessionPhasePlan(await getSetting(), "prd", agent, { model, effort });
         const legacyPrompt = startPrdPrompt(project_, brief, `prd/${slug}`, audit) + resumeNote(reused);
+        // ADR-0231 · cara bertanya dikunci saat lahir: teks bila lead menjawab project ini.
+        const askVia = await askViaFor(project.id, agent);
         const s = createSession(project.id, wt, {
-          id, flow: "prd", branch: `prd/${slug}`, model, effort, agent,
+          id, flow: "prd", branch: `prd/${slug}`, model, effort, agent, askVia,
           phaseFile: phaseFilePath(repoDir, id),
           decisionFile: decisionFilePath(repoDir, id),
           prompt: plan ? startPrdPrompt(project_, brief, `prd/${slug}`, audit, plan) + resumeNote(reused) : legacyPrompt,
@@ -379,8 +386,10 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         const prd = { title, path: prdPath, content };
         const plan = sessionPhasePlan(await getSetting(), "breakdown", agent, { model, effort });
         const legacyPrompt = startBreakdownPrompt(project_, prd, `breakdown/${slug}`) + resumeNote(reused);
+        // ADR-0231 · cara bertanya dikunci saat lahir: teks bila lead menjawab project ini.
+        const askVia = await askViaFor(project.id, agent);
         const s = createSession(project.id, wt, {
-          id, flow: "breakdown", branch: `breakdown/${slug}`, model, effort, agent,
+          id, flow: "breakdown", branch: `breakdown/${slug}`, model, effort, agent, askVia,
           phaseFile: phaseFilePath(repoDir, id),
           decisionFile: decisionFilePath(repoDir, id),
           prompt: plan ? startBreakdownPrompt(project_, prd, `breakdown/${slug}`, plan) + resumeNote(reused) : legacyPrompt,

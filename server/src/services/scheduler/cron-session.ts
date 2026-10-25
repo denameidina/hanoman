@@ -6,6 +6,7 @@ import { terminalAgentDefaults } from "../settings";
 import { ensureCodexTrust } from "../codex-trust";
 import { createSession, getSessionAsync } from "../pty";
 import { withSessionAdmission } from "../session-launch-gate";
+import { askViaFor } from "../lead/ask-via";
 
 export type CronLaunchInput = {
   id: string; projectId: string; name: string; prompt: string;
@@ -56,8 +57,10 @@ export async function startCronSession(cron: CronLaunchInput): Promise<{ id: str
     const wt = `${repoDir}/.worktrees/${id}`;
     if (!realGit.worktreeAlive(wt)) realGit.addWorktree(repoDir, wt, "HEAD");
 
+    // ADR-0231 · cara bertanya dikunci saat lahir: teks bila lead menjawab project ini.
+    const askVia = await askViaFor(cron.projectId, agent);
     const s = createSession(cron.projectId, wt, {
-      id, agent, model, effort,
+      id, agent, model, effort, askVia,
       prompt: cronPrompt(
         { id: project.id, name: project.name, desc: project.desc, stack: project.stack },
         { name: cron.name, prompt: cron.prompt },

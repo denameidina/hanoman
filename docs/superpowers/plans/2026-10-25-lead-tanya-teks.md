@@ -58,12 +58,12 @@ Spec: [`docs/superpowers/specs/2026-10-25-lead-tanya-teks-design.md`](../specs/2
 
 **Files:** `server/src/services/pty.ts` (`CreateOpts.askVia`, terapkan `textAsk` ke prompt+roster+agen fase, `askText` ke `agentFlags`), `server/src/services/session-launch.ts`, `server/src/routes/terminal.ts` (4 flow), `server/src/services/scheduler/cron-session.ts`, `server/src/services/qa-session.ts`; test `server/test/pty.test.ts` / `server/test/session-launch.test.ts`.
 
-- [ ] Test gagal: `createSession({ agent: "claude", askVia: "text", prompt })` → berkas prompt tanpa
+- [x] Test gagal: `createSession({ agent: "claude", askVia: "text", prompt })` → berkas prompt tanpa
   `AskUserQuestion` dan settings `--settings` memuat Stop event hook; agen fase (berkas `--agents`) tanpa
   `AskUserQuestion`; `askVia` absen → seperti sekarang. `startSpecSession` dengan lead menjawab project →
   prompt teks; lead mati → prompt `AskUserQuestion`.
-- [ ] Implementasi: setiap pemanggil `await askViaFor(projectId, agent)` sebelum `createSession`.
-- [ ] Test tersentuh hijau. Commit.
+- [x] Implementasi: setiap pemanggil `await askViaFor(projectId, agent)` sebelum `createSession`.
+- [x] Test tersentuh hijau. Commit.
 
 ### Task 4: docs & verifikasi
 
