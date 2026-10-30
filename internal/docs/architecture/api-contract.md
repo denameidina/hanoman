@@ -1081,6 +1081,11 @@ POST   /terminal/sessions  {project, flow?} # 201 { id } · 404 project · 400 t
 #     ke katalog modelnya (SPEC-339, `terminalAgentDefaults` di services/settings.ts), dan
 #     `ensureCodexTrust` diturunkan dari agen HASIL resolusi — bukan Setting.agent, karena di jalur
 #     ini keduanya kini bisa berbeda. agent di luar claude|codex|antigravity → 400.
+#     ADR-0232 · `worktree?: boolean`, `branchFrom?: string` (1–255): worktree:true → sesi lahir di
+#     `.worktrees/term-<8hex>` pada branch BARU `term/<8hex>` dari branchFrom (kosong → HEAD; lokal
+#     lalu origin/<rev>), id `term-<8hex>`, `branch` terisi → review/integrate SPEC-230 berlaku.
+#     Dibuat di dalam gerbang admission. Ref tak dikenal → 422 (worktree setengah jadi dilepas);
+#     branchFrom tanpa worktree:true → 400. Tanpa keduanya: cwd = repoDir seperti sebelumnya.
 #     Varian ini dijaga `flow: z.undefined()` di zod: ia permisif dan duduk SESUDAH semua varian
 #     ber-flow, jadi tanpa gerbang itu body flow yang CACAT (mis. {project, flow:"prd"} tanpa
 #     brief) akan lolos ke sini dan membuka terminal biasa secara SENYAP alih-alih dijawab 400.

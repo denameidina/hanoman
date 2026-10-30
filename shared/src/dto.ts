@@ -474,6 +474,12 @@ export const zTerminalSession = z.union([
     project: z.string(), flow: z.undefined(),
     agent: zAgent.optional(), model: z.string().optional(), effort: z.string().optional(),
     force: z.boolean().optional(),
+    // ADR-0232 · opsional: `worktree:true` → sesi lahir di `.worktrees/<id>` pada branch baru
+    // `term/<id>` dari `branchFrom` (kosong → HEAD repo), alih-alih langsung di repoDir. Tanpa
+    // keduanya body-nya byte-identik dengan sebelumnya. `branchFrom` tanpa `worktree` ditolak di
+    // route — ia tak berarti apa-apa di repoDir dan diam-diam mengabaikannya menyesatkan.
+    worktree: z.boolean().optional(),
+    branchFrom: z.string().min(1).max(255).optional(),
   }),
   // SPEC-252 · ADR-0061 — model & effort per SESI: override opsional saat Start; kosong → global.
   // SPEC-332 · ADR-0073 — mode goal per SESI: `goal` undefined → ikut Setting.goal.enabled,

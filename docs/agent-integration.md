@@ -753,3 +753,7 @@ boundary langsung membuang cache dan hasil in-flight lama. Probe hanya `--versio
 10 detik dan 16 KiB per stream; sandbox aktif/hardening tidak mem-probe host. Kegagalan
 observasi tidak memblokir sesi host. Tool tidak memasang CLI atau mengubah konfigurasi dan
 endpoint/tool versi Codex tidak berubah.
+
+ADR-0232: `hanoman_session_create` untuk terminal agen biasa (`project` tanpa `flow`/`shell`) menerima
+`worktree: true` dan `branchFrom` — sesi lahir di worktree `.worktrees/term-<id>` pada branch baru
+`term/<id>` dari branch pilihan. Tetap mode danger dengan capability `sessions:spawn`; tanpa tool baru.

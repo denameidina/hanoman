@@ -2390,6 +2390,10 @@ tombolnya. "Mulai lagi" pada baris riwayat ber-`kind: "terminal"` mengirim runti
 agen/model/effort sudah tercatat di `SessionHistory` sejak ADR-0079. Sejak audit S4c (2026-09-23)
 baris ber-`specId` juga mengirim `agent` (+ `model`/`effort` bila tercatat), supaya sesi codex tak
 dilanjutkan sebagai claude; `phaseOverrides` sesi asal tak tersimpan di mana pun, jadi tak diulang.
+ADR-0232 · form yang sama memuat kotak centang **Worktree terpisah**; dicentang → muncul **Branch
+asal** (`api.listBranches`, gabungan lokal + origin, remote-only bertanda `· origin`, opsi kosong =
+HEAD checkout project) dan body mendapat `worktree: true` (+ `branchFrom` bila dipilih). Tak
+dicentang → body persis seperti sebelumnya dan daftar branch tak dimuat.
 
 Toolbar juga punya **Riwayat** (SPEC-362 · [ADR-0079](../adr/0079-history-sesi-terminal-store-lokal-plus-transkrip.md)):
 membuka `SessionHistoryModal` — **modal**, bukan panel tetap, persis seperti picker "Ambil backlog".
