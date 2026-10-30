@@ -487,7 +487,8 @@ export function createApi(o: { base?: string } = {}) {
     j<TerminalWorkspaceSnapshot>(paths.terminalWorkspace, { method: "PUT", ...body(input) }),
   // SPEC-517 · runtime PER SESI untuk terminal agen biasa (opsional; kosong → default global di
   // server). Tanpa `opts`, body byte-identik dengan sebelum SPEC-517.
-  createTerminal: (project: string, opts?: { agent?: Agent; model?: string; effort?: string }) =>
+  // ADR-0232 · `worktree`/`branchFrom` opsional: sesi lahir di worktree terpisah dari branch pilihan.
+  createTerminal: (project: string, opts?: { agent?: Agent; model?: string; effort?: string; worktree?: boolean; branchFrom?: string }) =>
     j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, ...(opts ?? {}) }) }),
   // SPEC-236 · terminal biasa non-claude: shell mentah di repoDir project (tanpa flow).
   // SPEC-739 · ADR-0114 · `install` opsional membuat pane menjalankan perintah pemasangan metode

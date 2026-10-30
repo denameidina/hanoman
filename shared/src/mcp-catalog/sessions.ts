@@ -186,6 +186,8 @@ const MORE: readonly McpToolDef[] = [
           } }),
         },
         prdPath: str("flow `breakdown`: jalur PRD yang dipecah. WAJIB untuk alur itu."),
+        worktree: bool("Terminal agen biasa (hanya `project`, tanpa `flow`/`shell`): true = lahir di worktree terpisah pada branch baru `term/<id>`, bukan langsung di repo project. Kosong = di repo project."),
+        branchFrom: str("Bersama `worktree: true`: branch/ref asal worktree (lokal atau origin). Kosong = HEAD repo."),
         force: bool("Lewati gerbang dependency. Pakai HANYA sesudah melihat daftar pemblokirnya."),
       },
       allOf: [
@@ -215,7 +217,8 @@ const MORE: readonly McpToolDef[] = [
       if (flow === "breakdown") return { method: "POST", path: "/terminal/sessions", body: { project, flow, prdPath: String(a.prdPath) } };
       if (flow === "reverse" || flow === "scaffold") return { method: "POST", path: "/terminal/sessions", body: { project, flow } };
       const body: Record<string, unknown> = { project };
-      for (const k of ["agent", "model", "effort"]) if (s(a[k]) !== undefined) body[k] = s(a[k]);
+      for (const k of ["agent", "model", "effort", "branchFrom"]) if (s(a[k]) !== undefined) body[k] = s(a[k]);
+      if (typeof a.worktree === "boolean") body.worktree = a.worktree;
       return { method: "POST", path: "/terminal/sessions", body };
     },
     shape: (raw) => raw,

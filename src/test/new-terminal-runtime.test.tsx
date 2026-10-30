@@ -8,6 +8,7 @@ const listTerminals = vi.fn();
 const createTerminal = vi.fn();
 const getSettings = vi.fn();
 const getCodexVersion = vi.fn();
+const listBranches = vi.fn();
 vi.mock("../src/api/client", () => ({
   ApiError: class ApiError extends Error { constructor(public status: number, msg: string) { super(msg); } },
   api: {
@@ -18,6 +19,7 @@ vi.mock("../src/api/client", () => ({
     listSpecs: vi.fn(async () => ({ items: [], total: 0, page: 1, pageSize: 0 })),
     getSettings: (...a: unknown[]) => getSettings(...a),
     getCodexVersion: (...a: unknown[]) => getCodexVersion(...a),
+    listBranches: (...a: unknown[]) => listBranches(...a),
     getTerminalWorkspace: vi.fn(async () => ({ workspace: null, revision: 0, updatedAt: null })),
     putTerminalWorkspace: vi.fn(async (input: { baseRevision: number; workspace: unknown }) => ({
       workspace: input.workspace, revision: input.baseRevision + 1, updatedAt: "2026-08-15T00:00:00.000Z",
@@ -48,7 +50,8 @@ const settings = (over: object = {}) => ({
 
 beforeEach(() => {
   localStorage.clear();
-  [listTerminals, createTerminal, getSettings, getCodexVersion].forEach((m) => m.mockReset());
+  [listTerminals, createTerminal, getSettings, getCodexVersion, listBranches].forEach((m) => m.mockReset());
+  listBranches.mockResolvedValue({ branches: ["main", "dev"], remotes: ["main", "fitur-x"], defaultBranch: "main" });
   listTerminals.mockResolvedValue([]);
   createTerminal.mockResolvedValue({ id: "term1" });
   getSettings.mockResolvedValue(settings());
@@ -158,3 +161,46 @@ describe("Sesi baru · galat tak ditelan (audit UI/UX)", () => {
     expect(screen.getByLabelText("Model")).toHaveValue("gemini-3.8-flash-high");
     expect(screen.getByLabelText("Effort")).toHaveValue("high");
   });
+
+// ADR-0232 · worktree terpisah + branch asal dipilih per sesi.
+describe("Sesi baru · worktree terpisah (ADR-0232)", () => {
+  it("default tanpa worktree: body tak memuat worktree/branchFrom", async () => {
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByText("Belum ada sesi terminal");
+    fireEvent.click(screen.getByRole("button", { name: "Sesi baru" }));
+    await screen.findByLabelText("Agen");
+    expect(screen.queryByLabelText("Branch asal")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Buka sesi" }));
+    await waitFor(() => expect(createTerminal).toHaveBeenCalled());
+    expect(createTerminal.mock.calls[0]![1]).not.toHaveProperty("worktree");
+    expect(createTerminal.mock.calls[0]![1]).not.toHaveProperty("branchFrom");
+    expect(listBranches).not.toHaveBeenCalled();
+  });
+
+  it("worktree + branch pilihan ikut ke body; branch remote-only diberi tanda origin", async () => {
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByText("Belum ada sesi terminal");
+    fireEvent.click(screen.getByRole("button", { name: "Sesi baru" }));
+    await screen.findByLabelText("Agen");
+    fireEvent.click(screen.getByText("Worktree terpisah"));
+    const sel = await screen.findByLabelText("Branch asal");
+    await screen.findByRole("option", { name: "fitur-x · origin" });
+    fireEvent.change(sel, { target: { value: "dev" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buka sesi" }));
+    await waitFor(() => expect(createTerminal).toHaveBeenCalled());
+    expect(createTerminal.mock.calls[0]![1]).toMatchObject({ worktree: true, branchFrom: "dev" });
+  });
+
+  it("worktree tanpa memilih branch → HEAD (branchFrom tak dikirim)", async () => {
+    render(<TerminalScreen projects={projects} />);
+    await screen.findByText("Belum ada sesi terminal");
+    fireEvent.click(screen.getByRole("button", { name: "Sesi baru" }));
+    await screen.findByLabelText("Agen");
+    fireEvent.click(screen.getByText("Worktree terpisah"));
+    await screen.findByLabelText("Branch asal");
+    fireEvent.click(screen.getByRole("button", { name: "Buka sesi" }));
+    await waitFor(() => expect(createTerminal).toHaveBeenCalled());
+    expect(createTerminal.mock.calls[0]![1]).toMatchObject({ worktree: true });
+    expect(createTerminal.mock.calls[0]![1]).not.toHaveProperty("branchFrom");
+  });
+});

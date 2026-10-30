@@ -368,6 +368,39 @@ describe("terminal routes", () => {
     delete process.env.HANOMAN_CODEX_BIN;
   });
 
+  // ADR-0232 · "Sesi baru" boleh lahir di worktree terpisah, bercabang dari branch pilihan.
+  it("worktree:true → sesi di .worktrees/term-*, branch term/* dari branchFrom", async () => {
+    process.env.HANOMAN_CLAUDE_BIN = FAKE_CLAUDE;
+    execFileSync("git", ["branch", "-f", "dasar-232", "HEAD"], { cwd: repoDir });
+    const res = await app.inject({ method: "POST", url: "/api/terminal/sessions",
+      payload: { project: "p1", worktree: true, branchFrom: "dasar-232" } });
+    expect(res.statusCode).toBe(201);
+    const id = res.json().id as string;
+    expect(id).toMatch(/^term-[0-9a-f]{8}$/);
+    const s = listSessions().find((x) => x.id === id)!;
+    expect(realpathSync(s.cwd)).toBe(realpathSync(join(repoDir, ".worktrees", id)));
+    expect(s.branch).toBe(`term/${id.slice(5)}`);
+    const head = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: s.cwd, encoding: "utf8" }).trim();
+    expect(head).toBe(s.branch);
+    killSession(id);
+  });
+
+  it("worktree dari branch tak dikenal → 422, tak ada worktree/sesi yang tertinggal", async () => {
+    const dirs = () => (existsSync(join(repoDir, ".worktrees")) ? readdirSync(join(repoDir, ".worktrees")) : []).sort();
+    const before = { sessions: listSessions().length, dirs: dirs() };
+    const res = await app.inject({ method: "POST", url: "/api/terminal/sessions",
+      payload: { project: "p1", worktree: true, branchFrom: "tidak-ada-232" } });
+    expect(res.statusCode).toBe(422);
+    expect(listSessions().length).toBe(before.sessions);
+    expect(dirs()).toEqual(before.dirs);
+  });
+
+  it("branchFrom tanpa worktree → 400", async () => {
+    const res = await app.inject({ method: "POST", url: "/api/terminal/sessions",
+      payload: { project: "p1", branchFrom: "main" } });
+    expect(res.statusCode).toBe(400);
+  });
+
   it("agen di luar katalog → 400, tak ada sesi yang lahir", async () => {
     const before = listSessions().length;
     const res = await app.inject({ method: "POST", url: "/api/terminal/sessions",

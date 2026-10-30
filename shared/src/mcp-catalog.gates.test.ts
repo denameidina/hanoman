@@ -102,6 +102,13 @@ it("native phase overrides are preserved by the existing launch MCP tool", () =>
   expect(t.inputSchema.properties!.phaseOverrides).toBeDefined();
   expect(t.build({ spec: "SPEC-1442", flow: "feature", agent: "antigravity", phaseOverrides })!.body).toMatchObject({ phaseOverrides });
 });
+// ADR-0232 · terminal agen biasa di worktree terpisah, dari branch pilihan.
+it("hanoman_session_create meneruskan worktree/branchFrom untuk terminal biasa", () => {
+  const t = tool("hanoman_session_create");
+  expect(t.build({ project: "p1", worktree: true, branchFrom: "dev" })!.body)
+    .toEqual({ project: "p1", worktree: true, branchFrom: "dev" });
+  expect(t.build({ project: "p1" })!.body).toEqual({ project: "p1" });
+});
 
 // ADR-0222 · laporan run cron: dua tool baca, `scheduler:read`.
 describe("laporan run cron (ADR-0222)", () => {

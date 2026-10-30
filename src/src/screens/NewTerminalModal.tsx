@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal, Button, Select, Field, Callout } from "../ds";
+import { Modal, Button, Select, Field, Callout, Checkbox } from "../ds";
 import { api } from "../api/client";
 import { failureMessage } from "../lib/report-error";
 import { codexClientTooOld, codexModel, CODEX_DEFAULTS, BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS, type Agent } from "@hanoman/shared";
@@ -38,6 +38,12 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
   const [createError, setCreateError] = React.useState<string | null>(null);
   // SPEC-339 · versi codex CLI terpasang; null = tak terdeteksi (dan itu tak memicu peringatan).
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
+  // ADR-0232 · worktree terpisah (opsional): sesi tak menyentuh working tree project — dan karena
+  // itu tak menimpa sesi lain yang juga terbuka di sana. "" = HEAD checkout project.
+  const [worktree, setWorktree] = React.useState(false);
+  const [branchFrom, setBranchFrom] = React.useState("");
+  const [branches, setBranches] = React.useState<{ value: string; label: string }[]>([]);
+  const [branchNotice, setBranchNotice] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
@@ -63,6 +69,28 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
     });
   }, [open]);
 
+  // Daftar branch hanya dimuat bila worktree dipilih; ganti project → pilihan lama bisa tak ada di
+  // repo baru, jadi kembali ke HEAD alih-alih membiarkan server menolaknya 422.
+  React.useEffect(() => {
+    if (!open || !worktree || !projectId) return;
+    let alive = true;
+    setBranchNotice(null);
+    api.listBranches(projectId).then((r) => {
+      if (!alive) return;
+      const names = [...new Set([...r.branches, ...r.remotes])].sort();
+      setBranches(names.map((b) => ({
+        value: b, label: r.branches.includes(b) ? b : `${b} · origin`,
+      })));
+      setBranchFrom((cur) => (cur && !names.includes(cur) ? "" : cur));
+    }).catch((e: unknown) => {
+      if (!alive) return;
+      setBranches([]);
+      setBranchFrom("");
+      setBranchNotice(failureMessage("memuat daftar branch", e));
+    });
+    return () => { alive = false; };
+  }, [open, worktree, projectId]);
+
   const pickAgent = (a: Agent) => {
     setAgent(a);
     const r = runtimeFor(defs, a);
@@ -78,7 +106,10 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
     setBusy(true);
     setCreateError(null);
     try {
-      const { id } = await api.createTerminal(projectId, { agent, model, effort });
+      const { id } = await api.createTerminal(projectId, {
+        agent, model, effort,
+        ...(worktree ? { worktree: true, ...(branchFrom ? { branchFrom } : {}) } : {}),
+      });
       onCreated(id);
       onClose();
     } catch (e) {
@@ -125,6 +156,19 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
           options={runtimeEfforts(agent, model).map((v) => ({ value: v, label: v }))}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setEffort(e.target.value)} />
       </Field>
+      <Field label="Lokasi kerja" hint={worktree
+        ? <>Sesi bekerja di <code>.worktrees/term-…</code> pada branch baru <code>term/…</code>; commit-nya tetap ada setelah sesi ditutup.</>
+        : "Sesi bekerja langsung di checkout project, berbagi berkas dengan sesi lain di sana."}>
+        <Checkbox aria-label="Worktree terpisah" checked={worktree} label="Worktree terpisah"
+          onChange={() => setWorktree(!worktree)} />
+      </Field>
+      {worktree && (
+        <Field label="Branch asal" hint={branchNotice ?? "Worktree bercabang dari sini."}>
+          <Select aria-label="Branch asal" value={branchFrom} className="hn-terminal-field-full"
+            options={[{ value: "", label: "HEAD checkout project" }, ...branches]}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setBranchFrom(e.target.value)} />
+        </Field>
+      )}
       {/* SPEC-339 · catatan LUNAK: CLI terlalu tua untuk model terpilih. Tak memblokir "Buka sesi" —
           aturannya sama persis dengan kartu Settings & picker Start (satu `codexClientTooOld`). */}
       {agent === "antigravity" && <AntigravityVersionNote />}

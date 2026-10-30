@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { prisma } from "../db";
 import {
   zTerminalSession, zIntegrate, zTerminalSteerInput, zTerminalRenameInput, SESSION_NAME_MAX, zSessionDialogAnswer, METHODS, grantsCapability, type ReviewEmptyReason, type Stage,
@@ -413,6 +415,30 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     // `Setting.agent`, dan membaca yang salah membuat sesi mentok di layar trust codex (SPEC-377).
     const { agent, model, effort } = await terminalAgentDefaults(parsed.data);
     if (agent === "codex") ensureCodexTrust(repoDir);
+    // ADR-0232 · terminal agen di worktree terpisah: operator memilihnya agar sesi ini tak menimpa
+    // working tree sesi lain. Branch baru `term/<id>` (bukan detached) supaya commit-nya selamat
+    // saat sesi ditutup dan worktree-nya dilepas — review & integrate SPEC-230 bekerja apa adanya
+    // lewat `branch`. Worktree dibuat DI DALAM gerbang admission: ditolak gerbang → tak ada yatim.
+    if (parsed.data.worktree) {
+      const id = `term-${randomUUID().slice(0, 8)}`;
+      const branch = `term/${id.slice("term-".length)}`;
+      const from = parsed.data.branchFrom ?? "HEAD";
+      const result = await withSessionAdmission({ id, exempt: false, force: parsed.data.force }, async () => {
+        const wt = `${repoDir}/.worktrees/${id}`;
+        try {
+          realGit.addWorktree(repoDir, wt, from);
+          execFileSync("git", ["switch", "-q", "-c", branch], { cwd: wt, stdio: "pipe" });
+        } catch (e) {
+          if (ownsWorktree(repoDir, wt)) realGit.removeWorktree(repoDir, wt);
+          return { code: 422, body: { error: `gagal membuat worktree dari "${from}": ${(e as Error).message}` } };
+        }
+        const s = createSession(project.id, wt, { id, agent, model, effort, branch });
+        return { code: 201, body: { id: s.id } };
+      }, (pane) => ({ code: 201, body: { id: pane.id } }));
+      return reply.code(result.code).send(result.body);
+    }
+    if (parsed.data.branchFrom)
+      return reply.code(400).send({ error: "branchFrom hanya berlaku bersama worktree:true" });
     // ADR-0170 · terminal agen (bukan shell mentah) ikut gerbang cap/beban host — hanya
     // shell/install/console VPS yang tetap exempt (ADR-0161/ADR-0170).
     const s = await createOperatorSession(project.id, repoDir, { agent, model, effort },
