@@ -149,7 +149,8 @@ operator menjalankan `codex login`, atau lewati mockup.
 
 **Server — rute baru** (`server/src/routes/specs.ts`, capability turun dari prefix `specs` → `backlog:read`):
 
-- `GET /specs/:id/mockups` → `200 { source: "worktree" | "repo" | null, items: MockupItem[] }`.
+- `GET /specs/:id/mockups` → `200 { source: "worktree" | "repo" | null, dir: string | null, items: MockupItem[] }`
+  (`dir` = path absolut folder di mesin server, untuk agen lokal).
   `MockupItem = { name: string; size: number; modifiedAt: string }`, diurutkan menurut nama. Sumber
   folder: worktree sesi backlog (`.worktrees/<sessionId>/docs/mockups/<spec-id>/`) bila ada, selain itu
   checkout project (`<repoDir>/docs/mockups/<spec-id>/`), selain itu `items: []` dengan `source: null`.
@@ -166,8 +167,10 @@ operator menjalankan `codex login`, atau lewati mockup.
 - Tool baca `hanoman_backlog_mockups_list` (`shared/src/mcp-catalog/backlog.ts`, capability
   `backlog:read`). Balasannya memuat `items` plus `dir` (path absolut folder di mesin server), supaya lead
   dan agen lokal bisa membaca gambarnya langsung.
-- `GET /specs/:id/mockups/:name` masuk `UNWRAPPED` dengan alasan: biner gambar untuk `<img>` browser,
-  agen membaca berkas lewat `dir` dari tool daftar.
+- Transfer tool `hanoman_backlog_mockup_download` (`shared/src/mcp-catalog/transfer.ts`, capability
+  `backlog:read`, pola `hanoman_backlog_attachment_download`) untuk `GET /specs/:id/mockups/:name`:
+  mengunduh satu gambar ke disk lokal klien MCP. Mengikuti preseden ADR-0183 (rute biner punya transfer
+  tool, bukan `UNWRAPPED`); agen di mesin server tetap bisa membaca langsung lewat `dir`.
 
 **Frontend:**
 
@@ -232,8 +235,8 @@ operator menjalankan `codex login`, atau lewati mockup.
   checkout project, lalu ke daftar kosong. Spec tak ada SHALL memberi 404.
 - **AC-11** `GET /specs/:id/mockups/:name` SHALL menyajikan gambar dengan Content-Type yang benar dan
   header `nosniff` + CSP sandbox. Nama tak valid, traversal, atau symlink keluar SHALL memberi 404.
-- **AC-12** THE tool MCP `hanoman_backlog_mockups_list` SHALL ada dengan capability `backlog:read`, dan
-  rute bytes SHALL tercatat di `UNWRAPPED` beserta alasannya (gerbang `mcp-coverage` hijau).
+- **AC-12** THE tool MCP `hanoman_backlog_mockups_list` dan transfer tool `hanoman_backlog_mockup_download`
+  SHALL ada dengan capability `backlog:read` (gerbang `mcp-coverage` hijau).
 - **AC-13** THE `ImageViewer` SHALL mendukung zoom (roda, tombol, keyboard), Fit/100%, geser dengan
   drag, pinch, navigasi antar-gambar, dan tutup dengan Esc.
 - **AC-14** THE galeri mockup SHALL bisa dibuka dari dialog tanya sesi, chip fase Mockup, dan detail
