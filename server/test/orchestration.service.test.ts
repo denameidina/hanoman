@@ -9,8 +9,8 @@ afterEach(() => registerCodexNativeAgentSupport(() => ({ version: "0.151.0", ok:
 describe("sessionPhasePlan (ADR-0164)", () => {
   const orchestrator = { model: "claude-opus-5", effort: "high" };
   it("claude + flow aktif → rencana", () => {
-    // ADR-0230 · feature = 5 fase + Review.
-    expect(sessionPhasePlan(DEFAULT_SETTING, "feature", "claude", orchestrator)?.phases).toHaveLength(6);
+    // ADR-0230 · feature = 5 fase + Review. ADR-0233 · + Mockup = 7.
+    expect(sessionPhasePlan(DEFAULT_SETTING, "feature", "claude", orchestrator)?.phases).toHaveLength(7);
   });
   it("flow mati → null", () => {
     const setting = { ...DEFAULT_SETTING,

@@ -2,6 +2,7 @@ import React from "react";
 import type { SessionAsk, SessionDialogAnswer, SessionDialogPayload } from "@hanoman/shared";
 import { api, ApiError } from "../api/client";
 import { Button, Checkbox, Input } from "../ds";
+import { MockupGallery } from "./MockupGallery";
 
 // SPEC-899 · ADR-0142 · kotak jawaban satu sesi di dalam panel pet. Komponen sendiri, bukan blok di
 // HanomanPet.tsx: siklus hidupnya (muat → kirim → terkirim → 409 muat ulang) tak berhubungan sama
@@ -42,8 +43,11 @@ const LEAD_STATE: Record<SessionAsk["state"], string> = {
 const reasonOf = (e: unknown): string | undefined =>
   e instanceof ApiError ? (e.detail as { reason?: string } | null)?.reason : undefined;
 
-export function PetAnswer({ sessionId, label, reduced, ask }:
-  { sessionId: string; label: string; reduced: boolean; ask?: SessionAsk }) {
+export function PetAnswer({ sessionId, label, reduced, ask, specId }:
+  { sessionId: string; label: string; reduced: boolean; ask?: SessionAsk;
+    /** ADR-0233 · backlog sesi ini: bila ia punya mockup, tombol "Lihat mockup" muncul di samping
+     *  pertanyaan — persetujuan mockup dijawab sesudah gambarnya terlihat. */
+    specId?: string | null }) {
   const [payload, setPayload] = React.useState<SessionDialogPayload | null | undefined>(undefined);
   const [picked, setPicked] = React.useState<number[]>([]);
   const [text, setText] = React.useState("");
@@ -115,6 +119,7 @@ export function PetAnswer({ sessionId, label, reduced, ask }:
   // Payload event tiba lewat siaran dan tak menunggu scrape apa pun — jadi ia dirender di ATAS
   // ketiga cabang keluar di bawah, termasuk saat `GET …/dialog` menyerah.
   const asked = ask?.questions[Math.min(ask.at, Math.max(0, ask.questions.length - 1))];
+  const mockups = specId ? <MockupGallery specId={specId} variant="button" /> : null;
   const head = ask ? (
     <div className="hn-pet-head">
       <div data-testid="pet-answer-lead-state" className="hn-eyebrow">{LEAD_STATE[ask.state]}</div>
@@ -135,6 +140,7 @@ export function PetAnswer({ sessionId, label, reduced, ask }:
           {asked?.question || ask.message}
         </div>
       )}
+      {mockups}
       {ask.state !== "taken-over" && (
         <div className="hn-pet-mt-6">
           <Button data-testid="pet-answer-takeover" size="sm" variant="ghost" disabled={busy}
@@ -144,19 +150,20 @@ export function PetAnswer({ sessionId, label, reduced, ask }:
     </div>
   ) : null;
 
-  if (payload === undefined) return <div className="hn-pet-box">{head}{noteLine(NOTE.loading)}</div>;
+  const lead = head ?? mockups;
+  if (payload === undefined) return <div className="hn-pet-box">{lead}{noteLine(NOTE.loading)}</div>;
   // Payload event ada tapi dialognya belum tergambar — `PreToolUse` menembak SEBELUM tool-nya
   // jalan, jadi jendela itu nyata. Pertanyaannya sudah terbaca; kotak jawabnya belum bisa dipasang.
   // Satu baris catatan, bukan dua: hasil aksi terakhir (`note`) MENANG atas kalimat keadaan, karena
   // ia yang baru saja dijawab operator.
   if (payload === null)
-    return <div className="hn-pet-box">{head}{noteLine(note ?? (ask ? NOTE.preparing : NOTE.none))}</div>;
+    return <div className="hn-pet-box">{lead}{noteLine(note ?? (ask ? NOTE.preparing : NOTE.none))}</div>;
 
   const { dialog } = payload;
   const answered = dialog.tabs.filter((t) => t.answered).length;
   return (
     <div data-testid="pet-answer" data-session={sessionId} className="hn-pet-box">
-      {head}
+      {lead}
       {!ask && dialog.tabs.length > 1 && (
         <div className="hn-eyebrow hn-pet-eyebrow-bottom">
           Pertanyaan {Math.min(answered + 1, dialog.tabs.length)} dari {dialog.tabs.length}

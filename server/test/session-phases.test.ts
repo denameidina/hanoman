@@ -32,20 +32,24 @@ describe("phaseFilePath", () => {
 describe("readPhases", () => {
   it("berkas belum ada → fase pertama aktif, sisanya pending, tanpa melempar", () => {
     expect(states()).toEqual([
-      "Brainstorm:active", "Objective:pending", "Spec:pending", "Plan:pending", "Execute:pending", "Review:pending",
+      "Brainstorm:active", "Objective:pending", "Spec:pending", "Mockup:pending", "Plan:pending", "Execute:pending",
+      "Review:pending",
     ]);
   });
 
   it("baris done menandai fase, dan yang berikutnya menjadi aktif", () => {
     write("Brainstorm done\nObjective done\n");
     expect(states()).toEqual([
-      "Brainstorm:done", "Objective:done", "Spec:active", "Plan:pending", "Execute:pending", "Review:pending",
+      "Brainstorm:done", "Objective:done", "Spec:active", "Mockup:pending", "Plan:pending", "Execute:pending",
+      "Review:pending",
     ]);
   });
 
   it("skipped diperlakukan sebagai tercatat, bukan sebagai aktif", () => {
-    write("Audit done\nSpec skipped\nPlan skipped\n");
-    expect(states("qa")).toEqual(["Audit:done", "Spec:skipped", "Plan:skipped", "Execute:active", "Review:pending"]);
+    write("Audit done\nSpec skipped\nMockup skipped\nPlan skipped\n");
+    expect(states("qa")).toEqual([
+      "Audit:done", "Spec:skipped", "Mockup:skipped", "Plan:skipped", "Execute:active", "Review:pending",
+    ]);
   });
 
   // "Docs teknis" / "Konvensi & index" mengandung spasi: state adalah token TERAKHIR,
@@ -57,15 +61,40 @@ describe("readPhases", () => {
   });
 
   it("seluruh fase tercatat → tak ada yang aktif", () => {
-    write("Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\nReview done\n");
+    write("Brainstorm done\nObjective done\nSpec done\nMockup done\nPlan done\nExecute done\nReview done\n");
     expect(states().filter((s) => s.endsWith(":active"))).toEqual([]);
   });
 
   it("baris sampah, fase asing, dan state asing diabaikan diam-diam", () => {
     write("\n???\nBrainstorm done\nMandi pagi\nTidur selesai\nObjective menyala\n");
     expect(states()).toEqual([
-      "Brainstorm:done", "Objective:active", "Spec:pending", "Plan:pending", "Execute:pending", "Review:pending",
+      "Brainstorm:done", "Objective:active", "Spec:pending", "Mockup:pending", "Plan:pending", "Execute:pending",
+      "Review:pending",
     ]);
+  });
+
+  // ADR-0233 · fase opsional (Mockup). Sesi yang lahir sebelum fase itu ada tak pernah menulisnya;
+  // tanpa skip implisit pipeline-nya tak pernah tuntas dan chip Mockup menyala di belakang Plan.
+  it("ADR-0233 · Mockup tanpa catatan dibaca skipped bila fase sesudahnya sudah tercatat", () => {
+    write("Brainstorm done\nObjective done\nSpec done\nPlan done\n");
+    expect(states()).toEqual([
+      "Brainstorm:done", "Objective:done", "Spec:done", "Mockup:skipped", "Plan:done", "Execute:active",
+      "Review:pending",
+    ]);
+  });
+
+  it("ADR-0233 · Mockup tetap aktif selama belum ada fase sesudahnya yang tercatat", () => {
+    write("Audit done\nSpec done\n");
+    expect(states("qa")).toEqual([
+      "Audit:done", "Spec:done", "Mockup:active", "Plan:pending", "Execute:pending", "Review:pending",
+    ]);
+  });
+
+  it("ADR-0233 · berkas fase lama yang tuntas tanpa Mockup tetap lengkap", () => {
+    write("Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\nReview done\n");
+    const phases = readPhases(file, "feature");
+    expect(phasesComplete(phases)).toBe(true);
+    expect(stageFor(phases)).toBe("done");
   });
 });
 
@@ -76,6 +105,9 @@ describe("stageFor", () => {
     expect(stageFor(P([["Brainstorm", "active"]]))).toBe("brainstorming");
     expect(stageFor(P([["Brainstorm", "done"], ["Objective", "done"]]))).toBe("objective");
     expect(stageFor(P([["Spec", "done"]]))).toBe("spec-ready");
+    // ADR-0233 · Mockup tak menggeser stage: tetap spec-ready sampai Plan tercatat.
+    expect(stageFor(P([["Spec", "done"], ["Mockup", "done"]]))).toBe("spec-ready");
+    expect(stageFor(P([["Spec", "done"], ["Mockup", "skipped"]]))).toBe("spec-ready");
     expect(stageFor(P([["Plan", "done"]]))).toBe("planned");
     expect(stageFor(P([["Execute", "active"]]))).toBe("executing");
     expect(stageFor(P([["Execute", "done"]]))).toBe("executing");

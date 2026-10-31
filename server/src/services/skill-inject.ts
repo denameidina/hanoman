@@ -13,6 +13,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { agentEnvironment, scanGlobalSkills, scanProjectSkills } from "@hanoman/runner";
+import { isBundledCopy } from "./bundled-skills";
 
 export const INJECT_MARKER = "# hanoman:skill-inject";
 export interface InjectResult { addDir?: string; injected: string[]; warnings: string[] }
@@ -49,13 +50,22 @@ export function cleanupInjectedSkills(tempDir: string): void {
   }
 }
 
-export function injectGlobalSkills(o: { agent: "claude" | "codex" | "antigravity"; cwd: string; tempDir: string; hanomanHome: string }): InjectResult {
+export function injectGlobalSkills(o: {
+  agent: "claude" | "codex" | "antigravity"; cwd: string; tempDir: string; hanomanHome: string;
+  /** Akar home OS untuk memindai skill lapis user (default `homedir()`); test mengisinya. */
+  osHome?: string;
+}): InjectResult {
   const out: InjectResult = { injected: [], warnings: [] };
-  const opts = { hanomanHome: o.hanomanHome, env: process.env };
-  const global = scanGlobalSkills(opts).filter((s) => s.layer === "hanoman");
+  const opts = { hanomanHome: o.hanomanHome, env: process.env, ...(o.osHome ? { osHome: o.osHome } : {}) };
+  const scanned = scanGlobalSkills(opts);
+  const global = scanned.filter((s) => s.layer === "hanoman");
   if (!global.length) return out;
   const taken = new Set(scanProjectSkills("session", o.cwd, opts).map((s) => s.name));
-  const todo = global.filter((s) => !taken.has(s.name));
+  // ADR-0233 · skill BUNDEL paket hanoman dipasang hanya bila runtime sesi ini belum punya skill bernama
+  // sama di lapis user — mis. operator yang sudah memasang `~/.claude/skills/codex-image` sendiri. Skill
+  // global buatan operator tetap disuntik seperti sebelumnya.
+  const userOwned = new Set(scanned.filter((s) => s.layer === "user" && s.loadedBy.includes(o.agent)).map((s) => s.name));
+  const todo = global.filter((s) => !taken.has(s.name) && !(userOwned.has(s.name) && isBundledCopy(s.dir)));
   if (!todo.length) return out;
 
   if (o.agent === "claude") {

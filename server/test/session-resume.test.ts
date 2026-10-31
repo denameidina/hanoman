@@ -118,7 +118,7 @@ describe("SPEC-394 · resume dengan worktree utuh", () => {
     mkdirSync(join(wt, "docs", "superpowers", "plans"), { recursive: true });
     writeFileSync(join(wt, "docs", "superpowers", "plans", "spec-l3-plan.md"), "- [x] satu\n- [ ] dua\n");
     writeFileSync(join(wt, "belum-commit.txt"), "jangan hilang");
-    writeFileSync(join(dir, ".worktrees", ".phases", r1.id), "Audit done\nSpec skipped\n");
+    writeFileSync(join(dir, ".worktrees", ".phases", r1.id), "Audit done\nSpec skipped\nMockup skipped\n");
     killSession(r1.id);   // pane hilang, worktree tetap (mis. mesin restart)
 
     const fresh = await prisma.spec.findUniqueOrThrow({ where: { id: "SPEC-L3" } });
@@ -202,7 +202,7 @@ describe("SPEC-394 · resume tanpa worktree, fresh, dan stage done", () => {
     expect(row.headSha).toBeNull();
     const prompt = readFileSync(promptFilePath(r.id), "utf8");
     expect(prompt).not.toContain("MELANJUTKAN");
-    expect(prompt).toContain("Kerjakan fase berurutan: Audit → Spec → Plan → Execute → Review.");
+    expect(prompt).toContain("Kerjakan fase berurutan: Audit → Spec → Mockup → Plan → Execute → Review.");
     killSession(r.id);
   });
 

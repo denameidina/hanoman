@@ -396,7 +396,8 @@ describe("Antigravity phases at session birth (SPEC-1442)", () => {
     expect(reviewer).toContain('model: "inherit"');
     const meta = getSession(s.id)!;
     expect(meta.orchestrated).toBe(true);
-    expect(meta.agentRoster).toHaveLength(7);
+    // 7 agen fase feature (ADR-0233 menambah Mockup) + custom agent native-scout.
+    expect(meta.agentRoster).toHaveLength(8);
     expect(meta.agentRoster?.filter(d => d.phase).every(d => d.model === "inherit" && d.effort === undefined)).toBe(true);
   });
   it("phase failure atomically falls back with warning, no phase definitions or orchestrated metadata", () => {

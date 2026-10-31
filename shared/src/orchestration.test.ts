@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  EXECUTE_MODE_FLOWS, FLOW_PHASES, ORCHESTRATION_FLOWS, PHASE_AGENT_PREFIX, REVIEWER_FLOWS, UNSKIPPABLE_PHASES,
-  isPhaseAgentName, phaseAgentName,
+  EXECUTE_MODE_FLOWS, FLOW_PHASES, MOCKUP_PHASE, OPTIONAL_PHASES, ORCHESTRATION_FLOWS, PHASE_AGENT_PREFIX,
+  REVIEWER_FLOWS, UNSKIPPABLE_PHASES, isPhaseAgentName, phaseAgentName,
 } from "./orchestration";
 import { codexNativeAgentsSupported, resolvePhasePlan } from "./orchestration-plan";
 import { CODEX_MODELS, MODELS, ORCHESTRATION_DEFAULTS, replaceModelCatalog, zOrchestration, zSetting } from "./entities";
@@ -15,8 +15,34 @@ const orchestrator = { model: "claude-opus-5", effort: "xhigh" };
 describe("FLOW_PHASES (ADR-0164)", () => {
   it("setiap flow orkestrasi punya daftar fase", () => {
     expect(Object.keys(FLOW_PHASES).sort()).toEqual([...ORCHESTRATION_FLOWS].sort());
-    expect(FLOW_PHASES.feature).toEqual(["Brainstorm", "Objective", "Spec", "Plan", "Execute", "Review"]);
+    expect(FLOW_PHASES.feature).toEqual(["Brainstorm", "Objective", "Spec", "Mockup", "Plan", "Execute", "Review"]);
+    expect(FLOW_PHASES.qa).toEqual(["Audit", "Spec", "Mockup", "Plan", "Execute", "Review"]);
     expect(FLOW_PHASES.reverse).toEqual(["Scan", "Docs teknis", "Wawancara", "Konvensi & index", "Serah terima"]);
+  });
+});
+
+// ADR-0233 · fase Mockup opsional: hanya feature & qa, tepat sesudah Spec, bukan fase tak-boleh-dilewati.
+describe("fase Mockup (ADR-0233)", () => {
+  it("hanya di feature & qa, tepat di antara Spec dan Plan", () => {
+    for (const flow of ORCHESTRATION_FLOWS) {
+      const phases = FLOW_PHASES[flow];
+      if (flow === "feature" || flow === "qa") {
+        expect(phases.indexOf(MOCKUP_PHASE)).toBe(phases.indexOf("Spec") + 1);
+        expect(phases.indexOf("Plan")).toBe(phases.indexOf(MOCKUP_PHASE) + 1);
+      } else expect(phases).not.toContain(MOCKUP_PHASE);
+    }
+    expect(phaseAgentName(MOCKUP_PHASE)).toBe("hanoman-fase-mockup");
+  });
+  it("opsional dan boleh dilewati", () => {
+    expect(OPTIONAL_PHASES).toEqual(new Set(["Mockup"]));
+    expect(UNSKIPPABLE_PHASES.has(MOCKUP_PHASE)).toBe(false);
+  });
+  it("default sel Mockup: sonnet/medium (claude) · gpt-5.6-terra/medium (codex) · inherit (antigravity)", () => {
+    for (const flow of ["feature", "qa"] as const) {
+      expect(ORCHESTRATION_DEFAULTS[flow].claude.Mockup).toEqual({ model: "sonnet", effort: "medium" });
+      expect(ORCHESTRATION_DEFAULTS[flow].codex.Mockup).toEqual({ model: "gpt-5.6-terra", effort: "medium" });
+      expect(ORCHESTRATION_DEFAULTS[flow].antigravity.Mockup).toEqual({ model: "inherit", effort: null });
+    }
   });
 });
 
@@ -102,7 +128,7 @@ describe("resolvePhasePlan", () => {
 		const plan = resolvePhasePlan({ ...base, orchestration: emptyOrchestration })!;
     expect(plan).toMatchObject({ flow: "feature", runtime: "claude" });
     expect(plan.phases.map((p) => p.phase)).toEqual(FLOW_PHASES.feature);
-    expect(plan.phases[3]).toEqual({
+    expect(plan.phases.find((p) => p.phase === "Plan")).toEqual({
       phase: "Plan", agentName: "hanoman-fase-plan", model: "claude-opus-5", effort: "xhigh",
 		});
 	});

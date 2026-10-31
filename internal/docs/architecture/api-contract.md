@@ -426,6 +426,17 @@ GET    /specs/:id/attachments/:attId      # 200 byte (Content-Type mime, Content
 DELETE /specs/:id/attachments/:attId      # 200 { ok:true } | 404. Byte ikut dihapus + materialisasi
 #   direkonsiliasi, supaya "hapus" tak hanya berarti "hilang dari dashboard" sementara agen
 #   masih membacanya.
+# --- Mockup UI backlog (ADR-0233) ------------------------------------------------------------------
+#   Hasil fase Mockup: `docs/mockups/<spec-id huruf kecil>/` di worktree sesi
+#   (`.worktrees/<sessionIdForSpec>`), jatuh ke checkout project sesudah worktree dibersihkan. Tanpa
+#   salinan di server. Capability jatuh dari prefix `specs` (GET → backlog:read). MCP:
+#   `hanoman_backlog_mockups_list` (read) + `hanoman_backlog_mockup_download` (transfer, ADR-0183).
+GET    /specs/:id/mockups                 # 200 { source:"worktree"|"repo"|null, dir:string|null,
+#   items:[{name,size,modifiedAt}] } — hanya png/jpg/jpeg/webp, urut nama | 404 spec tak ada
+GET    /specs/:id/mockups/:name           # 200 byte (Content-Type dari ekstensi, Content-Disposition
+#   inline, X-Content-Type-Options nosniff, CSP `sandbox; default-src 'none'`, Cache-Control no-cache —
+#   revisi menimpa nama yang sama). 404 untuk SEMUA penolakan: nama di luar
+#   `^[A-Za-z0-9][A-Za-z0-9._-]*\.(png|jpe?g|webp)$`, traversal, symlink yang keluar folder, bukan berkas.
 GET  /specs/:id/docs                   # daftar dokumen superpowers backlog ini (audit/spec/plan/objective/brainstorm) — SPEC-170
 #   kind audit = `*-audit.md` ATAU `…/research/audit-…` (SPEC-237/ADR-0057) — dokumen audit SoT ikut tampil sbg audit
 GET  /specs/:id/docs/*path             # isi satu dokumen superpowers (raw)

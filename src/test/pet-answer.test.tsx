@@ -89,3 +89,20 @@ describe("PetAnswer dengan payload event", () => {
     expect(screen.queryByTestId("pet-answer-takeover")).toBeNull();
   });
 });
+
+// ADR-0233 · persetujuan mockup dijawab sesudah gambarnya terlihat: tombol galeri di samping pertanyaan.
+describe("PetAnswer · mockup backlog (ADR-0233)", () => {
+  it("backlog bermockup → tombol Lihat mockup di samping pertanyaan", async () => {
+    vi.spyOn(api, "specMockups").mockResolvedValue({
+      source: "worktree", dir: "/d", items: [{ name: "01-a.png", size: 1, modifiedAt: "2026-10-31T00:00:00.000Z" }],
+    });
+    render(<PetAnswer sessionId="s1" specId="SPEC-1" label="sesi" reduced ask={ASK} />);
+    expect(await screen.findByRole("button", { name: "Lihat mockup (1)" })).toBeTruthy();
+  });
+  it("tanpa specId → tak memuat mockup sama sekali", async () => {
+    const spy = vi.spyOn(api, "specMockups");
+    render(<PetAnswer sessionId="s1" label="sesi" reduced ask={ASK} />);
+    await screen.findByText("Basis data mana yang dipakai?");
+    expect(spy).not.toHaveBeenCalled();
+  });
+});

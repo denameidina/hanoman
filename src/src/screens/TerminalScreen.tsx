@@ -7,12 +7,13 @@ import { failureMessage } from "../lib/report-error";
 import { SESSION_ENDED_NOTICE, SESSION_HISTORY_ACTION } from "../lib/labels";
 import { api, ApiError, type TerminalSession, type Phase, type Flow } from "../api/client";
 import { subscribe } from "../api/events";
-import { flowForSource, sameTerminalWorkspace, type SessionHistoryView, type WorktreeCleanupView } from "@hanoman/shared";
+import { MOCKUP_PHASE, flowForSource, sameTerminalWorkspace, type SessionHistoryView, type WorktreeCleanupView } from "@hanoman/shared";
 import { TerminalPane } from "./TerminalPane";
 import { SessionHistoryModal } from "./SessionHistoryModal";
 import { NewTerminalModal } from "./NewTerminalModal";
 import { NewShellModal } from "./NewShellModal";
 import { SpecDocsModal } from "./SpecDocsModal";
+import { MockupViewer } from "./MockupGallery";
 import { IntegrateDialog } from "./IntegrateDialog";
 import { B_STAGES } from "./BacklogScreen";
 import type { SpecSlim } from "./types";
@@ -1268,8 +1269,10 @@ const CHIP_ICON: Record<ChipTone, string> = {
 // ADR-0164 · fase tanpa agen digambar persis seperti sebelumnya. Fase ber-agen jadi chip: nama ·
 // model · effort · durasi, ditambah ↻n bila diulang dan ⚠ bila bukti subagent tak diterima.
 // `compact` (sel sempit): hanya chip aktif yang menampilkan model/effort/durasi.
-export function PhaseStrip({ phases, compact = false, now }: {
+export function PhaseStrip({ phases, compact = false, now, onOpenMockup }: {
   phases: Phase[] | null; compact?: boolean; now?: number;
+  /** ADR-0233 · chip fase Mockup (aktif/selesai) membuka galeri mockup backlog sesi ini. */
+  onOpenMockup?: () => void;
 }) {
   const [open, setOpen] = React.useState<string | null>(null);
   // Audit R2 · pola popover DS (LimitIndicator): Esc, klik-luar, fokus masuk panel & kembali ke chip.
@@ -1321,8 +1324,15 @@ export function PhaseStrip({ phases, compact = false, now }: {
     <div data-testid="phase-strip" className="hn-terminal-phase">
       <div data-testid="phase-strip-scroller" className="hn-terminal-phase-scroller">
         {phases.map((p) => {
+          const mockupReady = !!onOpenMockup && p.name === MOCKUP_PHASE && (p.state === "active" || p.state === "done");
           if (!p.agent) {
-            return <span key={p.name} data-state={p.state} title={p.state} className="hn-terminal-phase-name">{p.name}</span>;
+            return mockupReady
+              ? <button key={p.name} type="button" data-state={p.state} onClick={onOpenMockup}
+                  aria-label="Lihat mockup" title="Lihat mockup" className="hn-terminal-phase-chip">
+                  <span data-state={p.state} className="hn-terminal-phase-name">{p.name}</span>
+                  <span aria-hidden>· lihat</span>
+                </button>
+              : <span key={p.name} data-state={p.state} title={p.state} className="hn-terminal-phase-name">{p.name}</span>;
           }
           const a = p.agent;
           const tone = chipTone(p);
@@ -1363,6 +1373,11 @@ export function PhaseStrip({ phases, compact = false, now }: {
           {openPhase.agent.resultExcerpt && (
             <pre className="hn-terminal-phase-excerpt">{openPhase.agent.resultExcerpt}</pre>
           )}
+          {onOpenMockup && openPhase.name === MOCKUP_PHASE && (openPhase.state === "active" || openPhase.state === "done") && (
+            <button type="button" className="hn-mockup-open" onClick={() => { setOpen(null); onOpenMockup(); }}>
+              Lihat mockup
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -1389,6 +1404,7 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
   fullscreen: boolean; onFullscreen: () => void; paneHidden?: boolean;
 }) {
   const [phases, setPhases] = React.useState<Phase[] | null>(null);
+  const [mockupOpen, setMockupOpen] = React.useState(false);
   // SPEC-800 · yang menentukan strip fase ringkas adalah lebar SEL, bukan viewport: sel sempit
   // (grid 4 kolom di desktop) butuh chip ringkas agar tak terpotong `overflow: hidden`.
   const bodyRef = React.useRef<HTMLDivElement>(null);
@@ -1490,7 +1506,9 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
           di dalam sel (yang `overflow: hidden`), jadi panel tak bisa lagi meluber ke luar sel. */}
       <div ref={bodyRef} className="hn-terminal-cell-body">
         {session.exited && <SessionEndedBanner />}
-        <PhaseStrip phases={phases} compact={bodyWidth < 480} />
+        <PhaseStrip phases={phases} compact={bodyWidth < 480}
+          onOpenMockup={session.specId ? () => setMockupOpen(true) : undefined} />
+        {mockupOpen && session.specId && <MockupViewer specId={session.specId} onClose={() => setMockupOpen(false)} />}
         {/* key = identitas sesi: pindah antar sel memindah subtree, bukan me-remount WebSocket.
             SPEC-232 · saat sel ini sedang layar-penuh, pane-nya dilepas (placeholder) supaya
             hanya modal yang meng-attach tmux — jaga invariant satu sesi = satu attach. */}
@@ -1667,6 +1685,7 @@ type FocusViewProps = {
 function FocusView({ sessionCount, focused, railItems, mobile, listError, menuFor, onFocus, drawerOpen, onDrawer,
   fullId, focusPhases, paneHandlers, fontSize, showKeys, onToggleKeys, predict, diag, screenReader }: FocusViewProps) {
   const current = focused ? railItems.find((item) => item.session.id === focused.id) : undefined;
+  const [mockupFor, setMockupFor] = React.useState<string | null>(null);
   return (
     <div className="hn-terminal-focus" data-testid="terminal-focus">
       {!mobile && sessionCount > 0 && (
@@ -1692,7 +1711,9 @@ function FocusView({ sessionCount, focused, railItems, mobile, listError, menuFo
               <OverflowActions label={`Aksi sesi ${focused.id}`} items={menuFor(focused)} />
             </header>
             {focused.exited && <SessionEndedBanner />}
-            <PhaseStrip compact={mobile} phases={focusPhases?.sessionId === focused.id ? focusPhases.phases : null} />
+            <PhaseStrip compact={mobile} phases={focusPhases?.sessionId === focused.id ? focusPhases.phases : null}
+              onOpenMockup={focused.specId ? () => setMockupFor(focused.specId!) : undefined} />
+            {mockupFor && <MockupViewer specId={mockupFor} onClose={() => setMockupFor(null)} />}
             <div className="hn-terminal-focus-body">
               {fullId === focused.id ? (
                 <div className="hn-terminal-focus-placeholder">Terbuka di layar penuh</div>

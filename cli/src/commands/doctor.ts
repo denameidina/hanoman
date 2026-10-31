@@ -54,6 +54,11 @@ export function doctorReport(p: Probes): { lines: string[]; ok: boolean } {
           ? "Antigravity CLI — host/lab saja; sandbox belum didukung; probe/login tidak dijalankan"
           : "Antigravity CLI — tak ada (opsional; install/login manual)",
       fatal: false },
+    // ADR-0233 · fase Mockup di claude/antigravity menghasilkan gambar lewat `codex exec` (skill
+    // codex-image). Tanpa codex fase itu tak bisa menggambar — sesi tetap jalan, operator ditanya.
+    ...(!p.codex && (p.claude || p.antigravity)
+      ? [{ mark: "!", text: "fase Mockup di runtime non-codex butuh codex CLI yang sudah login (`codex login`)", fatal: false }]
+      : []),
     // SPEC-471 · ADR-0095 · `gh` opsional: tanpa dia tarik issue jatuh ke HTTPS + GITHUB_TOKEN.
     { mark: p.gh ? "✓" : "·",
       text: p.gh ? `gh ${p.gh}` : "gh — tak ada (tarik issue akan lewat HTTP + GITHUB_TOKEN)",

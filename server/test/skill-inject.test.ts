@@ -169,3 +169,45 @@ const out = cp.spawnSync(${JSON.stringify(realGit)}, process.argv.slice(2), {std
   expect(injectGlobalSkills({ agent: "antigravity", cwd: repo, tempDir: tmp, hanomanHome: home }).injected).toContain("g1");
   expect(JSON.parse(readFileSync(result, "utf8"))).toEqual({ keyPresent: false, basePresent: false, projectKept: true });
 });
+
+// ADR-0233 · skill bundel (bermarker) tak disuntik ke runtime yang sudah punya skill user bernama sama.
+describe("skill bundel: suntik bila runtime belum punya (ADR-0233)", () => {
+  let osHome: string;
+  const saved = { claude: process.env.HANOMAN_CLAUDE_HOME, codex: process.env.HANOMAN_CODEX_HOME, agents: process.env.HANOMAN_AGENTS_HOME };
+  beforeEach(() => {
+    osHome = join(root, "os-home");
+    process.env.HANOMAN_CLAUDE_HOME = join(osHome, ".claude");
+    process.env.HANOMAN_CODEX_HOME = join(osHome, ".codex");
+    process.env.HANOMAN_AGENTS_HOME = join(osHome, ".agents");
+    skill(join(home, "skills/codex-image"), "codex-image");
+    writeFileSync(join(home, "skills/codex-image/.hanoman-bundled.json"), JSON.stringify({ sha: "x" }));
+  });
+  afterEach(() => {
+    for (const [k, v] of [["HANOMAN_CLAUDE_HOME", saved.claude], ["HANOMAN_CODEX_HOME", saved.codex], ["HANOMAN_AGENTS_HOME", saved.agents]] as const)
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  });
+  // Repo terpisah per runtime: codex & antigravity berbagi symlink `.agents/skills` di satu cwd.
+  const inject = (agent: "claude" | "codex" | "antigravity") => {
+    const cwd = join(root, `repo-${agent}`);
+    if (!existsSync(cwd)) { mkdirSync(cwd, { recursive: true }); execFileSync("git", ["init", "-q"], { cwd }); }
+    return injectGlobalSkills({ agent, cwd, tempDir: join(tmp, agent), hanomanHome: home, osHome });
+  };
+
+  it("tanpa duplikat user → disuntik ke claude, codex, dan antigravity", () => {
+    for (const agent of ["claude", "codex", "antigravity"] as const)
+      expect(inject(agent).injected, agent).toContain("codex-image");
+  });
+
+  it("~/.claude/skills/codex-image milik operator → tak disuntik ke claude, tetap ke codex & antigravity", () => {
+    skill(join(osHome, ".claude/skills/codex-image"), "codex-image");
+    expect(inject("claude").injected).not.toContain("codex-image");
+    expect(inject("claude").injected).toContain("g1");
+    expect(inject("codex").injected).toContain("codex-image");
+    expect(inject("antigravity").injected).toContain("codex-image");
+  });
+
+  it("skill global non-bundel bernama sama dengan skill user tetap disuntik (perilaku lama)", () => {
+    skill(join(osHome, ".claude/skills/g1"), "g1");
+    expect(inject("claude").injected).toContain("g1");
+  });
+});

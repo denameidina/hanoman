@@ -84,6 +84,13 @@ describe("katalog · MethodDef.install", () => {
   });
 });
 
+// ADR-0233 · `codex-image` dipasok bundel hanoman, bukan paket metode — tak pernah dihitung kurang.
+describe("skill yang dipasok hanoman", () => {
+  it.each(Object.keys(METHODS))("%s: codex-image tak ikut methodSkills", (id) => {
+    expect(methodSkills(METHODS[id]!)).not.toContain("codex-image");
+  });
+});
+
 describe("kesiapan Agent Skills", () => {
   it.each(zAgent.options)("%s: plugin Agent Skills saja belum memenuhi gerbang verifikasi", (agent) => {
     const m = METHODS["agent-skills"]!;

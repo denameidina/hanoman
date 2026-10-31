@@ -31,7 +31,7 @@ describe("resumePrompt", () => {
 
   it("tetap membawa kerangka startPrompt: fase, otonomi, skill, push, dan blok backlog", () => {
     const p = resumePrompt("qa", spec, "hanoman/spec-394", ctx);
-    expect(p).toContain("Kerjakan fase berurutan: Audit → Spec → Plan → Execute → Review.");
+    expect(p).toContain("Kerjakan fase berurutan: Audit → Spec → Mockup → Plan → Execute → Review.");
     expect(p).toContain("$HANOMAN_PHASE_FILE");
     expect(p).toContain("git push origin HEAD:refs/heads/hanoman/spec-394");
     expect(p).toContain(spec.id);
@@ -141,6 +141,9 @@ describe("startPrompt", () => {
     expect(p).toContain("confidence");
     expect(p).toContain("Spec skipped");
     expect(p).toContain("Plan skipped");
+    // ADR-0233 · jalur cepat juga melewati Mockup.
+    expect(p).toContain("LEWATI Spec, Mockup, dan Plan");
+    expect(p).toContain("`echo \"Mockup skipped\" >> \"$HANOMAN_PHASE_FILE\"`");
     // keputusan berpangkal pada hasil Audit
     expect(p.indexOf("Audit")).toBeLessThan(p.indexOf("Spec skipped"));
   });
@@ -718,5 +721,24 @@ describe("metode Agent Skills", () => {
       .toContain("docs/agent-skills/plans/**");
     expect(resumePrompt("feature", s, "b", r, undefined, undefined, "agent-skills"))
       .toContain("docs/agent-skills/plans/**");
+  });
+});
+
+// ADR-0233 · fase Mockup di mode sesi tunggal: keputusan skip, lokasi, batas, persetujuan, larangan
+// pengganti, dan penutupan — semuanya di prompt feature & qa, tidak di flow lain.
+describe("fase Mockup sesi tunggal (ADR-0233)", () => {
+  it("feature memuat panduan Mockup lengkap dan skill codex-image", () => {
+    const p = startPrompt("feature", spec, "b");
+    expect(p).toContain("Kerjakan fase berurutan: Brainstorm → Objective → Spec → Mockup → Plan → Execute → Review.");
+    for (const frag of [
+      "Fase Mockup: putuskan dulu", "ragu → anggap ada UI", "maks 6", "`docs/mockups/<spec-id>/<NN>-<slug>.png`",
+      "`## Mockup`", "lewat jalur tanya di klausa otonomi prompt ini", "`Lihat di hanoman: Backlog <SPEC-ID> → Mockup`",
+      "Setujui · Revisi (beserta catatan) · Lewati mockup", "spec gambar LENGKAP", "JANGAN membuat pengganti",
+      "`codex login`", "Tulis `Mockup done` sesudah disetujui & di-commit, atau `Mockup skipped` bila dilewati.",
+      "setiap task UI di plan merujuk berkas mockup", "- Mockup: codex-image",
+    ]) expect(p, frag).toContain(frag);
+  });
+  it("flow tanpa fase Mockup tak membawa panduannya", () => {
+    expect(startPrompt("goal", spec, "b")).not.toContain("Fase Mockup");
   });
 });

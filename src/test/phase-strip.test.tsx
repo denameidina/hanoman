@@ -173,3 +173,29 @@ it("SPEC-1442 unknown native telemetry is displayed as unknown rather than zero"
   expect(screen.getByRole("dialog")).toHaveTextContent("percobaan tidak diketahui");
   expect(screen.getByRole("dialog")).toHaveTextContent("token in tidak diketahui · out tidak diketahui · cache tidak diketahui");
 });
+
+// ADR-0233 · chip fase Mockup (aktif/selesai) membuka galeri; fase lain dan Mockup pending tidak.
+describe("PhaseStrip · chip Mockup (ADR-0233)", () => {
+  it("mode tunggal: chip Mockup aktif jadi tombol Lihat mockup", () => {
+    let opened = 0;
+    render(<PhaseStrip phases={[{ name: "Spec", state: "done" }, { name: "Mockup", state: "active" }, { name: "Plan", state: "pending" }]}
+      onOpenMockup={() => { opened += 1; }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Lihat mockup" }));
+    expect(opened).toBe(1);
+  });
+  it("Mockup pending atau tanpa handler → bukan tombol", () => {
+    const { unmount } = render(<PhaseStrip phases={[{ name: "Mockup", state: "pending" }]} onOpenMockup={() => {}} />);
+    expect(screen.queryByRole("button", { name: "Lihat mockup" })).toBeNull();
+    unmount();
+    render(<PhaseStrip phases={[{ name: "Mockup", state: "done" }]} />);
+    expect(screen.queryByRole("button", { name: "Lihat mockup" })).toBeNull();
+  });
+  it("mode orkestrasi: panel chip Mockup memuat tombol Lihat mockup", () => {
+    let opened = 0;
+    render(<PhaseStrip phases={[{ name: "Mockup", state: "done", agent: agent({ name: "hanoman-fase-mockup" }) }]}
+      onOpenMockup={() => { opened += 1; }} />);
+    fireEvent.click(screen.getByRole("button", { name: /Mockup/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Lihat mockup" }));
+    expect(opened).toBe(1);
+  });
+});

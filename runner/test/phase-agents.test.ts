@@ -26,7 +26,7 @@ describe("buildPhaseAgents (ADR-0164)", () => {
   it("satu agen fase per fase, bernama & ber-model sesuai rencana, tanpa tools", () => {
     const defs = phaseOnly(agentsFor("feature"));
     expect(agentsFor("feature").map((d) => d.name)).toEqual([
-      "hanoman-fase-brainstorm", "hanoman-fase-objective", "hanoman-fase-spec",
+      "hanoman-fase-brainstorm", "hanoman-fase-objective", "hanoman-fase-spec", "hanoman-fase-mockup",
       "hanoman-fase-plan", "hanoman-fase-execute", REVIEW,
     ]);
     // Default bawaan memakai alias native CLI sejak 1a5a0981, bukan id terpatok.
@@ -34,6 +34,7 @@ describe("buildPhaseAgents (ADR-0164)", () => {
       Brainstorm: { model: "sonnet", effort: "medium" },
       Objective: { model: "sonnet", effort: "medium" },
       Spec: { model: "opus", effort: "high" },
+      Mockup: { model: "sonnet", effort: "medium" },
       Plan: { model: "opus", effort: "high" },
       Execute: { model: "sonnet", effort: "high" },
     } as const;
@@ -481,7 +482,7 @@ describe("Antigravity phase protocol (SPEC-1442)", () => {
   };
   it("renders native tiers without exact model/effort or foreground promises", () => {
     const { plan, defs } = native();
-    expect(defs).toHaveLength(6);
+    expect(defs).toHaveLength(7);
     for (const def of defs) {
       expect(def).toMatchObject({ model: "inherit", effort: null, tools: null });
       expect(renderAntigravityAgent(def, defs)).toContain('model: "inherit"');
@@ -539,13 +540,29 @@ describe("Antigravity phase protocol (SPEC-1442)", () => {
   it.each([
     // Hash defs diperbarui sengaja oleh ADR-0225 (bentuk plan, keputusan di depan, aturan foreground).
     // ADR-0230 · parent & defs berubah sengaja: Review jadi fase resmi (langkah R pindah ke fase Review).
-    ["claude", "3005c24cf79478587df607e9f24d79679bec16932a5793187580aac3800b49a8", "94e51b35e3881e9ae1cd513eec0b1b1d227ded9befa34faa62e3b25bd0a76e47"],
-    ["codex", "c4b997870f0ae9d870a4ee5448c2ec2300d4fdee755d380b8d5ef187b8b49877", "72998f71a47d725352e7fd572e8bdb3a426a08d556fe48af42e948fcd1038ddc"],
+    // ADR-0233 · parent & defs berubah sengaja: fase Mockup (agen fase + langkah M + jalur cepat).
+    ["claude", "80ca520f5062cff6e76288944ee6a72b254fb47f513a22189e459d1c694c92bf", "2194af217f6cfbe522f102dfd00ee4c8e17e33ff119093a7c1886f7670412374"],
+    ["codex", "d184898e7b517b3942d2b34487d7d816c9dd4347cdff0d604d28f57509be9629", "ee2c5ce5a3e4bd2c66ddd74d66648f4497e548196cbe82f0ffdf8161fdf63e86"],
   ] as const)("%s existing parent/phase prompts stay byte-identical", (runtime, parentHash, defsHash) => {
     const plan = planFor("feature", runtime);
     const defs = withPhaseDelegation(buildPhaseAgents(plan, { flow: "feature", method: resolveMethod("superpowers"), verifyScope: "changed", context: "KONTEKS-UJI" }), [], runtime);
     const hash = (s: string) => createHash("sha256").update(s).digest("hex");
     expect(hash(orchestratorClause(plan))).toBe(parentHash);
     expect(hash(JSON.stringify(defs))).toBe(defsHash);
+  });
+});
+
+// ADR-0233 · agen fase Mockup memakai panduan yang sama dengan sesi tunggal, tetapi bertanya lewat
+// `Keputusan terbuka:` dan menyerahkan marker `skipped` ke orchestrator.
+describe("agen fase Mockup (ADR-0233)", () => {
+  it("instruksi memuat panduan Mockup, jalur tanya agen fase, dan rekomendasi lewati", () => {
+    const def = phaseOnly(agentsFor("feature")).find((d) => d.name === "hanoman-fase-mockup")!;
+    for (const frag of [
+      "- Mockup: putuskan dulu", "`docs/mockups/<spec-id>/<NN>-<slug>.png`", "maks 6",
+      "sebagai butir `Keputusan terbuka:` laporanmu (`Status: menunggu-keputusan`)",
+      "`Rekomendasi fase: lewati`", "JANGAN membuat pengganti", "codex-image",
+    ]) expect(def.instructions, frag).toContain(frag);
+    const plan = phaseOnly(agentsFor("feature")).find((d) => d.name === "hanoman-fase-plan")!;
+    expect(plan.instructions).toContain("setiap task UI di plan merujuk berkas mockup");
   });
 });

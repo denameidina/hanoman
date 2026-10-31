@@ -192,3 +192,34 @@ describe("sel fase Review (ADR-0230)", () => {
     expect(r.data.builtinRuntimeDefaults.orchestration["qa.claude.Review.model"]).toBe("seeded");
   });
 });
+
+// ADR-0233 · `Mockup` baru masuk FLOW_PHASES feature & qa — upgrade marker tak boleh menimpa sel yang
+// sudah diisi operator, dan sel yang kosong mendapat seed bawaan.
+describe("sel fase Mockup (ADR-0233)", () => {
+  const base = { autoDefault: true, autoScaffold: true, notifyFail: true };
+  const oldMarker = () => {
+    const m = structuredClone(BUILTIN_RUNTIME_DEFAULTS);
+    m.version = "2026-10-25-v1";
+    for (const key of Object.keys(m.orchestration)) if (key.includes(".Mockup.")) delete m.orchestration[key];
+    return m;
+  };
+  it("seed bawaan feature & qa memuat Mockup sonnet/medium · gpt-5.6-terra/medium", () => {
+    const r = applyRuntimeDefaults(undefined)!;
+    for (const flow of ["feature", "qa"] as const) {
+      expect(r.data.orchestration[flow].claude.Mockup).toEqual({ model: "sonnet", effort: "medium" });
+      expect(r.data.orchestration[flow].codex.Mockup).toEqual({ model: "gpt-5.6-terra", effort: "medium" });
+    }
+  });
+  it("upgrade dari marker lama mempertahankan sel Mockup yang diisi operator", () => {
+    const seeded = applyRuntimeDefaults(undefined)!.data;
+    const raw = structuredClone(seeded) as Record<string, any>;
+    raw.builtinRuntimeDefaults = oldMarker();
+    raw.orchestration.feature.codex.Mockup = { model: "gpt-5.6-sol", effort: "high" };
+    delete raw.orchestration.qa.codex.Mockup;
+    const r = applyRuntimeDefaults({ ...base, ...raw })!;
+    expect(r.data.orchestration.feature.codex.Mockup).toEqual({ model: "gpt-5.6-sol", effort: "high" });
+    expect(r.data.builtinRuntimeDefaults.orchestration["feature.codex.Mockup.model"]).toBe("user");
+    expect(r.data.orchestration.qa.codex.Mockup).toEqual({ model: "gpt-5.6-terra", effort: "medium" });
+    expect(r.data.builtinRuntimeDefaults.orchestration["qa.codex.Mockup.model"]).toBe("seeded");
+  });
+});

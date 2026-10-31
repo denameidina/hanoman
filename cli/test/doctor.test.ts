@@ -224,3 +224,15 @@ describe("SPEC-1442 · real doctor child environment", () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
+
+// ADR-0233 · fase Mockup di runtime non-codex menggambar lewat codex exec — tanpa codex: peringatan, bukan fatal.
+describe("doctor · fase Mockup butuh codex (ADR-0233)", () => {
+  it("claude tanpa codex → peringatan `codex login`, tetap ok", () => {
+    const r = doctorReport({ ...ok, codex: null });
+    expect(r.lines.join("\n")).toContain("! fase Mockup di runtime non-codex butuh codex CLI yang sudah login (`codex login`)");
+    expect(r.ok).toBe(true);
+  });
+  it("codex ada → tanpa peringatan Mockup", () => {
+    expect(doctorReport({ ...ok, codex: "codex-cli 0.151.0" }).lines.join("\n")).not.toContain("fase Mockup");
+  });
+});

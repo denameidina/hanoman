@@ -15,6 +15,7 @@
 - [0230 — Fase Review resmi untuk flow feature & qa](0230-fase-review-resmi.md) — **mengamandemen 0170 #4**. Review = fase pipeline feature/qa sesudah Execute (semua mode sesi); Review menutup stage `done` dan tak boleh `skipped`; reviewer jadi agen fase Review.
 - [0231 — Cara bertanya sesi claude mengikuti status lead](0231-cara-bertanya-mengikuti-status-lead.md) — **mengamandemen 0167 #2/#6**. Lead menjawab project saat sesi lahir → claude bertanya lewat teks; selain itu `AskUserQuestion`.
 - [0232 — "Sesi baru" boleh lahir di worktree terpisah](0232-sesi-baru-worktree-opsional.md) — **memperluas SPEC-517/230**. `worktree` + `branchFrom` opsional pada terminal agen biasa: `.worktrees/term-<id>` di branch `term/<id>`; review/integrate SPEC-230 berlaku. Default mati.
+- [0233 — Fase Mockup opsional + skill `codex-image` milik hanoman + viewer mockup](0233-fase-mockup.md) — **memperluas 0230/0040/0172**. Mockup = fase opsional feature/qa sesudah Spec, disetujui lead/manusia, dilewati agen bila tanpa UI; skill dibundel & disuntik; mockup dilihat di dashboard dengan zoom/pan.
 
 Sub-index dari [internal/docs/README.md](../README.md). Index utama menyimpan daftar **satu baris per
 ADR**; berkas ini menyimpan **narasinya** — apa yang diperluas, dicabut, atau diamandemen tiap

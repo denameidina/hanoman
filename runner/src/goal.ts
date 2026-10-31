@@ -1,5 +1,5 @@
 import type { Flow } from "./types";
-import { PLAN_DIRS, UNSKIPPABLE_PHASES, isGoalShapedFlow } from "@hanoman/shared";
+import { OPTIONAL_PHASES, PLAN_DIRS, UNSKIPPABLE_PHASES, isGoalShapedFlow } from "@hanoman/shared";
 import { PIPELINES } from "./prompt";
 import { readGoalPayload } from "./goal-spec";
 
@@ -52,6 +52,9 @@ export function defaultGoalCondition({ flow, specId, branchTo, spec }: GoalArgs)
       + `${phases.join(" → ")}, masing-masing berakhiran \`done\` atau \`skipped\``
       // ADR-0230 · fase yang tak boleh dilewati (Review) disebut eksplisit.
       + phases.filter((p) => UNSKIPPABLE_PHASES.has(p)).map((p) => ` (\`${p}\` wajib \`done\`)`).join("")
+      // ADR-0233 · fase opsional boleh tanpa baris bila fase sesudahnya sudah tercatat (cermin server).
+      + phases.filter((p) => OPTIONAL_PHASES.has(p))
+        .map((p) => ` (\`${p}\` boleh tanpa baris bila fase sesudahnya sudah tercatat)`).join("")
       + ";",
   ];
   if (planGate) {

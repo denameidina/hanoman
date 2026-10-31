@@ -39,6 +39,9 @@ export const paths = {
   // SPEC-843 · ADR-0124 · lampiran backlog item (multi-berkas per request).
   specAttachments: (id: string) => `${API}/specs/${id}/attachments`,
   specAttachment: (id: string, attId: string) => `${API}/specs/${id}/attachments/${attId}`,
+  // ADR-0233 · mockup UI backlog (docs/mockups/<spec-id>/).
+  specMockups: (id: string) => `${API}/specs/${id}/mockups`,
+  specMockup: (id: string, name: string) => `${API}/specs/${id}/mockups/${encodeURIComponent(name)}`,
   specReview: (id: string) => `${API}/specs/${id}/review`,
   specReviewFile: (id: string, path: string) => `${API}/specs/${id}/review/${path}`,
   // ADR-0213 · hapus worktree satu backlog item (cabang & commit tetap).

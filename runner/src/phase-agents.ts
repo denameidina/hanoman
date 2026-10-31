@@ -5,8 +5,8 @@ import {
 import type { AgentDef } from "./custom-agents";
 import type { Flow, VerifyScope } from "./types";
 import {
-  DECIDER, ESCALATION_CONTRACT, PLAN_SHAPE, REVERSE_PHASE_GUIDE, SCAFFOLD_PHASE_GUIDE, WORK_PHASES, breakdownPhaseLines,
-  codeStyleClause, guideLine, methodClause, phaseSkillsFor, prdPhaseLines, scopeClause,
+  DECIDER, ESCALATION_CONTRACT, MOCKUP_FOLLOW_UP, PLAN_SHAPE, REVERSE_PHASE_GUIDE, SCAFFOLD_PHASE_GUIDE, WORK_PHASES,
+  breakdownPhaseLines, codeStyleClause, guideLine, methodClause, mockupGuide, phaseSkillsFor, prdPhaseLines, scopeClause,
 } from "./prompt";
 import { REVERSE_STANDARD } from "./reverse-standard";
 
@@ -169,7 +169,7 @@ function backlogGuide(flow: Flow, phase: string, ctx: PhaseAgentContext): string
         + `serah-terima) ke SATU berkas \`${m.planDir}/<YYYY-MM-DD>-<spec-id>-<slug>.md\` (spec-id backlog `
         + "ini huruf kecil, mis. `2026-09-25-spec-123-ekspor-csv.md` — nama tanpa spec-id membuat hanoman tak "
         + "menemukan plan-nya). Laporkan path PERSIS berkas itu di `Artefak:`; orchestrator meneruskannya "
-        + `ke Execute. ${PLAN_SHAPE}`;
+        + `ke Execute. ${PLAN_SHAPE} ${MOCKUP_FOLLOW_UP.Plan}`;
     case "Execute":
       return "- Execute: kerjakan plan backlog ini — path persisnya di baris `Artefak fase sebelumnya:` "
         + `serah-terima (bila tak ada: berkas di \`${m.planDir}/\` yang namanya memuat spec-id backlog ini). `
@@ -178,7 +178,16 @@ function backlogGuide(flow: Flow, phase: string, ctx: PhaseAgentContext): string
         + "`done`, selama masih ada `- [ ]`. Laporan `Status: selesai` wajib memuat tabel `AC → bukti`: "
         + "setiap acceptance criteria dokumen spec (qa jalur-cepat: dokumen audit) → perintah yang kamu "
         + "jalankan beserta hasil yang kamu baca, atau path:baris yang membuktikannya. AC tanpa bukti = "
-        + "belum selesai; laporanmu diperiksa ulang sebelum fase ditutup.";
+        + `belum selesai; laporanmu diperiksa ulang sebelum fase ditutup. ${MOCKUP_FOLLOW_UP.Execute}`;
+    // ADR-0233 · panduan yang SAMA dengan sesi tunggal (`mockupGuide`); bedanya cuma jalur tanya & penutupan:
+    // agen fase tak bisa bertanya langsung dan tak menulis marker sendiri.
+    case "Mockup":
+      return "- Mockup: " + mockupGuide(
+        "sebagai butir `Keputusan terbuka:` laporanmu (`Status: menunggu-keputusan`) — orchestrator yang "
+          + "menanyakannya",
+        "Disetujui & di-commit → `Status: selesai`. Dilewati (tanpa UI, atau dipilih Lewati) → `Status: selesai` "
+          + "dengan `Rekomendasi fase: lewati` beserta alasannya; orchestrator yang menulis marker-nya.",
+      );
     case "Audit":
       return flow === "audit"
         ? "- Audit: ini audit-only — investigasi SAJA, JANGAN menulis perbaikan kode apa pun. Telusuri akar "
@@ -340,7 +349,8 @@ function reviewerInstructions(plan: PhasePlan, ctx: PhaseAgentContext): string {
         + `doc-of-record; bila path tak ada, cari berkas ber-spec-id di \`${m.specDir}/\` & \`${m.planDir}/\`). `
         + "Plan yang menyimpang dari spec adalah temuan.",
       "2. Ubah acceptance criteria jadi daftar yang diperiksa SATU PER SATU. Kalimat tak terukur ditandai "
-        + "tak terukur, bukan ditafsirkan.",
+        + "tak terukur, bukan ditafsirkan. Bila `docs/mockups/<spec-id>/` ada, kesesuaian UI hasil dengan "
+        + "mockup yang disetujui ikut jadi kriteria.",
       '3. Baca `git diff "$HANOMAN_BASE_SHA"...HEAD` dan `git status --porcelain` (perubahan belum di-commit '
         + "adalah temuan). Laporan Execute dan kotak `- [x]` hanyalah klaim.",
       "4. Jalankan test yang relevan dengan berkas yang berubah, sesuai scope verifikasi di bawah, dan baca "
