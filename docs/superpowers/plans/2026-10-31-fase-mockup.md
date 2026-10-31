@@ -93,7 +93,7 @@ export const OPTIONAL_PHASES: ReadonlySet<string>; // = new Set([MOCKUP_PHASE])
 
 ### Task 2: Panduan fase Mockup di prompt + skill fase + jalur cepat
 
-- [ ] Agen tahu cara mengerjakan, melewati, dan meminta persetujuan mockup di kedua mode.
+- [x] Agen tahu cara mengerjakan, melewati, dan meminta persetujuan mockup di kedua mode.
 
 **Files:** `shared/src/method-catalog.ts`, `runner/src/prompt.ts`, `runner/src/phase-agents.ts`,
 `runner/test/__golden__/*`.

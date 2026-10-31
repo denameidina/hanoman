@@ -4,7 +4,12 @@
 // Settings, catatan picker Start). Berkas ini tak menyentuh filesystem sama sekali — yang
 // memindai disk adalah `runner/src/skills.ts`.
 import type { Agent } from "./entities";
-import type { MethodDef } from "./method-catalog";
+import { MOCKUP_SKILL, type MethodDef } from "./method-catalog";
+
+// ADR-0233 · skill yang dipasok hanoman sendiri (bundel paket, di-seed ke `$HANOMAN_HOME/skills`), bukan
+// paket metode: installer metode tak pernah memasangnya, jadi menghitungnya "kurang" membuat setiap metode
+// selamanya belum siap.
+const HANOMAN_PROVIDED_SKILLS: ReadonlySet<string> = new Set([MOCKUP_SKILL]);
 
 export const ANTIGRAVITY_METHOD_UNAVAILABLE_REASON = "Installer metode Antigravity belum terverifikasi dari upstream";
 
@@ -27,9 +32,10 @@ export interface MethodStatusResponse {
   readonly methods: MethodSkillStatus[];
 }
 
-/** Skill konkret yang dipanggil prompt metode ini. */
+/** Skill konkret yang dipanggil prompt metode ini dan harus datang dari paket metode. */
 export function methodSkills(m: MethodDef): string[] {
-  return [...new Set([...Object.values(m.phaseSkills).flat(), ...m.exitSkills])];
+  return [...new Set([...Object.values(m.phaseSkills).flat(), ...m.exitSkills])]
+    .filter((id) => !HANOMAN_PROVIDED_SKILLS.has(id));
 }
 
 /**

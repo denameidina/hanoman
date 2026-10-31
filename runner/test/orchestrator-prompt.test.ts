@@ -20,7 +20,7 @@ describe("orchestratorClause (ADR-0164)", () => {
       feature: { enabled: true, executeMode: "inline", claude: { Plan: { model: "claude-sonnet-5", effort: "low" } }, codex: {}, antigravity: {} } };
     const c = orchestratorClause(plan("feature", "claude", o));
     expect(c).toContain("Sesi ini ORCHESTRATOR");
-    expect(c).toContain("4. Plan → `hanoman-fase-plan` · claude-sonnet-5 · low");
+    expect(c).toContain("5. Plan → `hanoman-fase-plan` · claude-sonnet-5 · low");
     expect(c).toContain("`Fase <Nama Fase>`");
     expect(c).toContain("Percobaan: <k>/2");
     expect(c).toContain("AskUserQuestion");
@@ -60,6 +60,8 @@ describe("orchestratorClause (ADR-0164)", () => {
     expect(c).toContain("send_input");
     expect(c).toContain("`Rekomendasi fase: jalur-cepat`");
     expect(c).toContain("Spec skipped");
+    // ADR-0233 · jalur cepat qa ikut melewati Mockup.
+    expect(c).toContain("`echo \"Mockup skipped\" >> \"$HANOMAN_PHASE_FILE\"`");
     expect(c).toContain("Plan skipped");
     expect(c).not.toContain("Fase <n>/<total>:");
     expect(c).toContain("BUKAN baris pertama blok serah-terima");
@@ -281,7 +283,7 @@ describe("P2 · orchestrator: fase Review, path plan persis, lampiran (ADR-0170,
     expect(c).toContain("Periksa dengan `cat \"$HANOMAN_PHASE_FILE\"`");
   });
   it("Review tercantum di daftar fase dengan model/effort reviewer; flow tanpa Review tak berubah", () => {
-    expect(orchestratorClause(plan("qa"))).toContain("5. Review → `hanoman-fase-review` · opus · high");
+    expect(orchestratorClause(plan("qa"))).toContain("6. Review → `hanoman-fase-review` · opus · high");
     const g = orchestratorClause(plan("goal"));
     expect(g).not.toContain("hanoman-fase-review");
     expect(g).not.toContain("Verdict");
@@ -316,5 +318,19 @@ describe("P2 · orchestrator: fase Review, path plan persis, lampiran (ADR-0170,
       expect(p).toContain("`/att/INDEX.md`");
       expect(p).not.toContain("BACA semuanya");
     }
+  });
+});
+
+// ADR-0233 · agen fase Mockup tak menulis marker: orchestrator memetakan `lewati` ke `skipped` dan
+// me-relay permintaan persetujuan apa adanya.
+describe("orchestratorClause · fase Mockup (ADR-0233)", () => {
+  it("feature & qa memuat langkah M; flow tanpa Mockup tidak", () => {
+    for (const flow of ["feature", "qa"] as const) {
+      const c = orchestratorClause(plan(flow));
+      expect(c).toContain("M. Fase Mockup: laporan `Status: selesai` dengan `Rekomendasi fase: lewati`");
+      expect(c).toContain("BUKAN `Mockup done`");
+      expect(c).toContain("baris `Lihat di hanoman:`");
+    }
+    expect(orchestratorClause(plan("goal"))).not.toContain("Fase Mockup");
   });
 });

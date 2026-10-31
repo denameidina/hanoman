@@ -1,4 +1,4 @@
-import { PLAN_DIRS, UNSKIPPABLE_PHASES } from "@hanoman/shared";
+import { OPTIONAL_PHASES, PLAN_DIRS, UNSKIPPABLE_PHASES } from "@hanoman/shared";
 import { PIPELINES } from "./prompt";
 import type { Flow } from "./types";
 import { EVENT_HOOK_COMMAND } from "./settings";
@@ -81,13 +81,16 @@ export function codexGoalScript(o: {
     `ST=${shq(o.stateFile)}`,
     "missing=''",
   ];
-  for (const p of phases) {
+  phases.forEach((p, i) => {
+    // ADR-0233 · fase `OPTIONAL_PHASES` (Mockup) juga lolos bila fase SESUDAHNYA sudah tercatat —
+    // cermin `derivePhases` server, supaya sesi lama yang dilanjutkan tak tertahan menunggu baris itu.
+    const name = OPTIONAL_PHASES.has(p) ? `(${phases.slice(i).join("|")})` : p;
     lines.push(
       // ADR-0230 · fase `UNSKIPPABLE_PHASES` (Review) hanya lolos dengan `done`.
-      `grep -qE ${shq(`^${p} ${UNSKIPPABLE_PHASES.has(p) ? "done" : "(done|skipped)"}[[:space:]]*$`)} "$PF" 2>/dev/null || `
+      `grep -qE ${shq(`^${name} ${UNSKIPPABLE_PHASES.has(p) ? "done" : "(done|skipped)"}[[:space:]]*$`)} "$PF" 2>/dev/null || `
       + `missing="$missing\\n- fase ${p} belum tercatat di \\$HANOMAN_PHASE_FILE"`,
     );
-  }
+  });
   if (planGate) {
     // Cermin planComplete() di server: hanya berkas plan yang cocok id spec ini yang digerbang.
     // SPEC-734 · INVARIAN 1 · loop atas UNION seluruh planDir terdaftar, bukan satu direktori:

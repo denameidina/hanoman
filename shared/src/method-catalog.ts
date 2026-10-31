@@ -54,6 +54,10 @@ export const DEFAULT_METHOD = "superpowers";
 // tanpa skill (runner/src/prompt.ts). Karena itu gerbangnya konstanta, bukan pilihan katalog.
 export const VERIFICATION_GATE = "superpowers:verification-before-completion";
 
+// ADR-0233 · skill fase Mockup, sama untuk semua metode & runtime (prompt netral-agen, ADR-0074): skill
+// bundel hanoman yang memilih engine sendiri — `image_gen` bawaan Codex, selain itu `codex exec`.
+export const MOCKUP_SKILL = "codex-image";
+
 // Katalog mattpocock mayoritas diketik manusia (`/grill-me`, `/to-spec`), jadi entri di bawah memilih
 // primitif model-invoked-nya (`grilling`, bukan `/grill-me`) dan klausa ini menegaskannya ke agen.
 // ADR-0167 (diselaraskan ADR-0170 P2): versi lama menyuruh "putuskan sendiri" — bertentangan dengan
@@ -95,6 +99,7 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
     phaseSkills: {
       Brainstorm: ["superpowers:brainstorming"],
       Audit: ["superpowers:systematic-debugging"],
+      Mockup: [MOCKUP_SKILL],
       Plan: ["superpowers:writing-plans"],
       Execute: [
         "superpowers:executing-plans",
@@ -140,6 +145,7 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
     phaseSkills: {
       Brainstorm: ["mattpocock-skills:grilling"],
       Audit: ["mattpocock-skills:diagnosing-bugs"],
+      Mockup: [MOCKUP_SKILL],
       Plan: ["mattpocock-skills:to-tickets"],
       Execute: [
         "mattpocock-skills:implement",
@@ -178,6 +184,7 @@ export const METHODS: Readonly<Record<string, MethodDef>> = {
     phaseSkills: {
       Brainstorm: ["agent-skills:idea-refine"],
       Spec: ["agent-skills:spec-driven-development"],
+      Mockup: [MOCKUP_SKILL],
       Audit: [
         "agent-skills:debugging-and-error-recovery",
         "agent-skills:code-review-and-quality",

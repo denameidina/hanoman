@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  METHODS, METHOD_IDS, DEFAULT_METHOD, VERIFICATION_GATE, PLAN_DIRS, SPEC_DIRS,
+  METHODS, METHOD_IDS, DEFAULT_METHOD, VERIFICATION_GATE, MOCKUP_SKILL, PLAN_DIRS, SPEC_DIRS,
   resolveMethod, readSpecMethod, stampSpecMethod,
 } from "./method-catalog";
 
@@ -48,6 +48,12 @@ describe("METHODS · invarian sumber", () => {
     for (const [key, m] of entries()) {
       expect(m.requires.length, `${key}.requires kosong`).toBeGreaterThan(0);
     }
+  });
+
+  // ADR-0233 · fase Mockup memakai skill bundel hanoman yang sama di setiap metode.
+  it("setiap metode memuat skill codex-image untuk fase Mockup", () => {
+    expect(MOCKUP_SKILL).toBe("codex-image");
+    for (const [key, m] of entries()) expect(m.phaseSkills.Mockup, key).toEqual([MOCKUP_SKILL]);
   });
 
   // ADR-0170 P2 · skill executing-plans sendiri menyuruh "if subagents are available, use

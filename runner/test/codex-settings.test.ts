@@ -85,6 +85,19 @@ describe("codexGoalScript", () => {
     expect(runGate(gate()).code).toBe(0);
   });
 
+  // ADR-0233 · Mockup opsional: lolos tanpa barisnya bila fase sesudahnya tercatat (sesi lama),
+  // tetapi menahan selama belum ada fase sesudahnya — cermin derivePhases server.
+  it("ADR-0233 · Mockup tanpa baris lolos bila fase sesudahnya tercatat, tertahan bila belum", () => {
+    mkdirSync(join(dir, "wt/docs/superpowers/plans"), { recursive: true });
+    writeFileSync(join(dir, "phases"),
+      "Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\nReview done\n");
+    expect(runGate(gate()).code).toBe(0);
+    writeFileSync(join(dir, "phases"), "Brainstorm done\nObjective done\nSpec done\n");
+    const r = runGate(gate());
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain("fase Mockup belum tercatat");
+  });
+
   it("memblok saat plan spec ini masih punya - [ ]", () => {
     writeFileSync(join(dir, "phases"),
       "Brainstorm done\nObjective done\nSpec done\nPlan done\nExecute done\nReview done\n");

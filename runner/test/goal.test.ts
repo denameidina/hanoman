@@ -11,7 +11,9 @@ describe("goal condition", () => {
   it("default memuat identitas backlog, seluruh fase, gate plan, dan push", () => {
     const c = defaultGoalCondition(args);
     expect(c).toContain("SPEC-332");
-    expect(c).toContain("Brainstorm → Objective → Spec → Plan → Execute → Review");
+    expect(c).toContain("Brainstorm → Objective → Spec → Mockup → Plan → Execute → Review");
+    // ADR-0233 · Mockup opsional, cermin derivePhases server.
+    expect(c).toContain("`Mockup` boleh tanpa baris bila fase sesudahnya sudah tercatat");
     // ADR-0230 · Review tak boleh `skipped`.
     expect(c).toContain("`Review` wajib `done`");
     expect(c).toContain('cat "$HANOMAN_PHASE_FILE"');
@@ -127,7 +129,7 @@ describe("kondisi goal untuk flow goal (SPEC-407)", () => {
 
   it("flow lain tak tersentuh", () => {
     expect(defaultGoalCondition({ flow: "feature", specId: "SPEC-332", branchTo: "b" }))
-      .toContain("Brainstorm → Objective → Spec → Plan → Execute");
+      .toContain("Brainstorm → Objective → Spec → Mockup → Plan → Execute");
   });
 });
 

@@ -1,5 +1,5 @@
 import type { Agent, Flow, SpecBrief, ProjectBrief, PrdBrief, AuditDoc, BreakdownPrd, Autonomy, VerifyScope, ResumeCtx, AttachmentCtx } from "./types";
-import { resolveMethod, FLOW_PHASES, REVIEWER_CELL, type ExecuteMode, type MethodDef, type PhasePlan } from "@hanoman/shared";
+import { resolveMethod, FLOW_PHASES, MOCKUP_PHASE, REVIEWER_CELL, type ExecuteMode, type MethodDef, type PhasePlan } from "@hanoman/shared";
 import { REVERSE_STANDARD } from "./reverse-standard";
 import { verifyScopeClause } from "./verify-scope";
 import { CODE_STYLE_CLAUSE } from "./code-style";
@@ -102,6 +102,8 @@ const phaseInstruction = (phases: readonly string[], method: MethodDef) => {
   // punya kotak `- [ ]`. Cermin server-side gate (SPEC-173, ADR-0029) di prompt-nya.
   if (!phases.includes("Plan") || !phases.includes("Execute")) return base;
   return base
+    + (phases.includes(MOCKUP_PHASE)
+      ? `\n${MOCKUP_SINGLE}\n${MOCKUP_FOLLOW_UP.Plan} ${MOCKUP_FOLLOW_UP.Execute}` : "")
     + `\nExecute BELUM selesai selama plan (\`${method.planDir}/**\`) masih punya task `
     + `\`- [ ]\`: kerjakan SEMUA PR/task sampai tiap kotak jadi \`- [x]\` sebelum menulis `
     + `\`Execute done\`. hanoman menahan backlog di \`executing\`, bukan \`done\`, selama masih ada \`- [ ]\`.`
@@ -118,7 +120,42 @@ export const SELF_REVIEW_CLAUSE =
   + "tabel `AC → putusan → bukti` (setiap acceptance criteria → perintah & hasil yang kamu baca, atau path:baris) "
   + "lalu satu baris `Verdict: lulus` atau `Verdict: rework`. `rework` → perbaiki temuannya, lalu review ulang; "
   + "maks 2 putaran rework, sisanya jadi keputusan terbuka. Tulis `Review done` HANYA sesudah `Verdict: lulus`; "
-  + "Review TIDAK PERNAH `skipped`.";
+  + "Review TIDAK PERNAH `skipped`. Bila `docs/mockups/<spec-id>/` ada, tabel itu juga memuat kesesuaian "
+  + "hasil dengan mockup yang disetujui.";
+
+// ADR-0233 · fase Mockup. SATU sumber untuk sesi tunggal (`phaseInstruction`) dan agen fase
+// (`backlogGuide`), supaya kedua mode tak berselisih soal kapan dilewati, di mana gambarnya, dan cara
+// meminta persetujuan. `ask` = jalur tanya mode itu; `close` = cara menutup fase di mode itu.
+export const mockupGuide = (ask: string, close: string): string =>
+  "putuskan dulu dari dokumen spec (qa jalur cepat: dokumen audit) apakah backlog ini mengubah "
+  + "atau membuat UI — layar, komponen, atau state yang terlihat pengguna. Tidak ada (perbaikan backend, CLI, "
+  + "refactor, docs) → fase ini dilewati, sebutkan alasannya dalam satu baris; ragu → anggap ada UI. Ada → "
+  + "baca design system project bila ada (mis. `internal/docs/design-system/**`, `DESIGN.md`) dan kode layar "
+  + "yang akan berubah, muat skill `codex-image`, lalu hasilkan SATU gambar per layar/state yang berubah, "
+  + "maks 6: desktop `1536x1024`, tambah mobile `1024x1536` bila layout responsif tersentuh, ke "
+  + "`docs/mockups/<spec-id>/<NN>-<slug>.png` (spec-id huruf kecil, NN dua digit urut). Tambahkan bagian "
+  + "`## Mockup` di dokumen spec: tiap berkas, layar/state yang ditunjukkannya, dan apa yang berubah. Lalu "
+  + `minta persetujuan ${ask}: sebutkan path absolut setiap gambar dan baris \`Lihat di hanoman: Backlog `
+  + "<SPEC-ID> → Mockup`, dengan opsi Setujui · Revisi (beserta catatan) · Lewati mockup. Revisi → buat ulang "
+  + "gambar yang diminta dengan spec gambar LENGKAP ditambah koreksinya (bukan koreksinya saja), timpa berkas "
+  + "yang sama, lalu minta persetujuan lagi. Lewati → hapus berkas mockup yang belum di-commit. Disetujui → "
+  + "commit `docs/mockups/<spec-id>/` beserta dokumen spec. Bila gambar tak bisa dihasilkan (Codex tak "
+  + "terpasang/belum login, image_gen gagal dua kali), JANGAN membuat pengganti (SVG/CSS/HTML yang "
+  + "dirasterisasi, emoji, atau placeholder bernama sama) — tanyakan dengan jalur yang sama: tunggu operator "
+  + `menjalankan \`codex login\` lalu lanjut, atau lewati mockup. ${close}`;
+
+// ADR-0233 · dampak mockup yang disetujui ke fase sesudahnya. Bersyarat pada keberadaan folder, karena
+// Mockup boleh dilewati.
+export const MOCKUP_FOLLOW_UP = {
+  Plan: "Bila `docs/mockups/<spec-id>/` ada, setiap task UI di plan merujuk berkas mockup yang diwujudkannya.",
+  Execute: "Bila `docs/mockups/<spec-id>/` ada, bangun UI dengan kode sesuai mockup itu — PNG mockup bukan aset "
+    + "produk.",
+} as const;
+
+const MOCKUP_SINGLE = "Fase Mockup: " + mockupGuide(
+  "lewat jalur tanya di klausa otonomi prompt ini",
+  "Tulis `Mockup done` sesudah disetujui & di-commit, atau `Mockup skipped` bila dilewati.",
+);
 
 // SPEC-734 · ADR-0113 · peta fase → skill datang dari registry metode (`METHODS` di
 // @hanoman/shared), bukan konstanta di sini. Objective dan Spec adalah keluaran skill brainstorming
@@ -242,6 +279,13 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + "putaran — relay tiap putaran dengan cara yang sama, bawa konteks & opsi dari laporannya, dan "
       + "biarkan jawaban bebas."
     : "";
+  // ADR-0233 · agen fase Mockup tak menulis marker; `lewati` dipetakan ke `skipped`, bukan `done`.
+  const mockupStep = plan.phases.some((p) => p.phase === MOCKUP_PHASE)
+    ? "M. Fase Mockup: laporan `Status: selesai` dengan `Rekomendasi fase: lewati` → jalankan `echo \"Mockup "
+      + "skipped\" >> \"$HANOMAN_PHASE_FILE\"` (gerbang yang sama seperti langkah 2), BUKAN `Mockup done`. "
+      + "Permintaan persetujuan mockup datang sebagai `Keputusan terbuka:` — relay lewat langkah 4 apa adanya, "
+      + "termasuk path gambar dan baris `Lihat di hanoman:`; jangan menyetujuinya sendiri."
+    : "";
   const handoff = plan.phases.some((p) => p.phase === "Serah terima")
     ? "Sesudah fase Serah terima tercatat, tampilkan bagian `Ringkasan serah terima:` dari laporannya APA "
       + "ADANYA ke manusia di terminal ini (teks biasa — informasi, bukan pertanyaan) sebelum menutup "
@@ -311,9 +355,11 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
       + `— hanoman yang merutekannya, kamu cukup bertanya.${turnTaking}`,
     o.fastPath
       ? "5. `Rekomendasi fase: jalur-cepat` sesudah Audit → SEBELUM lanjut ke Execute: jalankan `echo "
-        + "\"Spec skipped\" >> \"$HANOMAN_PHASE_FILE\"` lalu `echo \"Plan skipped\" >> \"$HANOMAN_PHASE_FILE\"` "
-        + "(gerbang yang sama seperti langkah 2), lalu lanjut ke Execute. `penuh` → Spec → Plan → Execute."
+        + "\"Spec skipped\" >> \"$HANOMAN_PHASE_FILE\"`, `echo \"Mockup skipped\" >> \"$HANOMAN_PHASE_FILE\"`, "
+        + "lalu `echo \"Plan skipped\" >> \"$HANOMAN_PHASE_FILE\"` (gerbang yang sama seperti langkah 2), lalu "
+        + "lanjut ke Execute. `penuh` → Spec → Mockup → Plan → Execute."
       : "",
+    mockupStep,
     reviewStep,
     handoff,
     "DILARANG mengerjakan isi fase sendiri — termasuk saat subagent gagal. Menulis `skipped` untuk fase "
@@ -332,11 +378,12 @@ export function orchestratorClause(plan: PhasePlan, o: { fastPath?: boolean } = 
 const auditDecisionInstruction = (flow: Flow): string =>
   flow !== "qa" ? "" :
     "Keputusan pasca-Audit (qa): bila temuan berconfidence tinggi dan perbaikannya bisa "
-    + "dikerjakan langsung (diff kecil, akar masalah jelas), LEWATI Spec dan Plan — tandai "
-    + "keduanya `skipped` (`echo \"Spec skipped\" >> \"$HANOMAN_PHASE_FILE\"` lalu "
+    + "dikerjakan langsung (diff kecil, akar masalah jelas), LEWATI Spec, Mockup, dan Plan — tandai "
+    + "ketiganya `skipped` (`echo \"Spec skipped\" >> \"$HANOMAN_PHASE_FILE\"`, "
+    + "`echo \"Mockup skipped\" >> \"$HANOMAN_PHASE_FILE\"`, lalu "
     + "`echo \"Plan skipped\" >> \"$HANOMAN_PHASE_FILE\"`) dan langsung ke Execute; dokumen "
     + "audit menjadi doc-of-record perbaikan itu. Bila temuan luas, berisiko, atau ambigu, "
-    + "jalankan Spec → Plan → Execute penuh. Keputusan ini milikmu berdasarkan hasil Audit, "
+    + "jalankan Spec → Mockup → Plan → Execute penuh. Keputusan ini milikmu berdasarkan hasil Audit, "
     + "bukan default — jangan bayar perencanaan yang tak perlu untuk perbaikan sepele.";
 
 // SPEC-340 · ADR-0076 — rekomendasi tindak lanjut audit harus TERBACA MESIN, bukan prosa. Sesi
@@ -402,8 +449,8 @@ const auditContinuationInstruction = (flow: Flow, spec: SpecBrief): string => {
     + `jadi dokumen audit sudah ada di ${doc}. `
     + "JANGAN mengulang investigasi fase Audit dari nol — baca dokumen audit itu sebagai temuan, "
     + "tandai fase Audit dilewati (`echo \"Audit skipped\" >> \"$HANOMAN_PHASE_FILE\"`), lalu ambil "
-    + "keputusan pasca-Audit: perbaikan jelas & kecil → langsung Execute (tandai `Spec skipped` dan "
-    + "`Plan skipped` bila sesuai); selain itu Spec → Plan → Execute penuh.";
+    + "keputusan pasca-Audit: perbaikan jelas & kecil → langsung Execute (tandai `Spec skipped`, "
+    + "`Mockup skipped`, dan `Plan skipped` bila sesuai); selain itu Spec → Mockup → Plan → Execute penuh.";
 };
 
 // I-2 · ADR-0164 · varian ORCHESTRATOR dari auditContinuationInstruction. Teks sesi tunggal di atas
@@ -443,9 +490,9 @@ export const auditContinuationForOrchestrator = (flow: Flow, spec: SpecBrief): s
     + "sini menggantikan langkah 5 di atas — JANGAN menunggu frasa `Rekomendasi fase: jalur-cepat` dari "
     + "agen Audit karena Audit tidak dijalankan pada kelanjutan ini. Kamu diizinkan mengambil SATU "
     + "keputusan ROUTING dari isi dokumen audit itu SAJA, dibaca langsung dari kriterianya: temuan "
-    + "berconfidence tinggi dan perbaikan langsung berdiff kecil → tandai `Spec skipped` lalu `Plan "
-    + "skipped` (gerbang yang sama) lalu panggil agen fase Execute; selebihnya panggil Spec → Plan → "
-    + "Execute penuh lewat agen fasenya masing-masing. Kamu TIDAK menginvestigasi ulang maupun merancang "
+    + "berconfidence tinggi dan perbaikan langsung berdiff kecil → tandai `Spec skipped`, `Mockup skipped`, "
+    + "lalu `Plan skipped` (gerbang yang sama) lalu panggil agen fase Execute; selebihnya panggil Spec → "
+    + "Mockup → Plan → Execute penuh lewat agen fasenya masing-masing. Kamu TIDAK menginvestigasi ulang maupun merancang "
     + "perbaikannya sendiri — itu tetap pekerjaan agen fase.";
 };
 
