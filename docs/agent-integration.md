@@ -36,8 +36,8 @@ backlog item (Spec)  →  sesi agen (tmux)  →  git worktree terisolasi
   `hanoman/<id>`. Isolasi worktree itulah satu-satunya batas keamanan eksekusi di hanoman —
   tak ada guardrail perintah.
 - **Fase bukan proses, melainkan giliran** di dalam satu sesi: `Brainstorm → Objective → Spec →
-  Plan → Execute` (bervariasi per jenis kerja). Kemajuannya dibaca dari berkas fase, bukan dari
-  status proses.
+  Mockup → Plan → Execute → Review` (bervariasi per jenis kerja; `Mockup` dilewati bila backlog tak
+  menyentuh UI, ADR-0233). Kemajuannya dibaca dari berkas fase, bukan dari status proses.
 - **Dokumentasi project (`internal/docs/**`) adalah Source of Truth.** Sebelum mengusulkan apa pun,
   baca dokumen project-nya — itu sikap yang diharapkan dari agen di sini.
 

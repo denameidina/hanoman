@@ -282,7 +282,7 @@ export function ImageViewer(props: {
 
 ### Task 8: Dokumentasi akhir + uji nyata
 
-- [ ] Semua docs SoT sinkron dan rute terbukti di server lokal.
+- [x] Semua docs SoT sinkron dan rute terbukti di server lokal.
 
 **Files:** `internal/skills/hanoman/SKILL.md` (daftar fase + skill bundel), `internal/docs/README.md`
 (link spec/plan/ADR), cek `internal/docs/architecture/data-model.md` bila menyebut daftar fase.
