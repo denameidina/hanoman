@@ -59,7 +59,7 @@ Frontend menambah `ImageViewer` (zoom/pan) dan galeri di tiga titik masuk.
 
 ### Task 1: Fase `Mockup` di pipeline + skip implisit + default orkestrasi + ADR
 
-- [ ] Fase Mockup masuk pipeline feature/qa dan sesi lama tak tersandera.
+- [x] Fase Mockup masuk pipeline feature/qa dan sesi lama tak tersandera.
 
 **Files:** `shared/src/orchestration.ts`, `server/src/services/session-phases.ts`, `shared/src/runtime-defaults.ts`,
 `internal/docs/adr/0233-fase-mockup.md` (baru), `internal/docs/README.md`, `internal/docs/architecture/stack.md`.

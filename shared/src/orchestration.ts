@@ -13,8 +13,10 @@ export type OrchestrationFlow = (typeof ORCHESTRATION_FLOWS)[number];
 // mengimpor runner.
 export const FLOW_PHASES: Readonly<Record<OrchestrationFlow, readonly string[]>> = {
   // ADR-0230 · `Review` = fase resmi sesudah Execute (dulu langkah R di dalam Execute, ADR-0170 #4).
-  feature: ["Brainstorm", "Objective", "Spec", "Plan", "Execute", "Review"],
-  qa: ["Audit", "Spec", "Plan", "Execute", "Review"],
+  // ADR-0233 · `Mockup` = fase opsional sesudah Spec: gambar UI disetujui sebelum Plan, dilewati agen
+  // bila backlog tak menyentuh UI.
+  feature: ["Brainstorm", "Objective", "Spec", "Mockup", "Plan", "Execute", "Review"],
+  qa: ["Audit", "Spec", "Mockup", "Plan", "Execute", "Review"],
   scaffold: ["Brainstorm", "Objective", "Doc index"],
   reverse: ["Scan", "Docs teknis", "Wawancara", "Konvensi & index", "Serah terima"],
   prd: ["Brainstorm", "PRD"],
@@ -72,6 +74,11 @@ export const REVIEWER_DEFAULTS: Readonly<Record<Agent, { model: string; effort: 
 };
 /** ADR-0230 · fase yang `skipped`-nya TIDAK dihitung tercapai/lengkap (server, gate codex, prompt). */
 export const UNSKIPPABLE_PHASES: ReadonlySet<string> = new Set([REVIEWER_CELL]);
+
+export const MOCKUP_PHASE = "Mockup";
+/** ADR-0233 · fase yang belum tercatat dibaca `skipped` bila fase sesudahnya sudah tercatat: sesi yang
+ *  lahir sebelum fase itu ada tak pernah menulis barisnya, dan pipeline-nya tak boleh tersandera. */
+export const OPTIONAL_PHASES: ReadonlySet<string> = new Set([MOCKUP_PHASE]);
 
 export type PhasePlan = {
   flow: OrchestrationFlow; runtime: Agent; phases: PhasePlanEntry[];

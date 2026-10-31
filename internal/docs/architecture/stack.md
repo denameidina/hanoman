@@ -258,6 +258,13 @@ titik berhenti — dan hanya berhenti untuk bertanya di terminal saat butuh kepu
 di `POST /terminal/sessions`) dan berlaku seumur hidup sesi (satu proses); manusia bisa mengetik `/model`
 di dalam terminal untuk menggesernya. Matrix per-fase (ADR-0058) dicabut — tak andal. Model-per-step (ADR-0003) usang bersama runner headless (ADR-0024).
 
+**Fase opsional** (ADR-0233): flow feature & qa memuat `Mockup` di antara Spec dan Plan
+(`Brainstorm → Objective → Spec → Mockup → Plan → Execute → Review`, qa `Audit → Spec → Mockup → Plan →
+Execute → Review`). Agen menulis `Mockup skipped` bila backlog tak menyentuh UI; selain itu ia menghasilkan
+PNG di `docs/mockups/<spec-id>/` lewat skill `codex-image` (dibundel paket di `server/skills/`, di-seed ke
+`$HANOMAN_HOME/skills` saat boot) dan meminta persetujuan. `OPTIONAL_PHASES` membuat fase yang belum tercatat
+terbaca `skipped` begitu fase sesudahnya tercatat, jadi sesi yang lahir sebelum fase itu ada tetap tuntas.
+
 **Metodologi kerja sebuah sesi adalah data, bukan literal** (SPEC-734/ADR-0113): satu konstanta
 `METHODS` di `shared/src/method-catalog.ts` mendeklarasikan per metode peta fase→skill, direktori
 artefak (`planDir`/`specDir`), klausa prompt tambahan, `exitSkills`, dan prasyarat instalasi —

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 // Naikkan versi ini setiap kali rekomendasi bawaan berubah. Seed server memakai versi ini
 // bersama marker per bagian untuk memperbarui konfigurasi bawaan tanpa menimpa edit operator.
-export const RUNTIME_DEFAULTS_VERSION = "2026-10-25-v1";
+export const RUNTIME_DEFAULTS_VERSION = "2026-10-31-v1";
 
 export const zRuntimeDefaultState = z.enum(["seeded", "user"]);
 export type RuntimeDefaultState = z.infer<typeof zRuntimeDefaultState>;
@@ -82,6 +82,8 @@ const flow = (
 // - Fase interaktif dengan manusia (Brainstorm, Objective, Wawancara) → Sonnet/Terra · medium.
 // - Verifikasi → Opus/Sol · medium: model berbeda dari eksekutor menangkap hijau palsu.
 // - Review (ADR-0230, feature & qa) → Opus/Sol · high = `REVIEWER_DEFAULTS`: penilai independen.
+// - Mockup (ADR-0233, feature & qa) → Sonnet/Terra · medium: menulis spec gambar dan menunggu
+//   `image_gen`; penalaran beratnya sudah dibayar di Spec.
 // - Menulis ulang temuan (Laporan, Serah terima) → Sonnet/Terra · medium/low.
 // no_effort sengaja mati sebagai pagar agar task remeh tidak menyalakan pipeline.
 export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefault> = {
@@ -90,6 +92,7 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
       Brainstorm: cell("sonnet", "medium"),
       Objective: cell("sonnet", "medium"),
       Spec: cell("opus", "high"),
+      Mockup: cell("sonnet", "medium"),
       Plan: cell("opus", "high"),
       Execute: cell("sonnet", "high"),
       Review: cell("opus", "high"),
@@ -98,6 +101,7 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
       Brainstorm: cell("gpt-5.6-terra", "medium"),
       Objective: cell("gpt-5.6-terra", "medium"),
       Spec: cell("gpt-5.6-sol", "high"),
+      Mockup: cell("gpt-5.6-terra", "medium"),
       Plan: cell("gpt-5.6-sol", "high"),
       Execute: cell("gpt-5.6-terra", "high"),
       Review: cell("gpt-5.6-sol", "high"),
@@ -107,6 +111,7 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
     {
       Audit: cell("opus", "high"),
       Spec: cell("opus", "high"),
+      Mockup: cell("sonnet", "medium"),
       Plan: cell("sonnet", "high"),
       Execute: cell("sonnet", "high"),
       Review: cell("opus", "high"),
@@ -114,6 +119,7 @@ export const BUILTIN_ORCHESTRATION_DEFAULTS: Record<OrchestrationFlow, FlowDefau
     {
       Audit: cell("gpt-5.6-sol", "high"),
       Spec: cell("gpt-5.6-sol", "high"),
+      Mockup: cell("gpt-5.6-terra", "medium"),
       Plan: cell("gpt-5.6-terra", "high"),
       Execute: cell("gpt-5.6-terra", "high"),
       Review: cell("gpt-5.6-sol", "high"),

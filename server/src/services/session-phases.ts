@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { promisify } from "node:util";
 import { PIPELINES, WORK_PHASES, type Flow } from "@hanoman/runner";
-import { PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, UNSKIPPABLE_PHASES, phaseAgentName, type Stage, type Agent } from "@hanoman/shared";
+import { OPTIONAL_PHASES, PLAN_DIRS, PHASE_EVIDENCE_GRACE_MS, UNSKIPPABLE_PHASES, phaseAgentName, type Stage, type Agent } from "@hanoman/shared";
 import { STAGES } from "./stage-machine";
 
 export type PhaseState = "done" | "skipped" | "active" | "pending";
@@ -77,11 +77,15 @@ async function recordedAsync(file: string): Promise<Map<string, PhaseState>> {
 }
 
 // Fase aktif diturunkan, tidak disimpan: yang pertama belum tercatat.
+// ADR-0233 · fase `OPTIONAL_PHASES` tanpa catatan dibaca `skipped` begitu fase SESUDAHNYA tercatat.
 const derivePhases = (seen: Map<string, PhaseState>, flow: Flow): Phase[] => {
+  const names = PIPELINES[flow];
   let activeTaken = false;
-  return PIPELINES[flow].map((name) => {
+  return names.map((name, i) => {
     const state = seen.get(name);
     if (state) return { name, state };
+    if (OPTIONAL_PHASES.has(name) && names.slice(i + 1).some((later) => seen.has(later)))
+      return { name, state: "skipped" as const };
     if (activeTaken) return { name, state: "pending" as const };
     activeTaken = true;
     return { name, state: "active" as const };
