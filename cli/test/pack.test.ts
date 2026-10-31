@@ -144,3 +144,17 @@ describe("ADR-0233 · skill bundel ikut terpaket", () => {
     expect(REQUIRED_ARTIFACTS).toContain("skills/codex-image/scripts/codex-image.sh");
   });
 });
+
+// Insiden 0.9.38 · `skills/` tersalin ke dist-npm dan lolos gerbang REQUIRED_ARTIFACTS (yang memeriksa
+// STAGING), tetapi tak ada di tarball karena whitelist `files` package.json tak menyebutnya — npm pack
+// membuangnya diam-diam. Penjaga ini menuntut setiap artefak lolos whitelist itu.
+describe("whitelist `files` paket memuat setiap artefak", () => {
+  const files = (packageJsonFor("0.0.0", {}) as { files: string[] }).files;
+  const passes = (p: string) => p === "package.json" || files.includes(p.split("/")[0]!);
+  it("setiap tujuan copyPlan lolos whitelist", () => {
+    for (const item of copyPlan("/repo")) expect(passes(item.to), item.to).toBe(true);
+  });
+  it("setiap REQUIRED_ARTIFACTS lolos whitelist", () => {
+    for (const a of REQUIRED_ARTIFACTS) expect(passes(a), a).toBe(true);
+  });
+});
