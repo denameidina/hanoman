@@ -59,7 +59,9 @@ export function packageJsonFor(version: string, deps: Record<string, string>): o
       prepublishOnly: "node dist/cli.js __verify",
     },
     engines: { node: ">=20" },
-    files: ["bin", "dist", "web", "prisma", "docs", "scripts", "README.md", "LICENSE"],
+    // Whitelist ini menang atas isi dist-npm: direktori yang tak disebut dibuang `npm pack` diam-diam
+    // (0.9.38 terbit tanpa `skills/`). Penjaganya di cli/test/pack.test.ts.
+    files: ["bin", "dist", "web", "prisma", "docs", "scripts", "skills", "README.md", "LICENSE"],
     dependencies: deps,
     // MIT: paket ini didistribusikan publik supaya orang `npm i -g`. `UNLICENSED` berarti "tak ada
     // izin pakai" — 0.1.0 terbit dengan kontradiksi itu, dan versi terbit tak bisa diperbaiki.
