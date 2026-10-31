@@ -228,7 +228,7 @@ export async function readMockup(spec: { id: string; projectId: string }, name: 
 
 ### Task 6: Komponen `ImageViewer` (zoom/pan/navigasi)
 
-- [ ] Operator bisa memperbesar, memperkecil, menggeser, dan berpindah antar-gambar dengan mudah.
+- [x] Operator bisa memperbesar, memperkecil, menggeser, dan berpindah antar-gambar dengan mudah.
 
 **Files:** `src/src/ds/ImageViewer.tsx` (baru), `src/src/ds/index.ts`, `src/src/ds/styles.css` atau token yang ada.
 **Test:** `src/test/image-viewer.test.tsx` (baru).

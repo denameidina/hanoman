@@ -31,6 +31,7 @@ export {
 export { usePopoverFocus } from "./popover";
 export type { ResponsivePanel, ResponsiveTier } from "./responsive";
 export { MarkdownView, hnDocHtml, isMarkdownPath } from "./markdown";
+export { ImageViewer, type ViewerImage } from "./ImageViewer";
 export { DocDownload } from "./DocDownload";
 export { DocPreviewModal } from "./DocPreviewModal";
 export { Mark, Wordmark, HN_MARKS } from "./marks";

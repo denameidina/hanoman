@@ -42,6 +42,7 @@ import {
   Cpu,
   Crosshair,
   Delete,
+  Diamond,
   Diff,
   Dot,
   Download,
@@ -120,6 +121,7 @@ import {
   PlugZap,
   Plus,
   Pointer,
+  Presentation,
   Radar,
   Radio,
   RefreshCw,
@@ -173,6 +175,8 @@ import {
   WifiOff,
   X,
   Zap,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -217,6 +221,7 @@ export const ICONS: Record<string, LucideIcon> = {
   Cpu,
   Crosshair,
   Delete,
+  Diamond,
   Diff,
   Dot,
   Download,
@@ -295,6 +300,7 @@ export const ICONS: Record<string, LucideIcon> = {
   PlugZap,
   Plus,
   Pointer,
+  Presentation,
   Radar,
   Radio,
   RefreshCw,
@@ -348,4 +354,6 @@ export const ICONS: Record<string, LucideIcon> = {
   WifiOff,
   X,
   Zap,
+  ZoomIn,
+  ZoomOut,
 };
