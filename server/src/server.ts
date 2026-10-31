@@ -14,6 +14,7 @@ import { installConsoleTap } from "./services/logs/console-tap";
 import { getSetting } from "./services/settings";
 import { detectOrphanWorktrees } from "./services/worktree-project";
 import { installCustomAgents } from "./services/custom-agents";
+import { seedBundledSkills } from "./services/bundled-skills";
 import { reconcileAgentInvocations } from "./services/agent-invocations";
 import { listSessions } from "./services/pty";
 import { installTelegramGateway } from "./services/telegram/bootstrap";
@@ -116,6 +117,11 @@ bootstrapReady.then(async () => {
   // pertama. Ditunggu (bukan fire-and-forget): sesi yang lahir sebelum cache terisi akan lahir
   // TANPA custom agent, dan itu gejala senyap — argv-nya sah, agennya cuma tak ada.
   await installCustomAgents();
+  // ADR-0233 · skill bundel paket (codex-image) masuk lapis global $HANOMAN_HOME/skills sebelum sesi
+  // pertama lahir, supaya penyuntikan skill-inject sudah melihatnya. Fail-open di dalam.
+  const skills = seedBundledSkills(home);
+  if (skills.seeded.length || skills.updated.length)
+    console.log(`skill bundel: di-seed ${skills.seeded.join(", ") || "-"} · diperbarui ${skills.updated.join(", ") || "-"}`);
   // Route HTTP juga dapat melahirkan sesi. Karena itu listen baru dibuka sesudah config dan
   // katalog siap; "sebelum scheduler tick" saja masih menyisakan race untuk request Start.
   return app.listen({ port, host });

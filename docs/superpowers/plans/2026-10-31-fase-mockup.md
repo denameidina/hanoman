@@ -134,7 +134,7 @@ export const mockupFollowUp: { Plan: string; Execute: string; Review: string };
 
 ### Task 3: Skill `codex-image` dibundel + seed saat boot
 
-- [ ] hanoman membawa dan memasang skill `codex-image` ke `$HANOMAN_HOME/skills`.
+- [x] hanoman membawa dan memasang skill `codex-image` ke `$HANOMAN_HOME/skills`.
 
 **Files:** `server/skills/codex-image/{SKILL.md,scripts/codex-image.sh,scripts/normalize-set.py,references/sprite-sheets.md}`
 (baru, salin dari `~/.claude/skills/codex-image/`), `server/src/services/bundled-skills.ts` (baru),
@@ -145,11 +145,11 @@ export const mockupFollowUp: { Plan: string; Execute: string; Review: string };
 
 ```ts
 // server/src/services/bundled-skills.ts
-export const BUNDLED_MARKER = ".hanoman-bundled.json"; // { version: string; sha: string }
+export const BUNDLED_MARKER = ".hanoman-bundled.json"; // { sha: string; seededAt: string }
 export function bundledSkillsDir(): string;             // pola scriptPath(): paket `skills/` → repo `server/skills/`
 export function bundledSkillNames(): string[];
 export function isBundledCopy(dir: string): boolean;    // marker ada (dipakai Task 4)
-export function seedBundledSkills(hanomanHome: string, log?: (m: string) => void):
+export function seedBundledSkills(hanomanHome: string, o?: { source?: string; log?: (m: string) => void }):
   { seeded: string[]; updated: string[]; kept: string[] };
 ```
 
@@ -160,7 +160,7 @@ export function seedBundledSkills(hanomanHome: string, log?: (m: string) => void
 - `sha` = sha256 atas daftar (path relatif + isi) berkas skill, urut, tanpa marker. Seed: belum ada → salin +
   marker; ada + marker + sha isi sekarang == sha marker + sha bundel berbeda → timpa; selain itu biarkan +
   log (AC-7). Fail-open: galat apa pun → log, server tetap boot.
-- `server.ts`: panggil `seedBundledSkills(resolveHome(), app.log.warn)` di sebelah `installCustomAgents()`.
+- `server.ts`: panggil `seedBundledSkills(home)` sesudah `installCustomAgents()`, sebelum `listen`.
 - `copyPlan`: `{ from: join(repo, "server/skills"), to: "skills", dir: true }`.
 - Test (dir sementara sebagai home & bundel tiruan): salin awal + marker; update bila belum diubah; tak
   menimpa bila diubah; tak menimpa tanpa marker; sumber hilang → hasil kosong tanpa throw. `pack.test`:

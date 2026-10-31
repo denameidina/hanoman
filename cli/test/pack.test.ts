@@ -131,3 +131,16 @@ describe("SPEC-883 · skrip VPS ikut terpaket", () => {
     }
   });
 });
+
+// ADR-0233 · skill bundel dibaca runtime oleh bundledSkillsDir() (<pkg>/skills), lalu di-seed ke
+// $HANOMAN_HOME/skills. Tanpa entri ini instalasi npm tak pernah punya skill codex-image.
+describe("ADR-0233 · skill bundel ikut terpaket", () => {
+  it("copyPlan menyalin server/skills ke skills/", () => {
+    const item = copyPlan("/repo").find((i) => i.to === "skills");
+    expect(item).toEqual({ from: "/repo/server/skills", to: "skills", dir: true });
+  });
+  it("SKILL.md dan skrip codex-image wajib ada di artefak", () => {
+    expect(REQUIRED_ARTIFACTS).toContain("skills/codex-image/SKILL.md");
+    expect(REQUIRED_ARTIFACTS).toContain("skills/codex-image/scripts/codex-image.sh");
+  });
+});

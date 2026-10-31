@@ -32,6 +32,9 @@ export const REQUIRED_ARTIFACTS = [
   // ENOENT. Gerbang ini yang membuat kegagalan itu tak bisa terbit lagi.
   "scripts/vps/audit.sh", "scripts/vps/harden.sh",
   "scripts/vps/remediate.sh", "scripts/vps/provision.sh",
+  // ADR-0233 · skill bundel di-seed ke $HANOMAN_HOME/skills oleh bundledSkillsDir() — tanpa berkas ini
+  // fase Mockup di runtime non-codex kehilangan skill-nya di setiap instalasi npm.
+  "skills/codex-image/SKILL.md", "skills/codex-image/scripts/codex-image.sh",
 ] as const;
 
 export function packageJsonFor(version: string, deps: Record<string, string>): object {
@@ -90,6 +93,8 @@ export function copyPlan(repo: string): Array<{ from: string; to: string; dir?: 
     { from: join(repo, "docs/agent-integration.md"), to: "docs/agent-integration.md" },
     // SPEC-883 · skrip VPS (audit/harden/remediate/provision) dibaca runtime lewat scriptPath().
     { from: join(repo, "server/scripts/vps"), to: "scripts/vps", dir: true },
+    // ADR-0233 · skill bundel (codex-image), dibaca runtime lewat bundledSkillsDir().
+    { from: join(repo, "server/skills"), to: "skills", dir: true },
     { from: join(repo, "LICENSE"), to: "LICENSE" },
   ];
 }
