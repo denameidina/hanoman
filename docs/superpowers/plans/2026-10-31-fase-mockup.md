@@ -168,7 +168,7 @@ export function seedBundledSkills(hanomanHome: string, o?: { source?: string; lo
 
 ### Task 4: Suntik "bila belum punya" + catatan doctor
 
-- [ ] Skill bundel tak menggandakan skill bernama sama yang sudah dimiliki runtime.
+- [x] Skill bundel tak menggandakan skill bernama sama yang sudah dimiliki runtime.
 
 **Files:** `server/src/services/skill-inject.ts:52`, `cli/src/commands/doctor.ts`.
 **Test:** `server/test/skill-inject.test.ts`, test doctor yang ada (`cli/test/`, cari `doctor`).
