@@ -25,6 +25,7 @@ import {
 } from "./backlog-worktree";
 import { SpecDocsModal } from "./SpecDocsModal";
 import { SpecAttachmentsPanel, type AttachmentToast } from "./SpecAttachments";
+import { MockupGallery } from "./MockupGallery";
 import { IntegrateDialog } from "./IntegrateDialog";
 import { SyncButton } from "./SyncButton";
 import { branchOptions } from "./branch";
@@ -509,6 +510,8 @@ function SpecDetail({ spec, onClose, onEditBranch, onRevertStage, onMarkDone, on
           {/* SPEC-843 · ADR-0124 · lampiran boleh ditambah/dihapus KAPAN SAJA, termasuk selagi sesi
               berjalan — server memateralisasi ulang dan fase berikutnya membacanya. */}
           <SpecAttachmentsPanel specId={spec.id} onToast={onAttachmentToast ?? (() => {})} />
+          {/* ADR-0233 · mockup hasil fase Mockup; tak dirender bila belum ada. */}
+          <MockupGallery specId={spec.id} variant="section" />
         </section>
 
         {/* 4 · Lanjutan: terlipat, karena tak dibutuhkan setiap kali item dibuka. */}

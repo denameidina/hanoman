@@ -6,6 +6,7 @@
    State gerak hidup di ref dan ditulis langsung ke style (dikoalesir rAF untuk pointer/roda), jadi
    menggeser tidak me-render ulang React; yang ikut state hanya label persen zoom. */
 import React from "react";
+import { createPortal } from "react-dom";
 import { Modal } from "./kit";
 import { Icon } from "./icon";
 import { IconButton } from "./components/forms";
@@ -149,7 +150,9 @@ export function ImageViewer({ images, index, onIndex, onClose, title = "Mockup" 
   };
 
   if (!img) return null;
-  return (
+  // Portal ke body: viewer dibuka dari permukaan yang bisa ber-`transform` (panel pet, sel terminal), dan
+  // ancestor ber-transform menjadikan overlay `position: fixed` terkurung di dalamnya.
+  return createPortal(
     <Modal open title={title} eyebrow={`${index + 1} / ${images.length} · ${img.name}`} icon="image"
       onClose={onClose} width={1280} fillHeight>
       <div className="hn-viewer" data-testid="image-viewer">
@@ -191,6 +194,7 @@ export function ImageViewer({ images, index, onIndex, onClose, title = "Mockup" 
           </div>
         )}
       </div>
-    </Modal>
+    </Modal>,
+    document.body,
   );
 }

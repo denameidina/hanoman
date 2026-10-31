@@ -83,3 +83,13 @@ describe("SPEC-843 · UI lampiran backlog", () => {
     expect(onChange).toHaveBeenCalledWith([]);
   });
 });
+
+// ADR-0233 · thumbnail gambar lampiran membuka viewer zoom yang sama dengan mockup.
+describe("lampiran gambar · viewer zoom (ADR-0233)", () => {
+  it("klik thumbnail membuka ImageViewer berisi lampiran gambar saja", async () => {
+    render(<SpecAttachmentsPanel specId="SPEC-1" onToast={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Lihat layar.png" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("1 / 1 · layar.png")).toBeTruthy();
+  });
+});

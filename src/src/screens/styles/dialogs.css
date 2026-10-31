@@ -73,3 +73,27 @@
 .hn-att-name { flex: 1; color: var(--text-strong); word-break: break-all; }
 .hn-att-meta { color: var(--text-subtle); font-size: 12px; white-space: nowrap; }
 .hn-att-link { display: inline-flex; color: var(--text-muted); }
+
+/* ADR-0233 · galeri mockup (detail backlog, dialog tanya sesi) + tombol thumbnail lampiran. */
+.hn-mockup-section { margin-bottom: 14px; }
+.hn-mockup-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.hn-mockup-thumb {
+  display: flex; flex-direction: column; gap: 6px; padding: 6px; text-align: left; cursor: zoom-in;
+  border: 1px solid var(--border-hair); border-radius: var(--radius-sm); background: var(--surface-card);
+}
+.hn-mockup-thumb:hover { border-color: var(--accent); }
+.hn-mockup-thumb:focus-visible, .hn-mockup-open:focus-visible, .hn-att-zoom:focus-visible {
+  outline: 2px solid var(--border-focus); outline-offset: 2px;
+}
+.hn-mockup-thumb img {
+  width: 100%; aspect-ratio: 3 / 2; object-fit: cover; border-radius: var(--radius-xs); display: block;
+  background: var(--surface-sunken);
+}
+.hn-mockup-name { font-size: 12px; color: var(--text-muted); word-break: break-all; }
+.hn-mockup-open {
+  display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; margin-top: 8px; cursor: zoom-in;
+  border: 1px solid var(--accent); border-radius: var(--radius-sm); background: var(--accent-tint);
+  color: var(--text-strong); font-size: 13px; font-weight: 600;
+}
+.hn-mockup-error { font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px; }
+.hn-att-zoom { padding: 0; border: none; background: none; cursor: zoom-in; flex-shrink: 0; border-radius: var(--radius-xs); }

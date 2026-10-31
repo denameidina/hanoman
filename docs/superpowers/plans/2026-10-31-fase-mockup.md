@@ -255,7 +255,7 @@ export function ImageViewer(props: {
 
 ### Task 7: Galeri mockup + tiga titik masuk + thumbnail lampiran
 
-- [ ] Mockup bisa dibuka dari dialog tanya sesi, chip fase Mockup, dan detail backlog.
+- [x] Mockup bisa dibuka dari dialog tanya sesi, chip fase Mockup, dan detail backlog.
 
 **Files:** `src/src/screens/MockupGallery.tsx` (baru), `src/src/api/client.ts:287`, `src/src/screens/PetAnswer.tsx`,
 `src/src/screens/HanomanPet.tsx:622,632`, `src/src/screens/TerminalScreen.tsx:1271,1493,1695`,

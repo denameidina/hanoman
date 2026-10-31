@@ -2,7 +2,7 @@
    BUAT (berkas belum punya specId, jadi ditahan di memori sampai item lahir) dan
    `SpecAttachmentsPanel` untuk detail item yang sudah ada. Keduanya berbagi tampilan kartu. */
 import React from "react";
-import { Button, Icon, IconButton, useConfirm } from "../ds";
+import { Button, Icon, IconButton, ImageViewer, useConfirm, type ViewerImage } from "../ds";
 import { paths, type SpecAttachmentView } from "@hanoman/shared";
 import { api } from "../api/client";
 import { failureMessage } from "../lib/report-error";
@@ -86,6 +86,7 @@ export type AttachmentToast = (msg: string, tone?: "ok" | "warn" | "err") => voi
 export function SpecAttachmentsPanel({ specId, onToast }: { specId: string; onToast: AttachmentToast }) {
   const [items, setItems] = React.useState<SpecAttachmentView[]>([]);
   const [busy, setBusy] = React.useState(false);
+  const [viewing, setViewing] = React.useState<number | null>(null);
   const { confirm, dialog } = useConfirm();
 
   // Dua penjagaan, dua sebab berbeda — keduanya kelas "detail backlog roboh seluruhnya":
@@ -131,6 +132,9 @@ export function SpecAttachmentsPanel({ specId, onToast }: { specId: string; onTo
     } catch (e) { onToast(failureMessage("menghapus lampiran", e), "err"); }
   }
 
+  // ADR-0233 · thumbnail gambar membuka viewer zoom yang sama dengan mockup, berisi semua lampiran gambar.
+  const images: ViewerImage[] = items.filter((a) => isImage(a.mimeType))
+    .map((a) => ({ src: paths.specAttachment(specId, a.id), name: a.filename }));
   return (
     <div className="hn-att-panel">
       <div className="hn-eyebrow hn-att-eyebrow">Lampiran</div>
@@ -140,7 +144,10 @@ export function SpecAttachmentsPanel({ specId, onToast }: { specId: string; onTo
             {items.map((a) => (
               <div key={a.id} className="hn-att-card">
                 {isImage(a.mimeType)
-                  ? <img src={paths.specAttachment(specId, a.id)} alt={a.filename} className="hn-att-thumb" />
+                  ? <button type="button" className="hn-att-zoom" aria-label={`Lihat ${a.filename}`}
+                      onClick={() => setViewing(images.findIndex((img) => img.src === paths.specAttachment(specId, a.id)))}>
+                      <img src={paths.specAttachment(specId, a.id)} alt={a.filename} className="hn-att-thumb" />
+                    </button>
                   : <Icon name={iconFor(a.mimeType)} size={16} />}
                 <span className="hn-att-name">{a.filename}</span>
                 <span className="hn-att-meta">{humanSize(a.size)}</span>
@@ -157,6 +164,10 @@ export function SpecAttachmentsPanel({ specId, onToast }: { specId: string; onTo
         )}
       </Dropzone>
       {dialog}
+      {viewing !== null && viewing >= 0 && (
+        <ImageViewer images={images} index={viewing} onIndex={setViewing} onClose={() => setViewing(null)}
+          title="Lampiran" />
+      )}
     </div>
   );
 }

@@ -619,7 +619,7 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
                     sedang beranimasi keluar masih ter-mount, dan kotak yang lahir di sana akan
                     memanggil endpoint dialog untuk panel yang justru sedang ditutup. */}
                 {c.kind === "waiting" && open && waiting.map((s) => (
-                  <PetAnswer key={s.id} sessionId={s.id} label={s.specId ?? s.id} reduced={reduced}
+                  <PetAnswer key={s.id} sessionId={s.id} specId={s.specId} label={s.specId ?? s.id} reduced={reduced}
                     ask={asks.find((a) => a.sessionId === s.id)} />
                 ))}
                 {/* SPEC-909 · ADR-0146 · kotak yang sama untuk sesi yang sedang diputuskan lead,
@@ -629,7 +629,7 @@ export function HanomanPet({ sessions, backlog, asks = [], onOpen }:
                 {c.kind === "deciding" && open && deciding.map((s) => {
                   const ask = asks.find((a) => a.sessionId === s.id);
                   return ask
-                    ? <PetAnswer key={s.id} sessionId={s.id} label={s.specId ?? s.id}
+                    ? <PetAnswer key={s.id} sessionId={s.id} specId={s.specId} label={s.specId ?? s.id}
                         reduced={reduced} ask={ask} />
                     : null;
                 })}
