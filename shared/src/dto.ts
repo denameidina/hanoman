@@ -1009,6 +1009,14 @@ export const zSpecAttachmentView = z.object({
   size: z.number().int(), createdAt: z.string(),
 });
 export type SpecAttachmentView = z.infer<typeof zSpecAttachmentView>;
+// ADR-0233 · mockup UI backlog di `docs/mockups/<spec-id>/` (worktree sesi, jatuh ke checkout project).
+// `dir` = path absolut di mesin server, untuk agen lokal yang membaca gambarnya langsung.
+export const zMockupItem = z.object({ name: z.string(), size: z.number().int(), modifiedAt: z.string() });
+export type MockupItem = z.infer<typeof zMockupItem>;
+export const zSpecMockups = z.object({
+  source: z.enum(["worktree", "repo"]).nullable(), dir: z.string().nullable(), items: z.array(zMockupItem),
+});
+export type SpecMockups = z.infer<typeof zSpecMockups>;
 export const zTicketDetail = zTicketView.extend({
   detail: z.string(),
   attachments: z.array(zTicketAttachmentView),

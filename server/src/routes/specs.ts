@@ -34,6 +34,7 @@ import {
 } from "../services/spec-attachment";
 import { dropSpecAttachmentsDir, syncSpecAttachmentsDir } from "../services/spec-attachment-dir";
 import { readUpload } from "../services/uploads";
+import { listMockups, readMockup } from "../services/spec-mockups";
 import { branchFromCandidates } from "../services/branches";
 import { STAGES } from "../services/stage-machine";
 import { artifactsToRemove } from "../services/stage-artifacts";
@@ -467,6 +468,28 @@ export default async function (app: FastifyInstance) {
     // fase berikutnya, jadi lampiran yang datang di tengah sesi tetap sampai (ADR-0124 §3).
     await syncSpecAttachmentsDir(spec.id, spec.projectId);
     return reply.code(201).send(result);
+  });
+
+  // ADR-0233 · mockup UI backlog. Capability jatuh dari prefix `specs` seperti lampiran (GET → backlog:read).
+  app.get("/specs/:id/mockups", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const spec = await prisma.spec.findUnique({ where: { id }, select: { id: true, projectId: true } });
+    if (!spec) return reply.code(404).send({ error: "not found" });
+    return listMockups(spec);
+  });
+
+  app.get("/specs/:id/mockups/:name", async (req, reply) => {
+    const { id, name } = req.params as { id: string; name: string };
+    const spec = await prisma.spec.findUnique({ where: { id }, select: { id: true, projectId: true } });
+    const file = spec ? await readMockup(spec, name) : null;
+    if (!file) return reply.code(404).send({ error: "not found" });
+    reply.header("content-type", file.mime);
+    reply.header("content-disposition", `inline; filename="${name}"`);
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("content-security-policy", "sandbox; default-src 'none'");
+    // Revisi mockup menimpa nama yang sama — browser wajib bertanya ulang.
+    reply.header("cache-control", "no-cache");
+    return reply.send(file.buf);
   });
 
   app.get("/specs/:id/attachments/:attId", async (req, reply) => {

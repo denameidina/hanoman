@@ -302,6 +302,8 @@ Tool MCP-nya (semua tulis bermode `danger`, hanya tampil dengan `--danger`):
 | `GET /api/specs/:id/attachments` | `backlog:read` | lampiran backlog item — gambar & dokumen yang dilampirkan manusia sebagai konteks kerja. |
 | `POST /api/specs/:id/attachments` | `backlog:write` | unggah lampiran (`multipart/form-data`, beberapa berkas per request). Berkas yang ditolak **tak** menggagalkan yang lain — periksa `rejected[]`. |
 | `GET /api/specs/:id/attachments/:attId` | `backlog:read` | byte satu lampiran. |
+| `GET /api/specs/:id/mockups` | `backlog:read` | mockup UI hasil fase Mockup (`docs/mockups/<spec-id>/`, ADR-0233): `{ source: "worktree"\|"repo"\|null, dir, items:[{name,size,modifiedAt}] }`. `dir` adalah path di mesin server. Tool: `hanoman_backlog_mockups_list`. |
+| `GET /api/specs/:id/mockups/:name` | `backlog:read` | byte satu gambar mockup (`inline`, `nosniff`). Tool: `hanoman_backlog_mockup_download`. |
 | `DELETE /api/specs/:id/attachments/:attId` | `backlog:write` | hapus satu lampiran. |
 | `GET /api/specs/:id/docs` | `backlog:read` | dokumen yang ditulis sesi item itu. |
 | `GET /api/specs/:id/review` | `backlog:read` | diff hasil kerja sesi. Bila belum ada worktree maupun commit: **200** dengan `empty: true` dan `reason` — `no-worktree` (belum pernah dimulai) atau `no-commit` (worktree sudah lenyap tanpa commit); `base`, `files`, dan `changed` kosong. Itu keadaan, bukan galat (ADR-0213). Sesi memakai pola yang sama (ADR-0215). |
@@ -662,6 +664,7 @@ Tool MCP berbicara JSON teks, jadi **byte tak pernah lewat model**. Satu mekanis
 | Tool | Mode | Capability |
 |---|---|---|
 | `hanoman_backlog_attachment_upload`, `hanoman_backlog_attachment_download` | tulis | `backlog:write` / `backlog:read` |
+| `hanoman_backlog_mockup_download` (gambar mockup fase Mockup, ADR-0233) | tulis | `backlog:read` |
 | `hanoman_ticket_attachment_download` | tulis | `support:read` |
 | `hanoman_qa_attachment_upload`, `hanoman_qa_import`, `hanoman_qa_cases_import` | tulis | `qa:write` |
 | `hanoman_qa_attachment_download`, `hanoman_qa_template_xlsx`, `hanoman_qa_report_export_file` | tulis | `qa:read` |

@@ -78,6 +78,23 @@ export const TRANSFER_TOOLS: readonly McpToolDef[] = [
     shape: (raw) => raw,
   },
 
+  // ADR-0233 · mockup UI backlog (`docs/mockups/<spec-id>/`), biner → transfer tool (preseden ADR-0183).
+  {
+    name: "hanoman_backlog_mockup_download",
+    title: "Unduh mockup backlog",
+    description: `Mengunduh SATU gambar mockup UI backlog item ke disk lokal klien MCP. Nama berkas dari hanoman_backlog_mockups_list. ${DOWNLOAD_RESULT}`,
+    inputSchema: obj({
+      properties: { spec: SPEC, name: str("Nama berkas mockup, mis. `01-backlog-detail.png`."), savePath: SAVE_PATH, overwrite: OVERWRITE },
+      required: ["spec", "name"],
+    }),
+    mode: "write", capability: "backlog:read", samplePath: "/specs/SPEC-1/mockups/01-x.png", sampleMethod: "GET",
+    build: (a) => ({
+      method: "GET", path: `/specs/${enc(String(a.spec))}/mockups/${enc(String(a.name))}`,
+      download: dlFile(a, String(a.name ?? "mockup.png")),
+    }),
+    shape: (raw) => raw,
+  },
+
   // ───────────────────────── lampiran tiket ─────────────────────────
   {
     name: "hanoman_ticket_attachment_download",

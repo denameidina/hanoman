@@ -260,6 +260,18 @@ const LIFECYCLE_AND_MORE: readonly McpToolDef[] = [
     build: (a) => ({ method: "GET", path: `/specs/${enc(String(a.spec))}/attachments` }),
     shape: (raw) => raw,
   },
+  // ADR-0233 · mockup UI hasil fase Mockup, dibaca dari worktree sesi atau checkout project.
+  {
+    name: "hanoman_backlog_mockups_list",
+    title: "Daftar mockup backlog",
+    description:
+      "Daftar gambar mockup UI sebuah backlog item (hasil fase Mockup, `docs/mockups/<spec-id>/`): `source` (`worktree` sesi atau `repo` checkout project, null bila belum ada), `dir` (path absolut folder di MESIN SERVER hanoman — baca langsung bila kamu di mesin yang sama), dan `items` {name, size, modifiedAt}. Unduh satu gambar ke disk klien dengan hanoman_backlog_mockup_download.",
+    inputSchema: obj({ properties: { spec: str(ID_HINT) }, required: ["spec"] }),
+    mode: "read", capability: "backlog:read",
+    samplePath: "/specs/SPEC-1/mockups", sampleMethod: "GET",
+    build: (a) => ({ method: "GET", path: `/specs/${enc(String(a.spec))}/mockups` }),
+    shape: (raw) => raw,
+  },
   {
     name: "hanoman_backlog_attachment_delete",
     title: "Hapus lampiran backlog",

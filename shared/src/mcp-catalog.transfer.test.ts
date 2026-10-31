@@ -11,10 +11,12 @@ const tool = (name: string) => {
 
 // ADR-0183 · katalog tool untuk route multipart/biner + hapus QA.
 describe("katalog MCP · transfer berkas", () => {
-  it("delapan belas tool terdaftar dengan mode & capability yang dijanjikan", () => {
+  it("sembilan belas tool terdaftar dengan mode & capability yang dijanjikan", () => {
     expect(TRANSFER_TOOLS.map((t) => [t.name, t.mode, t.capability])).toEqual([
       ["hanoman_backlog_attachment_upload", "write", "backlog:write"],
       ["hanoman_backlog_attachment_download", "write", "backlog:read"],
+      // ADR-0233 · gambar mockup backlog.
+      ["hanoman_backlog_mockup_download", "write", "backlog:read"],
       ["hanoman_ticket_attachment_download", "write", "support:read"],
       ["hanoman_qa_attachment_upload", "write", "qa:write"],
       ["hanoman_qa_attachment_download", "write", "qa:read"],

@@ -185,7 +185,7 @@ export function seedBundledSkills(hanomanHome: string, o?: { source?: string; lo
 
 ### Task 5: Rute mockup + keputusan MCP + kontrak
 
-- [ ] Dashboard dan agen bisa mendaftar & mengambil gambar mockup backlog.
+- [x] Dashboard dan agen bisa mendaftar & mengambil gambar mockup backlog.
 
 **Files:** `server/src/services/spec-mockups.ts` (baru), `server/src/routes/specs.ts` (dekat `:435`),
 `shared/src/dto.ts`, `shared/src/api.ts:40`, `shared/src/mcp-catalog/backlog.ts`, `shared/src/mcp-catalog/transfer.ts`,
