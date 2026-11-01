@@ -52,6 +52,8 @@ export type TerminalSession = {
   model?: string; effort?: string; orchestrated?: boolean;
   /** Nama kustom hasil rename operator; absen = label turunan (project · spec · judul). */
   name?: string;
+  /** ADR-0234 · akun runtime sesi; absen = akun bawaan. */
+  accountId?: string;
 };
 // SPEC-167 · respons dry-run PATCH /specs/:id saat revert akan menghapus artefak.
 export type RevertPending = { pending: true; stage: string; wouldDelete: string[] };
@@ -82,6 +84,7 @@ export type IdeUploadResult = {
 };
 // SPEC-908 · satu definisi di @hanoman/shared; dulu kembar dengan server/src/services/git-ide.ts.
 import type { GraphCommit, RepoStatus, Stash } from "@hanoman/shared";
+import type { AccountLimitsDTO, RuntimeAccountDTO, RuntimeAccountsListDTO } from "@hanoman/shared";
 import type {
   CreateQaCase, CreateQaFinding, CreateQaReport, PatchQaCase, PatchQaFinding, PatchQaReport,
   QaAttachmentView, QaBacklogResult, QaCasesImportResult, QaExportFormat, QaImportResult, QaOwnerType, QaReportDetail, QaReportView,
@@ -374,6 +377,19 @@ export function createApi(o: { base?: string } = {}) {
   markNotificationRead: (id: string) => j<void>(paths.notificationRead(id), { method: "POST" }),
   clearNotifications: () => j<void>(paths.notifications, { method: "DELETE" }),
   getLimits: () => j<LimitsDTO>(paths.limits),
+  // ADR-0234 · akun runtime & limit per akun.
+  getAccountLimits: () => j<AccountLimitsDTO[]>(paths.limitsAccounts),
+  listRuntimeAccounts: () => j<RuntimeAccountsListDTO>(paths.runtimeAccounts),
+  createRuntimeAccount: (b: { runtime: Agent; label: string }) =>
+    j<RuntimeAccountDTO>(paths.runtimeAccounts, { method: "POST", ...body(b) }),
+  renameRuntimeAccount: (id: string, label: string) =>
+    j<RuntimeAccountDTO>(paths.runtimeAccount(id), { method: "PATCH", ...body({ label }) }),
+  deleteRuntimeAccount: (id: string) => j<void>(paths.runtimeAccount(id), { method: "DELETE" }),
+  setDefaultRuntimeAccount: (runtime: Agent, accountId: string) =>
+    j<RuntimeAccountsListDTO>(paths.runtimeAccountsDefault, { method: "PUT", ...body({ runtime, accountId }) }),
+  loginRuntimeAccount: (id: string, opts?: { deviceAuth?: boolean }) =>
+    j<{ id: string }>(paths.runtimeAccountLogin(id), { method: "POST", ...body(opts ?? {}) }),
+  checkRuntimeAccount: (id: string) => j<RuntimeAccountDTO>(paths.runtimeAccountCheck(id), { method: "POST", ...body({}) }),
   getDocs: (id: string) => j<{ coverage: number; tree: any[] }>(paths.docs(id)),
   getDoc: (id: string, path: string) => j<{ path: string; content: string }>(paths.docFile(id, path)),
   getSpecDocs: (id: string) => j<{ files: SpecDoc[] }>(paths.specDocs(id)),
@@ -492,7 +508,7 @@ export function createApi(o: { base?: string } = {}) {
   // SPEC-517 · runtime PER SESI untuk terminal agen biasa (opsional; kosong → default global di
   // server). Tanpa `opts`, body byte-identik dengan sebelum SPEC-517.
   // ADR-0232 · `worktree`/`branchFrom` opsional: sesi lahir di worktree terpisah dari branch pilihan.
-  createTerminal: (project: string, opts?: { agent?: Agent; model?: string; effort?: string; worktree?: boolean; branchFrom?: string }) =>
+  createTerminal: (project: string, opts?: { agent?: Agent; account?: string; model?: string; effort?: string; worktree?: boolean; branchFrom?: string }) =>
     j<{ id: string }>(paths.terminalSessions, { method: "POST", ...body({ project, ...(opts ?? {}) }) }),
   // SPEC-236 · terminal biasa non-claude: shell mentah di repoDir project (tanpa flow).
   // SPEC-739 · ADR-0114 · `install` opsional membuat pane menjalankan perintah pemasangan metode
@@ -506,6 +522,7 @@ export function createApi(o: { base?: string } = {}) {
   // SPEC-332 · ADR-0073 · mode goal per sesi (opsional; kosong → default global di server).
   startSession: (b: { spec: string; flow: Flow; model?: string; effort?: string; phaseOverrides?: PhaseOverrides; goal?: boolean; goalCondition?: string;
     agent?: Agent;                    // SPEC-338 · ADR-0074 · mesin sesi; kosong → Setting.agent
+    account?: string;                 // ADR-0234 · akun runtime; kosong → default runtime
     verifyScope?: VerifyScope;        // SPEC-376 · ADR-0080 · scope verifikasi; kosong → Setting.verifyScope
     method?: string;                  // SPEC-734 · ADR-0113 · metode workflow; kosong → payload → Setting.method
     force?: boolean }) =>             // ADR-0093/0161 · lewati dependency + admission (jalur manusia)

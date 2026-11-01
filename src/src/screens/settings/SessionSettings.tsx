@@ -21,6 +21,7 @@ import {
 } from "./model";
 import { AntigravityVersionNote, AgentGroupHeader, CodexVersionNote } from "./fields";
 import { Prose, SectionNote, SettingRow } from "./rows";
+import { RuntimeAccounts } from "./RuntimeAccounts";
 import type { SettingsStore } from "./useSettingsStore";
 import { useSettingField } from "./useSettingField";
 
@@ -277,6 +278,9 @@ export function SessionSettings({ s, store, onToast, codexVer }: {
           Sesi baru memakai <b>{AGENT_LABEL[inherited.agent]}</b> · <code>{inherited.model}</code> · <code>{inherited.effort}</code>.
         </div>
       </Card>
+
+      {/* ADR-0234 · akun langganan per runtime (default + login). */}
+      <RuntimeAccounts onToast={onToast} />
 
       <Card eyebrow="goal" title="Mode goal — sesi backlog" data-setting-card data-search="mode goal kondisi template gate stop">
         {agent === "antigravity" && <Prose>Mode goal native Antigravity belum didukung. Nilai global tetap disimpan; matikan mode goal secara eksplisit atau pilih runtime lain sebelum memulai sesi.</Prose>}

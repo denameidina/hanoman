@@ -2502,7 +2502,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `useAccountLimits(): AccountLimitsDTO[]`, `loadAccountLimits(): Promise<AccountLimitsDTO[]>` (tak pernah melempar), `_resetAccountLimitsStore()`
   - `<RuntimeAccounts onToast? />`
 
-- [ ] **Step 1: Klien API**
+- [x] **Step 1: Klien API**
 
 Di `src/src/api/client.ts` (impor tipe `RuntimeAccountDTO, RuntimeAccountsListDTO, AccountLimitsDTO` dari `@hanoman/shared`), di objek `createApi`, sesudah `getLimits: …`:
 
@@ -2524,7 +2524,7 @@ Di `src/src/api/client.ts` (impor tipe `RuntimeAccountDTO, RuntimeAccountsListDT
 
 `createTerminal` opts: tambahkan `account?: string` ke tipe. `startSession` body: tambahkan `account?: string` ke tipe parameternya.
 
-- [ ] **Step 2: Store limit akun**
+- [x] **Step 2: Store limit akun**
 
 Create `src/src/api/account-limits.ts`:
 
@@ -2568,7 +2568,7 @@ export async function loadAccountLimits(): Promise<AccountLimitsDTO[]> {
 export function _resetAccountLimitsStore(): void { state = []; }
 ```
 
-- [ ] **Step 3: Tulis test panel yang gagal**
+- [x] **Step 3: Tulis test panel yang gagal**
 
 Create `src/src/screens/settings/RuntimeAccounts.test.tsx`:
 
@@ -2652,7 +2652,7 @@ describe("RuntimeAccounts", () => {
 Run: WEB `src/src/screens/settings/RuntimeAccounts.test.tsx`
 Expected: FAIL — komponen tak ada.
 
-- [ ] **Step 4: Komponen panel**
+- [x] **Step 4: Komponen panel**
 
 Create `src/src/screens/settings/RuntimeAccounts.tsx`:
 
@@ -2847,7 +2847,7 @@ Create `src/src/screens/styles/accounts.css`:
 }
 ```
 
-- [ ] **Step 5: Pasang di SessionSettings**
+- [x] **Step 5: Pasang di SessionSettings**
 
 Di `src/src/screens/settings/SessionSettings.tsx`: impor `import { RuntimeAccounts } from "./RuntimeAccounts";` dan render `<RuntimeAccounts onToast={onToast} />` tepat sesudah `</Card>` milik kartu `"Agen & model — default global"` (sebelum `<Card eyebrow="goal" …>`). Sesuaikan tipe `onToast` bila signature di SessionSettings berbeda (lihat pemakaian `onToast?.(…, "ok", "terminal")` di `installMethod`).
 
@@ -2858,13 +2858,13 @@ Cari test yang me-mock `api` lalu merender `SessionSettings`/`SettingsScreen` (`
     checkRuntimeAccount: vi.fn(),
 ```
 
-- [ ] **Step 6: Jalankan test**
+- [x] **Step 6: Jalankan test**
 
 Run: WEB `src/src/screens/settings/RuntimeAccounts.test.tsx` dan berkas test Settings yang ditambal.
 Expected: PASS (kecuali `src/test/settings-search.test.tsx` yang gagal juga di baseline).
 Run: `pnpm --filter ./src typecheck`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 /usr/bin/git add src/src/api/client.ts src/src/api/account-limits.ts src/src/screens/settings/RuntimeAccounts.tsx \

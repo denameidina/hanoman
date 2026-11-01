@@ -1,0 +1,21 @@
+/* ADR-0234 · panel akun runtime (Settings). Token DS saja: bone paper, brass accent. */
+.hn-acct-group { margin-top: 16px; }
+.hn-acct-group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hn-acct-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.hn-acct-row {
+  display: grid; grid-template-columns: minmax(120px, 1.2fr) minmax(120px, 1.5fr) auto auto auto;
+  align-items: center; gap: 12px; padding: 8px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle, var(--bone-200));
+}
+.hn-acct-row[data-status="perlu-login-ulang"] .hn-acct-status { color: var(--brass-700); }
+.hn-acct-row[data-status="belum-login"] .hn-acct-status { color: var(--text-muted); }
+.hn-acct-pick { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.hn-acct-label { font-weight: 600; color: var(--text-strong); }
+.hn-acct-identity, .hn-acct-lim { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.hn-acct-actions { display: flex; gap: 4px; justify-content: flex-end; }
+.hn-acct-note { grid-column: 1 / -1; color: var(--brass-700); font-size: 0.9em; }
+.hn-acct-hint { margin-top: 8px; color: var(--text-muted); }
+@media (max-width: 640px) {
+  .hn-acct-row { grid-template-columns: 1fr auto; }
+  .hn-acct-identity, .hn-acct-lim, .hn-acct-status { grid-column: 1 / -1; }
+}
