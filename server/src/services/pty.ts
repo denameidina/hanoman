@@ -278,7 +278,8 @@ const claudeBin = () => effectiveStr("HANOMAN_CLAUDE_BIN") ?? "claude";
 export const shellBin = (): string => effectiveStr("HANOMAN_SHELL") ?? process.env.SHELL ?? "/bin/bash";
 // SPEC-338 · ADR-0074 · cermin HANOMAN_CLAUDE_BIN untuk Codex CLI.
 const codexBin = () => effectiveStr("HANOMAN_CODEX_BIN") ?? "codex";
-const agentBin = (agent: Agent): string => {
+// ADR-0234 · diekspor: perintah login & probe status akun memakai biner yang sama dengan sesi.
+export const agentBin = (agent: Agent): string => {
   if (agent === "antigravity") return antigravityBin();
   return agent === "codex" ? codexBin() : claudeBin();
 };

@@ -762,7 +762,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `nextStatus(loggedIn: boolean, everLoggedIn: boolean): RuntimeAccountStatus`
   - `pty.ts`: `export const agentBin(agent: Agent): string`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/runtime-accounts-identity.test.ts`:
 
@@ -854,12 +854,12 @@ describe("nextStatus", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: SRV `server/test/runtime-accounts-identity.test.ts`
 Expected: FAIL — modul tak ada.
 
-- [ ] **Step 3: Implementasi `keychain.ts`**
+- [x] **Step 3: Implementasi `keychain.ts`**
 
 Create `server/src/services/runtime-accounts/keychain.ts` (rumus service disesuaikan bila spike Task 0 Step 2 menemukan bentuk lain):
 
@@ -910,7 +910,7 @@ export function deleteClaudeKeychainEntry(service: string, run: SecurityRun = se
 }
 ```
 
-- [ ] **Step 4: Ekspor `agentBin` dari pty**
+- [x] **Step 4: Ekspor `agentBin` dari pty**
 
 Di `server/src/services/pty.ts:281`, ubah `const agentBin = (agent: Agent): string => {` menjadi:
 
@@ -919,7 +919,7 @@ Di `server/src/services/pty.ts:281`, ubah `const agentBin = (agent: Agent): stri
 export const agentBin = (agent: Agent): string => {
 ```
 
-- [ ] **Step 5: Implementasi `identity.ts`**
+- [x] **Step 5: Implementasi `identity.ts`**
 
 Create `server/src/services/runtime-accounts/identity.ts`:
 
@@ -991,12 +991,12 @@ export function nextStatus(loggedIn: boolean, everLoggedIn: boolean): RuntimeAcc
 }
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan lulus**
+- [x] **Step 6: Jalankan test, pastikan lulus**
 
 Run: SRV `server/test/runtime-accounts-identity.test.ts`
 Expected: PASS (10 test).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 /usr/bin/git add server/src/services/runtime-accounts/keychain.ts server/src/services/runtime-accounts/identity.ts \
