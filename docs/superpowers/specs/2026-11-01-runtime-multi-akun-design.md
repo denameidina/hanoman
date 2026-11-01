@@ -83,19 +83,20 @@ Model baru `RuntimeAccount` (migration + ADR-0234):
 | `id` | String @id | |
 | `runtime` | String | `claude` \| `codex` \| `antigravity` |
 | `label` | String | nama pilihan operator, unik per runtime |
-| `homeDir` | String? | `$HANOMAN_HOME/accounts/<runtime>/<id>`; null untuk mode tukar agy |
+| `homeDir` | String | `$HANOMAN_HOME/accounts/<runtime>/<id>` (untuk agy: tempat slot token terenkripsi) |
 | `identity` | Json? | `{ email?, plan? }` hasil baca lokal, hanya untuk tampilan |
-| `secretRef` | String? | khusus mode tukar agy: kunci blob terenkripsi `secret-box` |
-| `status` | String | `belum-login` \| `aktif` \| `perlu-login-ulang` (cache; diturunkan ulang saat dibaca) |
+| `status` | String | `belum-login` \| `aktif` \| `perlu-login-ulang` (diperbarui saat Periksa / boot / login ditutup) |
 | `createdAt`, `lastLoginAt` | DateTime | |
 
 - **Akun bawaan "Default"** tidak disimpan sebagai baris. Ia adalah home bawaan (`~/.claude`, `~/.codex`,
   Keychain agy) dan disintesis di lapis layanan dengan id tetap `default:<runtime>`. Tak bisa dihapus.
-- **Default per runtime** di `Setting` (kolom Json, tanpa migration tambahan):
-  `accounts: { claude?: string, codex?: string, antigravity?: string }`. Absen = `default:<runtime>`.
+- **Default per runtime** di `Setting.accounts: { claude?, codex?, antigravity? }` (kolom Json, tanpa
+  migration tambahan). Absen = `default:<runtime>`. `Setting` sudah LOCAL per mesin (tak ada di `FIELDS`
+  sync). Mengikuti pola `remoteControl`: **`PUT /settings` mempertahankan nilai tersimpan**, dan yang
+  mengubahnya hanya `PUT /api/runtime-accounts/default`, supaya simpan form Settings tak menimpa pilihan akun.
 - `SessionHistory` mendapat kolom `accountId String?` (null = baris lama / akun bawaan).
 - **LOCAL-only**: `RuntimeAccount` tak masuk `SYNCED`/`FIELDS` sync, sama seperti `LocalBinding`. Kredensial
-  tak pernah masuk DB (kecuali blob terenkripsi mode tukar agy) dan tak pernah dikirim ke klien.
+  tak pernah masuk DB dan tak pernah dikirim ke klien.
 - Direktori akun dibuat `0700`.
 
 ### 2. Isi direktori akun
@@ -123,13 +124,13 @@ Settings → Runtime → panel **Akun** per runtime.
 1. **Tambah akun** → label → `POST /api/runtime-accounts` membuat baris + direktori + symlink.
 2. `POST /api/runtime-accounts/:id/login` membuka **sesi terminal login** di tab Terminal. Perintahnya
    dirakit server dari katalog per runtime:
-   - claude: `claude` dengan `CLAUDE_CONFIG_DIR=<homeDir>` (TUI first-run → `/login`). Spike memastikan
-     apakah ada subcommand login non-TUI yang lebih bersih.
+   - claude: `claude auth login --claudeai` dengan `CLAUDE_CONFIG_DIR=<homeDir>` (terverifikasi ada di claude 2.1.316).
    - codex: `codex login` dengan `CODEX_HOME=<homeDir>`. Opsi `--device-auth` saat hanoman diakses jarak jauh.
    - agy: sesuai hasil spike (lihat §6).
-3. Saat pane login keluar, atau saat tombol **Periksa** ditekan, server membaca identitas secara lokal tanpa
-   jaringan: claude dari `.claude.json` (`oauthAccount`), codex dari klaim `id_token` di `auth.json`, agy dari
-   `id_token_email`. Status jadi `aktif` bila kredensial terbaca.
+3. Saat sesi login ditutup, saat panel Akun dibuka, saat boot, atau saat tombol **Periksa** ditekan, server
+   memperbarui identitas & status: claude lewat `claude auth status --json` (`loggedIn`, `email`,
+   `subscriptionType`) dengan `CLAUDE_CONFIG_DIR=<homeDir>`; codex dari klaim `id_token` di `auth.json`
+   (tanpa jaringan); agy dari slot token. Status jadi `aktif` bila login terbaca.
 4. Email yang sama sudah terdaftar di runtime yang sama → peringatan duplikat (tidak memblokir).
 5. **Hapus akun**: konfirmasi, ditolak `409 account-in-use` bila ada sesi hidup yang memakainya. Direktori
    dihapus; untuk claude macOS, entri Keychain ber-suffix milik akun ikut dihapus.
@@ -148,14 +149,24 @@ Settings → Runtime → panel **Akun** per runtime.
   - codex akun non-bawaan: `CODEX_HOME=<homeDir>`.
   - akun bawaan: tak ada perubahan dari perilaku sekarang.
 - Akun dipatok ke sesi: tmux `@hanoman_account` (sesi hidup) + `SessionHistory.accountId` (riwayat/resume).
-  Resume memakai akun yang sama. Akun sudah dihapus → resume berhenti dengan pesan, tidak pindah akun diam-diam.
+  Auto-resume (ADR-0169) dan "Mulai lagi" dari riwayat memakai akun yang sama. Akun itu sudah dihapus →
+  auto-resume mencatatnya gagal dengan alasan, tidak pindah akun diam-diam. Start manual sebuah backlog
+  yang pernah berjalan tetap boleh memilih akun lain (pilihan awal = default runtime): kelanjutan sesi
+  hanoman berjalan dari artefak (berkas fase, worktree), bukan dari riwayat percakapan CLI.
+- Sesi otomatis yang default runtime-nya akun berstatus bukan `aktif` jatuh ke akun bawaan, dengan
+  peringatan di log server.
+- Resolusi akun di `createSession` lewat resolver yang didaftarkan layanan akun (pola
+  `registerSessionHooks`), supaya `pty.ts` tetap nol dependensi DB dan ke-12 pemanggilnya tercakup sekaligus.
+- Picker Start untuk **mesin lain** (relay) tidak menampilkan field Akun: akun bersifat per mesin, dan mesin
+  tujuan memakai default-nya sendiri.
 - Pembaca yang dibuat sadar akun:
   - `transcriptRoots` di `agent-invocations.ts`: tambah home akun ke allowlist, dibandingkan setelah `realpath`
     (transkrip claude lewat symlink `projects/`).
-  - Pembaca goal codex (`goals_1.sqlite`) memakai home akun sesi.
-  - Sandbox production: direktori akun di-mount di `/agent-home` menggantikan `HANOMAN_AGENT_CREDENTIAL_DIR`,
-    dengan mode mount yang sama dengan mount kredensial sekarang. Akun bawaan tetap memakai
-    `HANOMAN_AGENT_CREDENTIAL_DIR`. agy tetap tak didukung di sandbox (`assertAntigravityLaunch`).
+  - (Tidak ada pembaca `goals_1.sqlite` di hanoman — terverifikasi; tak ada yang perlu diubah.)
+  - **Sandbox production hanya mendukung akun bawaan.** Direktori kredensial sandbox global per proses dan
+    di-mount read-only (`session-sandbox.ts:67,93`), jadi path akun host tak ada di dalam container. Saat
+    sandbox aktif, memilih akun non-bawaan → `409 account-sandbox-unsupported`, dan resolver selalu memakai
+    akun bawaan (cermin `assertAntigravityLaunch`).
 
 ### 5. Limit per akun
 
@@ -167,9 +178,14 @@ Settings → Runtime → panel **Akun** per runtime.
 
 - hanoman **tidak pernah me-refresh token** (aturan yang sudah berlaku).
 - Window yang `resetsAt`-nya sudah lewat ditampilkan **"sudah reset"**, bukan persen lama.
-- DTO baru `AccountLimitsDTO { accountId, runtime, label, identity, status, windows, fetchedAt }`.
-  Grup siar baru `accountLimits` (array) di `/api/events/ws`.
-- Grup lama `limits`, `codexLimits`, `antigravityLimits` tetap ada dan berisi akun default runtime masing-masing.
+- DTO baru `AccountLimitsDTO { accountId, runtime, label, builtin, isDefault, loginStatus, limits }`.
+  **Tanpa email**: prefix `/limits` adalah `GLOBAL_READ` (terbaca setiap agent token), jadi identitas akun
+  hanya disajikan `GET /api/runtime-accounts` di balik `settings:read`. Grup siar baru `accountLimits`
+  (array) di `/api/events/ws`.
+- "Sudah reset" dihitung di klien (`resetsAt` < sekarang), tanpa perubahan DTO.
+- Grup lama `limits`, `codexLimits`, `antigravityLimits` (dan tool `hanoman_limits*`) tetap ada dan tetap
+  berisi **akun bawaan**, demi kompatibilitas klien lama. Pil limit di top bar membaca `accountLimits` dan
+  mencerminkan akun **default** runtime bila runtime itu punya ≥2 akun.
 
 ### 6. Antigravity
 
@@ -179,9 +195,12 @@ pola §2–§4 seperti runtime lain.
 
 Bila tidak, **mode tukar eksklusif** (hanya macOS):
 
-- Blob token tiap akun disimpan terenkripsi lewat `secret-box` (`RuntimeAccount.secretRef`).
+- Slot token tiap akun = berkas `<homeDir>/slot.enc` (0600, dienkripsi `secret-box`) berisi isi Keychain
+  `gemini`/`antigravity` **dan** berkas `~/.gemini/antigravity-cli/antigravity-oauth-token` (agy bisa jatuh
+  ke berkas itu bila Keychain kosong). Akun bawaan punya slot di `accounts/antigravity/default/`. Akun aktif
+  dicatat di `accounts/antigravity/active`. Tak ada kredensial di DB.
 - Start dengan akun X: ada sesi agy hidup dengan akun lain → `409 antigravity-account-busy`. Tidak ada →
-  tulis blob X ke Keychain `gemini`/`antigravity`.
+  pulihkan slot X ke Keychain (lewat `security -i` dari stdin, bukan argv) dan ke berkas token.
 - Saat sesi agy selesai, dan sebelum setiap penukaran, isi Keychain dibaca balik ke slot akun yang sedang
   aktif supaya token hasil refresh agy tak hilang.
 - Login akun agy baru: penukaran ke slot kosong lalu login agy di terminal; hasilnya disimpan ke slot akun.
@@ -206,7 +225,7 @@ Bila tidak, **mode tukar eksklusif** (hanya macOS):
 | `PUT /api/runtime-accounts/default` `{runtime, accountId}` | tool `hanoman_runtime_account_default_set` (write) |
 | `GET /api/limits/accounts` | `GLOBAL_READ` + tool `hanoman_limits_accounts` (read) |
 | `POST /terminal/sessions` field `account?` | parameter opsional di tool launch sesi yang sudah ada |
-| `POST /api/runtime-accounts`, `PATCH`/`DELETE /api/runtime-accounts/:id`, `POST /api/runtime-accounts/:id/login` | **COOKIE_ONLY**: pengelolaan kredensial; login butuh manusia di browser |
+| `POST /api/runtime-accounts`, `PATCH`/`DELETE /api/runtime-accounts/:id`, `POST /api/runtime-accounts/:id/login`, `POST /api/runtime-accounts/:id/check` | **COOKIE_ONLY** (dicatat di `UNWRAPPED`): pengelolaan kredensial; login butuh manusia di browser |
 
 Respons tak pernah memuat token, isi `auth.json`, atau blob.
 
@@ -218,6 +237,7 @@ Respons tak pernah memuat token, isi `auth.json`, atau blob.
 | runtime akun ≠ agen | `409 account-runtime-mismatch` |
 | akun belum login / perlu login ulang | `409 account-not-logged-in` |
 | agy: sesi hidup dengan akun lain | `409 antigravity-account-busy` |
+| sandbox aktif, akun non-bawaan dipilih / dijadikan default | `409 account-sandbox-unsupported` |
 | hapus akun yang dipakai sesi hidup | `409 account-in-use` |
 | label duplikat dalam runtime yang sama | `409 account-label-taken` |
 | symlink terputus / berkas menyimpang | launch jalan, akun ditandai `drift` |
@@ -242,8 +262,7 @@ Respons tak pernah memuat token, isi `auth.json`, atau blob.
    codex; apakah symlink `config.toml`/`settings.json` bertahan setelah CLI menulis; isolasi agy. Hasil di ADR-0234.
 1. Model `RuntimeAccount` + `SessionHistory.accountId` + migration + ADR-0234; layanan akun (home, symlink,
    identitas, `mcpServers`); API + MCP.
-2. Wiring launch: resolusi akun, env `pty.ts`, `@hanoman_account`, resume, `transcriptRoots`, goal codex,
-   mount sandbox.
+2. Wiring launch: resolusi akun, env `pty.ts`, `@hanoman_account`, resume, `transcriptRoots`, gerbang sandbox.
 3. Limit per akun + grup siar `accountLimits`.
 4. UI: panel Settings, picker Start / Sesi baru, chip sesi, popover limit.
 5. agy (isolasi atau mode tukar eksklusif).
