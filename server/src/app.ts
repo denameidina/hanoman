@@ -23,6 +23,7 @@ import terminal from "./routes/terminal";
 import terminalWorkspace from "./routes/terminal-workspace";
 import vps from "./routes/vps";
 import limits from "./routes/limits";
+import runtimeAccounts from "./routes/runtime-accounts";   // ADR-0234
 import codex from "./routes/codex";
 import antigravity from "./routes/antigravity";
 import models from "./routes/models";
@@ -280,6 +281,7 @@ export function buildApp(
     await api.register(terminalWorkspace);
     await api.register(vps);
     await api.register(limits);
+  await api.register(runtimeAccounts);   // ADR-0234
     await api.register(update);
     await api.register(events, wsOptions);
     await api.register(wsTickets, { allowTestPrincipal: !requireAuth && env.NODE_ENV === "test" });

@@ -1842,7 +1842,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `loginArgv(runtime, opts): string[]`, `openLoginSession(accountId, opts): Promise<{ id: string }>`
   - MCP: `hanoman_runtime_accounts_list`, `hanoman_runtime_account_default_set`; `hanoman_session_create.account`.
 
-- [ ] **Step 1: Tulis test route yang gagal**
+- [x] **Step 1: Tulis test route yang gagal**
 
 Create `server/test/runtime-accounts.route.test.ts`:
 
@@ -1927,7 +1927,7 @@ describe("loginArgv", () => {
 Run: SRV `server/test/runtime-accounts.route.test.ts`
 Expected: FAIL (route 404, `loginArgv` tak ada).
 
-- [ ] **Step 2: Perintah & sesi login**
+- [x] **Step 2: Perintah & sesi login**
 
 Tambahkan ke `server/src/services/runtime-accounts/login.ts`:
 
@@ -1977,7 +1977,7 @@ export async function openLoginSession(accountId: string, opts: { deviceAuth?: b
 
 (gabungkan impor dengan impor yang sudah ada di berkas: `accountSnapshot` dari `./registry` sudah diimpor di Task 5.)
 
-- [ ] **Step 3: Route**
+- [x] **Step 3: Route**
 
 Create `server/src/routes/runtime-accounts.ts`:
 
@@ -2053,7 +2053,7 @@ export default async function (app: FastifyInstance) {
 
 Di `server/src/app.ts`: impor `import runtimeAccounts from "./routes/runtime-accounts";` di dekat `import limits …` (:25), dan `await api.register(runtimeAccounts);` sesudah `await api.register(limits);` (:282).
 
-- [ ] **Step 4: Capability**
+- [x] **Step 4: Capability**
 
 Di `server/src/services/agent-capabilities.ts`, tepat sebelum `if (top === "settings" || top === "config") return rw("settings");`:
 
@@ -2068,7 +2068,7 @@ Di `server/src/services/agent-capabilities.ts`, tepat sebelum `if (top === "sett
   }
 ```
 
-- [ ] **Step 5: MCP — tool baru, parameter `account`, UNWRAPPED**
+- [x] **Step 5: MCP — tool baru, parameter `account`, UNWRAPPED**
 
 Di `shared/src/mcp-catalog/settings.ts`, tambahkan dua elemen di akhir `SETTINGS_TOOLS`:
 
@@ -2123,7 +2123,7 @@ Di `server/test/mcp-coverage.test.ts`, di dalam `UNWRAPPED` (sesudah entri `/aut
   ["POST /runtime-accounts/:id/check", "menjalankan CLI agen untuk membaca status login kredensial — bagian alur login manusia"],
 ```
 
-- [ ] **Step 6: Dokumentasi kontrak**
+- [x] **Step 6: Dokumentasi kontrak**
 
 Di `internal/docs/architecture/api-contract.md`, dekat baris `GET /limits/antigravity …` (:800) tambahkan:
 
@@ -2150,14 +2150,14 @@ Di `docs/agent-integration.md`, pada tabel route→capability (sekitar :316), ta
 
 dan satu kalimat di bawah paragraf Settings: "`hanoman_session_create` menerima `account` (id dari `hanoman_runtime_accounts_list`); buat/hapus/login akun hanya lewat dashboard (ADR-0234)."
 
-- [ ] **Step 7: Jalankan test**
+- [x] **Step 7: Jalankan test**
 
 Run: SRV `server/test/runtime-accounts.route.test.ts server/test/mcp-coverage.test.ts`
 Run: WEB `shared/src/mcp-catalog.team.test.ts`
 Expected: PASS. (`hanoman_limits_accounts` belum ada — ia lahir di Task 7 bersama route-nya.)
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 /usr/bin/git add server/src/routes/runtime-accounts.ts server/src/app.ts server/src/services/agent-capabilities.ts \

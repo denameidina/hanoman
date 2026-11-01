@@ -318,6 +318,12 @@ Tool MCP-nya (semua tulis bermode `danger`, hanya tampil dengan `--danger`):
 | `GET /api/lead/decisions` | `lead:read` | jejak keputusan hanoman-lead. Menerima `page`/`limit`; `take`/`skip` lama tetap jalan. |
 | `GET /api/scheduler/queue` | `settings:read` | antrean scheduler (`?status=queued\|launched\|done\|failed`). `GET /api/scheduler/state` **tak lagi** memuat `queue` — ia memuat `queueCounts`. |
 | `POST /api/lead/decisions` | `lead:write` | minta putusan — baca **§8** dan **§11** dulu. |
+| `GET /api/runtime-accounts` | `settings:read` | akun runtime per mesin (tool `hanoman_runtime_accounts_list`). Memuat email. |
+| `PUT /api/runtime-accounts/default` | `settings:write` | default akun per runtime (tool `hanoman_runtime_account_default_set`). |
+| `GET /api/limits/accounts` | — (GLOBAL_READ) | limit per akun, tanpa email (tool `hanoman_limits_accounts`). |
+
+Akun runtime (ADR-0234): `hanoman_session_create` menerima `account` (id dari `hanoman_runtime_accounts_list`;
+kosong = akun default runtime). Tambah/hapus/login akun hanya lewat dashboard (COOKIE_ONLY).
 
 Settings memakai tool existing `hanoman_settings_get`/`hanoman_settings_set` dan capability
 `settings:read|write` untuk runtime Antigravity (SPEC-1442/ADR-0221). Panggil `_get` tepat sebelum

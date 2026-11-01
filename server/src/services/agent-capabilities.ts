@@ -179,6 +179,14 @@ export function capabilityForRoute(method: string, path: string): Resolved {
   // agent token. Tulis (POST kirim tiket, mulai/kirim chat) tetap cookie-only: itu bertindak SEBAGAI
   // klien — peniruan identitas, bukan capability.
   if (top === "portal") return read ? "portal:read" : "COOKIE_ONLY";
+  // ADR-0234 · akun runtime. Baca daftar & set default = `settings:*` (cermin setelan sesi). Buat, ganti
+  // label, hapus, login, periksa menyentuh kredensial langganan di mesin ini atau butuh manusia di
+  // browser OAuth → COOKIE_ONLY. Dicocokkan ke method + panjang segmen (kelas bug SPEC-405).
+  if (top === "runtime-accounts") {
+    if (read && seg.length === 1) return "settings:read";
+    if (method === "PUT" && seg.length === 2 && seg[1] === "default") return "settings:write";
+    return "COOKIE_ONLY";
+  }
   if (top === "settings" || top === "config") return rw("settings");
   if (top === "specs") {
     // ADR-0155 · integrate & hapus backlog menghapus artefak dokumen. `PATCH /specs/:id {stage}`
