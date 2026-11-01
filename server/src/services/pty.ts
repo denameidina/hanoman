@@ -197,6 +197,8 @@ export type Pane = SessionInfo & {
   width?: number;
   height?: number;
 };
+// ADR-0234 · akun runtime yang dipakai sebuah sesi (diisi resolver layanan akun).
+export type SessionAccount = { id: string; env: Record<string, string>; unset: string[] };
 export type SessionAgentMeta = {
   id?: string; name: string; model?: string; timeoutSeconds?: number; definitionHash?: string;
   // ADR-0164 · agen fase membawa nama fasenya; effort = nilai efektif saat lahir (sudah dikoersi).

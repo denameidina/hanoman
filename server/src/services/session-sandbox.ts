@@ -10,9 +10,14 @@ export class RuntimeLaunchError extends Error {
   }
 }
 
+/** Sandbox sesi menyala? Satu sumber untuk gerbang agy (ADR-0117) dan akun runtime (ADR-0234). */
+export function sessionSandboxOn(env: Env = process.env): boolean {
+  return resolveHardening(env) || (env.HANOMAN_SESSION_SANDBOX !== undefined && env.HANOMAN_SESSION_SANDBOX !== "off");
+}
+
 export function assertAntigravityLaunch(agent: Agent, goal?: string | boolean, env: Env = process.env): void {
   if (agent !== "antigravity") return;
-  if (resolveHardening(env) || (env.HANOMAN_SESSION_SANDBOX !== undefined && env.HANOMAN_SESSION_SANDBOX !== "off"))
+  if (sessionSandboxOn(env))
     throw new RuntimeLaunchError(409, "antigravity-sandbox-unsupported", "Antigravity CLI hanya tersedia pada host/lab; sandbox belum didukung.");
   if (goal) throw new RuntimeLaunchError(409, "antigravity-goal-unsupported", "Antigravity CLI belum mendukung enforcement goal native.");
 }

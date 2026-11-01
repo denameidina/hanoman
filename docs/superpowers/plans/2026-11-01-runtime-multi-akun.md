@@ -1030,7 +1030,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `assertLaunchAccount(agent, requested?, sandbox?): Promise<void>`
 - Produces (session-sandbox.ts): `sessionSandboxOn(env?): boolean`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/runtime-accounts-registry.test.ts`:
 
@@ -1164,12 +1164,12 @@ describe("resolver", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: SRV `server/test/runtime-accounts-registry.test.ts`
 Expected: FAIL — modul tak ada.
 
-- [ ] **Step 3: `sessionSandboxOn`**
+- [x] **Step 3: `sessionSandboxOn`**
 
 Di `server/src/services/session-sandbox.ts`, sebelum `assertAntigravityLaunch`:
 
@@ -1182,7 +1182,7 @@ export function sessionSandboxOn(env: Env = process.env): boolean {
 
 dan ubah baris pertama `assertAntigravityLaunch` menjadi `if (sessionSandboxOn(env))` (kondisinya identik).
 
-- [ ] **Step 4: Implementasi `registry.ts`**
+- [x] **Step 4: Implementasi `registry.ts`**
 
 Create `server/src/services/runtime-accounts/registry.ts`:
 
@@ -1400,7 +1400,7 @@ export async function refreshAllStatuses(): Promise<void> {
 }
 ```
 
-- [ ] **Step 5: Implementasi `resolver.ts`**
+- [x] **Step 5: Implementasi `resolver.ts`**
 
 Create `server/src/services/runtime-accounts/resolver.ts`:
 
@@ -1467,13 +1467,13 @@ export async function assertLaunchAccount(agent: Agent, requested: string | unde
 export type SessionAccount = { id: string; env: Record<string, string>; unset: string[] };
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan lulus**
+- [x] **Step 6: Jalankan test, pastikan lulus**
 
 Run: SRV `server/test/runtime-accounts-registry.test.ts server/test/runtime-accounts-settings.test.ts`
 Expected: PASS.
 Run: `pnpm --filter ./server typecheck` — tanpa error.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 /usr/bin/git add server/src/services/runtime-accounts/registry.ts server/src/services/runtime-accounts/resolver.ts \
