@@ -41,6 +41,8 @@ process.env.HANOMAN_TMUX_SOCKET ??= "hanoman-test";
 process.env.HANOMAN_UPDATE_FETCH = "0";
 // ADR-0224 · limit Antigravity tak boleh membaca Keychain asli & memanggil Google dari test.
 process.env.HANOMAN_ANTIGRAVITY_LIMITS_FETCH = "0";
+// ADR-0234 · limit akun runtime terdaftar juga tak boleh membaca Keychain asli / memanggil API dari test.
+process.env.HANOMAN_ACCOUNT_LIMITS_FETCH = "0";
 // SPEC-903 (QA) · `=`, bukan `??=`: vitest sendiri sudah `NODE_ENV ??= "test"`, jadi nilai yang
 // DIWARISI dari shell menang — dan shell sesi hanoman mengekspor `NODE_ENV=development`. Suite ini
 // tak bisa jalan di bawah nilai lain: `revalidateWsPrincipal` menerima principal `test` HANYA saat

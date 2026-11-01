@@ -37,7 +37,7 @@ const USER_AGENT = "antigravity (hanoman)";
 // angka yang bergerak per jam/minggu.
 const TTL_MS = 60_000;
 // Token yang tinggal sesingkat ini dianggap sudah kedaluwarsa — jangan kirim token yang mati di jalan.
-const EXPIRY_SKEW_MS = 30_000;
+export const EXPIRY_SKEW_MS = 30_000;
 
 let lastOk: AntigravityLimitsDTO | null = null;
 let freshUntil = 0;
@@ -53,22 +53,28 @@ const securityRun: SecurityRun = (args) =>
  * Token agy dari Keychain. go-keyring menyimpannya sebagai `go-keyring-base64:<base64(JSON)>`
  * dengan bentuk `{ token: { access_token, expiry, … }, … }` (terukur agy 1.4.2, 2026-10-18).
  */
-export function readAgyToken(run: SecurityRun = securityRun): AgyToken | null {
+/** ADR-0234 · parse isi Keychain/slot agy (`go-keyring-base64:` opsional) → token akses + kedaluwarsa. */
+export function parseAgyToken(raw: string): AgyToken | null {
   try {
-    let raw = run(["find-generic-password", "-s", "gemini", "-a", "antigravity", "-w"]).trim();
+    let s = raw.trim();
     const prefix = "go-keyring-base64:";
-    if (raw.startsWith(prefix)) raw = Buffer.from(raw.slice(prefix.length), "base64").toString("utf8");
-    const tok = (JSON.parse(raw) as { token?: { access_token?: unknown; expiry?: unknown } })?.token;
+    if (s.startsWith(prefix)) s = Buffer.from(s.slice(prefix.length), "base64").toString("utf8");
+    const tok = (JSON.parse(s) as { token?: { access_token?: unknown; expiry?: unknown } })?.token;
     if (typeof tok?.access_token !== "string" || !tok.access_token) return null;
     const expiry = typeof tok.expiry === "string" ? Date.parse(tok.expiry) : NaN;
     return { accessToken: tok.access_token, expiry: Number.isFinite(expiry) ? expiry : null };
   } catch { return null; }
 }
 
+export function readAgyToken(run: SecurityRun = securityRun): AgyToken | null {
+  try { return parseAgyToken(run(["find-generic-password", "-s", "gemini", "-a", "antigravity", "-w"])); }
+  catch { return null; }
+}
+
 const agyHome = (): string => join(homedir(), ".gemini", "antigravity-cli");
 
 /** Project Cloud Code default agy — dikirim apa adanya bila ada; endpoint tetap menjawab tanpanya. */
-function defaultProject(): string | null {
+export function defaultProject(): string | null {
   try { return readFileSync(join(agyHome(), "cache", "default_project_id.txt"), "utf8").trim() || null; }
   catch { return null; }
 }
@@ -139,14 +145,10 @@ const prodDeps: AntigravityLimitsDeps = {
   now: Date.now,
 };
 
-async function fetchQuota(deps: AntigravityLimitsDeps): Promise<AntigravityLimitsDTO> {
-  if (deps.platform !== "darwin") return fallback();
-  const tok = deps.token();
-  if (!tok) return fallback();
-  if (tok.expiry !== null && tok.expiry - EXPIRY_SKEW_MS <= deps.now()) return fallback();
-  const project = deps.project();
+/** ADR-0234 · satu panggilan kuota untuk token tertentu. null = gagal / bentuk tak dikenali. */
+export async function fetchAgyWindows(tok: AgyToken, project: string | null, f: typeof fetch): Promise<LimitWindow[] | null> {
   try {
-    const res = await deps.fetch(QUOTA_URL, {
+    const res = await f(QUOTA_URL, {
       method: "POST",
       headers: {
         authorization: `Bearer ${tok.accessToken}`, "content-type": "application/json", "user-agent": USER_AGENT,
@@ -155,15 +157,22 @@ async function fetchQuota(deps: AntigravityLimitsDeps): Promise<AntigravityLimit
       // Endpoint yang menggantung tak boleh menumpuk koneksi di bawah siar 30 dtk (SPEC-197).
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) return fallback();
+    if (!res.ok) return null;
     const windows = mapQuota(await res.json());
-    if (!windows.length) return fallback();
-    const dto: AntigravityLimitsDTO = {
-      status: "ok", windows, fetchedAt: new Date(deps.now()).toISOString(),
-    };
-    lastOk = dto;
-    return dto;
-  } catch { return fallback(); }
+    return windows.length ? windows : null;
+  } catch { return null; }
+}
+
+async function fetchQuota(deps: AntigravityLimitsDeps): Promise<AntigravityLimitsDTO> {
+  if (deps.platform !== "darwin") return fallback();
+  const tok = deps.token();
+  if (!tok) return fallback();
+  if (tok.expiry !== null && tok.expiry - EXPIRY_SKEW_MS <= deps.now()) return fallback();
+  const windows = await fetchAgyWindows(tok, deps.project(), deps.fetch);
+  if (!windows) return fallback();
+  const dto: AntigravityLimitsDTO = { status: "ok", windows, fetchedAt: new Date(deps.now()).toISOString() };
+  lastOk = dto;
+  return dto;
 }
 
 export async function getAntigravityLimits(deps: AntigravityLimitsDeps = prodDeps): Promise<AntigravityLimitsDTO> {

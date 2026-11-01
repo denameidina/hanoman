@@ -43,7 +43,18 @@ export const SYSTEM_TOOLS: readonly McpToolDef[] = [
     mode: "read", capability: null, samplePath: "/limits/antigravity", sampleMethod: "GET",
     build: () => ({ method: "GET", path: "/limits/antigravity" }),
     shape: (raw) => raw,
+  },  // ADR-0234 · limit per akun runtime. GLOBAL_READ → tanpa email (identitas di hanoman_runtime_accounts_list).
+  {
+    name: "hanoman_limits_accounts",
+    title: "Limit langganan per akun runtime",
+    description:
+      "Limit (window 5 jam, mingguan, dst) untuk SETIAP akun runtime terdaftar di mesin ini — Claude, Codex, Antigravity — termasuk akun bawaan `default:<runtime>`. Tanpa email. `limits.status` stale = data terakhir (akun belum dipakai sejak tokennya kedaluwarsa); window yang `resetsAt`-nya sudah lewat berarti sudah reset. `isDefault` menandai akun yang dipakai sesi baru.",
+    inputSchema: obj({ properties: {} }),
+    mode: "read", capability: null, samplePath: "/limits/accounts", sampleMethod: "GET",
+    build: () => ({ method: "GET", path: "/limits/accounts" }),
+    shape: (raw) => raw,
   },
+
   {
     name: "hanoman_overview_get",
     title: "Ringkasan kinerja hari ini (Overview)",

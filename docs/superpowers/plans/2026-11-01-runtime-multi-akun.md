@@ -2185,7 +2185,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `runtime-accounts/limits.ts`: `readClaudeAccountToken(homeDir, platform?)`, `type AccountLimitsDeps`, `getAccountLimits(deps?): Promise<AccountLimitsDTO[]>`, `setAntigravityAccountLimits(fn)` (Task 10), `_resetAccountLimitsCache()`
   - `GET /limits/accounts`; frame `{ t: "accountLimits", accounts }`; tool `hanoman_limits_accounts`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/runtime-accounts-limits.test.ts`:
 
@@ -2251,7 +2251,7 @@ describe("getAccountLimits", () => {
 Run: SRV `server/test/runtime-accounts-limits.test.ts`
 Expected: FAIL — modul tak ada.
 
-- [ ] **Step 2: Refactor `services/limits.ts`**
+- [x] **Step 2: Refactor `services/limits.ts`**
 
 1. `function mapWindows(json: unknown)` → `export function mapWindows(json: unknown)`.
 2. Tambahkan (sesudah `mapWindows`):
@@ -2288,7 +2288,7 @@ Expected: FAIL — modul tak ada.
    ```
    dengan impor `import { readClaudeKeychainToken } from "./runtime-accounts/keychain";`.
 
-- [ ] **Step 3: Refactor `services/antigravity-limits.ts`**
+- [x] **Step 3: Refactor `services/antigravity-limits.ts`**
 
 1. Pecah `readAgyToken`:
    ```ts
@@ -2332,7 +2332,7 @@ Expected: FAIL — modul tak ada.
 
 Run: SRV `server/test/limits.route.test.ts` dan test limit lama (`ls server/test | grep -E "limits|antigravity"`) → PASS tanpa diubah.
 
-- [ ] **Step 4: Implementasi `runtime-accounts/limits.ts`**
+- [x] **Step 4: Implementasi `runtime-accounts/limits.ts`**
 
 Create `server/src/services/runtime-accounts/limits.ts`:
 
@@ -2430,7 +2430,7 @@ export async function getAccountLimits(deps: AccountLimitsDeps = prodDeps()): Pr
 }
 ```
 
-- [ ] **Step 5: Route, grup siar, tool MCP**
+- [x] **Step 5: Route, grup siar, tool MCP**
 
 `server/src/routes/limits.ts`: impor `getAccountLimits` dari `../services/runtime-accounts/limits` dan tambahkan:
 
@@ -2466,7 +2466,7 @@ export async function getAccountLimits(deps: AccountLimitsDeps = prodDeps()): Pr
 
 `shared/src/mcp-catalog.team.test.ts:101`: tambahkan `"hanoman_limits_accounts"` ke array `names`.
 
-- [ ] **Step 6: Jalankan test**
+- [x] **Step 6: Jalankan test**
 
 Run: SRV `server/test/runtime-accounts-limits.test.ts server/test/limits.route.test.ts server/test/mcp-coverage.test.ts`
 Run: SRV untuk test events yang ada (`ls server/test | grep -i event` → jalankan yang menguji `/events/ws`).
@@ -2474,7 +2474,7 @@ Run: WEB `shared/src/mcp-catalog.team.test.ts`
 Expected: PASS.
 Run: `pnpm --filter ./server typecheck && pnpm --filter ./shared typecheck`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 /usr/bin/git add server/src/services/runtime-accounts/limits.ts server/src/services/limits.ts server/src/services/antigravity-limits.ts \

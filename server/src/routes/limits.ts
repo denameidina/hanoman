@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { getLimits } from "../services/limits";
 import { getCodexLimits } from "../services/codex-limits";
 import { getAntigravityLimits } from "../services/antigravity-limits";
+import { getAccountLimits } from "../services/runtime-accounts/limits";
 
 // GET /api/limits — auth-gated otomatis (bukan anggota PUBLIC di app.ts). Limit langganan Claude
 // realtime; poll frontend tiap 60s, cache 30s di service. Lihat SPEC-181.
@@ -14,4 +15,6 @@ export default async function limits(app: FastifyInstance) {
   app.get("/limits", async () => getLimits());
   app.get("/limits/codex", async () => getCodexLimits());
   app.get("/limits/antigravity", async () => getAntigravityLimits());
+  // ADR-0234 · limit per akun runtime (bawaan + terdaftar). GLOBAL_READ → DTO sengaja tanpa email.
+  app.get("/limits/accounts", async () => getAccountLimits());
 }
