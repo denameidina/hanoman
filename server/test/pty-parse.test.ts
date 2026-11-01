@@ -24,11 +24,18 @@ const line = (over: Record<string, string> = {}) => {
 
 describe("parsePanes", () => {
   it("FMT dan destructuring sama panjang", () => {
-    expect(FIELDS).toHaveLength(24);
+    expect(FIELDS).toHaveLength(25);
     // SPEC-1218 · AC-C2 · pane_width/pane_height di UJUNG (pola SPEC-919): kolom lama tak bergeser.
-    expect(FIELDS[FIELDS.length - 3]).toBe("#{pane_width}");
-    expect(FIELDS[FIELDS.length - 2]).toBe("#{pane_height}");
-    expect(FIELDS[FIELDS.length - 1]).toBe("#{@hanoman_name}");
+    expect(FIELDS[FIELDS.length - 4]).toBe("#{pane_width}");
+    expect(FIELDS[FIELDS.length - 3]).toBe("#{pane_height}");
+    expect(FIELDS[FIELDS.length - 2]).toBe("#{@hanoman_name}");
+    // ADR-0234 · akun runtime — di UJUNG juga.
+    expect(FIELDS[FIELDS.length - 1]).toBe("#{@hanoman_account}");
+  });
+
+  it("ADR-0234 · @hanoman_account terbaca jadi accountId; kosong → undefined", () => {
+    expect(parsePanes(line({ "#{@hanoman_account}": "a1b2c3d4" }))[0]!.accountId).toBe("a1b2c3d4");
+    expect(parsePanes(line())[0]!.accountId).toBeUndefined();
   });
 
   it("SPEC-1218 · AC-C2 · paneGeometry(id) murni dari listPanes — cols/rows dari pane_width/pane_height", () => {

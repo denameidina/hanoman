@@ -28,6 +28,8 @@ import { listCleanups } from "../services/worktree-reaper";
 import { closeSession } from "../services/session-close";
 import { recordHeadSha } from "../services/spec-head";
 import { appendDiag } from "../services/terminal-diag";
+import { AccountError } from "../services/runtime-accounts/registry";
+import { assertLaunchAccount } from "../services/runtime-accounts/resolver";
 import { readPrd } from "../services/project-prds";
 import { readAuditDoc } from "../services/audit-escalation";
 import { recordSessionResult } from "../services/session-result";
@@ -133,6 +135,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         const setting = await getSetting();
         const agent = parsed.data.agent ?? setting.agent;
         validatePhaseOverrides(agent, parsed.data.phaseOverrides);
+        await assertLaunchAccount(agent, parsed.data.account);   // ADR-0234 · sebelum approveLaunch
         const requestedGoal = parsed.data.flow === "goal" || parsed.data.flow === "no_effort" || (parsed.data.goal ?? setting.goal.enabled);
         if (agent === "antigravity") await withSessionAdmission({ id: sessionIdForSpec(spec.id), force: parsed.data.force }, async () => {
           assertAntigravityLaunch(agent, requestedGoal);
@@ -146,6 +149,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
           flow: parsed.data.flow, model: parsed.data.model, effort: parsed.data.effort,
           goal: parsed.data.goal, goalCondition: parsed.data.goalCondition,   // SPEC-332 · ADR-0073
           agent: parsed.data.agent,                                           // SPEC-338 · ADR-0074
+          accountId: parsed.data.account,                                     // ADR-0234
           verifyScope: parsed.data.verifyScope,                               // SPEC-376 · ADR-0080
           method: parsed.data.method,                                         // SPEC-734 · ADR-0113
           phaseOverrides: parsed.data.phaseOverrides,                         // ADR-0164 · override subagent per sesi
@@ -156,6 +160,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
         // artefak sesi sebelumnya. Aditif — klien yang hanya membaca `id` tak terpengaruh.
         return reply.code(201).send(r.resumed ? { id: r.id, resumed: true } : { id: r.id });
       } catch (e) {
+        if (e instanceof AccountError) return reply.code(e.status).send({ error: e.code, message: e.message });
         if (e instanceof LaunchError) {
           // Parity status: needs-bind → 400 {needsBind}, worktree gagal → 422.
           // SPEC-447 · ADR-0093 · dependency belum siap → 409 + daftar pemblokirnya, supaya UI
@@ -414,6 +419,13 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
     // `ensureCodexTrust` diturunkan dari agen HASIL resolusi — sejak sekarang ia bisa berbeda dari
     // `Setting.agent`, dan membaca yang salah membuat sesi mentok di layar trust codex (SPEC-377).
     const { agent, model, effort } = await terminalAgentDefaults(parsed.data);
+    // ADR-0234 · akun pilihan form "Sesi baru". Disalin ke lokal: penyempitan union hilang di closure.
+    const account = parsed.data.account;
+    try { await assertLaunchAccount(agent, account); }
+    catch (e) {
+      if (e instanceof AccountError) return reply.code(e.status).send({ error: e.code, message: e.message });
+      throw e;
+    }
     if (agent === "codex") ensureCodexTrust(repoDir);
     // ADR-0232 · terminal agen di worktree terpisah: operator memilihnya agar sesi ini tak menimpa
     // working tree sesi lain. Branch baru `term/<id>` (bukan detached) supaya commit-nya selamat
@@ -432,7 +444,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
           if (ownsWorktree(repoDir, wt)) realGit.removeWorktree(repoDir, wt);
           return { code: 422, body: { error: `gagal membuat worktree dari "${from}": ${(e as Error).message}` } };
         }
-        const s = createSession(project.id, wt, { id, agent, model, effort, branch });
+        const s = createSession(project.id, wt, { id, agent, model, effort, branch, accountId: account });
         return { code: 201, body: { id: s.id } };
       }, (pane) => ({ code: 201, body: { id: pane.id } }));
       return reply.code(result.code).send(result.body);
@@ -441,7 +453,7 @@ export default async function (app: FastifyInstance, opts: { allowedOrigins?: Se
       return reply.code(400).send({ error: "branchFrom hanya berlaku bersama worktree:true" });
     // ADR-0170 · terminal agen (bukan shell mentah) ikut gerbang cap/beban host — hanya
     // shell/install/console VPS yang tetap exempt (ADR-0161/ADR-0170).
-    const s = await createOperatorSession(project.id, repoDir, { agent, model, effort },
+    const s = await createOperatorSession(project.id, repoDir, { agent, model, effort, accountId: account },
       { exempt: false, force: parsed.data.force });
     return reply.code(201).send({ id: s.id });
   });

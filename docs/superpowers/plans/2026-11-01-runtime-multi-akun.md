@@ -1500,7 +1500,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `loginSessionId(accountId): string`, `accountIdForLoginSession(sessionId): string | null`
   - `installRuntimeAccounts(): Promise<void>`
 
-- [ ] **Step 1: Kunci kolom FMT baru (test gagal dulu)**
+- [x] **Step 1: Kunci kolom FMT baru (test gagal dulu)**
 
 Di `server/test/pty-parse.test.ts`, test `"FMT dan destructuring sama panjang"` jadi:
 
@@ -1524,7 +1524,7 @@ Di `server/test/pty-parse.test.ts`, test `"FMT dan destructuring sama panjang"` 
 Run: SRV `server/test/pty-parse.test.ts`
 Expected: FAIL (panjang 24, `accountId` tak ada).
 
-- [ ] **Step 2: FMT, parsePanes, SessionInfo**
+- [x] **Step 2: FMT, parsePanes, SessionInfo**
 
 Di `server/src/services/pty.ts`:
 
@@ -1547,7 +1547,7 @@ Di `server/src/services/pty.ts`:
 
 Run: SRV `server/test/pty-parse.test.ts` → PASS.
 
-- [ ] **Step 3: Resolver di createSession**
+- [x] **Step 3: Resolver di createSession**
 
 Di `server/src/services/pty.ts`:
 
@@ -1585,7 +1585,7 @@ Di `server/src/services/pty.ts`:
 7. `SessionBirth`: tambahkan `accountId?: string;`. Panggilan `emitBirth({ … })`: tambahkan `accountId: account?.id,`.
 8. `return { id, projectId, …, agent };` jadi `return { id, projectId, specId: opts.specId, flow: opts.flow, cwd, branch: opts.branch, exited: false, decision: false, agent, ...(account ? { accountId: account.id } : {}) };`
 
-- [ ] **Step 4: Tulis test launch yang gagal**
+- [x] **Step 4: Tulis test launch yang gagal**
 
 Create `server/test/runtime-accounts-launch.test.ts`:
 
@@ -1650,7 +1650,7 @@ Catatan: sesuaikan `create` Project/Spec dengan field wajib model nyata (lihat `
 Run: SRV `server/test/runtime-accounts-launch.test.ts`
 Expected: FAIL (`accountId` belum ada di `SessionBirth`/riwayat; `login.ts` & `prodResumeStart` tak ada).
 
-- [ ] **Step 5: Riwayat sesi**
+- [x] **Step 5: Riwayat sesi**
 
 Di `server/src/services/session-history.ts`:
 
@@ -1659,7 +1659,7 @@ Di `server/src/services/session-history.ts`:
 3. `SessionRuntime`: `export type SessionRuntime = { agent: "claude" | "codex" | "antigravity"; model?: string; effort?: string; accountId?: string };`
 4. `reconciledRuntimesSince`: `select` tambahkan `accountId: true`; objek yang di-`set` tambahkan `...(r.accountId ? { accountId: r.accountId } : {}),`.
 
-- [ ] **Step 6: Launch backlog membawa akun**
+- [x] **Step 6: Launch backlog membawa akun**
 
 Di `server/src/services/session-launch.ts`:
 
@@ -1687,7 +1687,7 @@ export const prodResumeStart: ResumeDeps["startSpec"] = async (spec, runtime) =>
 
 dan di `prodDeps` ganti `startSpec: (spec, runtime) => startSpecSession(…)` menjadi `startSpec: prodResumeStart,`. Periksa bahwa blok `catch` di `resumeReconciledSessions` meneruskan `(e as Error).message` ke `recordFail` sebagai `reason`; bila tidak, ubah agar begitu.
 
-- [ ] **Step 7: `login.ts` (helper id) dan `install.ts`**
+- [x] **Step 7: `login.ts` (helper id) dan `install.ts`**
 
 Create `server/src/services/runtime-accounts/login.ts`:
 
@@ -1742,7 +1742,7 @@ Di `server/src/server.ts`, tepat sesudah `installSessionHistory();`:
 
 (impor `import { installRuntimeAccounts } from "./services/runtime-accounts/install";`). Pastikan baris ini berada sebelum panggilan `resumeReconciledSessions(…)` (±:161).
 
-- [ ] **Step 8: Route terminal — validasi & teruskan akun**
+- [x] **Step 8: Route terminal — validasi & teruskan akun**
 
 Di `server/src/routes/terminal.ts`:
 
@@ -1767,7 +1767,7 @@ Di `server/src/routes/terminal.ts`:
    ```
    `createSession(project.id, wt, { id, agent, model, effort, branch })` → tambahkan `accountId: parsed.data.account`. `createOperatorSession(project.id, repoDir, { agent, model, effort }, …)` → `{ agent, model, effort, accountId: parsed.data.account }`.
 
-- [ ] **Step 9: Allowlist transkrip**
+- [x] **Step 9: Allowlist transkrip**
 
 Di `server/src/services/agent-invocations.ts:67-70`:
 
@@ -1783,7 +1783,7 @@ const transcriptRoots = (): string[] => [
 
 (impor `import { accountsRoot } from "./runtime-accounts/paths";`).
 
-- [ ] **Step 10: Test route terminal menolak akun tak sah**
+- [x] **Step 10: Test route terminal menolak akun tak sah**
 
 Tambahkan ke `server/test/runtime-accounts-launch.test.ts`:
 
@@ -1806,7 +1806,7 @@ describe("POST /terminal/sessions + account", () => {
 
 Bila project `p` tak punya `LocalBinding`, route menjawab 400 `needsBind` sebelum mencapai validasi akun — dalam kasus itu buat binding seperti test route terminal lain (`grep -rn "localBinding.create" server/test | head -2`) supaya cabang akun benar-benar teruji.
 
-- [ ] **Step 11: Jalankan test**
+- [x] **Step 11: Jalankan test**
 
 Run: SRV `server/test/runtime-accounts-launch.test.ts server/test/pty-parse.test.ts server/test/runtime-accounts-registry.test.ts`
 Expected: PASS.
@@ -1814,7 +1814,7 @@ Run juga test yang sudah ada di jalur ini: SRV `server/test/session-boot-resume.
 Expected: PASS (atau gagal yang sama persis dengan baseline `main`).
 Run: `pnpm --filter ./server typecheck`.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 /usr/bin/git add server/src/services/pty.ts server/test/pty-parse.test.ts server/src/services/session-history.ts \

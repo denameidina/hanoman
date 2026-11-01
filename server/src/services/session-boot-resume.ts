@@ -9,6 +9,7 @@ import { reconciledRuntimesSince, reconciledSpecIdsSince, type SessionRuntime } 
 import { startSpecSession, type StartSpecResult } from "./session-launch";
 import { LaunchAdmissionError } from "./session-admission";
 import { recordFailure } from "./notifications";
+import { accountExists } from "./runtime-accounts/registry";
 
 export type ResumeDeps = {
   // S4c · `runtime` = agen/model/effort sesi asal (SessionHistory); absen → default Setting global.
@@ -20,12 +21,20 @@ export type ResumeDeps = {
   recordDeferred: (specId: string, title: string, projectId: string | null, reason: string) => Promise<void>;
 };
 
+// ADR-0234 · resume memakai akun yang SAMA dengan saat sesi lahir. Akun itu sudah dihapus → gagal dengan
+// alasan (operator melanjutkan manual & memilih akun), bukan diam-diam pindah ke akun lain.
+export const prodResumeStart: ResumeDeps["startSpec"] = async (spec, runtime) => {
+  if (runtime?.accountId && !accountExists(runtime.accountId))
+    throw new Error(`akun runtime ${runtime.accountId} sudah dihapus — lanjutkan manual dan pilih akun lain`);
+  return startSpecSession(spec, { flow: flowForSource(spec.source), ...(runtime ?? {}) });
+};
+
 const prodDeps: ResumeDeps = {
   // ADR-0170 · mengamandemen ADR-0169 keputusan #4: `bypassCapacity` DICABUT. Auto-resume kini
   // tunduk cap/beban host seperti "Lanjutkan" manual — mesin 8 GB operator sudah dua kali kernel
   // panic akibat batch sesi paralel tepat SAAT boot (memori mac-mini-8gb-panic-agen-paralel),
   // titik waktu paling rawan menumpuk kandidat resume. Gerbang dependency ADR-0093 tak berubah.
-  startSpec: (spec, runtime) => startSpecSession(spec, { flow: flowForSource(spec.source), ...(runtime ?? {}) }),
+  startSpec: prodResumeStart,
   recordFail: recordFailure,
   recordDeferred: recordFailure,
 };
