@@ -134,6 +134,8 @@ export const S_DEFAULTS: Setting = {
   remoteControl: REMOTE_CONTROL_DEFAULTS,
   logShipping: LOG_SHIPPING_DEFAULTS,
   logRetention: LOG_RETENTION_DEFAULTS,
+  // ADR-0234 · default akun runtime — dikelola panel Akun runtime, dipertahankan server pada PUT /settings.
+  accounts: {},
   // SPEC-881 · stempel suntingan agen bawaan. Wajib di tipe `Setting`.
   builtinAgents: {},
   builtinAgentPolicies: {},

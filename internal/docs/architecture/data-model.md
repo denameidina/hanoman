@@ -5,7 +5,8 @@ satu berkas di `$HANOMAN_HOME`, default `~/.hanoman/hanoman.db`, tanpa Docker/Po
 **Tujuh model inti**: Project, Spec, Setting, Notification, User,
 Session, Vps — plus model pendukung (VpsAuditSnapshot/VpsItemState, DeviceToken, **AgentToken**,
 **ClientProjectAccess** (SPEC-617), SessionResult, SyncLog,
-LocalBinding, SyncOutbox, SyncState, SyncConflict, **SyncTombstone** (SPEC-799), RuntimeConfig) dan **model Help Center**
+LocalBinding, SyncOutbox, SyncState, SyncConflict, **SyncTombstone** (SPEC-799), RuntimeConfig,
+**RuntimeAccount** (ADR-0234)) dan **model Help Center**
 (`Ticket`, `TicketAttachment`, SPEC-253/[ADR-0062](../adr/0062-help-center-tiket-publik-triase.md)).
 Tidak ada model `Run` maupun `Trigger` — keduanya di-drop saat pindah ke sesi interaktif (ADR-0024; migrasi
 `drop_run_trigger_github`). **Model error monitoring** (`ErrorGroup`, `ErrorEvent`, `SourceMapArtifact`) dan
@@ -13,6 +14,13 @@ Tidak ada model `Run` maupun `Trigger` — keduanya di-drop saat pindah ke sesi 
 bersama error monitoring & cross-audit (migrasi `drop_errors_sdk_crossaudit`). Enum
 stage/source/priority/ticket-status/ticket-category disimpan sebagai `String` dan divalidasi zod di
 `@hanoman/shared` (`enums.ts`), bukan enum Prisma.
+
+**`RuntimeAccount`** ([ADR-0234](../adr/0234-multi-akun-runtime.md)) — akun langganan runtime di mesin ini:
+`runtime`, `label` (unik per runtime), `homeDir` (`$HANOMAN_HOME/accounts/<runtime>/<id>`), `identity`
+`{email?, plan?}` untuk tampilan, `status` `belum-login|aktif|perlu-login-ulang`. LOCAL-only, tanpa kredensial
+(kredensial hidup di `homeDir`/Keychain). Akun bawaan tak punya baris (`default:<runtime>`).
+`SessionHistory.accountId` mencatat akun saat sesi lahir. Default per runtime di `Setting.accounts`, yang
+hanya ditulis `PUT /api/runtime-accounts/default`.
 
 **Presence sesi lintas device TIDAK punya model** (SPEC-919 ·
 [ADR-0148](../adr/0148-status-hidup-tidak-disync.md)). "Sesi apa yang hidup di device mana" hidup di

@@ -8,6 +8,7 @@ import { zLeadProject } from "./lead";
 import { DEFAULT_METHOD } from "./method-catalog";
 import { REMOTE_CONTROL_DEFAULTS, zRemoteControl } from "./relay";
 import { LOG_RETENTION_DEFAULTS, LOG_SHIPPING_DEFAULTS, zLogRetention, zLogShipping } from "./logs";
+import { zRuntimeAccountDefaults } from "./runtime-accounts";
 import {
   BUILTIN_ORCHESTRATION_DEFAULTS, BUILTIN_RUNTIME_DEFAULTS, zBuiltinRuntimeDefaults,
 } from "./runtime-defaults";
@@ -506,6 +507,10 @@ export const zSetting = z.object({
   remoteControl: zRemoteControl.default(REMOTE_CONTROL_DEFAULTS),      // grant kendali jarak jauh (default mati)
   logShipping: zLogShipping.default(LOG_SHIPPING_DEFAULTS),            // lajur log ke hub (SPEC-1217)
   logRetention: zLogRetention.default(LOG_RETENTION_DEFAULTS),         // retensi log di hub (SPEC-1217)
+  // ADR-0234 · default akun runtime per mesin. LOCAL (setting tak ada di SYNCED) dan TAK ditulis
+  // `PUT /settings` (routes/settings.ts mempertahankan nilai tersimpan) — pengelolanya
+  // `PUT /api/runtime-accounts/default`. Absen = akun bawaan `default:<runtime>`.
+  accounts: zRuntimeAccountDefaults.default({}),
   // SPEC-881 · ADR-0136 · sidik jari isi bawaan yang TERAKHIR ditulis seed di mesin ini, per nama
   // agen. Dipakai seed untuk membedakan "belum pernah disunting operator" dari "sudah". WAJIB
   // dideklarasikan di sini: zod membuang kunci tak dikenal dan `PUT /settings` menulis balik hasil

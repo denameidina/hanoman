@@ -82,7 +82,7 @@ Butuh operator untuk langkah login. Hasilnya menentukan konstanta di Task 2/3 da
 **Interfaces:**
 - Produces: nilai terverifikasi untuk `claudeKeychainService()` (Task 3), `MIRRORED_CLAUDE_KEYS` (Task 2), dan keputusan agy (Task 10).
 
-- [ ] **Step 1: Codex — apakah symlink `config.toml` bertahan saat codex menulis (otomatis)**
+- [x] **Step 1: Codex — apakah symlink `config.toml` bertahan saat codex menulis (otomatis)**
 
 ```bash
 B=$(mktemp -d); A=$(mktemp -d)
@@ -117,7 +117,7 @@ CLAUDE_CONFIG_DIR="$D" claude --dangerously-skip-permissions
 
 Catat setiap dialog yang muncul sebelum prompt (onboarding/tema/bypass/trust) dan kunci `~/.claude.json` mana yang menekannya. Daftar akhirnya menjadi `MIRRORED_CLAUDE_KEYS` (Task 2). Bersihkan: `CLAUDE_CONFIG_DIR="$D" claude auth logout; rm -rf "$D"`.
 
-- [ ] **Step 4: Antigravity — cari isolasi per direktori (batas 30 menit)**
+- [x] **Step 4: Antigravity — cari isolasi per direktori (batas 30 menit)**
 
 ```bash
 AGY=$(readlink -f ~/.local/bin/agy)
@@ -216,7 +216,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - Prisma `RuntimeAccount { id, runtime, label, homeDir, identity Json?, status, createdAt, lastLoginAt? }`, `SessionHistory.accountId String?`
   - paths: `paths.runtimeAccounts`, `paths.runtimeAccount(id)`, `paths.runtimeAccountsDefault`, `paths.runtimeAccountLogin(id)`, `paths.runtimeAccountCheck(id)`, `paths.limitsAccounts`
 
-- [ ] **Step 1: Tulis test yang gagal — `PUT /settings` mempertahankan `accounts`**
+- [x] **Step 1: Tulis test yang gagal — `PUT /settings` mempertahankan `accounts`**
 
 Create `server/test/runtime-accounts-settings.test.ts`:
 
@@ -250,12 +250,12 @@ describe("Setting.accounts", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: SRV `server/test/runtime-accounts-settings.test.ts`
 Expected: FAIL — `accounts` undefined (zod membuang kunci tak dikenal).
 
-- [ ] **Step 3: Buat `shared/src/runtime-accounts.ts`**
+- [x] **Step 3: Buat `shared/src/runtime-accounts.ts`**
 
 ```ts
 import { z } from "zod";
@@ -323,7 +323,7 @@ Tambahkan di `shared/src/index.ts` (di antara baris `export * from …` lain):
 export * from "./runtime-accounts";
 ```
 
-- [ ] **Step 4: `zSetting.accounts`**
+- [x] **Step 4: `zSetting.accounts`**
 
 Di `shared/src/entities.ts`, impor di bagian atas:
 
@@ -340,7 +340,7 @@ Di `zSetting`, tepat sesudah baris `logRetention: zLogRetention.default(LOG_RETE
   accounts: zRuntimeAccountDefaults.default({}),
 ```
 
-- [ ] **Step 5: `PUT /settings` mempertahankan `accounts`**
+- [x] **Step 5: `PUT /settings` mempertahankan `accounts`**
 
 Di `server/src/routes/settings.ts`, objek `data` (±:44-48) jadi:
 
@@ -354,12 +354,12 @@ Di `server/src/routes/settings.ts`, objek `data` (±:44-48) jadi:
     };
 ```
 
-- [ ] **Step 6: Jalankan test, pastikan lulus**
+- [x] **Step 6: Jalankan test, pastikan lulus**
 
 Run: SRV `server/test/runtime-accounts-settings.test.ts`
 Expected: PASS (2 test).
 
-- [ ] **Step 7: DTO, event, path**
+- [x] **Step 7: DTO, event, path**
 
 Di `shared/src/dto.ts`:
 
@@ -388,7 +388,7 @@ Di `shared/src/api.ts`, sesudah `limits: \`${API}/limits\`,` tambahkan:
   runtimeAccountCheck: (id: string) => `${API}/runtime-accounts/${encodeURIComponent(id)}/check`,
 ```
 
-- [ ] **Step 8: Skema Prisma**
+- [x] **Step 8: Skema Prisma**
 
 Di `server/prisma/schema.prisma`, dalam `model SessionHistory` sesudah `transcriptBytes Int?`:
 
@@ -418,7 +418,7 @@ model RuntimeAccount {
 }
 ```
 
-- [ ] **Step 9: Migration**
+- [x] **Step 9: Migration**
 
 ```bash
 mkdir -p server/prisma/migrations/20261101090000_runtime_account
@@ -453,7 +453,7 @@ CREATE UNIQUE INDEX "RuntimeAccount_runtime_label_key" ON "RuntimeAccount"("runt
 
 Lalu `pnpm db:generate`.
 
-- [ ] **Step 10: `PG_ORDER`**
+- [x] **Step 10: `PG_ORDER`**
 
 `cli/test/migrate-pg.test.ts` menuntut `PG_ORDER` = seluruh model DMMF. Di `cli/src/commands/migrate-pg.ts`, sesudah baris `"RuntimeConfig", "LeadFlow", "LeadDecision",` tambahkan:
 
@@ -462,7 +462,7 @@ Lalu `pnpm db:generate`.
   "RuntimeAccount",
 ```
 
-- [ ] **Step 11: Dokumentasi data model**
+- [x] **Step 11: Dokumentasi data model**
 
 Di `internal/docs/architecture/data-model.md`, pada daftar model pendukung LOCAL-only (baris yang menyebut `LocalBinding, SyncOutbox, …, RuntimeConfig`), tambahkan `**RuntimeAccount**` (ADR-0234), dan satu paragraf:
 
@@ -474,14 +474,14 @@ tak punya baris (`default:<runtime>`). `SessionHistory.accountId` mencatat akun 
 Default per runtime di `Setting.accounts`.
 ```
 
-- [ ] **Step 12: Verifikasi**
+- [x] **Step 12: Verifikasi**
 
 Run: SRV `server/test/runtime-accounts-settings.test.ts cli/test/migrate-pg.test.ts server/test/sync-parents-dmmf.test.ts`
 Expected: PASS.
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck`
 Expected: tanpa error.
 
-- [ ] **Step 13: Commit**
+- [x] **Step 13: Commit**
 
 ```bash
 /usr/bin/git add shared/src/runtime-accounts.ts shared/src/index.ts shared/src/entities.ts shared/src/dto.ts shared/src/api.ts \

@@ -40,6 +40,8 @@ export const PG_ORDER = [
   // tautannya bagi pembaca berikutnya.
   "SchedulerQueueItem", "SchedulerCron", "SchedulerCronRun",
   "RuntimeConfig", "LeadFlow", "LeadDecision",
+  // ADR-0234 · LOCAL-only; sumber Postgres lama tak punya tabel ini → jalur 42P01 = nol baris.
+  "RuntimeAccount",
   // SPEC-476 · ADR-0096 · tabel gateway LOCAL-only; sumber Postgres lama lazimnya tidak punya
   // tabel ini dan jalur 42P01 di bawah memperlakukannya sebagai nol baris.
   "TelegramGatewayState", "TelegramChat", "TelegramUpdate", "TelegramMemory",

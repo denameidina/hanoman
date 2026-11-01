@@ -478,6 +478,9 @@ model SessionHistory {
   reconciledAt    DateTime?
   transcriptKey   String?
   transcriptBytes Int?
+  // ADR-0234 · akun runtime saat sesi lahir (`RuntimeAccount.id` atau `default:<runtime>`). Tanpa FK:
+  // riwayat bertahan sesudah akunnya dihapus. null = baris lama / akun bawaan.
+  accountId       String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -796,6 +799,22 @@ model RuntimeConfig {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ADR-0234 · akun langganan runtime (claude/codex/antigravity) di mesin ini. LOCAL-only: tak masuk
+// SYNCED/FIELDS sync. Kredensial TIDAK di sini — ia hidup di `homeDir` (atau Keychain macOS).
+// Akun bawaan tak punya baris: id tetap `default:<runtime>`.
+model RuntimeAccount {
+  id          String    @id
+  runtime     String
+  label       String
+  homeDir     String
+  identity    Json?
+  status      String    @default("belum-login")
+  createdAt   DateTime  @default(now())
+  lastLoginAt DateTime?
+
+  @@unique([runtime, label])
 }
 
 // SPEC-476 · ADR-0096 · seluruh state gateway Telegram bersifat LOCAL-only. Telegram adalah kanal
