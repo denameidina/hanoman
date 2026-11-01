@@ -3164,7 +3164,7 @@ Lewati task ini bila spike Task 0 Step 4 menemukan isolasi per direktori (catat 
   - `type AgyIo = { run: SecurityRun; readFile(p): string | null; writeFile(p, s): void; removeFile(p): void; tokenFile: string; accountsDir: string; liveAgyAccountIds(): string[] }`
   - `activeAgyAccount(io?): string`, `captureActiveSlot(io?): void`, `activateAgyAccount(targetId, io?): void` (melempar `AccountError` busy), `readSlot(accountId, io?): AgySlot | null`, `probeAgyLogin(accountId, io?): LoginProbe`, `agyAccountLimits(row): Promise<LimitsDTO>`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/runtime-accounts-agy.test.ts`:
 
@@ -3268,7 +3268,7 @@ describe("mode tukar agy", () => {
 Run: SRV `server/test/runtime-accounts-agy.test.ts`
 Expected: FAIL — modul tak ada.
 
-- [ ] **Step 2: Implementasi `antigravity-swap.ts`**
+- [x] **Step 2: Implementasi `antigravity-swap.ts`**
 
 Create `server/src/services/runtime-accounts/antigravity-swap.ts`:
 
@@ -3404,7 +3404,7 @@ export async function agyAccountLimits(row: AccountRow, io: AgyIo = fsIo()): Pro
 `secret-box` membaca/membuat kuncinya di `$HANOMAN_HOME` (`secretKeyPath()`), jadi test mengarahkan
 `HANOMAN_HOME` ke direktori tmp (lihat `beforeEach` di Step 1) dan memanggil `resetSecretKeyCache()`.
 
-- [ ] **Step 3: Cabang agy di resolver & validasi**
+- [x] **Step 3: Cabang agy di resolver & validasi**
 
 Di `server/src/services/runtime-accounts/resolver.ts`:
 
@@ -3431,7 +3431,7 @@ Di `server/src/services/runtime-accounts/resolver.ts`:
 
 Route terminal (Task 5 Step 8) sudah memetakan `AccountError` → status; resolver yang melempar di dalam `createSession` dari jalur otomatis tertangkap pemanggilnya sebagai kegagalan peluncuran biasa.
 
-- [ ] **Step 4: Pasang di `install.ts`**
+- [x] **Step 4: Pasang di `install.ts`**
 
 Tambahkan ke `installRuntimeAccounts()` (sebelum `void refreshAllStatuses()`):
 
@@ -3451,13 +3451,13 @@ dan di `openLoginSession` (login.ts) — untuk runtime `antigravity`, panggil `a
 Builtin agy di limits: ubah `builtin.antigravity` di `prodDeps` (Task 7) menjadi
 `() => activeAgyAccount() === builtinAccountId("antigravity") ? getAntigravityLimits() : agyAccountLimits({ id: builtinAccountId("antigravity") } as AccountRow)` supaya limit akun bawaan tetap terbaca saat akun lain aktif.
 
-- [ ] **Step 5: Jalankan test**
+- [x] **Step 5: Jalankan test**
 
 Run: SRV `server/test/runtime-accounts-agy.test.ts server/test/runtime-accounts-registry.test.ts server/test/runtime-accounts-limits.test.ts server/test/runtime-accounts.route.test.ts`
 Expected: PASS.
 Run: `pnpm --filter ./server typecheck`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 /usr/bin/git add server/src/services/runtime-accounts/antigravity-swap.ts server/src/services/runtime-accounts/resolver.ts \

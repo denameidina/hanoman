@@ -108,6 +108,19 @@ describe("resolver", () => {
     expect(warns).toHaveLength(1);
   });
 
+  it("agy: tanpa akun agy terdaftar → tak ada penukaran; dengan akun → slot target diaktifkan", async () => {
+    const calls: string[] = [];
+    const d = { ...quiet, activateAgy: (id: string) => { calls.push(id); } };
+    expect(resolveLaunchAccount("antigravity", undefined, d)).toBeNull();
+    expect(calls).toEqual([]);
+    const a = await createAccount("antigravity", "G");
+    _setAccountSnapshot({ rows: accountSnapshot().rows.map((r) => (r.id === a.id ? { ...r, status: "aktif" as const } : r)) });
+    expect(resolveLaunchAccount("antigravity", a.id, d)).toEqual({ id: a.id, env: {}, unset: [] });
+    // Default = bawaan → slot bawaan diaktifkan kembali (akun lain mungkin sedang memegang Keychain).
+    expect(resolveLaunchAccount("antigravity", undefined, d)).toBeNull();
+    expect(calls).toEqual([a.id, "default:antigravity"]);
+  });
+
   it("sandbox aktif → selalu null", async () => {
     const a = await createAccount("claude", "K");
     await checkAccount(a.id, probes);
