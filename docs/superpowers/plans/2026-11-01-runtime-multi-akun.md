@@ -3512,7 +3512,7 @@ Run: SRV seluruh berkas test server dari daftar itu, lalu WEB seluruh berkas tes
 Run: `pnpm --filter ./shared typecheck && pnpm --filter ./server typecheck && pnpm --filter ./src typecheck && pnpm --filter ./cli typecheck`
 Expected: hijau, kecuali gagal baseline yang tercantum di Global Constraints (buktikan dengan menjalankan berkas yang sama di `main`).
 
-- [ ] **Step 4: Uji endpoint nyata (boot server + curl)**
+- [x] **Step 4: Uji endpoint nyata (boot server + curl)**
 
 ```bash
 pnpm --filter ./server build

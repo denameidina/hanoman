@@ -62,7 +62,18 @@ runtime dan per sesi, dan melihat limit tiap akun — dengan skills dan konfigur
 - **Antigravity 1.4.12:** `ANTIGRAVITY_GEMINI_DIR` tak berefek, flag tersembunyi `--gemini_dir=<dir>`
   memindahkan data (config, percakapan, cache) tetapi `agy -p` di direktori kosong tetap login lewat Keychain
   bersama. `AGY_ACCOUNT` hanya untuk akun plugin. Tak ada isolasi login per direktori → keputusan 8.
-- Dialog sesi pertama claude di config dir baru: diverifikasi pada uji manual akhir (lihat di bawah).
+- Dialog sesi pertama claude di config dir baru: belum diverifikasi end-to-end (butuh login akun kedua oleh
+  operator); `MIRRORED_CLAUDE_KEYS` menyalin status onboarding/tema/bypass dari `.claude.json` bawaan.
+
+## Verifikasi akhir (2026-11-01)
+
+Server hasil build di-boot terisolasi (`HANOMAN_HOME` baru, socket tmux sendiri) dan diuji lewat HTTP:
+daftar 3 akun bawaan; buat akun codex → home 0700 dengan symlink `config.toml`/`skills`/`AGENTS.md`; label
+duplikat 409; set default + `PUT /settings` mempertahankan `accounts`; `GET /limits/accounts` tanpa email;
+Start backlog dengan akun asing 404, runtime salah 409, belum login 409; `POST …/login` (device auth)
+membuka pane `acct-login-<id>` yang menjalankan `codex login` dengan `CODEX_HOME` akun; hapus akun → home
+hilang, `~/.codex` bawaan utuh, default kembali ke bawaan; hapus akun bawaan 400. Semua lulus.
+Suite yang tersentuh: server 122/127 berkas lulus — 5 sisanya gagal identik di `main` (baseline).
 
 ## Konsekuensi
 
