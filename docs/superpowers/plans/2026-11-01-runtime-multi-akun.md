@@ -510,7 +510,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `mirrorClaudeJson(accountHome, baseJsonPath?): void`
   - `prepareAccountHome(runtime, homeDir): { linked: string[]; drift: string[] }`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `server/test/runtime-accounts-home.test.ts`:
 
@@ -602,12 +602,12 @@ describe("mirrorClaudeJson", () => {
 });
 ```
 
-- [ ] **Step 2: Jalankan, pastikan gagal**
+- [x] **Step 2: Jalankan, pastikan gagal**
 
 Run: SRV `server/test/runtime-accounts-home.test.ts`
 Expected: FAIL — modul `runtime-accounts/home` tak ada.
 
-- [ ] **Step 3: Implementasi `paths.ts`**
+- [x] **Step 3: Implementasi `paths.ts`**
 
 Create `server/src/services/runtime-accounts/paths.ts`:
 
@@ -640,7 +640,7 @@ export function insideAccountsRoot(path: string, env: NodeJS.ProcessEnv = proces
 }
 ```
 
-- [ ] **Step 4: Implementasi `home.ts`**
+- [x] **Step 4: Implementasi `home.ts`**
 
 Create `server/src/services/runtime-accounts/home.ts` (isi `MIRRORED_CLAUDE_KEYS` disesuaikan dengan hasil Task 0 Step 3):
 
@@ -724,12 +724,12 @@ export function prepareAccountHome(runtime: RuntimeName, homeDir: string): { lin
 }
 ```
 
-- [ ] **Step 5: Jalankan test, pastikan lulus**
+- [x] **Step 5: Jalankan test, pastikan lulus**
 
 Run: SRV `server/test/runtime-accounts-home.test.ts`
 Expected: PASS (9 test).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 /usr/bin/git add server/src/services/runtime-accounts/paths.ts server/src/services/runtime-accounts/home.ts \
