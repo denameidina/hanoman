@@ -25,6 +25,8 @@ import { usePersistedState, isStr, isBool, isNum } from "../ui-state";
 import { clampFontSize, shouldCollapseToTabs, FONT_DEFAULT, FONT_DEFAULT_MOBILE,
   FONT_MIN, FONT_MAX, MIN_PANE_WIDTH } from "./terminal-chrome";
 import { chipAccessibleName, chipTone, formatDuration, modelLabel, type ChipTone } from "./phase-chip";
+import { useAccountLimits } from "../api/account-limits";
+import { isBuiltinAccountId } from "@hanoman/shared";
 import { RAIL_PILL, SessionRail, type RailItem } from "./TerminalRail";
 import { groupByProject, isTerminalView, railStartedMs, railStatus, resolveFocus, sortRail, type TerminalView } from "./terminal-rail";
 import { relativeTime } from "../lib/time-format";
@@ -386,6 +388,8 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
             agent: r.agent === "antigravity" ? "antigravity" : r.agent === "codex" ? "codex" : "claude",
             ...(r.model ? { model: r.model } : {}),
             ...(r.effort ? { effort: r.effort } : {}),
+            // ADR-0234 · akun runtime sesi asal ikut — "Mulai lagi" berjanji konteks yang sama.
+            ...(r.accountId ? { account: r.accountId } : {}),
             ...(force ? { force } : {}),
           })
         : r.kind === "shell"
@@ -399,6 +403,7 @@ export function TerminalScreen({ userId = "test-user", projects, backlog = NO_BA
                 agent: r.agent === "antigravity" ? "antigravity" : r.agent === "codex" ? "codex" : "claude",
                 ...(r.model ? { model: r.model } : {}),
                 ...(r.effort ? { effort: r.effort } : {}),
+                ...(r.accountId ? { account: r.accountId } : {}),   // ADR-0234
               })
             : await (force ? api.createTerminalFlow(r.projectId, r.kind as Flow, { force })
               : api.createTerminalFlow(r.projectId, r.kind as Flow));
@@ -1386,6 +1391,14 @@ export function PhaseStrip({ phases, compact = false, now, onOpenMockup }: {
 
 const Cell = React.memo(CellImpl);
 
+// ADR-0234 · label akun runtime dari siaran `accountLimits`. Akun bawaan / sesi lama → null (tanpa chip).
+function useAccountLabel(accountId: string | undefined): string | null {
+  const own = !!accountId && !isBuiltinAccountId(accountId);
+  const all = useAccountLimits(own);
+  if (!own) return null;
+  return all.find((a) => a.accountId === accountId)?.label ?? accountId;
+}
+
 function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, onExit, onReview, onSessionReview, titleOf, onIntegrate, onIntegrateSession, specOf, fontSize, showKeys, predict, diag, screenReader, fullscreen, onFullscreen, onDialog, onRename, paneHidden }: {
   session: TerminalSession; nameOf: (pid: string) => string;
   onClose: () => void; onForget: () => void; canArrange: boolean; onDetach: () => void; onExit: (code: number) => void;
@@ -1452,6 +1465,8 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
   // satu-satunya aksi yang menghentikan agen, jadi ia berdiri sendiri dan dikonfirmasi.
   // Menu ⋯ sel grid: satu sumber dengan rail dan pane fokus (sessionMenuItems). Sel grid tetap
   // memegang tombol × sendiri, jadi menunya tak memuat "Tutup".
+  // ADR-0234 · label akun runtime sesi (hanya akun non-bawaan; instalasi satu akun tak berubah).
+  const accountLabel = useAccountLabel(session.accountId);
   const menuItems = sessionMenuItems(session, {
     label, canArrange, specOf, onReview, onSessionReview, onIntegrate, onIntegrateSession,
     onDialog, onDetach, onFullscreen, onRename,
@@ -1472,6 +1487,11 @@ function CellImpl({ session, nameOf, onClose, onForget, canArrange, onDetach, on
           {label} · {session.id.slice(0, 6)}
         </span>
         {/* ADR-0164 · model & effort orchestrator; model tiap fase ada di chip PhaseStrip. */}
+        {accountLabel && (
+          <span data-testid="account-chip" title="Akun runtime sesi ini" className="hn-terminal-orch">
+            {accountLabel}
+          </span>
+        )}
         {session.orchestrated && session.model && (
           <span data-testid="orchestrator-chip" title="Model & effort orchestrator"
             className="hn-terminal-orch">

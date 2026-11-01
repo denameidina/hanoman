@@ -22,8 +22,16 @@ function subscribe(cb: () => void): () => void {
   };
 }
 
-export function useAccountLimits(): AccountLimitsDTO[] {
-  return useSyncExternalStore(subscribe, () => state, () => state);
+const EMPTY: AccountLimitsDTO[] = [];
+const noSubscribe = () => () => {};
+
+/**
+ * `enabled=false` → tak berlangganan sama sekali (dan mengembalikan []). Dipakai chip akun sesi: sesi
+ * tanpa akun non-bawaan — mayoritas — tak perlu menambah pelanggan ke kanal siar.
+ */
+export function useAccountLimits(enabled = true): AccountLimitsDTO[] {
+  return useSyncExternalStore(enabled ? subscribe : noSubscribe,
+    () => (enabled ? state : EMPTY), () => (enabled ? state : EMPTY));
 }
 
 /**

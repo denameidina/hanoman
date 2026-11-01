@@ -41,3 +41,7 @@
 }
 .hn-lim-eyebrow { margin-bottom: 8px; }
 .hn-lim-footnote { font-size: var(--text-xs); color: var(--text-subtle); margin-top: 6px; line-height: 1.45; }
+
+/* ADR-0234 · daftar akun runtime di popover limit. */
+.hn-lim-accounts { display: flex; flex-direction: column; gap: 12px; }
+.hn-lim-account + .hn-lim-account { border-top: 1px solid var(--bone-200); padding-top: 8px; }

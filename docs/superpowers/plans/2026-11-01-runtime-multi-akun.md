@@ -2892,7 +2892,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `<AccountField agent accounts value onChange />` (null bila runtime < 2 akun)
   - `TerminalSession.accountId?: string`
 
-- [ ] **Step 1: Tulis test yang gagal**
+- [x] **Step 1: Tulis test yang gagal**
 
 Create `src/src/screens/AccountField.test.tsx`:
 
@@ -2952,7 +2952,7 @@ describe("<AccountField>", () => {
 Run: WEB `src/src/screens/AccountField.test.tsx`
 Expected: FAIL — modul tak ada.
 
-- [ ] **Step 2: `limit-reset.ts` & logika di `session-runtime.ts`**
+- [x] **Step 2: `limit-reset.ts` & logika di `session-runtime.ts`**
 
 Create `src/src/lib/limit-reset.ts`:
 
@@ -3003,7 +3003,7 @@ export function accountOptionLabel(a: AccountLimitsDTO, now: number = Date.now()
 }
 ```
 
-- [ ] **Step 3: Komponen `AccountField`**
+- [x] **Step 3: Komponen `AccountField`**
 
 Create `src/src/screens/AccountField.tsx`:
 
@@ -3040,7 +3040,7 @@ Periksa `Select` di `src/src/ds` menerima `disabled` per opsi (`grep -n "options
 
 Run: WEB `src/src/screens/AccountField.test.tsx` → PASS.
 
-- [ ] **Step 4: Pasang di dialog Start (`App.tsx`)**
+- [x] **Step 4: Pasang di dialog Start (`App.tsx`)**
 
 Di komponen dialog Start (`App.tsx` ±:140-360):
 
@@ -3062,7 +3062,7 @@ Di komponen dialog Start (`App.tsx` ±:140-360):
            ...(!isRemoteTarget && account && accountsList.filter((x) => x.runtime === agent).length >= 2 ? { account } : {}),
    ```
 
-- [ ] **Step 5: Pasang di `NewTerminalModal`**
+- [x] **Step 5: Pasang di `NewTerminalModal`**
 
 Di `src/src/screens/NewTerminalModal.tsx`, pola yang sama:
 
@@ -3075,7 +3075,7 @@ Di `src/src/screens/NewTerminalModal.tsx`, pola yang sama:
 
 Jalankan test form yang sudah ada: WEB `src/test/new-terminal-runtime.test.tsx` dan test dialog Start (`grep -rln "StartSessionModal\|startSession" src/test src/src --include=*.test.tsx`). Mock parsial tanpa `getAccountLimits` tetap lulus karena `loadAccountLimits` tak pernah melempar; bila ada yang gagal karena `account-limits` mengimpor `./events`, tambahkan `vi.mock("../src/api/account-limits", () => ({ loadAccountLimits: async () => [], useAccountLimits: () => [] }))` di berkas itu.
 
-- [ ] **Step 6: Chip akun di Terminal**
+- [x] **Step 6: Chip akun di Terminal**
 
 1. `src/src/api/client.ts` tipe `TerminalSession`: sesudah `name?: string;` tambahkan `/** ADR-0234 · akun runtime sesi; absen = akun bawaan. */ accountId?: string;`
 2. `src/src/screens/TerminalScreen.tsx`: impor `useAccountLimits` dan `isBuiltinAccountId`. Di komponen header sel (tempat `orchestrator-chip` dirender, :1471-1480) tambahkan:
@@ -3089,7 +3089,7 @@ Jalankan test form yang sudah ada: WEB `src/test/new-terminal-runtime.test.tsx` 
    ```
    dengan `const accountLabels = new Map(useAccountLimits().map((a) => [a.accountId, a.label]));` di badan komponen yang sama (hook di level atas komponen, bukan di dalam kondisi). Bila komponen header bukan komponen tersendiri, letakkan hook di komponen terdekat yang merender header dan teruskan `accountLabels` sebagai prop.
 
-- [ ] **Step 6b: "Mulai lagi" dari riwayat membawa akun yang sama**
+- [x] **Step 6b: "Mulai lagi" dari riwayat membawa akun yang sama**
 
 Di `src/src/screens/TerminalScreen.tsx` (±:384-402, fungsi restart dari baris riwayat `r`): pada objek
 `api.startSession({ … })` dan `api.createTerminal(r.projectId, { … })` tambahkan
@@ -3099,7 +3099,7 @@ Akun yang sudah dihapus dijawab server `404 account-not-found`; pesan galatnya t
 restart yang sudah ada (periksa bahwa `catch` di fungsi itu menampilkan `ApiError.detail.message` bila ada;
 bila hanya status, tambahkan `message` ke teks galatnya).
 
-- [ ] **Step 7: Popover limit menampilkan semua akun + "sudah reset"**
+- [x] **Step 7: Popover limit menampilkan semua akun + "sudah reset"**
 
 Di `src/src/screens/LimitIndicator.tsx`:
 
@@ -3128,13 +3128,13 @@ Di `src/src/screens/LimitIndicator.tsx`:
 
 Jalankan test limit yang ada (`ls src/test src/src/screens | grep -i limit`) — bila me-mock store limit tanpa `account-limits`, tambahkan `vi.mock("../src/api/account-limits", () => ({ useAccountLimits: () => [] }))` (sesuaikan path relatif).
 
-- [ ] **Step 8: Jalankan test**
+- [x] **Step 8: Jalankan test**
 
 Run: WEB `src/src/screens/AccountField.test.tsx` + semua test web yang disentuh di Step 4–7.
 Expected: PASS (kecuali baseline `settings-search`).
 Run: `pnpm --filter ./src typecheck`.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 /usr/bin/git add src/src/lib/limit-reset.ts src/src/screens/AccountField.tsx src/src/screens/AccountField.test.tsx \

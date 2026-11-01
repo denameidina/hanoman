@@ -2,9 +2,11 @@ import React from "react";
 import { Modal, Button, Select, Field, Callout, Checkbox } from "../ds";
 import { api } from "../api/client";
 import { failureMessage } from "../lib/report-error";
-import { codexClientTooOld, codexModel, CODEX_DEFAULTS, BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS, type Agent } from "@hanoman/shared";
+import { codexClientTooOld, codexModel, CODEX_DEFAULTS, BUILTIN_ANTIGRAVITY_RUNTIME_DEFAULTS, type Agent, type AccountLimitsDTO } from "@hanoman/shared";
 import { AntigravityVersionNote } from "./settings/fields";
-import { runtimeCoerceEffort, runtimeOptions, runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./session-runtime";
+import { runtimeCoerceEffort, runtimeOptions, runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs, defaultAccountId, accountChoice } from "./session-runtime";
+import { AccountField } from "./AccountField";
+import { loadAccountLimits } from "../api/account-limits";
 import "./styles/terminal.css";
 
 /**
@@ -38,6 +40,9 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
   const [createError, setCreateError] = React.useState<string | null>(null);
   // SPEC-339 · versi codex CLI terpasang; null = tak terdeteksi (dan itu tak memicu peringatan).
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
+  // ADR-0234 · akun runtime mesin ini. Kosong = field Akun tersembunyi.
+  const [accountsList, setAccountsList] = React.useState<AccountLimitsDTO[]>([]);
+  const [account, setAccount] = React.useState("");
   // ADR-0232 · worktree terpisah (opsional): sesi tak menyentuh working tree project — dan karena
   // itu tak menimpa sesi lain yang juga terbuka di sana. "" = HEAD checkout project.
   const [worktree, setWorktree] = React.useState(false);
@@ -60,6 +65,7 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
       const a: Agent = s.agent ?? "claude";
       const r = runtimeFor(d, a);
       setDefs(d); setAgent(a); setModel(r.model); setEffort(r.effort);
+      void loadAccountLimits().then((l) => { setAccountsList(l); setAccount(defaultAccountId(l, a)); });
     }).catch((e: unknown) => {
       setSettingsNotice(`${failureMessage("memuat pengaturan", e)} · memakai default bawaan`);
     });
@@ -93,6 +99,7 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
 
   const pickAgent = (a: Agent) => {
     setAgent(a);
+    setAccount(defaultAccountId(accountsList, a));   // ADR-0234
     const r = runtimeFor(defs, a);
     setModel(r.model); setEffort(r.effort);
   };
@@ -108,6 +115,7 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
     try {
       const { id } = await api.createTerminal(projectId, {
         agent, model, effort,
+        ...accountChoice(accountsList, agent, account),   // ADR-0234
         ...(worktree ? { worktree: true, ...(branchFrom ? { branchFrom } : {}) } : {}),
       });
       onCreated(id);
@@ -146,6 +154,8 @@ export function NewTerminalModal({ open, projectId, projectName, projects, onPro
           options={runtimeOptions}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickAgent(e.target.value as Agent)} />
       </Field>
+      <AccountField agent={agent} accounts={accountsList} value={account} onChange={setAccount}
+        className="hn-terminal-field-full" />
       <Field label="Model">
         <Select aria-label="Model" value={model} className="hn-terminal-field-full"
           options={runtimeModelOptions(agent, model)}

@@ -1,10 +1,12 @@
 import React from "react";
-import type { LimitsDTO } from "@hanoman/shared";
+import type { AccountLimitsDTO, Agent, LimitsDTO } from "@hanoman/shared";
 // Import langsung dari file komponen, bukan barrel `../ds`: barrel meng-ekspor `Shell`, dan
 // shell.tsx meng-import <LimitBadge> dari sini — lewat barrel itu jadi siklus impor.
 import { useLimits, worstWindow, severityToken } from "../api/limits";
 import { useCodexLimits } from "../api/codex-limits";
 import { useAntigravityLimits } from "../api/antigravity-limits";
+import { useAccountLimits } from "../api/account-limits";
+import { resetPassed } from "../lib/limit-reset";
 import { usePopoverFocus } from "../ds/popover";
 import { relativeTime } from "../lib/time-format";
 import { LIMIT_SEVERITY_LABEL } from "../lib/labels";
@@ -62,6 +64,8 @@ export function LimitWindows({ dto, emptyHint }: { dto: LimitsDTO; emptyHint?: s
     <div className="hn-lim-windows">
       {dto.windows.map((w) => {
         const tok = severityToken(w.severity);
+        // ADR-0234 · data lama yang window-nya sudah reset → "sudah reset", bukan persen lama.
+        const reset = resetPassed(w, dto.status);
         return (
           <div key={w.key} className="hn-lim-window" style={cssVars({ "--lim-fg": tok.fg })}>
             <div className="hn-lim-head">
@@ -69,11 +73,11 @@ export function LimitWindows({ dto, emptyHint }: { dto: LimitsDTO; emptyHint?: s
                 {w.label}{w.isActive ? " · aktif" : ""}
               </span>
               <span className="hn-lim-value">
-                <span className="hn-lim-pct">{w.usedPct}%</span>
-                <span className="hn-lim-word">{severityWord(w.severity)}</span>
+                <span className="hn-lim-pct">{reset ? "sudah reset" : `${w.usedPct}%`}</span>
+                {!reset && <span className="hn-lim-word">{severityWord(w.severity)}</span>}
               </span>
             </div>
-            <WindowMeter label={w.label} pct={w.usedPct} severity={w.severity} />
+            <WindowMeter label={w.label} pct={reset ? 0 : w.usedPct} severity={w.severity} />
             {w.resetsAt && (
               <span className="hn-lim-reset">{resetLabel(w.resetsAt, w.key.startsWith("weekly"))}</span>
             )}
@@ -92,10 +96,14 @@ export function LimitWindows({ dto, emptyHint }: { dto: LimitsDTO; emptyHint?: s
 // SPEC-338 · Satu pil + popover untuk SEMUA limit (Claude & Codex). Dua agen tetap dua pil terpisah:
 // angkanya datang dari sumber yang berbeda (Claude: panggilan live; Codex: snapshot sesi terakhir),
 // jadi satu angka "terburuk" lintas keduanya akan mencampur data hidup dengan data historis.
-function LimitPill({ title, dto, mark = "dot", emptyHint, eyebrow, footnote }: {
+function LimitPill({ title, dto: own, mark = "dot", emptyHint, eyebrow, footnote, accounts = [] }: {
   title: string; dto: LimitsDTO; mark?: "dot" | "square" | "diamond"; emptyHint?: string; eyebrow?: string;
   footnote?: React.ReactNode;
+  /** ADR-0234 · semua akun runtime ini. ≥2 akun → pil = akun DEFAULT, popover = daftar semua akun. */
+  accounts?: AccountLimitsDTO[];
 }) {
+  const multi = accounts.length >= 2;
+  const dto = multi ? accounts.find((a) => a.isDefault)?.limits ?? own : own;
   const worst = worstWindow(dto.windows);
   const [open, setOpen] = React.useState(false);
   const popover = usePopoverFocus(open, () => setOpen(false), "dialog");
@@ -136,7 +144,18 @@ function LimitPill({ title, dto, mark = "dot", emptyHint, eyebrow, footnote }: {
         <div ref={popover.panelRef} id={popover.panelId} role="dialog" aria-label={title} tabIndex={-1}
           onKeyDown={popover.onKeyDown} className="hn-viewport-popover hn-lim-popover">
           <div className="hn-eyebrow hn-lim-eyebrow">{eyebrow ?? title}</div>
-          <LimitWindows dto={dto} emptyHint={emptyHint} />
+          {multi ? (
+            <div className="hn-lim-accounts">
+              {accounts.map((a) => (
+                <div key={a.accountId} className="hn-lim-account">
+                  <div className="hn-eyebrow hn-lim-eyebrow">{a.label}{a.isDefault ? " · default" : ""}</div>
+                  <LimitWindows dto={a.limits} emptyHint="Belum terbaca — akun ini belum dipakai atau belum login." />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <LimitWindows dto={dto} emptyHint={emptyHint} />
+          )}
           {footnote && <div className="hn-lim-footnote">{footnote}</div>}
         </div>
       )}
@@ -145,9 +164,15 @@ function LimitPill({ title, dto, mark = "dot", emptyHint, eyebrow, footnote }: {
 }
 
 // Pil limit Claude — self-fetch via useLimits(), tanpa props. Shell cukup merender <LimitBadge/>.
+// ADR-0234 · akun runtime satu runtime (dari siaran `accountLimits`).
+function useRuntimeAccounts(runtime: Agent): AccountLimitsDTO[] {
+  return useAccountLimits().filter((a) => a.runtime === runtime);
+}
+
 export function LimitBadge() {
   const dto = useLimits();
-  return <LimitPill title="Limit Claude" dto={dto} />;
+  const accounts = useRuntimeAccounts("claude");
+  return <LimitPill title="Limit Claude" dto={dto} accounts={accounts} />;
 }
 
 // SPEC-338 · ADR-0074 · pil limit Codex — TERPISAH dari pil Claude (lihat LimitPill).
@@ -155,9 +180,10 @@ export function LimitBadge() {
 // melihat pil "—" permanen. Ia muncul sendiri begitu ada sesi Codex pertama yang melaporkan kuota.
 export function CodexLimitBadge() {
   const dto = useCodexLimits();
-  if (dto.status === "unavailable" || !worstWindow(dto.windows)) return null;
+  const accounts = useRuntimeAccounts("codex");
+  if (accounts.length < 2 && (dto.status === "unavailable" || !worstWindow(dto.windows))) return null;
   return (
-    <LimitPill title="Limit Codex" dto={dto} mark="square"
+    <LimitPill title="Limit Codex" dto={dto} mark="square" accounts={accounts}
       emptyHint="Limit Codex belum terbaca. Jalankan satu sesi Codex dulu."
       eyebrow={`Limit Codex${dto.plan ? ` · paket ${dto.plan}` : ""}`}
       footnote="Dibaca dari sesi Codex terakhir. Nilainya berubah saat sesi Codex berjalan, tidak realtime." />
@@ -168,9 +194,10 @@ export function CodexLimitBadge() {
 // saat `unavailable`, sama seperti Codex: operator yang tak memakai agy tak perlu pil "—" permanen.
 export function AntigravityLimitBadge() {
   const dto = useAntigravityLimits();
-  if (dto.status === "unavailable" || !worstWindow(dto.windows)) return null;
+  const accounts = useRuntimeAccounts("antigravity");
+  if (accounts.length < 2 && (dto.status === "unavailable" || !worstWindow(dto.windows))) return null;
   return (
-    <LimitPill title="Limit Antigravity" dto={dto} mark="diamond"
+    <LimitPill title="Limit Antigravity" dto={dto} mark="diamond" accounts={accounts}
       emptyHint="Limit Antigravity belum terbaca. Login ke agy di host ini dulu."
       footnote="Dibaca dari API kuota Google memakai login agy di host ini. Bila agy tak berjalan, token login kedaluwarsa dan angka yang tampil adalah data terakhir." />
   );

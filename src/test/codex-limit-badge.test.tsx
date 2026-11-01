@@ -3,6 +3,8 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 
 // Store limits berlangganan WS lewat api/events — sumbernya di-mock supaya test bisa mendorong frame.
 let push: ((m: unknown) => void) | null = null;
+// ADR-0234 · badge juga membaca store akun runtime; di sini tak ada akun terdaftar (perilaku lama).
+vi.mock("../src/api/account-limits", () => ({ useAccountLimits: () => [] }));
 vi.mock("../src/api/events", () => ({
   subscribe: (cb: (m: unknown) => void) => { push = cb; return () => { push = null; }; },
 }));
