@@ -4,6 +4,7 @@ import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 import type { LimitsDTO, LimitWindow, LimitSeverity } from "@hanoman/shared";
 import { effectiveStr } from "../config";
+import { readClaudeKeychainToken } from "./runtime-accounts/keychain";
 
 // Sumber limit realtime = endpoint OAuth yang sama dengan `/usage` Claude Code. hanoman tidak
 // memparse output terminal claude (ADR-0024): ia membaca token hidup Claude Code dan memanggil
@@ -41,14 +42,9 @@ const osAccount = (): string | null => {
  * Token kosong tak pernah dikembalikan: ia berarti "coba sumber berikutnya", bukan "tak login".
  */
 export function keychainAccessToken(run: SecurityRun = securityRun, account = osAccount()): string | null {
-  const base = ["find-generic-password", "-s", "Claude Code-credentials"];
-  for (const scope of account ? [["-a", account], []] : [[]]) {
-    try {
-      const tok: unknown = JSON.parse(run([...base, ...scope, "-w"]))?.claudeAiOauth?.accessToken;
-      if (typeof tok === "string" && tok) return tok;
-    } catch { /* entri tak ada / bukan JSON → sumber berikutnya */ }
-  }
-  return null;
+  // ADR-0234 · logika bersama dengan akun runtime (`runtime-accounts/keychain.ts`); service tanpa suffix
+  // = config dir bawaan.
+  return readClaudeKeychainToken("Claude Code-credentials", run, account);
 }
 
 // Keychain dulu (macOS tanpa CLAUDE_CONFIG_DIR eksplisit — di mesin dev berkasnya kedaluwarsa,
@@ -73,7 +69,7 @@ type RawLimit = {
   is_active?: boolean; scope?: { model?: { display_name?: string } } | null;
 };
 
-function mapWindows(json: unknown): LimitWindow[] {
+export function mapWindows(json: unknown): LimitWindow[] {
   const arr = (json as { limits?: unknown } | null)?.limits;
   if (!Array.isArray(arr)) return [];
   return (arr as RawLimit[]).map((l) => {
@@ -92,6 +88,19 @@ function mapWindows(json: unknown): LimitWindow[] {
   });
 }
 
+/** ADR-0234 · satu panggilan usage untuk token tertentu. null = gagal/ditolak; pemanggil memutuskan stale/unavailable. */
+export async function fetchClaudeWindows(token: string, fetchImpl: typeof fetch = fetch): Promise<LimitWindow[] | null> {
+  try {
+    const res = await fetchImpl(USAGE_URL, {
+      headers: { authorization: `Bearer ${token}`, "anthropic-beta": "oauth-2025-04-20" },
+      // SPEC-197 · tanpa timeout, endpoint yang menggantung menahan request ~300s dan poll menumpuk koneksi.
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    return mapWindows(await res.json());
+  } catch { return null; }
+}
+
 function fallback(): LimitsDTO {
   return lastOk ? { ...lastOk, status: "stale" }
                 : { status: "unavailable", windows: [], fetchedAt: null };
@@ -100,18 +109,11 @@ function fallback(): LimitsDTO {
 async function fetchUsage(): Promise<LimitsDTO> {
   const token = readAccessToken();
   if (!token) return fallback();
-  try {
-    const res = await fetch(USAGE_URL, {
-      headers: { authorization: `Bearer ${token}`, "anthropic-beta": "oauth-2025-04-20" },
-      // SPEC-197 · tanpa timeout, endpoint yang menggantung menahan request ~300s dan poll 60s
-      // menumpuk koneksi. AbortError ditangkap catch di bawah → fallback (stale/unavailable).
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return fallback();
-    const dto: LimitsDTO = { status: "ok", windows: mapWindows(await res.json()), fetchedAt: nowIso() };
-    lastOk = dto;
-    return dto;
-  } catch { return fallback(); }
+  const windows = await fetchClaudeWindows(token);
+  if (!windows) return fallback();
+  const dto: LimitsDTO = { status: "ok", windows, fetchedAt: nowIso() };
+  lastOk = dto;
+  return dto;
 }
 
 export async function getLimits(): Promise<LimitsDTO> {

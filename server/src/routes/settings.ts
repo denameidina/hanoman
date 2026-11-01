@@ -45,6 +45,8 @@ export default async function (app: FastifyInstance) {
       ...runtimePreserved,
       builtinRuntimeDefaults: markRuntimeDefaultsUserEdited(before, runtimePreserved),
       remoteControl: before.remoteControl, logShipping: before.logShipping, logRetention: before.logRetention,
+      // ADR-0234 · pilihan akun runtime milik PUT /runtime-accounts/default, bukan form Settings.
+      accounts: before.accounts,
     };
     const row = await prisma.setting.upsert({ where: { id: 1 },
       update: { data }, create: { id: 1, data } });

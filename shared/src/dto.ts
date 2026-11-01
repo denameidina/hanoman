@@ -11,6 +11,7 @@ import {
   type LeadEventView, type LeadApprovalView, type LeadSessionView,
 } from "./lead";
 import { zAutoMerge } from "./auto-merge";
+import { zAccountId, type AccountLimitsDTO } from "./runtime-accounts";
 import { zHandledBy, zHandledByView } from "./handled-by";
 import { zPrdStatus } from "./prd-status";
 import type { Spec, SpecSlim, Notification } from "./entities";
@@ -46,6 +47,8 @@ export const zSessionHistory = z.object({
   // instance lebih baru tak boleh melempar di boundary — `sessionOutcome()` yang menafsirkannya.
   endedReason: z.string().nullable(), reconciledAt: z.string().nullable(),
   exitCode: z.number().nullable(), transcriptBytes: z.number().nullable(),
+  // ADR-0234 · akun runtime saat sesi lahir. null/absen = akun bawaan (atau baris lama).
+  accountId: z.string().nullable().optional(),
 });
 export type SessionHistoryView = z.infer<typeof zSessionHistory>;
 
@@ -473,6 +476,7 @@ export const zTerminalSession = z.union([
   z.object({
     project: z.string(), flow: z.undefined(),
     agent: zAgent.optional(), model: z.string().optional(), effort: z.string().optional(),
+    account: zAccountId.optional(),   // ADR-0234 · akun runtime pilihan form "Sesi baru"
     force: z.boolean().optional(),
     // ADR-0232 · opsional: `worktree:true` → sesi lahir di `.worktrees/<id>` pada branch baru
     // `term/<id>` dari `branchFrom` (kosong → HEAD repo), alih-alih langsung di repoDir. Tanpa
@@ -493,6 +497,7 @@ export const zTerminalSession = z.union([
     phaseOverrides: zPhaseOverrides.optional(),
     goal: z.boolean().optional(), goalCondition: z.string().max(4000).optional(),
     agent: zAgent.optional(),
+    account: zAccountId.optional(),   // ADR-0234 · akun runtime pilihan picker Start
     verifyScope: zVerifyScope.optional(),
     // SPEC-734 · ADR-0113 — metode workflow per SESI: undefined → Spec.payload.method →
     // Setting.method → "superpowers". LENIENT (`z.string()`, bukan `z.enum`): id yang tak dikenal
@@ -889,6 +894,7 @@ export type EventMsg =
   | { t: "notifications"; items: Notification[]; unread: number; total: number; page: number; pageSize: number }
   | { t: "limits"; limits: LimitsDTO }
   | { t: "codexLimits"; limits: CodexLimitsDTO }   // SPEC-338 · ADR-0074 · grup terpisah dari `limits`
+  | { t: "accountLimits"; accounts: AccountLimitsDTO[] }   // ADR-0234 · limit per akun runtime
   | { t: "antigravityLimits"; limits: AntigravityLimitsDTO }   // ADR-0224 · grup terpisah dari `limits`
   | { t: "vps"; vps: VpsView[] }
   | { t: "cleanups"; cleanups: WorktreeCleanupView[] }   // SPEC-742 · ADR-0116

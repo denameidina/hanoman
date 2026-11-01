@@ -51,6 +51,13 @@ export const paths = {
   // ADR-0204 · tandai satu notifikasi terbaca (POST, idempoten).
   notificationRead: (id: string) => `${API}/notifications/${encodeURIComponent(id)}/read`,
   limits: `${API}/limits`,
+  // ADR-0234 · akun runtime & limit per akun.
+  limitsAccounts: `${API}/limits/accounts`,
+  runtimeAccounts: `${API}/runtime-accounts`,
+  runtimeAccount: (id: string) => `${API}/runtime-accounts/${encodeURIComponent(id)}`,
+  runtimeAccountsDefault: `${API}/runtime-accounts/default`,
+  runtimeAccountLogin: (id: string) => `${API}/runtime-accounts/${encodeURIComponent(id)}/login`,
+  runtimeAccountCheck: (id: string) => `${API}/runtime-accounts/${encodeURIComponent(id)}/check`,
   // SPEC-339 · versi codex CLI (peringatan lunak model GPT-5.6).
   codexVersion: `${API}/codex/version`,
   antigravityVersion: `${API}/antigravity/version`,

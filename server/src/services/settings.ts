@@ -34,6 +34,7 @@ export const DEFAULT_SETTING: Setting = {
   remoteControl: REMOTE_CONTROL_DEFAULTS, // SPEC-1215 · ADR-0165 · grant LOCAL-only, default mati
   logShipping: LOG_SHIPPING_DEFAULTS,     // SPEC-1215 · ADR-0166
   logRetention: LOG_RETENTION_DEFAULTS,   // SPEC-1215 · ADR-0166
+  accounts: {},                           // ADR-0234 · default akun runtime (absen = akun bawaan)
   builtinAgents: {},               // SPEC-881 · ADR-0136 · sidik jari seed (lokal, tak disync)
   builtinAgentPolicies: {},        // SPEC-950 · marker safety policy sekali-jalan (lokal)
   builtinRuntimeDefaults: BUILTIN_RUNTIME_DEFAULTS, // seed rekomendasi model/fase; user edit dipertahankan

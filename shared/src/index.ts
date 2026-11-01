@@ -1,5 +1,6 @@
 export const ping = () => "pong";
 export * from "./enums";
+export * from "./runtime-accounts";   // ADR-0234 · multi-akun runtime
 export * from "./spec-source";
 export * from "./method-catalog";
 export * from "./method-status";

@@ -21,6 +21,7 @@ type Row = {
   branch: string | null; cwd: string; startedAt: Date; endedAt: Date | null; exitCode: number | null;
   endedReason: string | null; reconciledAt: Date | null;
   transcriptKey: string | null; transcriptBytes: number | null;
+  accountId: string | null;   // ADR-0234
 };
 
 // Kosakata `endedReason` hidup di @hanoman/shared bersama pembacanya (`sessionOutcome`): penulis
@@ -33,7 +34,7 @@ const view = (r: Row): SessionHistoryView => ({
   kind: r.kind, flow: r.flow, agent: r.agent, model: r.model, effort: r.effort, branch: r.branch,
   cwd: r.cwd, startedAt: r.startedAt.toISOString(), endedAt: r.endedAt?.toISOString() ?? null,
   endedReason: r.endedReason, reconciledAt: r.reconciledAt?.toISOString() ?? null,
-  exitCode: r.exitCode, transcriptBytes: r.transcriptBytes,
+  exitCode: r.exitCode, transcriptBytes: r.transcriptBytes, accountId: r.accountId,
 });
 
 // Judul spec ikut disalin sebagai SNAPSHOT: riwayat harus tetap terbaca setelah spec-nya dihapus,
@@ -50,6 +51,7 @@ export async function beginSession(b: SessionBirth): Promise<void> {
       id: randomUUID(), sessionId: b.sessionId, projectId: b.projectId, specId: b.specId ?? null,
       title: await titleFor(b.specId), kind: b.kind, flow: b.flow ?? null, agent: b.agent,
       model: b.model ?? null, effort: b.effort ?? null, branch: b.branch ?? null, cwd: b.cwd,
+      accountId: b.accountId ?? null,   // ADR-0234
     },
   });
 }
@@ -246,11 +248,12 @@ export async function reconciledSpecIdsSince(cutoff: Date): Promise<string[]> {
 // S4c · runtime SAAT LAHIR sesi yang direkonsiliasi, per spec (baris terbaru pada sapuan ini).
 // Auto-resume (ADR-0169) melanjutkan sesi yang SAMA (ADR-0084): agen/model/effort-nya ikut, bukan
 // Setting global — sesi codex tak boleh lanjut sebagai claude. Nilai null tak diteruskan.
-export type SessionRuntime = { agent: "claude" | "codex" | "antigravity"; model?: string; effort?: string };
+// ADR-0234 · `accountId` ikut: resume melanjutkan sesi dengan akun runtime yang SAMA.
+export type SessionRuntime = { agent: "claude" | "codex" | "antigravity"; model?: string; effort?: string; accountId?: string };
 export async function reconciledRuntimesSince(cutoff: Date): Promise<Map<string, SessionRuntime>> {
   const rows = await prisma.sessionHistory.findMany({
     where: { endedReason: RECONCILED, reconciledAt: { gte: cutoff }, specId: { not: null } },
-    select: { specId: true, agent: true, model: true, effort: true },
+    select: { specId: true, agent: true, model: true, effort: true, accountId: true },
     orderBy: { startedAt: "desc" },
   });
   const out = new Map<string, SessionRuntime>();
@@ -260,6 +263,7 @@ export async function reconciledRuntimesSince(cutoff: Date): Promise<Map<string,
       // `agent` kolom String — nilai asing jatuh ke claude, cermin pembacaan @hanoman_agent (pty.ts).
       agent: r.agent === "antigravity" ? "antigravity" : r.agent === "codex" ? "codex" : "claude",
       ...(r.model ? { model: r.model } : {}), ...(r.effort ? { effort: r.effort } : {}),
+      ...(r.accountId ? { accountId: r.accountId } : {}),
     });
   }
   return out;

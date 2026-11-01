@@ -160,4 +160,34 @@ export const SETTINGS_TOOLS: readonly McpToolDef[] = [
     build: (a) => ({ method: "POST", path: `/scheduler/queue/${enc(String(a.item))}/requeue` }),
     shape: (raw) => raw,
   },
+  // ADR-0234 · akun runtime. Hanya baca & set default — tambah/hapus/login akun tetap di dashboard
+  // (COOKIE_ONLY: pengelolaan kredensial dan login OAuth butuh manusia di browser).
+  {
+    name: "hanoman_runtime_accounts_list",
+    title: "Daftar akun runtime",
+    description:
+      "Akun langganan Claude Code/Codex/Antigravity yang terdaftar di mesin ini — termasuk akun bawaan `default:<runtime>` — dengan status login (belum-login|aktif|perlu-login-ulang), email & paket, drift konfigurasi, dan akun mana yang jadi default tiap runtime. `id`-nya dipakai di `account` pada hanoman_session_create. Menambah/menghapus/login akun hanya lewat dashboard.",
+    inputSchema: obj({ properties: {} }),
+    mode: "read", capability: "settings:read",
+    samplePath: "/runtime-accounts", sampleMethod: "GET",
+    build: () => ({ method: "GET", path: "/runtime-accounts" }),
+    shape: (raw) => raw,
+  },
+  {
+    name: "hanoman_runtime_account_default_set",
+    title: "Set akun default runtime",
+    description:
+      "Menjadikan satu akun sebagai default runtime-nya untuk SETIAP sesi baru di mesin ini, termasuk sesi otomatis (scheduler, lead, reverse/prd). `accountId` dari hanoman_runtime_accounts_list; `default:<runtime>` mengembalikan ke akun bawaan. Sesi yang sedang berjalan tak berubah. Ditolak 409 bila runtime akun tak cocok atau sandbox sesi aktif (hanya akun bawaan).",
+    inputSchema: obj({
+      properties: {
+        runtime: enumStr(["claude", "codex", "antigravity"], "Runtime yang default-nya diubah."),
+        accountId: str("Id akun dari hanoman_runtime_accounts_list."),
+      },
+      required: ["runtime", "accountId"],
+    }),
+    mode: "write", capability: "settings:write",
+    samplePath: "/runtime-accounts/default", sampleMethod: "PUT",
+    build: (a) => ({ method: "PUT", path: "/runtime-accounts/default", body: { runtime: String(a.runtime), accountId: String(a.accountId) } }),
+    shape: (raw) => raw,
+  },
 ];

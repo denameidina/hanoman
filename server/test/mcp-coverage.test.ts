@@ -48,6 +48,13 @@ const UNWRAPPED = new Map<string, string>([
   ["GET /auth/status", "PUBLIK dan dijawab tanpa auth; `user` selalu null untuk agent token — tak ada isi untuk agen (hanoman_about / GET /health untuk probe)"],
   ["POST /auth/setup", "bootstrap akun pertama + cookie sesi + setup token di berkas HANOMAN_HOME; bukan operasi agen"],
   ["POST /auth/login", "menerbitkan cookie sesi untuk browser; agen tak punya sesi cookie (kredensialnya agent token)"],
+  // ADR-0234 · akun runtime: menyentuh kredensial langganan di mesin ini; login butuh manusia di browser
+  // OAuth. Semuanya COOKIE_ONLY di capabilityForRoute.
+  ["POST /runtime-accounts", "membuat direktori kredensial akun langganan di mesin ini — pengelolaan kredensial milik manusia"],
+  ["PATCH /runtime-accounts/:id", "mengelola akun kredensial (label) — milik manusia di dashboard, cermin POST"],
+  ["DELETE /runtime-accounts/:id", "menghapus kredensial akun langganan (direktori + Keychain) — tak boleh didelegasikan"],
+  ["POST /runtime-accounts/:id/login", "membuka sesi login OAuth yang hanya bisa diselesaikan manusia di browser"],
+  ["POST /runtime-accounts/:id/check", "menjalankan CLI agen untuk membaca status login kredensial — bagian alur login manusia"],
   ["POST /auth/logout", "menghapus cookie sesi browser; tak ada artinya untuk Bearer agent token"],
   ["GET /terminal/workspace", "tata letak tab/pane BROWSER per akun (req.user.id); agent token tak punya req.user"],
   ["PUT /terminal/workspace", "tata letak tab/pane BROWSER per akun (req.user.id); agent token tak punya req.user"],

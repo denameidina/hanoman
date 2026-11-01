@@ -9,6 +9,7 @@ import { registerBacklogSource } from "./services/scheduler/sources/backlog";
 import { registerTriaseSource } from "./services/scheduler/sources/triase";
 import { installSessionHistory, reconcileHistory } from "./services/session-history";
 import { resumeReconciledSessions } from "./services/session-boot-resume";
+import { installRuntimeAccounts } from "./services/runtime-accounts/install";
 import { installEventTap } from "./services/logs/event-log";
 import { installConsoleTap } from "./services/logs/console-tap";
 import { getSetting } from "./services/settings";
@@ -133,6 +134,8 @@ bootstrapReady.then(async () => {
   // SPEC-362 · ADR-0079 · pasang hook riwayat SEBELUM apa pun bisa melahirkan sesi, lalu tutup
   // baris "berjalan" yang panenya sudah lenyap (tmux mati di luar hanoman: kill-server, reboot).
   installSessionHistory();
+  // ADR-0234 · resolver akun runtime + snapshot SEBELUM sesi apa pun lahir dan sebelum auto-resume.
+  await installRuntimeAccounts();
   // SPEC-1215 · ADR-0166 · tap event lokal (lahir/tutup sesi). Hook sesi kini aditif, jadi ia berdiri
   // di samping riwayat sesi, bukan menggantikannya.
   installEventTap({ transcriptEnabled: async () => (await getSetting()).logShipping.transcript });

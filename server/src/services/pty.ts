@@ -168,6 +168,8 @@ export type SessionInfo = {
   model?: string; effort?: string; orchestrated?: boolean;
   /** Nama kustom yang diberi operator (rename). Absen = UI memakai label turunan (spec/flow/project). */
   name?: string;
+  /** ADR-0234 · akun runtime sesi. Absen = akun bawaan (atau sesi lama). */
+  accountId?: string;
 };
 export type Pane = SessionInfo & {
   // ADR-0161: metadata tmux internal; klasifikasi tidak mengubah hitungan semua pane hidup.
@@ -197,6 +199,8 @@ export type Pane = SessionInfo & {
   width?: number;
   height?: number;
 };
+// ADR-0234 · akun runtime yang dipakai sebuah sesi (diisi resolver layanan akun).
+export type SessionAccount = { id: string; env: Record<string, string>; unset: string[] };
 export type SessionAgentMeta = {
   id?: string; name: string; model?: string; timeoutSeconds?: number; definitionHash?: string;
   // ADR-0164 · agen fase membawa nama fasenya; effort = nilai efektif saat lahir (sudah dikoersi).
@@ -278,7 +282,8 @@ const claudeBin = () => effectiveStr("HANOMAN_CLAUDE_BIN") ?? "claude";
 export const shellBin = (): string => effectiveStr("HANOMAN_SHELL") ?? process.env.SHELL ?? "/bin/bash";
 // SPEC-338 · ADR-0074 · cermin HANOMAN_CLAUDE_BIN untuk Codex CLI.
 const codexBin = () => effectiveStr("HANOMAN_CODEX_BIN") ?? "codex";
-const agentBin = (agent: Agent): string => {
+// ADR-0234 · diekspor: perintah login & probe status akun memakai biner yang sama dengan sesi.
+export const agentBin = (agent: Agent): string => {
   if (agent === "antigravity") return antigravityBin();
   return agent === "codex" ? codexBin() : claudeBin();
 };
@@ -502,6 +507,8 @@ export const FMT = [
   "#{pane_width}", "#{pane_height}",
   // Nama kustom sesi (rename dari UI/MCP) — di UJUNG juga. Opsi tmux, jadi selamat dari restart API.
   "#{@hanoman_name}",
+  // ADR-0234 · akun runtime sesi (`RuntimeAccount.id` / `default:<runtime>`) — di UJUNG juga.
+  "#{@hanoman_account}",
 ].join("\t");
 
 // Satu-satunya sumber kebenaran soal sesi adalah tmux server. Tidak ada map yang perlu
@@ -541,7 +548,7 @@ export function parsePanes(out: string): Pane[] {
   return out.split("\n").filter(Boolean).flatMap((line) => {
     const [n, projectId, specId, flow, phaseFile, cwd, dead, code, decisionFile, branch, agent,
       alternate, activity, eventHook, created, agentRoster, launchClass, model, effort,
-      orchestrated, doneAtBirth, paneWidth, paneHeight, customName] = line.split("\t");
+      orchestrated, doneAtBirth, paneWidth, paneHeight, customName, accountRaw] = line.split("\t");
     if (!n?.startsWith(PREFIX)) return [];
     const exited = dead === "1";
     const activityAt = Number(activity);
@@ -578,6 +585,8 @@ export function parsePanes(out: string): Pane[] {
       // SPEC-1218 · AC-C2 · kosong (tmux lama tanpa kolom ini) → undefined, bukan NaN.
       width: paneWidth ? Number(paneWidth) : undefined,
       height: paneHeight ? Number(paneHeight) : undefined,
+      // ADR-0234 · sesi lama / akun bawaan tanpa opsi ini → undefined.
+      accountId: accountRaw || undefined,
       name: customName?.trim() || undefined,
     }];
   });
@@ -606,7 +615,7 @@ function parseAgentRoster(value: string | undefined): SessionAgentMeta[] {
 }
 
 const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch, decision, agent,
-  decisionFile, activityAt, model, effort, orchestrated, name }: Pane): SessionInfo => ({
+  decisionFile, activityAt, model, effort, orchestrated, name, accountId }: Pane): SessionInfo => ({
   id, projectId, specId, flow, cwd, exited, branch, decision, agent,
   // Hanya untuk pane mati: `pane_dead_status` kosong pada pane hidup, dan `exitCode: 0` di sana
   // akan terbaca sebagai "sudah berakhir sukses".
@@ -616,6 +625,7 @@ const toSessionInfo = ({ id, projectId, specId, flow, cwd, exited, code, branch,
   ...(effort ? { effort } : {}),
   ...(orchestrated ? { orchestrated: true } : {}),
   ...(name ? { name } : {}),
+  ...(accountId ? { accountId } : {}),
 });
 
 export const listSessions = (): SessionInfo[] => listPanes().map(toSessionInfo);
@@ -683,6 +693,7 @@ export function sessionEventEnv(
 export type SessionBirth = {
   sessionId: string; projectId: string; specId?: string; flow?: string; kind: SessionKind;
   agent: Agent; model?: string; effort?: string; branch?: string; cwd: string;
+  accountId?: string;   // ADR-0234
 };
 export type SessionDeath = { sessionId: string; exitCode: number | null; transcript: string | null };
 type SessionHooks = { onBirth?: (b: SessionBirth) => void; onDeath?: (d: SessionDeath) => void };
@@ -693,6 +704,14 @@ const hooks = new Set<SessionHooks>();
 export function registerSessionHooks(h: SessionHooks): () => void {
   hooks.add(h);
   return () => { hooks.delete(h); };
+}
+// ADR-0234 · akun runtime per sesi. pty tetap NOL dependensi DB: layanan akun mendaftarkan resolver
+// SINKRON (snapshot memori) saat boot — cermin registerSessionHooks. Tanpa pendaftar → akun bawaan.
+type AccountResolver = (agent: Agent, requested?: string) => SessionAccount | null;
+let accountResolver: AccountResolver = () => null;
+export function registerAccountResolver(r: AccountResolver): () => void {
+  accountResolver = r;
+  return () => { if (accountResolver === r) accountResolver = () => null; };
 }
 // Fire-and-forget: riwayat/log tak boleh memblokir atau menggagalkan kelahiran/penutupan sesi, dan
 // pendaftar yang melempar tak boleh membungkam pendaftar sesudahnya.
@@ -814,6 +833,8 @@ export type CreateOpts = {
   // rute-tanya AskUserQuestion di prompt/agen ditukar teks (`textAsk`) dan hook Stop ikut ke jalur
   // event; absen/`tool` = seperti sebelumnya. Runtime lain mengabaikannya.
   askVia?: AskVia;
+  // ADR-0234 · akun runtime pilihan pemanggil (sudah divalidasi). Kosong = default runtime.
+  accountId?: string;
 };
 
 export function createSession(projectId: string, cwd: string, opts: CreateOpts = {}): SessionInfo {
@@ -1064,6 +1085,9 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   // SPEC-338 · ADR-0074 · perbedaan CLI antar agen dirakit `agentFlags`; di sini tinggal
   // mengutip & merangkai, persis seperti sebelumnya untuk claude.
   const agent: Agent = opts.agent ?? "claude";
+  // ADR-0234 · hanya sesi AGEN; shell/console tak membawa akun. Resolver boleh melempar (agy sibuk) —
+  // itu terjadi sebelum tmux menyentuh apa pun.
+  const account = opts.command ? null : accountResolver(agent, opts.accountId);
   let argv: string;
   if (opts.command) {
     argv = opts.command.map(sq).join(" ");
@@ -1150,11 +1174,15 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   for (const [k, v] of Object.entries(agentEnvironment(runtime, opts.env ?? {}))) {
     if (v !== undefined && !(runtime === "antigravity" && ANTIGRAVITY_ENV_KEYS.some(key => key === k))) envPairs.push(`${k}=${sq(v)}`);
   }
+  // ADR-0234 · env akun runtime (CLAUDE_CONFIG_DIR / CODEX_HOME).
+  for (const [k, v] of Object.entries(account?.env ?? {})) envPairs.push(`${k}=${sq(v)}`);
   // Kredensial warisan yang dikosongkan operator: `claude` mewarisi env dari tmux server (lahir
   // dengan env server ini), jadi hanya `env -u` yang benar-benar melepasnya dari sesi baru.
   const unsets = [...(runtime === "antigravity" ? [] : ANTIGRAVITY_ENV_KEYS),
     ...(runtime === "antigravity" ? ["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"] : []),
     ...(!opts.command ? [...suppressedInheritKeys(), ...hanomanDbInheritUnsets()] : []),
+    // ADR-0234 · kredensial env yang mengalahkan login akun (CLAUDE_CODE_OAUTH_TOKEN dst).
+    ...(account?.unset ?? []),
   ].flatMap((key) => ["-u", key]);
   let cmd = unsets.length ? ["env", ...unsets, ...envPairs, argv].join(" ")
     : envPairs.length ? `${envPairs.join(" ")} ${argv}` : argv;
@@ -1209,6 +1237,7 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   if (opts.branch) tmux("set-option", "-t", name(id), "@hanoman_branch", opts.branch);
   // SPEC-338 · mesin sesi ikut tersimpan di tmux — sumber kebenaran sesi tetap tmux, bukan DB.
   tmux("set-option", "-t", name(id), "@hanoman_agent", agent);
+  if (account) tmux("set-option", "-t", name(id), "@hanoman_account", account.id);   // ADR-0234
   const kind = sessionKind({ ...opts, id }, projectId, cwd);
   // ADR-0228 · pane lead bukan pekerjaan backlog: kelas `terminal` supaya tak memakan slot cap agen.
   tmux("set-option", "-t", name(id), "@hanoman_launch_class",
@@ -1261,9 +1290,10 @@ export function createSession(projectId: string, cwd: string, opts: CreateOpts =
   emitBirth({
     sessionId: id, projectId, specId: opts.specId, flow: opts.flow,
     kind,
-    agent, model: opts.model, effort: opts.effort, branch: opts.branch, cwd,
+    agent, model: opts.model, effort: opts.effort, branch: opts.branch, cwd, accountId: account?.id,
   });
-  return { id, projectId, specId: opts.specId, flow: opts.flow, cwd, branch: opts.branch, exited: false, decision: false, agent };
+  return { id, projectId, specId: opts.specId, flow: opts.flow, cwd, branch: opts.branch, exited: false, decision: false, agent,
+    ...(account ? { accountId: account.id } : {}) };
 }
 
 // SPEC-332 · ADR-0073 — jalur KEDUA mode goal. Hook Stop (claude: `--settings`; codex: gate sh di

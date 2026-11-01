@@ -3,7 +3,7 @@
    calls the client and updates state from the response. */
 import React from "react";
 import { useModelCatalog } from "./api/model-catalog";
-import { zLaunchRejection, type LaunchRejection } from "@hanoman/shared";
+import { zLaunchRejection, type LaunchRejection, type AccountLimitsDTO } from "@hanoman/shared";
 import { BrowserRouter, useLocation, useNavigate } from "react-router-dom";
 import { parseRoute, routePath } from "./routes";
 import { STAGE_LABEL } from "./lib/labels";
@@ -29,7 +29,9 @@ import { flowForSource, isGoalShapedFlow, payloadShapeFor, codexModel, codexClie
 import { startTargets, type StartTarget, type TargetReason } from "./api/start-targets";
 // SPEC-517 · katalog runtime picker hidup di satu berkas, dipakai bersama picker "Sesi baru"
 // di halaman Terminal — dua picker yang berselisih pendapat adalah kelas bug yang sudah mahal.
-import { runtimeCoerceEffort, runtimeOptions, runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs } from "./screens/session-runtime";
+import { runtimeCoerceEffort, runtimeOptions, runtimeModelOptions, runtimeEfforts, runtimeFor, type RuntimeDefs, defaultAccountId, accountChoice } from "./screens/session-runtime";
+import { AccountField } from "./screens/AccountField";
+import { loadAccountLimits } from "./api/account-limits";
 import { useLaunchAdmission } from "./screens/use-launch-admission";
 import { AttachmentPicker } from "./screens/SpecAttachments";
 import { PhasePlanPreview } from "./screens/PhasePlanPreview";
@@ -150,6 +152,9 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   const [remoteError, setRemoteError] = React.useState<{ error: string; remoteSession?: { deviceId: string; name: string; sessionId: string | null } } | null>(null);
   // SPEC-339 · versi codex CLI terpasang; null = tak terdeteksi (dan itu tak memicu peringatan).
   const [codexVer, setCodexVer] = React.useState<string | null>(null);
+  // ADR-0234 · akun runtime mesin ini (limit + default). Kosong = field Akun tersembunyi.
+  const [accountsList, setAccountsList] = React.useState<AccountLimitsDTO[]>([]);
+  const [account, setAccount] = React.useState("");
   // ADR-0164 · matriks orkestrasi untuk pratinjau fase. Absen di respons Setting lama →
   // ORCHESTRATION_DEFAULTS (matriks bawaan, sama dengan server — S4a).
   const [orchestration, setOrchestration] = React.useState<Orchestration | undefined>(undefined);
@@ -181,6 +186,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
       };
       const a: Agent = s.agent ?? "claude";
       setDefs(d); setAgent(a); setModel(d[a].model); setEffort(d[a].effort);
+      void loadAccountLimits().then((l) => { setAccountsList(l); setAccount(defaultAccountId(l, a)); });
       // SPEC-407 · ADR-0089 · backlog goal membawa kondisinya sendiri (server menurunkannya dari
       // item), jadi (a) mode goal-nya tak boleh bisa dimatikan — itulah yang membedakan source ini
       // dari brief — dan (b) template global TIDAK ikut di-prefill: mengirimnya sebagai override
@@ -236,6 +242,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
   );
   const pickAgent = (a: Agent) => {
     setAgent(a);
+    setAccount(defaultAccountId(accountsList, a));   // ADR-0234
     setPhaseOverrides({});
     // SPEC-339 · default global bisa saja pasangan lama yang kini tak sah — koreksi saat dipasang.
     // SPEC-517 · aturannya (blok agen terpilih + koersi effort codex) hidup di session-runtime.ts,
@@ -273,6 +280,7 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
     try {
       const { id, resumed } = await targetApi.startSession({
         spec: s.id, flow, model, effort, agent,
+        ...(!isRemoteTarget ? accountChoice(accountsList, agent, account) : {}),   // ADR-0234
         ...(Object.keys(phaseOverrides).length ? { phaseOverrides } : {}),
         goal: goalOn, goalCondition: goalOn && goalCond.trim() ? goalCond.trim() : undefined,
         verifyScope, method,
@@ -351,6 +359,10 @@ export function StartSessionModal({ open, spec, onClose, onStarted, onError }:
           options={runtimeOptions}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => pickAgent(e.target.value as Agent)} />
       </Field>
+      {/* ADR-0234 · akun bersifat per mesin: start ke mesin lain (relay) memakai default mesin itu. */}
+      {!isRemoteTarget && (
+        <AccountField agent={agent} accounts={accountsList} value={account} onChange={setAccount} />
+      )}
       <Field label="Model">
         <Select aria-label="Model" value={model} className="hn-w-full"
           options={runtimeModelOptions(agent, model)}

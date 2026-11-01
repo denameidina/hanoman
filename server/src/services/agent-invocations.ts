@@ -10,6 +10,7 @@ import {
 import { prisma } from "../db";
 import { sessionEventRelayStatus } from "./session-event-relay";
 import type { PhaseInvocation } from "./session-phases";
+import { accountsRoot } from "./runtime-accounts/paths";
 
 const MAX_EXCERPT_BYTES = 4_096;
 const MAX_TRANSCRIPT_BYTES = 10 * 1024 * 1024;
@@ -67,6 +68,9 @@ const utf8Prefix = (value: string, maxBytes: number): string => {
 const transcriptRoots = (): string[] => [
   resolve(process.env.CLAUDE_CONFIG_DIR ?? `${homedir()}/.claude`),
   resolve(process.env.CODEX_HOME ?? `${homedir()}/.codex`),
+  // ADR-0234 · home akun runtime (CLAUDE_CONFIG_DIR/CODEX_HOME per sesi). Transkrip claude akun lewat
+  // symlink `projects/` tetap berada di bawah akar ini.
+  resolve(accountsRoot()),
 ];
 
 const inside = (path: string, root: string): boolean => {

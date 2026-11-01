@@ -797,6 +797,20 @@ GET      /limits/codex                  # CodexLimitsDTO { status, windows[], fe
 #   `isActive` hanya true untuk window yang disebut `rate_limit_reached_type` (codex tak punya is_active).
 #   status: ok = snapshot ≤12 jam; stale = lebih tua (tetap ditampilkan, ditandai); unavailable = belum
 #   pernah ada sesi codex yang melaporkan kuota → badge disembunyikan di UI.
+GET      /limits/accounts               # AccountLimitsDTO[] — limit per akun runtime (bawaan + terdaftar)  (ADR-0234)
+#   SENGAJA tanpa email (prefix /limits = GLOBAL_READ). Sumber sama dengan limit bawaan, diarahkan ke kredensial/
+#   home akun; tanpa refresh token → akun menganggur `stale`/`unavailable`. Akun bawaan = service lama apa adanya.
+GET      /runtime-accounts              # RuntimeAccountsListDTO { accounts[], sandbox }   settings:read (ADR-0234)
+POST     /runtime-accounts              # {runtime,label} → 201 RuntimeAccountDTO · 409 account-label-taken   COOKIE_ONLY
+PATCH    /runtime-accounts/:id          # {label} → RuntimeAccountDTO · akun bawaan → 400   COOKIE_ONLY
+DELETE   /runtime-accounts/:id          # 204 · 409 account-in-use · akun bawaan → 400      COOKIE_ONLY
+PUT      /runtime-accounts/default      # {runtime,accountId} → RuntimeAccountsListDTO     settings:write
+#   409 account-runtime-mismatch | account-sandbox-unsupported; `default:<runtime>` = kembali ke akun bawaan.
+POST     /runtime-accounts/:id/login    # {deviceAuth?} → 201 {id} sesi terminal login (perintah dirakit server)  COOKIE_ONLY
+POST     /runtime-accounts/:id/check    # → RuntimeAccountDTO (status login terbaru)       COOKIE_ONLY
+#   POST /terminal/sessions (backlog & terminal agen) menerima `account?`: 404 account-not-found,
+#   409 account-runtime-mismatch | account-not-logged-in | account-sandbox-unsupported | antigravity-account-busy.
+#   Body error akun: { error: <kode>, message }.
 GET      /limits/antigravity            # AntigravityLimitsDTO { status, windows[], fetchedAt }  (ADR-0224)
 #   Limit langganan ANTIGRAVITY CLI (`agy`). agy tak menulis kuota ke disk, jadi server membaca token
 #   OAuth agy dari Keychain macOS (go-keyring: service `gemini`, akun `antigravity`) dan memanggil
@@ -918,7 +932,7 @@ DELETE /agent-tokens/:id             # 204 · revoke (set revokedAt); 404 tak ad
 > `telegram` (ADR-0096), `team` (papan Tim: `/tasks*` + `/members*`, ADR-0157). Peta route→capability di `server/src/services/agent-capabilities.ts`:
 > GET/HEAD → `:read`, selainnya → `:write`; sub-path `/projects/:id/{docs,prds}` → `docs`,
 > `/projects/:id/{tree,file,git,status,graph,commit,compare,remotes,…}` → `ide`; WS terminal → `sessions:write`.
-> **Read-only global** (`/limits`,`/limits/codex`,`/limits/antigravity`,`/update`,`/events/ws`,`/fs/browse`,`/health`) → token
+> **Read-only global** (`/limits`,`/limits/codex`,`/limits/antigravity`,`/limits/accounts`,`/update`,`/events/ws`,`/fs/browse`,`/health`) → token
 > ber-capability apa pun — bahkan token TANPA satu pun capability — **hanya untuk method baca**
 > (SPEC-405 · ADR-0088). Keempat yang bukan WS/health punya tool MCP ber-`capability: null` (ADR-0157). **Tak-boleh-didelegasikan** (agent → 403):
 > `/auth`, `/agent-tokens`, `/device-tokens`, `/sync`, tulis `/portal` (ADR-0195; baca = `portal:read`),

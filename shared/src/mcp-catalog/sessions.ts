@@ -171,6 +171,7 @@ const MORE: readonly McpToolDef[] = [
           "Alur sesi. Wajib bila `spec` diisi. `reverse`/`prd`/`breakdown`/`scaffold` adalah sesi tingkat-project dan dipasangkan dengan `project`."),
         shell: bool("true = terminal shell biasa di repo project, tanpa agen. Hanya dengan `project`."),
         agent: enumStr(["claude", "codex", "antigravity"], "Mesin sesi. Kosong = default global."),
+        account: str("Id akun runtime dari hanoman_runtime_accounts_list (ADR-0234). Kosong = akun default runtime di mesin ini."),
         model: str("Model. Kosong = default global."),
         effort: str("Effort. Kosong = default global."),
         goal: bool("Mode goal per-sesi. Kosong = ikut setelan global."),
@@ -205,7 +206,7 @@ const MORE: readonly McpToolDef[] = [
       // 400 karena varian permisif `{project, flow: undefined}` sengaja menolak `flow` yang cacat.
       if (s(a.spec)) {
         const body: Record<string, unknown> = { spec: String(a.spec), flow: String(a.flow) };
-        for (const k of ["model", "effort", "goalCondition", "agent", "verifyScope", "method"])
+        for (const k of ["model", "effort", "goalCondition", "agent", "account", "verifyScope", "method"])
           if (s(a[k]) !== undefined) body[k] = s(a[k]);
         if (a.phaseOverrides && typeof a.phaseOverrides === "object" && !Array.isArray(a.phaseOverrides)) body.phaseOverrides = a.phaseOverrides;
         for (const k of ["goal", "force"]) if (typeof a[k] === "boolean") body[k] = a[k];
@@ -217,7 +218,7 @@ const MORE: readonly McpToolDef[] = [
       if (flow === "breakdown") return { method: "POST", path: "/terminal/sessions", body: { project, flow, prdPath: String(a.prdPath) } };
       if (flow === "reverse" || flow === "scaffold") return { method: "POST", path: "/terminal/sessions", body: { project, flow } };
       const body: Record<string, unknown> = { project };
-      for (const k of ["agent", "model", "effort", "branchFrom"]) if (s(a[k]) !== undefined) body[k] = s(a[k]);
+      for (const k of ["agent", "account", "model", "effort", "branchFrom"]) if (s(a[k]) !== undefined) body[k] = s(a[k]);
       if (typeof a.worktree === "boolean") body.worktree = a.worktree;
       return { method: "POST", path: "/terminal/sessions", body };
     },

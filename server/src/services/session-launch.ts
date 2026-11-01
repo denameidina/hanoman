@@ -95,6 +95,9 @@ export async function startSpecSession(
     // SPEC-338 · ADR-0074 · mesin sesi. undefined → ikut Setting.agent. Governor scheduler tak
     // memasoknya → ikut default global, seperti model/effort.
     agent?: Agent;
+    // ADR-0234 · akun runtime. undefined → default runtime (Setting.accounts). Auto-resume memasoknya
+    // dari SessionHistory; route dari picker Start.
+    accountId?: string;
     // SPEC-376 · ADR-0080 · scope verifikasi. undefined → ikut Setting.verifyScope (default
     // "changed"). Governor scheduler tak memasoknya → ikut default global, seperti model/effort.
     verifyScope?: VerifyScope;
@@ -300,7 +303,7 @@ export async function startSpecSession(
     // ADR-0231 · cara bertanya dikunci saat lahir: teks bila lead menjawab project ini.
     const askVia = await askViaFor(spec.projectId, agent);
     const s = createSession(spec.projectId, worktree, {
-      specId: spec.id, flow: opts.flow, model, effort, goal, agent, askVia,
+      specId: spec.id, flow: opts.flow, model, effort, goal, agent, askVia, accountId: opts.accountId,
       phaseFile: phaseFilePath(repoDir, id),
       decisionFile: decisionFilePath(repoDir, id),
       attachmentsDir: attachments.items.length ? attachments.dir : undefined,
