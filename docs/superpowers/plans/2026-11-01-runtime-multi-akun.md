@@ -96,7 +96,7 @@ rm -rf "$A" "$B"
 
 Catat hasilnya. "PUTUS" tak mengubah desain (drift terdeteksi `inspectAccountHome`), tapi wajib ditulis di ADR.
 
-- [ ] **Step 2: Claude — nama service Keychain untuk `CLAUDE_CONFIG_DIR` (operator login akun kedua)**
+- [x] **Step 2: Claude — nama service Keychain untuk `CLAUDE_CONFIG_DIR` (operator login akun kedua)**
 
 ```bash
 D="$HOME/.hanoman/accounts/claude/spike0000"; mkdir -p "$D"
@@ -108,7 +108,7 @@ CLAUDE_CONFIG_DIR="$D" claude auth status --json
 
 Expected: ada service `Claude Code-credentials-<8hex>` dan `<8hex>` = keluaran `node`. Bila berbeda, catat rumus yang benar. Task 3 Step 3 menyesuaikan `claudeKeychainService()`.
 
-- [ ] **Step 3: Claude — dialog apa yang muncul di sesi pertama config dir baru**
+- [x] **Step 3: Claude — dialog apa yang muncul di sesi pertama config dir baru**
 
 ```bash
 python3 -I -c "import json,os;d=json.load(open(os.path.expanduser('~/.claude.json')));print(sorted(k for k in d if k in ('mcpServers','hasCompletedOnboarding','lastOnboardingVersion','theme','bypassPermissionsModeAccepted','projects')))"
@@ -126,7 +126,7 @@ strings -n 6 "$AGY" | grep -nE "DefaultKeyringMarkerPath|KeyringTokenStorage|ant
 
 Uji: dengan `HOME` sementara, apakah agy memakai berkas `antigravity-oauth-token` alih-alih Keychain. Bila tak ditemukan cara bersih dalam 30 menit, keputusan = **mode tukar eksklusif** (Task 10 apa adanya). Bila ditemukan, Task 10 diganti spec lanjutan; catat di ADR.
 
-- [ ] **Step 5: Tulis ADR-0234**
+- [x] **Step 5: Tulis ADR-0234**
 
 Buat `internal/docs/adr/0234-multi-akun-runtime.md`:
 
@@ -177,7 +177,7 @@ itu mengganti akun untuk semua sesi di mesin.
 
 Ganti setiap `<…>` dengan hasil Step 1–4 (jangan biarkan placeholder).
 
-- [ ] **Step 6: Tautkan di index**
+- [x] **Step 6: Tautkan di index**
 
 Di `internal/docs/README.md`, sesudah baris `- [0233 — Fase Mockup …](…)`, tambahkan:
 
@@ -187,7 +187,7 @@ Di `internal/docs/README.md`, sesudah baris `- [0233 — Fase Mockup …](…)`,
 
 (Salin bentuk tautan persis dari baris 0233 di atasnya bila awalan path-nya berbeda.)
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 /usr/bin/git add internal/docs/adr/0234-multi-akun-runtime.md internal/docs/README.md docs/superpowers/plans/2026-11-01-runtime-multi-akun.md
@@ -3476,7 +3476,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 **Files:**
 - Modify: `internal/skills/hanoman/SKILL.md`, `CLAUDE.md`, `internal/docs/README.md` (bila ada entri lain yang perlu ditautkan)
 
-- [ ] **Step 1: SKILL.md**
+- [x] **Step 1: SKILL.md**
 
 Di `internal/skills/hanoman/SKILL.md`, sesudah butir "**Dua agen** (SPEC-338/ADR-0074) …", tambahkan butir:
 
@@ -3498,11 +3498,11 @@ Di `internal/skills/hanoman/SKILL.md`, sesudah butir "**Dua agen** (SPEC-338/ADR
 
 Pada kalimat "**Sebelas** grup snapshot GLOBAL …", tambahkan `accountLimits (ADR-0234)` ke daftar grup (jangan mengubah hitungan lain tanpa memverifikasi `GROUPS` di `events.ts`).
 
-- [ ] **Step 2: CLAUDE.md**
+- [x] **Step 2: CLAUDE.md**
 
 Di `CLAUDE.md` bagian Konteks, ubah "tiga belas grup snapshot global — termasuk … serta `antigravityLimits`, limit Antigravity CLI (ADR-0224)" menjadi "empat belas grup snapshot global — termasuk … `antigravityLimits`, limit Antigravity CLI (ADR-0224), serta `accountLimits`, limit per akun runtime (ADR-0234)". Verifikasi hitungannya dengan `grep -c "build: async" server/src/services/events.ts` dibandingkan sebelum/sesudah.
 
-- [ ] **Step 3: Test seluruh set yang tersentuh**
+- [x] **Step 3: Test seluruh set yang tersentuh**
 
 ```bash
 /usr/bin/git diff --name-only main...HEAD | grep -E "\.test\.tsx?$"
